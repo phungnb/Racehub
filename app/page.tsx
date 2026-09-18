@@ -1,0 +1,228 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
+import ChallengeTab from '@/components/ChallengeTab'
+import ClubTab from '@/features/club/components/ClubTab'
+import RunTab from '@/components/RunTab'
+import FeedTab from '@/components/FeedTab'
+import AuthScreen from '@/components/AuthScreen'
+import ProfileTab from '@/components/ProfileTab' // <--- Import component Profile vừa tạo
+
+// Định nghĩa từ điển đa ngôn ngữ (Localization Dictionary)
+const translations = {
+  vi: {
+    brand: "RACEHUB",
+    level: "Thành viên chính thức",
+    xp: "Kinh nghiệm (XP)",
+    xu: "Tài sản (Xu)",
+    profileTitle: "Hồ sơ cá nhân",
+    displayName: "Tên hiển thị (Leaderboard)",
+    stravaStatus: "Trạng thái kết nối nguồn dữ liệu",
+    nav: { home: "Home", challenge: "Challenge", run: "Run", club: "Club", profile: "Profile" }
+  },
+  en: {
+    brand: "RACEHUB",
+    level: "Official Member",
+    xp: "Experience (XP)",
+    xu: "Tokens (Xu)",
+    profileTitle: "Runner Profile",
+    displayName: "Display Name (Leaderboard)",
+    stravaStatus: "Data Source Connection Status",
+    nav: { home: "Home", challenge: "Challenge", run: "Run", club: "Club", profile: "Profile" }
+  }
+}
+
+export default function RaceHubApp() {
+  const [currentTab, setCurrentTab] = useState<'home' | 'challenge' | 'run' | 'club' | 'profile'>('home')
+  const [lang, setLang] = useState<'vi' | 'en'>('vi')
+  const [profile, setProfile] = useState<any>(null)
+  const [clubs, setClubs] = useState<any[]>([])
+  const t = translations[lang]
+  const [session, setSession] = useState<any>(null)
+  const [loadingAuth, setLoadingAuth] = useState(true)
+
+  useEffect(() => {
+    async function loadData() {
+      const { data } = await supabase.from('profiles').select('*').limit(1).maybeSingle()
+      if (data) {
+        setProfile(data)
+      } else {
+        const newUserId = crypto.randomUUID()
+        const defaultProfile = {
+          id: newUserId,
+          display_name: 'Nguyễn Bá Phụng',
+          xu: 500,
+          xp: 1200,
+          level: 3
+        }
+        const { error: insertError } = await supabase.from('profiles').insert(defaultProfile)
+        if (!insertError) setProfile(defaultProfile)
+      }
+
+      const { data: clubData } = await supabase.from('clubs').select('*').order('name', { ascending: true })
+      if (clubData) setClubs(clubData)
+    }
+    loadData()
+  }, [])
+
+  const handleProfileUpdated = () => {
+    async function reloadProfile() {
+      const { data } = await supabase.from('profiles').select('*').limit(1).maybeSingle()
+      if (data) setProfile(data)
+    }
+    reloadProfile()
+  }
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setLoadingAuth(false)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      setLoadingAuth(false)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  if (loadingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-orange-500 font-bold text-sm">
+        Đang khởi tạo bảo mật RaceHub...
+      </div>
+    )
+  }
+
+  if (!session) {
+    return <AuthScreen onAuthSuccess={() => window.location.reload()} />
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-white flex justify-center selection:bg-orange-500 selection:text-white">
+      <div className="w-full max-w-md bg-slate-950 min-h-screen border-x border-slate-900 flex flex-col shadow-2xl relative">
+        
+        {/* HEADER CỐ ĐỊNH */}
+        <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-5 py-3.5 flex justify-between items-center">
+          <h1 className="text-lg font-black tracking-wider text-orange-500 flex items-center gap-2">
+            {t.brand} <span className="text-[9px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full">v1.0</span>
+          </h1>
+          
+          <div className="flex items-center gap-2.5">
+            <button 
+              onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')}
+              className="text-xs bg-slate-900 border border-slate-800 hover:border-orange-500 text-slate-300 px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer"
+            >
+              🌐 {lang.toUpperCase()}
+            </button>
+            <span className="text-xs bg-slate-900 border border-slate-800 px-3 py-1 rounded-full text-slate-300 font-semibold">
+              ⚡ {profile?.xp || 0} XP
+            </span>
+          </div>
+        </header>
+
+        {/* NỘI DUNG TỪNG TAB */}
+        <main className="flex-1 p-5 space-y-4 pb-32 overflow-y-auto">
+          {currentTab === 'home' && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+                <div className="flex items-center space-x-4">
+                  <div className="w-14 h-14 bg-gradient-to-tr from-orange-500 to-amber-400 rounded-full flex items-center text-xl font-bold justify-center text-slate-950 shadow-lg">
+                    {profile?.display_name?.charAt(0) || 'R'}
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold">{profile?.display_name || 'Runner'}</h2>
+                    <p className="text-xs text-slate-400">Level {profile?.level || 1} • {t.level}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+                    <span className="text-[11px] text-slate-400 block">{t.xp}</span>
+                    <span className="text-base font-extrabold text-orange-400">{profile?.xp || 0} XP</span>
+                  </div>
+                  <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+                    <span className="text-[11px] text-slate-400 block">{t.xu}</span>
+                    <span className="text-base font-extrabold text-amber-400">{profile?.xu || 0} Xu</span>
+                  </div>
+                </div>
+              </div>
+              <FeedTab profile={profile} />
+            </div>
+          )}
+
+          {currentTab === 'challenge' && (
+            <div className="space-y-4 animate-fadeIn">
+              <ChallengeTab profile={profile} challengeSubView="discover" setChallengeSubView={() => {}} />
+            </div>
+          )}
+
+          {currentTab === 'run' && (
+            <div className="space-y-4 animate-fadeIn">
+              <RunTab profile={profile} onActivitySaved={() => console.log("Đã lưu hoạt động")} />
+            </div>
+          )}
+
+          {currentTab === 'club' && (
+            <div className="space-y-4 animate-fadeIn">
+              <ClubTab profile={profile} onProfileUpdated={handleProfileUpdated} />
+            </div>
+          )}
+
+          {/* GỌI COMPONENT PROFILE TAB ĐÃ ĐƯỢC TÁCH */}
+          {currentTab === 'profile' && (
+            <ProfileTab profile={profile} t={t} />
+          )}
+        </main>
+
+        {/* THANH ĐIỀU HƯỚNG DƯỚI CỐ ĐỊNH */}
+        <nav className="absolute bottom-0 left-0 right-0 bg-slate-950/95 backdrop-blur-lg border-t border-slate-800 py-3 px-4 z-50 shadow-2xl">
+          <div className="max-w-md mx-auto grid grid-cols-5 gap-1 text-center items-center">
+            <button 
+              onClick={() => setCurrentTab('home')}
+              className={`flex flex-col items-center py-1 transition-colors cursor-pointer ${currentTab === 'home' ? 'text-orange-500 font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <span className="text-lg">🏠</span>
+              <span className="text-[10px]">{t.nav.home}</span>
+            </button>
+            
+            <button 
+              onClick={() => setCurrentTab('challenge')}
+              className={`flex flex-col items-center py-1 transition-colors cursor-pointer ${currentTab === 'challenge' ? 'text-orange-500 font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <span className="text-lg">🎯</span>
+              <span className="text-[10px]">{t.nav.challenge}</span>
+            </button>
+
+            <div className="flex justify-center">
+              <button 
+                onClick={() => setCurrentTab('run')}
+                className={`w-12 h-12 rounded-full flex flex-col items-center justify-center shadow-lg transition-transform transform active:scale-95 cursor-pointer ${currentTab === 'run' ? 'bg-orange-600 text-white ring-4 ring-orange-500/30' : 'bg-gradient-to-tr from-orange-500 to-amber-400 text-slate-950 hover:opacity-90'}`}
+              >
+                <span className="text-xl">⚡</span>
+              </button>
+            </div>
+
+            <button 
+              onClick={() => setCurrentTab('club')}
+              className={`flex flex-col items-center py-1 transition-colors cursor-pointer ${currentTab === 'club' ? 'text-orange-500 font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <span className="text-lg">🛡️</span>
+              <span className="text-[10px]">{t.nav.club}</span>
+            </button>
+
+            <button 
+              onClick={() => setCurrentTab('profile')}
+              className={`flex flex-col items-center py-1 transition-colors cursor-pointer ${currentTab === 'profile' ? 'text-orange-500 font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <span className="text-lg">👤</span>
+              <span className="text-[10px]">{t.nav.profile}</span>
+            </button>
+          </div>
+        </nav>
+
+      </div>
+    </div>
+  )
+}
