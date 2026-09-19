@@ -397,3 +397,20 @@ export function clubErrorMessage(e: any): string {
   if (e?.code === '42501') return 'Bạn không có quyền thực hiện thao tác này.'
   return raw || 'Không thực hiện được. Hãy thử lại.'
 }
+export interface MyClubMembership {
+  club: Club
+  role: ClubRole
+  status: MemberStatus
+}
+
+export async function listMyClubMemberships(userId: string): Promise<MyClubMembership[]> {
+  const { data, error } = await supabase
+    .from('club_members')
+    .select('role, status, club:clubs(*)')
+    .eq('user_id', userId)
+    .in('status', ['APPROVED', 'PENDING', 'BANNED'])
+  if (error) throw error
+  return (data ?? [])
+    .filter((r: any) => r.club)
+    .map((r: any) => ({ club: r.club as Club, role: r.role as ClubRole, status: r.status as MemberStatus }))
+}

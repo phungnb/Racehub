@@ -22,9 +22,9 @@ import {
   joinClub,
   listClubs,
   listMembers,
-  listMyMemberships, // MỚI: xem hướng dẫn thêm vào ../api
+  listMyClubMemberships, // MỚI: xem hướng dẫn thêm vào ../api
   removeMember,
-  type MyMembership,
+  type MyClubMembership,
 } from '../api'
 
 interface ClubTabProps {
@@ -106,7 +106,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
   const [showInvite, setShowInvite] = useState(false)
 
   // CLB của tôi
-  const [memberships, setMemberships] = useState<MyMembership[]>([])
+  const [memberships, setMemberships] = useState<MyClubMembership[]>([])
   const [mineLoading, setMineLoading] = useState(true)
   const [activeMineId, setActiveMineId] = useState<string | null>(null)
   const discoverRef = useRef<HTMLElement>(null)
@@ -134,7 +134,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
   const refreshMine = useCallback(async () => {
     if (!userId) return
     try {
-      setMemberships(await listMyMemberships(userId))
+      setMemberships(await listMyClubMemberships(userId))
     } catch (e) {
       show(clubErrorMessage(e), 'err')
     } finally {
@@ -666,7 +666,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
                         {club.name}
                       </span>
                       <span className="block text-[10px] text-slate-400 truncate">
-                        {club.description ?? 'Câu lạc bộ tập luyện cộng đồng.'}
+                        {club.description || 'Câu lạc bộ tập luyện cộng đồng.'}
                       </span>
                       <span className="block text-[10px] text-slate-500 mt-0.5">
                         {club.member_count}/{club.member_limit} thành viên
