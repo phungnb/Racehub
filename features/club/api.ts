@@ -1,7 +1,7 @@
 // features/club/api.ts
 // Lớp truy cập dữ liệu toàn diện cho module CLB (Hợp nhất từ clubApi.ts và clubSettingsApi.ts)
 
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/shared/lib/supabase'
 
 export type ClubRole = 'OWNER' | 'VICE_OWNER' | 'CONTENT_ADMIN' | 'CHALLENGE_ADMIN' | 'CAPTAIN' | 'MEMBER'
 export type MemberStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'BANNED'
@@ -218,10 +218,12 @@ export async function joinClub(clubId: string): Promise<ClubMember> {
   return normalizeMember(data)
 }
 
-export async function joinClubByCode(code: string): Promise<ClubMember> {
+export async function joinClubByCode(code: string) {
+  // Bắt buộc phải dùng key là 'p_code' vì SQL function đang khai báo nhận biến p_code
   const { data, error } = await supabase.rpc('join_club_by_code', { p_code: code })
+  
   if (error) throw error
-  return normalizeMember(data)
+  return data
 }
 
 export async function setMemberStatus(memberId: string, status: MemberStatus) {

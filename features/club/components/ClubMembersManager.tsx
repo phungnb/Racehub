@@ -14,7 +14,7 @@ import {
   type ClubMember,
   type ClubRole,
   type MemberStatus
-} from '../../api';
+} from '../api';
 
 interface Props {
   clubId: string

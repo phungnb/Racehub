@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/shared/lib/supabase'
 
 export default function AuthScreen({ onAuthSuccess }: { onAuthSuccess: () => void }) {
   const [isLogin, setIsLogin] = useState(true)

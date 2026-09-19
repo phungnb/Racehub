@@ -1,5 +1,5 @@
-import { supabase } from '@/lib/supabase'
-import { processActivityThroughRaceHubEngine } from '@/lib/racehubEngine'
+import { supabase } from '@/shared/lib/supabase'
+import { processActivityThroughRaceHubEngine } from '@/shared/lib/racehubEngine'
 
 /**
  * Giả lập luồng đồng bộ bài chạy thực tế từ Strava cho một User

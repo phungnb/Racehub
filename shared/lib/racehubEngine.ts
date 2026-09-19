@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/shared/lib/supabase'
 
 /**
  * RACEHUB ENGINE - CHẠY NGẨM XỬ LÝ BÀI CHẠY VÀ CẬP NHẬT TIẾN ĐỘ THỬ THÁCH

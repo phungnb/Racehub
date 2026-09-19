@@ -1,13 +1,14 @@
 'use client'
-
-import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import ChallengeTab from '@/components/ChallengeTab'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { supabase } from '@/shared/lib/supabase'
+import ChallengeTab from '@/features/challenge/components/ChallengeTab'
 import ClubTab from '@/features/club/components/ClubTab'
-import RunTab from '@/components/RunTab'
-import FeedTab from '@/components/FeedTab'
-import AuthScreen from '@/components/AuthScreen'
-import ProfileTab from '@/components/ProfileTab' // <--- Import component Profile vừa tạo
+import RunTab from '@/features/run/components/RunTab'
+import FeedTab from '@/features/feed/components/FeedTab'
+import AuthScreen from '@/features/auth/components/AuthScreen'
+import ProfileTab from '@/features/profile/components/ProfileTab'
+import { joinClubByCode } from '@/features/club/api'
 
 // Định nghĩa từ điển đa ngôn ngữ (Localization Dictionary)
 const translations = {
@@ -33,8 +34,45 @@ const translations = {
   }
 }
 
+// Tách SearchParamHandler ra ngoài component chính để bọc Suspense an toàn cho Next.js build
+function SearchParamHandler({ 
+  setInitialClubId, 
+  setCurrentTab,
+  session 
+}: { 
+  setInitialClubId: (id: string) => void, 
+  setCurrentTab: (tab: any) => void,
+  session: any
+}) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  useEffect(() => {
+    // 1. Kiểm tra nếu có pending_join_code (sau khi đăng nhập xong từ link mời)
+    const pendingCode = sessionStorage.getItem('pending_join_code')
+    if (pendingCode && session) {
+      sessionStorage.removeItem('pending_join_code')
+      // Điều hướng trực tiếp về trang xử lý join club với code đó
+      router.replace(`/club/join/${pendingCode}`)
+      return
+    }
+
+    // 2. Xử lý query param thông thường (?tab=club&clubId=...)
+    const tab = searchParams.get('tab')
+    const clubId = searchParams.get('clubId')
+    if (tab === 'club' && clubId) {
+      setCurrentTab('club')
+      setInitialClubId(clubId)
+      router.replace('/')
+    }
+  }, [searchParams, router, setInitialClubId, setCurrentTab, session])
+
+  return null
+}
+
 export default function RaceHubApp() {
   const [currentTab, setCurrentTab] = useState<'home' | 'challenge' | 'run' | 'club' | 'profile'>('home')
+  const [initialClubId, setInitialClubId] = useState<string | null>(null)
   const [lang, setLang] = useState<'vi' | 'en'>('vi')
   const [profile, setProfile] = useState<any>(null)
   const [clubs, setClubs] = useState<any[]>([])
@@ -90,18 +128,32 @@ export default function RaceHubApp() {
 
   if (loadingAuth) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-orange-500 font-bold text-sm">
-        Đang khởi tạo bảo mật RaceHub...
+      <div className="min-h-screen bg-slate-950 text-white flex justify-center selection:bg-orange-500 selection:text-white">
+        <div className="w-full max-w-md bg-slate-950 min-h-screen border-x border-slate-900 flex flex-col shadow-2xl relative items-center justify-center text-orange-500 font-bold text-xs"> 
+          Đang khởi tạo bảo mật RaceHub...
+        </div>
       </div>
     )
   }
 
   if (!session) {
-    return <AuthScreen onAuthSuccess={() => window.location.reload()} />
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex justify-center selection:bg-orange-500 selection:text-white">
+        <Suspense fallback={null}>
+          <SearchParamHandler setInitialClubId={setInitialClubId} setCurrentTab={setCurrentTab} session={session} />
+        </Suspense>
+        <div className="w-full max-w-md bg-slate-950 min-h-screen border-x border-slate-900 flex flex-col shadow-2xl relative">
+          <AuthScreen onAuthSuccess={() => window.location.reload()} />
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex justify-center selection:bg-orange-500 selection:text-white">
+      <Suspense fallback={null}>
+        <SearchParamHandler setInitialClubId={setInitialClubId} setCurrentTab={setCurrentTab} session={session} />
+      </Suspense>
       <div className="w-full max-w-md bg-slate-950 min-h-screen border-x border-slate-900 flex flex-col shadow-2xl relative">
         
         {/* HEADER CỐ ĐỊNH */}
@@ -166,11 +218,10 @@ export default function RaceHubApp() {
 
           {currentTab === 'club' && (
             <div className="space-y-4 animate-fadeIn">
-              <ClubTab profile={profile} onProfileUpdated={handleProfileUpdated} />
+              <ClubTab profile={profile} onProfileUpdated={handleProfileUpdated} initialClubId={initialClubId} />
             </div>
           )}
 
-          {/* GỌI COMPONENT PROFILE TAB ĐÃ ĐƯỢC TÁCH */}
           {currentTab === 'profile' && (
             <ProfileTab profile={profile} t={t} />
           )}

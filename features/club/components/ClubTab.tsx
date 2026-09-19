@@ -1,11 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/shared/lib/supabase'
 
 // Import components từ cổng xuất chuẩn hoặc đường dẫn tính năng
 import ClubMembersManager from '@/features/club/components/ClubMembersManager'
-import ClubSettings, { ClubAvatar} from '@/features/club/components/clubSettings'
+import ClubSettings, { ClubAvatar } from './ClubSettings'
+import MyClubsRail from './MyClubsRail'
 
 // Import toàn bộ API từ module features/club thay vì @/lib/clubApi
 import {
@@ -21,20 +22,21 @@ import {
   joinClub,
   listClubs,
   listMembers,
-  outranks,
+  listMyMemberships, // MỚI: xem hướng dẫn thêm vào ../api
   removeMember,
-  setMemberRole,
-  setMemberStatus,
-  transferOwnership,
-} from '../../api';
+  type MyMembership,
+} from '../api'
+
 interface ClubTabProps {
   profile: any
   onProfileUpdated: () => void
+  initialClubId?: string | null
 }
 
 type SubTab = 'overview' | 'leaderboard' | 'activities' | 'members' | 'settings'
 
 const CONTRIBUTION = 10
+const PAGE_SIZE = 12
 
 /* ================================================================= */
 /* Toast — thay alert(). alert() khoá luồng và không nói được gì     */
@@ -74,8 +76,6 @@ function Toast({ toast }: { toast: { text: string; tone: 'ok' | 'err' } | null }
 
 /* ================================================================= */
 
-const initials = (name?: string | null) => (name ?? 'U').trim().charAt(0).toUpperCase()
-
 function RoleBadge({ role }: { role: ClubRole }) {
   const tone =
     role === 'OWNER'
@@ -93,6 +93,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
 
   const [clubs, setClubs] = useState<Club[]>([])
   const [search, setSearch] = useState('')
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [selectedClubId, setSelectedClubId] = useState<string | null>(null)
   const [clubDetail, setClubDetail] = useState<Club | null>(null)
   const [members, setMembers] = useState<ClubMember[]>([])
@@ -103,6 +104,12 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
   const [newClubName, setNewClubName] = useState('')
   const [newClubDesc, setNewClubDesc] = useState('')
   const [showInvite, setShowInvite] = useState(false)
+
+  // CLB của tôi
+  const [memberships, setMemberships] = useState<MyMembership[]>([])
+  const [mineLoading, setMineLoading] = useState(true)
+  const [activeMineId, setActiveMineId] = useState<string | null>(null)
+  const discoverRef = useRef<HTMLElement>(null)
 
   /* --------------------------- Danh sách CLB --------------------------- */
 
@@ -121,6 +128,47 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
     const t = setTimeout(() => { refreshClubs(search) }, search ? 300 : 0)
     return () => clearTimeout(t)
   }, [search, refreshClubs])
+
+  /* ------------------------ CLB tôi đã tham gia ------------------------ */
+
+  const refreshMine = useCallback(async () => {
+    if (!userId) return
+    try {
+      setMemberships(await listMyMemberships(userId))
+    } catch (e) {
+      show(clubErrorMessage(e), 'err')
+    } finally {
+      setMineLoading(false)
+    }
+  }, [userId, show])
+
+  // Tải lần đầu và mỗi khi quay lại từ màn chi tiết (vai trò/thành viên có thể đã đổi)
+  useEffect(() => {
+    if (!selectedClubId) refreshMine()
+  }, [selectedClubId, refreshMine])
+
+  const myApproved = useMemo(
+    () =>
+      memberships
+        .filter((m) => m.status === 'APPROVED')
+        .sort(
+          (a, b) =>
+            Number(isStaff(b.role)) - Number(isStaff(a.role)) ||
+            a.club.name.localeCompare(b.club.name, 'vi'),
+        ),
+    [memberships],
+  )
+  const statusByClub = useMemo(
+    () => new Map(memberships.map((m) => [m.club.id, m.status])),
+    [memberships],
+  )
+
+  // Giữ CLB đang chọn trên thanh biểu tượng; mặc định là CLB đầu tiên
+  useEffect(() => {
+    setActiveMineId((prev) =>
+      prev && myApproved.some((m) => m.club.id === prev) ? prev : myApproved[0]?.club.id ?? null,
+    )
+  }, [myApproved])
 
   /* --------------------------- Chi tiết CLB ---------------------------- */
 
@@ -234,6 +282,14 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
       show(row.status === 'APPROVED' ? 'Bạn đã vào Câu lạc bộ.' : 'Đã gửi yêu cầu, chờ Chủ nhiệm duyệt.')
     })
 
+  // Tham gia ngay từ danh sách khám phá, không cần mở chi tiết
+  const handleQuickJoin = (clubId: string) =>
+    run(`join:${clubId}`, async () => {
+      const row = await joinClub(clubId)
+      show(row.status === 'APPROVED' ? 'Bạn đã vào Câu lạc bộ.' : 'Đã gửi yêu cầu, chờ Chủ nhiệm duyệt.')
+      await Promise.all([refreshMine(), refreshClubs(search)])
+    })
+
   const handleLeave = () => {
     if (!myMembership) return
     if (!confirm('Rời khỏi Câu lạc bộ này?')) return
@@ -253,7 +309,9 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
       show(`Đã góp ${CONTRIBUTION} Xu vào quỹ.`)
     })
 
-  const inviteLink = `${window.location.origin}/club/join/${clubDetail?.invite_code ?? ''}`
+  const inviteLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/club/join/${
+    clubDetail?.invite_code ?? ''
+  }`
 
   const copyInvite = async () => {
     try {
@@ -263,6 +321,8 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
       show('Trình duyệt chặn sao chép. Hãy chọn và copy thủ công.', 'err')
     }
   }
+
+  const scrollToDiscover = () => discoverRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   /* ===================== MÀN CHI TIẾT CÂU LẠC BỘ ====================== */
 
@@ -289,9 +349,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center space-x-3 min-w-0">
-                  <div className="w-12 h-12 shrink-0 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl flex items-center text-lg font-black justify-center text-white shadow-md">
-                    {clubDetail.name.substring(0, 2).toUpperCase()}
-                  </div>
+                  <ClubAvatar club={clubDetail} size={48} />
                   <div className="min-w-0">
                     <h2 className="text-sm font-bold text-white truncate">{clubDetail.name}</h2>
                     <p className="text-[10px] text-slate-400 truncate">
@@ -368,6 +426,14 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
             {/* ---------------------- TỔNG QUAN ---------------------- */}
             {subTab === 'overview' && (
               <div className="space-y-4 animate-fadeIn">
+                {/* Thông báo ghim (đặt trong tab Cài đặt, hiển thị ở đây cho mọi thành viên) */}
+                {clubDetail.announcement && (
+                  <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-4 space-y-1">
+                    <span className="text-[10px] font-bold text-orange-400 block">Thông báo ghim</span>
+                    <p className="text-xs text-slate-200 whitespace-pre-line">{clubDetail.announcement}</p>
+                  </div>
+                )}
+
                 <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3 shadow-xl">
                   <span className="text-[10px] text-slate-400 block">Quỹ Câu lạc bộ</span>
                   <div className="flex justify-between items-center gap-3">
@@ -480,8 +546,12 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
 
   /* ========================= MÀN DANH SÁCH ========================== */
 
+  const myIds = new Set(myApproved.map((m) => m.club.id))
+  const discover = clubs.filter((c) => !myIds.has(c.id))
+  const shown = discover.slice(0, visibleCount)
+
   return (
-    <div className="space-y-4 animate-fadeIn text-xs">
+    <div className="space-y-6 animate-fadeIn text-xs">
       <Toast toast={toast} />
 
       <div className="flex justify-between items-center gap-3">
@@ -493,13 +563,6 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
           {isCreating ? 'Đóng' : 'Thành lập CLB'}
         </button>
       </div>
-
-      <input
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Tìm Câu lạc bộ theo tên…"
-        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-orange-500"
-      />
 
       {isCreating && (
         <form onSubmit={handleCreateClub} className="bg-slate-900 border border-orange-500/50 rounded-2xl p-4 space-y-3 shadow-xl animate-fadeIn">
@@ -540,44 +603,112 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
         </form>
       )}
 
-      <div className="space-y-3">
-        {clubs.length === 0 ? (
+      {/* ══════════ 1. CLB CỦA TÔI (luôn ở trên cùng) ══════════ */}
+      <section aria-labelledby="my-clubs" className="space-y-2">
+        <h3 id="my-clubs" className="text-sm font-bold text-white">
+          CLB của tôi
+          {myApproved.length > 0 && <span className="ml-1.5 text-slate-500 font-medium">{myApproved.length}</span>}
+        </h3>
+        <MyClubsRail
+          items={myApproved.map((m) => ({ club: m.club, role: m.role }))}
+          activeId={activeMineId}
+          loading={mineLoading}
+          onSelect={setActiveMineId}
+          onOpen={setSelectedClubId}
+          onFind={scrollToDiscover}
+          onCreate={() => setIsCreating(true)}
+        />
+      </section>
+
+      {/* ══════════ 2. KHÁM PHÁ ══════════ */}
+      <section ref={discoverRef} aria-labelledby="discover" className="space-y-3 scroll-mt-4">
+        <h3 id="discover" className="text-sm font-bold text-white">
+          Khám phá Câu lạc bộ
+        </h3>
+
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value)
+            setVisibleCount(PAGE_SIZE)
+          }}
+          placeholder="Tìm Câu lạc bộ theo tên…"
+          aria-label="Tìm Câu lạc bộ theo tên"
+          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-orange-500"
+        />
+
+        {discover.length === 0 ? (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center text-xs text-slate-400">
-            {search ? 'Không tìm thấy Câu lạc bộ nào khớp.' : 'Chưa có Câu lạc bộ nào. Hãy thành lập cái đầu tiên.'}
+            {search
+              ? 'Không tìm thấy Câu lạc bộ nào khớp.'
+              : myApproved.length > 0
+              ? 'Bạn đã tham gia tất cả Câu lạc bộ hiện có.'
+              : 'Chưa có Câu lạc bộ nào. Hãy thành lập cái đầu tiên.'}
           </div>
         ) : (
-          clubs.map((club) => (
-            <button
-              key={club.id}
-              onClick={() => setSelectedClubId(club.id)}
-              className="w-full text-left bg-slate-900 hover:border-orange-500/50 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg cursor-pointer transition-colors group"
-            >
-              <div className="flex justify-between items-start gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-12 h-12 shrink-0 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl flex items-center text-lg font-black justify-center text-white shadow-md">
-                    {club.name.substring(0, 2).toUpperCase()}
+          <ul className="space-y-2.5">
+            {shown.map((club) => {
+              const status = statusByClub.get(club.id)
+              const full = club.member_count >= club.member_limit
+              return (
+                <li
+                  key={club.id}
+                  className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 flex items-center gap-3 shadow-lg"
+                >
+                  <button
+                    onClick={() => setSelectedClubId(club.id)}
+                    className="flex-1 min-w-0 flex items-center gap-3 text-left cursor-pointer group"
+                  >
+                    <ClubAvatar club={club} size={44} />
+                    <span className="min-w-0">
+                      <span className="block font-bold text-[13px] text-white group-hover:text-orange-400 transition-colors truncate">
+                        {club.name}
+                      </span>
+                      <span className="block text-[10px] text-slate-400 truncate">
+                        {club.description ?? 'Câu lạc bộ tập luyện cộng đồng.'}
+                      </span>
+                      <span className="block text-[10px] text-slate-500 mt-0.5">
+                        {club.member_count}/{club.member_limit} thành viên
+                      </span>
+                    </span>
+                  </button>
+
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-lg font-bold">
+                      {club.treasury_balance.toLocaleString('vi-VN')} Xu
+                    </span>
+                    {status === 'PENDING' ? (
+                      <span className="text-[11px] text-amber-400 font-bold py-1">Chờ duyệt</span>
+                    ) : status === 'BANNED' ? (
+                      <span className="text-[11px] text-rose-400 font-bold py-1">Bị hạn chế</span>
+                    ) : full ? (
+                      <span className="text-[11px] text-slate-500 font-bold py-1">Đã đầy</span>
+                    ) : (
+                      <button
+                        onClick={() => handleQuickJoin(club.id)}
+                        disabled={busy === `join:${club.id}`}
+                        className="border border-orange-500 text-orange-400 hover:bg-orange-500 hover:text-slate-950 disabled:opacity-50 font-bold text-[11px] px-3 py-1 rounded-lg cursor-pointer transition-colors"
+                      >
+                        {busy === `join:${club.id}` ? 'Đang gửi…' : 'Tham gia'}
+                      </button>
+                    )}
                   </div>
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-sm text-white group-hover:text-orange-400 transition-colors truncate">
-                      {club.name}
-                    </h3>
-                    <p className="text-[10px] text-slate-400 truncate">
-                      {club.description ?? 'Câu lạc bộ tập luyện cộng đồng.'}
-                    </p>
-                  </div>
-                </div>
-                <span className="shrink-0 text-xs bg-amber-500/20 text-amber-400 px-2 py-1 rounded-lg font-bold">
-                  {club.treasury_balance.toLocaleString('vi-VN')} Xu
-                </span>
-              </div>
-              <div className="flex justify-between items-center pt-2 border-t border-slate-800/60 text-[10px] text-slate-400">
-                <span>{club.member_count} thành viên</span>
-                <span className="text-orange-400 font-bold">Xem chi tiết</span>
-              </div>
-            </button>
-          ))
+                </li>
+              )
+            })}
+          </ul>
         )}
-      </div>
+
+        {discover.length > shown.length && (
+          <button
+            onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+            className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-semibold py-2.5 rounded-xl cursor-pointer"
+          >
+            Xem thêm ({discover.length - shown.length})
+          </button>
+        )}
+      </section>
     </div>
   )
 }
