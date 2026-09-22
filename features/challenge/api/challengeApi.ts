@@ -26,6 +26,7 @@ export async function createChallengeInSupabase(payload: CreateChallengePayload)
     throw new Error('Thiếu thông tin người dùng.');
   }
 
+  // Tạo mã chống bấm đúp (Idempotency Key độc nhất cho mỗi lần bấm)
   const idempotencyKey = `chal_${payload.created_by}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
   const { data, error } = await supabase.rpc('create_challenge_with_ledger', {
