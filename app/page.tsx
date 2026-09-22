@@ -35,13 +35,21 @@ const translations = {
 }
 
 // Tách SearchParamHandler ra ngoài component chính để bọc Suspense an toàn cho Next.js build
+const STRAVA_ERROR_MESSAGES: Record<string, string> = {
+  access_denied: 'Bạn đã hủy hoặc từ chối cấp quyền truy cập Strava.',
+  account_conflict: 'Tài khoản Strava này đã được liên kết với một tài khoản khác trên hệ thống.',
+  server_error: 'Đã có lỗi hệ thống khi kết nối Strava. Vui lòng thử lại sau.',
+}
+
 function SearchParamHandler({ 
   setInitialClubId, 
   setCurrentTab,
+  setStravaNotice,
   session 
 }: { 
   setInitialClubId: (id: string) => void, 
   setCurrentTab: (tab: any) => void,
+  setStravaNotice: (notice: { type: 'success' | 'error', message: string } | null) => void,
   session: any
 }) {
   const searchParams = useSearchParams()
@@ -52,20 +60,52 @@ function SearchParamHandler({
     const pendingCode = sessionStorage.getItem('pending_join_code')
     if (pendingCode && session) {
       sessionStorage.removeItem('pending_join_code')
-      // Điều hướng trực tiếp về trang xử lý join club với code đó
       router.replace(`/club/join/${pendingCode}`)
       return
     }
-
-    // 2. Xử lý query param thông thường (?tab=club&clubId=...)
+    const pendingReferral = sessionStorage.getItem('pending_referral_id')
+    if (pendingReferral && session) {
+      sessionStorage.removeItem('pending_referral_id')
+      router.replace(`/join/${pendingReferral}`)
+      return
+    }
+    // 2. Xử lý query param điều hướng tab (?tab=club&clubId=... hoặc ?tab=profile)
     const tab = searchParams.get('tab')
     const clubId = searchParams.get('clubId')
     if (tab === 'club' && clubId) {
       setCurrentTab('club')
       setInitialClubId(clubId)
+    } else if (tab === 'profile') {
+      setCurrentTab('profile')
+    }
+
+    // 3. Xử lý kết quả kết nối Strava (?strava_success=true hoặc ?strava_error=...)
+    const stravaSuccess = searchParams.get('strava_success')
+    const stravaError = searchParams.get('strava_error')
+    const referralSuccess = searchParams.get('referral_success')
+    if (referralSuccess === 'true') {
+      setStravaNotice({ type: 'success', message: 'Nhận thưởng giới thiệu thành công! 🎉' })
+      setTimeout(() => setStravaNotice(null), 4000)
+    }
+        if (stravaSuccess === 'true') {
+      setStravaNotice({ type: 'success', message: 'Kết nối Strava thành công! 🎉' })
+      setTimeout(() => setStravaNotice(null), 4000)
+    } else if (stravaError) {
+      setStravaNotice({
+        type: 'error',
+        message: STRAVA_ERROR_MESSAGES[stravaError] || 'Đã có lỗi không xác định khi kết nối Strava.',
+      })
+      setTimeout(() => setStravaNotice(null), 6000)
+    }
+
+    // Dọn query params khỏi URL sau khi đã xử lý, tránh xử lý lặp lại khi reload
+    if (tab || clubId || stravaSuccess || stravaError) {
       router.replace('/')
     }
-  }, [searchParams, router, setInitialClubId, setCurrentTab, session])
+    if (tab || clubId || stravaSuccess || stravaError || referralSuccess) {
+      router.replace('/')
+    }
+  }, [searchParams, router, setInitialClubId, setCurrentTab, setStravaNotice, session])
 
   return null
 }
@@ -78,35 +118,47 @@ export default function RaceHubApp() {
   const [clubs, setClubs] = useState<any[]>([])
   const t = translations[lang]
   const [session, setSession] = useState<any>(null)
+  const [stravaNotice, setStravaNotice] = useState<{ type: 'success' | 'error', message: string } | null>(null)
   const [loadingAuth, setLoadingAuth] = useState(true)
 
   useEffect(() => {
-    async function loadData() {
-      const { data } = await supabase.from('profiles').select('*').limit(1).maybeSingle()
-      if (data) {
-        setProfile(data)
-      } else {
-        const newUserId = crypto.randomUUID()
-        const defaultProfile = {
-          id: newUserId,
-          display_name: 'Nguyễn Bá Phụng',
-          xu: 500,
-          xp: 1200,
-          level: 3
-        }
-        const { error: insertError } = await supabase.from('profiles').insert(defaultProfile)
-        if (!insertError) setProfile(defaultProfile)
-      }
+  if (!session?.user?.id) return
 
-      const { data: clubData } = await supabase.from('clubs').select('*').order('name', { ascending: true })
-      if (clubData) setClubs(clubData)
+  async function loadData() {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .maybeSingle()
+
+    if (data) {
+      setProfile(data)
+    } else {
+      const defaultProfile = {
+        id: session.user.id,
+        display_name: session.user.email?.split('@')[0] || 'Runner',
+        xu: 500,
+        xp: 0,
+        level: 1
+      }
+      const { error: insertError } = await supabase.from('profiles').insert(defaultProfile)
+      if (!insertError) setProfile(defaultProfile)
+    }
+
+    const { data: clubData } = await supabase.from('clubs').select('*').order('name', { ascending: true })
+    if (clubData) setClubs(clubData)
     }
     loadData()
-  }, [])
+  }, [session])
 
   const handleProfileUpdated = () => {
     async function reloadProfile() {
-      const { data } = await supabase.from('profiles').select('*').limit(1).maybeSingle()
+      if (!session?.user?.id) return
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .maybeSingle()
       if (data) setProfile(data)
     }
     reloadProfile()
@@ -140,7 +192,7 @@ export default function RaceHubApp() {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex justify-center selection:bg-orange-500 selection:text-white">
         <Suspense fallback={null}>
-          <SearchParamHandler setInitialClubId={setInitialClubId} setCurrentTab={setCurrentTab} session={session} />
+          <SearchParamHandler setInitialClubId={setInitialClubId} setCurrentTab={setCurrentTab} setStravaNotice={setStravaNotice} session={session} />
         </Suspense>
         <div className="w-full max-w-md bg-slate-950 min-h-screen border-x border-slate-900 flex flex-col shadow-2xl relative">
           <AuthScreen onAuthSuccess={() => window.location.reload()} />
@@ -152,7 +204,7 @@ export default function RaceHubApp() {
   return (
     <div className="min-h-screen bg-slate-950 text-white flex justify-center selection:bg-orange-500 selection:text-white">
       <Suspense fallback={null}>
-        <SearchParamHandler setInitialClubId={setInitialClubId} setCurrentTab={setCurrentTab} session={session} />
+        <SearchParamHandler setInitialClubId={setInitialClubId} setCurrentTab={setCurrentTab} setStravaNotice={setStravaNotice} session={session} />
       </Suspense>
       <div className="w-full max-w-md bg-slate-950 min-h-screen border-x border-slate-900 flex flex-col shadow-2xl relative">
         
@@ -174,7 +226,16 @@ export default function RaceHubApp() {
             </span>
           </div>
         </header>
-
+        {stravaNotice && (
+          <div className={`mx-5 mt-3 px-4 py-2.5 rounded-xl text-sm font-semibold flex justify-between items-center ${
+            stravaNotice.type === 'success' 
+              ? 'bg-green-500/15 text-green-400 border border-green-500/30' 
+              : 'bg-red-500/15 text-red-400 border border-red-500/30'
+          }`}>
+            <span>{stravaNotice.message}</span>
+            <button onClick={() => setStravaNotice(null)} className="ml-3 opacity-70 hover:opacity-100 cursor-pointer">✕</button>
+          </div>
+        )}
         {/* NỘI DUNG TỪNG TAB */}
         <main className="flex-1 p-5 space-y-4 pb-32 overflow-y-auto">
           {currentTab === 'home' && (

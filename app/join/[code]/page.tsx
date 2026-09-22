@@ -3,13 +3,12 @@
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/shared/lib/supabase'
-import { joinClubByCode, clubErrorMessage } from '@/features/club/api'
+import { applyReferral, referralErrorMessage } from '@/features/referral/api'
 
-export default function JoinClubPage({ params }: { params: Promise<{ code: string }> }) {
+export default function ReferralPage({ params }: { params: Promise<{ code: string }> }) {
   const router = useRouter()
-  // Unwrap params bằng React.use() theo chuẩn Next.js mới nhất
   const resolvedParams = use(params)
-  const code = resolvedParams.code
+  const referrerId = resolvedParams.code
 
   const [status, setStatus] = useState<'checking-auth' | 'loading' | 'error'>('checking-auth')
   const [message, setMessage] = useState('')
@@ -22,33 +21,32 @@ export default function JoinClubPage({ params }: { params: Promise<{ code: strin
       if (cancelled) return
 
       if (!session) {
-        // Lưu lại code để join tiếp sau khi đăng nhập xong
-        sessionStorage.setItem('pending_join_code', code)
+        sessionStorage.setItem('pending_referral_id', referrerId)
         router.replace('/')
         return
       }
 
       setStatus('loading')
       try {
-        const member = await joinClubByCode(code)
+        await applyReferral(referrerId)
         if (cancelled) return
-        router.replace(`/?tab=club&clubId=${member.club_id}`)
+        router.replace('/?referral_success=true')
       } catch (e) {
         if (cancelled) return
         setStatus('error')
-        setMessage(clubErrorMessage(e))
+        setMessage(referralErrorMessage(e))
       }
     }
 
     run()
     return () => { cancelled = true }
-  }, [code, router])
+  }, [referrerId, router])
 
   if (status === 'error') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 p-6">
         <div className="bg-slate-900 border border-rose-900/60 rounded-2xl p-6 max-w-sm w-full text-center space-y-3">
-          <h1 className="text-sm font-bold text-rose-400">Không thể tham gia</h1>
+          <h1 className="text-sm font-bold text-rose-400">Không thể áp dụng lời mời</h1>
           <p className="text-xs text-slate-400">{message}</p>
           <button
             onClick={() => router.replace('/')}
@@ -63,7 +61,7 @@ export default function JoinClubPage({ params }: { params: Promise<{ code: strin
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950">
-      <p className="text-xs text-slate-400">Đang xử lý lời mời…</p>
+      <p className="text-xs text-slate-400">Đang xử lý lời mời giới thiệu…</p>
     </div>
   )
 }

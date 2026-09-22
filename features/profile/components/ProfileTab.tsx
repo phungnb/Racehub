@@ -5,16 +5,15 @@ import { supabase } from '@/shared/lib/supabase'
 import CharacterHub from '@/features/character/components/CharacterHub'
 
 export default function ProfileTab({ profile, t }: { profile: any, t: any }) {
-  // Quản lý chuyển đổi giữa xem thông tin cá nhân hay vào phòng nhân vật game hóa
   const [activeProfileTab, setActiveProfileTab] = useState<'character' | 'settings'>('character')
-  
   const [displayName, setDisplayName] = useState(profile?.display_name || '')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [copied, setCopied] = useState(false)
+  
+  const isStravaConnected = !!profile?.strava_connected
 
-  // Tạo link mời dựa trên origin hiện tại (hoặc mã định danh user/club)
   const inviteLink = typeof window !== 'undefined' ? `${window.location.origin}/join/${profile?.id || 'racehub'}` : ''
 
   const handleCopyLink = () => {
@@ -42,6 +41,36 @@ export default function ProfileTab({ profile, t }: { profile: any, t: any }) {
     }
   }
 
+  const handleConnectStrava = () => {
+    const clientId = '141757'
+    const redirectUri = `${window.location.origin}/api/strava/callback`
+    const userState = profile?.id
+
+    if (!userState) {
+      alert('Không tìm thấy thông tin tài khoản.')
+      return
+    }
+
+    window.location.href = `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&approval_prompt=force&prompt=login&scope=read,activity:read_all&state=${userState}`
+  }
+  const handleDisconnectStrava = async () => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          strava_connected: false,
+          strava_access_token: null,
+          strava_refresh_token: null 
+        })
+        .eq('id', profile.id)
+
+      if (error) throw error
+      window.location.reload()
+    } catch (err: any) {
+      alert('Không thể hủy kết nối: ' + err.message)
+    }
+  }
+
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     window.location.reload()
@@ -49,8 +78,6 @@ export default function ProfileTab({ profile, t }: { profile: any, t: any }) {
 
   return (
     <div className="space-y-5 animate-fadeIn pb-10">
-      
-      {/* THANH ĐIỀU HƯỚNG NỘI BỘ TRONG TAB PROFILE */}
       <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-bold">
         <button
           onClick={() => setActiveProfileTab('character')}
@@ -66,15 +93,10 @@ export default function ProfileTab({ profile, t }: { profile: any, t: any }) {
         </button>
       </div>
 
-      {/* HIỂN THỊ NỘI DUNG TÙY THEO TAB ĐƯỢC CHỌN */}
       {activeProfileTab === 'character' ? (
-        // Gọi trực tiếp module CharacterHub độc lập
         <CharacterHub userId={profile?.id} />
       ) : (
-        // Giao diện hồ sơ, cài đặt và kết nối nguồn dữ liệu truyền thống
         <div className="space-y-4 animate-fadeIn">
-          
-          {/* NÚT MỜI THÀNH VIÊN & QR CODE */}
           <div className="bg-gradient-to-r from-orange-950/40 via-slate-900 to-slate-900 border border-orange-500/30 rounded-2xl p-4 flex items-center justify-between shadow-xl">
             <div className="space-y-0.5">
               <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
@@ -90,9 +112,8 @@ export default function ProfileTab({ profile, t }: { profile: any, t: any }) {
             </button>
           </div>
 
-          {/* Form đổi tên hiển thị */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-xl">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">✏️ {t.displayName}</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">✏️ {t?.displayName || 'Tên hiển thị'}</h3>
             <form onSubmit={handleUpdateProfile} className="space-y-3">
               <input 
                 type="text" 
@@ -112,14 +133,31 @@ export default function ProfileTab({ profile, t }: { profile: any, t: any }) {
             </form>
           </div>
 
-          {/* Trạng thái kết nối nguồn dữ liệu & thiết bị điện tử chạy bộ */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-xl">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">⌚ Thiết bị & Nguồn dữ liệu chạy bộ</h3>
             <div className="space-y-2">
               <div className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800/80">
                 <span className="text-xs font-bold text-slate-200 flex items-center gap-2">🏃 Strava</span>
-                <span className="text-[10px] bg-orange-500/20 text-orange-400 px-2.5 py-1 rounded-full font-bold">ĐÃ KẾT NỐI</span>
+                {isStravaConnected ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] bg-orange-500/20 text-orange-400 px-2.5 py-1 rounded-full font-bold">ĐÃ KẾT NỐI</span>
+                    <button 
+                      onClick={handleDisconnectStrava}
+                      className="text-[10px] bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer"
+                    >
+                      Hủy
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={handleConnectStrava}
+                    className="text-[10px] bg-slate-800 hover:bg-orange-600 text-slate-300 hover:text-white px-3 py-1 rounded-full font-bold transition-all cursor-pointer"
+                  >
+                    LIÊN KẾT
+                  </button>
+                )}
               </div>
+              
               <div className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800/80">
                 <span className="text-xs font-bold text-slate-200 flex items-center gap-2">⌚ Garmin Connect</span>
                 <button className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1 rounded-full font-bold transition-all cursor-pointer">LIÊN KẾT</button>
@@ -139,7 +177,6 @@ export default function ProfileTab({ profile, t }: { profile: any, t: any }) {
             </div>
           </div>
 
-          {/* Đăng xuất tài khoản */}
           <div className="pt-2">
             <button 
               onClick={handleSignOut}
@@ -148,11 +185,9 @@ export default function ProfileTab({ profile, t }: { profile: any, t: any }) {
               🚪 Đăng xuất tài khoản
             </button>
           </div>
-
         </div>
       )}
 
-      {/* MODAL HIỂN THỊ LINK MỜI & MÃ QR */}
       {showInviteModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl animate-fadeIn text-center">
@@ -160,13 +195,10 @@ export default function ProfileTab({ profile, t }: { profile: any, t: any }) {
               <h3 className="text-xs font-black uppercase tracking-wider text-white">Mời thành viên tham gia RaceHub</h3>
               <button onClick={() => setShowInviteModal(false)} className="text-slate-400 hover:text-white text-xs font-bold px-2 py-1 bg-slate-800 rounded-lg cursor-pointer">✕</button>
             </div>
-
-            {/* Mô phỏng khung mã QR */}
             <div className="bg-white p-4 rounded-2xl w-40 h-40 mx-auto flex flex-col items-center justify-center shadow-inner">
               <div className="text-5xl">📷</div>
               <span className="text-[9px] text-slate-900 font-bold mt-2">Quét mã QR để vào App</span>
             </div>
-
             <div className="space-y-2">
               <p className="text-[11px] text-slate-400">Hoặc sao chép đường dẫn mời trực tiếp:</p>
               <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl px-3 py-2">
@@ -187,7 +219,6 @@ export default function ProfileTab({ profile, t }: { profile: any, t: any }) {
           </div>
         </div>
       )}
-
     </div>
   )
 }
