@@ -85,7 +85,8 @@ declare
   v_prof record;
   v_total_km numeric;
 begin
-  select * into a from public.activities where id = p_activity_id for update;
+  select * from public.activities where id = p_activity_id for update
+    into a;
   if not found or a.rewarded_at is not null or a.user_id is null then
     return jsonb_build_object('earned_xu', coalesce(a.earned_xu, 0), 'earned_xp', coalesce(a.earned_xp, 0));
   end if;
@@ -98,10 +99,11 @@ begin
 
   -- Xu: theo km, giới hạn trần mỗi ngày (giờ Việt Nam)
   v_day_start := date_trunc('day', coalesce(a.started_at, now()) at time zone 'Asia/Ho_Chi_Minh') at time zone 'Asia/Ho_Chi_Minh';
-  select coalesce(sum(earned_xu), 0) into v_today_xu
+  select coalesce(sum(earned_xu), 0)
     from public.activities
    where user_id = a.user_id and rewarded_at is not null
-     and started_at >= v_day_start and started_at < v_day_start + interval '1 day';
+     and started_at >= v_day_start and started_at < v_day_start + interval '1 day'
+    into v_today_xu;
   -- 1 km đầu = firstKmXu, mỗi km tiếp theo = extraKmXu (Module 3 · FR21); bài dưới 1 km không có Xu
   v_xu := round(least(
             case when v_km >= 1 then (cfg->>'firstKmXu')::numeric + (v_km - 1) * (cfg->>'extraKmXu')::numeric else 0 end,
@@ -128,10 +130,12 @@ begin
    where id = a.id;
 
   -- Thưởng người giới thiệu khi bạn mới chạy đủ số km tối thiểu (chống tạo tài khoản ảo)
-  select id, referred_by into v_prof from public.profiles where id = a.user_id;
+  select id, referred_by from public.profiles where id = a.user_id
+    into v_prof;
   if v_prof.referred_by is not null then
-    select coalesce(sum(coalesce(nullif(moving_distance_m, 0), distance_m, 0)), 0) / 1000.0 into v_total_km
-      from public.activities where user_id = a.user_id and rewarded_at is not null;
+    select coalesce(sum(coalesce(nullif(moving_distance_m, 0), distance_m, 0)), 0) / 1000.0
+      from public.activities where user_id = a.user_id and rewarded_at is not null
+    into v_total_km;
     if v_total_km >= (cfg->>'refMinKmRequired')::numeric and (cfg->>'refBonusInviter')::numeric > 0 then
       perform private.ledger_post('REFERRAL_INVITER', 'referral_inviter:' || a.user_id,
         'Thưởng giới thiệu bạn bè', a.user_id,
@@ -184,7 +188,8 @@ declare
   v_need_club numeric;
 begin
   if p_idempotency_key is null or length(p_idempotency_key) < 8 then raise exception 'IDEMPOTENCY_KEY_REQUIRED'; end if;
-  select campaign_id into v_existing from public.ledger_transactions where idempotency_key = v_key;
+  select campaign_id from public.ledger_transactions where idempotency_key = v_key
+    into v_existing;
   if found then
     return jsonb_build_object('challenge_id', v_existing, 'duplicate', true,
                               'invite_code', (select code from public.challenge_invites where challenge_id = v_existing));
@@ -209,8 +214,9 @@ begin
 
   if v_format = 'TEAM' then
     if v_mode not in ('TEAM_SUM', 'TEAM_AVG', 'TEAM_GAP', 'LAST_MEMBER') then raise exception 'INVALID_GAME_MODE'; end if;
-    select array_agg(trim(v)) into v_teams from jsonb_array_elements_text(coalesce(p->'team_names', '[]'::jsonb)) as t(v)
-     where trim(v) <> '';
+    select array_agg(trim(v)) from jsonb_array_elements_text(coalesce(p->'team_names', '[]'::jsonb)) as t(v)
+     where trim(v) <> ''
+    into v_teams;
     if coalesce(array_length(v_teams, 1), 0) not between 2 and 8 then raise exception 'INVALID_TEAMS'; end if;
     if exists (select 1 from unnest(v_teams) as t(v) where char_length(v) > 40) then raise exception 'INVALID_TEAMS'; end if;
     if v_start < now() + interval '10 minutes' then raise exception 'TEAM_START_TOO_SOON'; end if;
@@ -222,7 +228,8 @@ begin
   if v_audience not in ('PUBLIC', 'CLUB_ONLY', 'INVITE_ONLY') then raise exception 'INVALID_AUDIENCE'; end if;
   if v_audience = 'CLUB_ONLY' then
     if v_club is null or not public.club_is_staff(v_club) then raise exception 'FORBIDDEN'; end if;
-    select name into v_club_name from public.clubs where id = v_club;
+    select name from public.clubs where id = v_club
+    into v_club_name;
   else
     v_club := null;
   end if;
@@ -242,9 +249,10 @@ begin
   v_payer := coalesce(v_club, v_uid);
   -- Vé tạo miễn phí do admin tặng: dùng vé sắp hết hạn trước, vé nhỏ nhất đủ số người
   if v_fee > 0 then
-    select id into v_pass from public.challenge_passes
+    select id from public.challenge_passes
      where owner_id = v_payer and remaining > 0 and max_slots >= v_slots and (expires_at is null or expires_at > now())
-     order by expires_at nulls last, max_slots, created_at limit 1 for update;
+     order by expires_at nulls last, max_slots, created_at limit 1 for update
+    into v_pass;
     if v_pass is not null then v_fee_waived := v_fee; v_fee := 0; end if;
   end if;
   v_need_user := case when v_club is null then v_fee else 0 end + case when v_source = 'CREATOR' then v_reward else 0 end;
@@ -346,9 +354,10 @@ declare
   v_pass record;
   f jsonb := private.economy_config();
 begin
-  select id, remaining, max_slots, expires_at into v_pass from public.challenge_passes
+  select id, remaining, max_slots, expires_at from public.challenge_passes
    where owner_id = v_payer and remaining > 0 and max_slots >= v_slots and (expires_at is null or expires_at > now())
-   order by expires_at nulls last, max_slots, created_at limit 1;
+   order by expires_at nulls last, max_slots, created_at limit 1
+    into v_pass;
   return jsonb_build_object(
     'fee', v_fee,
     'payer', case when v_payer = v_uid then 'USER' else 'CLUB' end,
@@ -429,16 +438,19 @@ begin
   if char_length(v_reason) < 5 then raise exception 'REASON_REQUIRED'; end if;
   if p_idempotency_key is null or length(p_idempotency_key) < 8 then raise exception 'IDEMPOTENCY_KEY_REQUIRED'; end if;
   if p_target_type = 'USER' then
-    select display_name into v_name from public.profiles where id = p_target_id;
+    select display_name from public.profiles where id = p_target_id
+    into v_name;
     if not found then raise exception 'USER_NOT_FOUND'; end if;
   elsif p_target_type = 'CLUB' then
-    select name into v_name from public.clubs where id = p_target_id;
+    select name from public.clubs where id = p_target_id
+    into v_name;
     if not found then raise exception 'CLUB_NOT_FOUND'; end if;
   else
     raise exception 'INVALID_TARGET';
   end if;
   -- Gửi lại cùng khóa (mạng chập chờn, bấm 2 lần): trả kết quả cũ, không báo / ghi nhật ký lần 2
-  select id into v_tx from public.ledger_transactions where idempotency_key = 'admin_grant:' || p_idempotency_key;
+  select id from public.ledger_transactions where idempotency_key = 'admin_grant:' || p_idempotency_key
+    into v_tx;
   if found then
     return jsonb_build_object('transaction_id', v_tx, 'balance', private.balance(p_target_id), 'duplicate', true);
   end if;
@@ -485,10 +497,12 @@ begin
   if coalesce(p_max_slots, 0) not between 1 and 10000 then raise exception 'INVALID_MAX_SLOTS'; end if;
   if p_expires_at is not null and p_expires_at <= now() then raise exception 'INVALID_TIME_RANGE'; end if;
   if p_target_type = 'USER' then
-    select display_name into v_name from public.profiles where id = p_target_id;
+    select display_name from public.profiles where id = p_target_id
+    into v_name;
     if not found then raise exception 'USER_NOT_FOUND'; end if;
   elsif p_target_type = 'CLUB' then
-    select name into v_name from public.clubs where id = p_target_id;
+    select name from public.clubs where id = p_target_id
+    into v_name;
     if not found then raise exception 'CLUB_NOT_FOUND'; end if;
   else
     raise exception 'INVALID_TARGET';
@@ -548,7 +562,7 @@ language plpgsql stable security definer set search_path = public as $$
 declare v jsonb;
 begin
   perform private.require_admin();
-  select jsonb_build_object(
+  v := jsonb_build_object(
     'policy', private.economy_config(),
     'wallets', (select coalesce(sum(e.amount), 0) from public.ledger_entries e join public.profiles p on p.id = e.account_id),
     'treasuries', (select coalesce(sum(e.amount), 0) from public.ledger_entries e join public.clubs c on c.id = e.account_id),
@@ -566,7 +580,7 @@ begin
                    from public.admin_audit_log l
                   where l.action in ('ADMIN_GRANT_XU', 'ADJUST_USER_XU', 'TOPUP_CLUB_FUND', 'GRANT_CHALLENGE_PASS', 'REVOKE_CHALLENGE_PASS', 'PUBLISH_CONFIG')
                   order by l.created_at desc limit 30) x)
-  ) into v;
+  );
   return v;
 end $$;
 
@@ -593,9 +607,11 @@ begin
   end if;
 
   perform pg_advisory_xact_lock(hashtext('config:' || p_config_key));
-  select config_value into v_old from public.system_config_versions
-   where config_key = p_config_key and status = 'PUBLISHED' order by version desc limit 1;
-  select coalesce(max(version), 0) + 1 into v_next from public.system_config_versions where config_key = p_config_key;
+  select config_value from public.system_config_versions
+   where config_key = p_config_key and status = 'PUBLISHED' order by version desc limit 1
+    into v_old;
+  select coalesce(max(version), 0) + 1 from public.system_config_versions where config_key = p_config_key
+    into v_next;
   update public.system_config_versions set status = 'ARCHIVED' where config_key = p_config_key and status = 'PUBLISHED';
   insert into public.system_config_versions (config_key, version, status, config_value, created_by)
   values (p_config_key, v_next, 'PUBLISHED', p_config_value, v_admin);
