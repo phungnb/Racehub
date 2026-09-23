@@ -57,10 +57,11 @@ export async function fetchUserInventory(userId: string) {
   return data || [];
 }
 
-export async function equipItemRpc(itemId: string) {
-  // Máy chủ tự xác định người gọi bằng auth.uid() (migration 20261001000400)
-  const { data, error } = await supabase.rpc('equip_item', {
-    p_item_id: itemId
+export async function equipItemRpc(itemId: string, category: string) {
+  // Máy chủ tự xác định người gọi bằng auth.uid() và kiểm tra quyền sở hữu vật phẩm
+  const { data, error } = await supabase.rpc('equip_avatar_item', {
+    p_item_id: itemId,
+    p_category: category,
   });
 
   if (error) {

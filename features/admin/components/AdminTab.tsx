@@ -40,7 +40,8 @@ export default function AdminTab({ profile }: AdminTabProps) {
       const [challRes, userRes, settingRes] = await Promise.all([
         supabase.from('challenges').select('id', { count: 'exact', head: true }),
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
-        supabase.from('system_config_versions').select('*').eq('config_key', 'economy_global_config').maybeSingle()
+        supabase.from('system_config_versions').select('*').eq('config_key', 'economy_global_config').eq('status', 'PUBLISHED')
+          .order('version', { ascending: false }).limit(1).maybeSingle()
       ]);
 
       setStats({

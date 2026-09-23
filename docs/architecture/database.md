@@ -171,6 +171,13 @@ Mọi hàm `SECURITY DEFINER` phải:
 
 ## 7. Kế hoạch migrate từ schema hiện tại
 
+> **Cập nhật sau khi có schema production (`supabase/remote_schema.sql`):** giai đoạn đầu dùng lại các bảng đã có thay vì tạo bảng mới:
+> - Token OAuth → `connected_accounts` (khóa hoàn toàn với client), thay vì `private.provider_connections`.
+> - Quyền admin → `profiles.role` / `profiles.is_admin` (nay client không sửa được), thay vì `user_roles`.
+> - Sổ cái → `ledger_transactions` / `ledger_entries` hiện có (`amount` chuyển sang numeric), mỗi tài khoản là `account_id` = id user / id CLB / UUID hệ thống.
+>
+> Xem các migration `20261001000100` đến `000300` và [BAO_CAO_BAO_MAT.md](../BAO_CAO_BAO_MAT.md). Bảng dưới đây là lộ trình dài hạn tới lược đồ đích.
+
 Schema hiện tại chỉ được suy ra từ code (chỉ có 1 file migration). Bước đầu tiên bắt buộc là `supabase db pull`.
 
 | Hiện tại (suy ra từ code) | Đích | Cách migrate |

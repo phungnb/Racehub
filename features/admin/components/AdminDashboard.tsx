@@ -27,7 +27,7 @@ export default function AdminDashboard({ profile }: { profile: any }) {
     // Duyệt qua RPC: máy chủ kiểm tra quyền admin và ghi nhật ký
     const { error } = await supabase.rpc('review_activity', {
       p_activity_id: activityId,
-      p_decision: status,
+      p_status: status,
     })
 
     if (!error) {

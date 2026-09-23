@@ -25,35 +25,42 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 
 ## Bước 3 — Chạy migration
 
-Chạy **4 file mới** trong `supabase/migrations/`, theo thứ tự tên file:
+> ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
-1. `20261001000100_security_baseline.sql`
-2. `20261001000200_profiles_and_connections.sql`
-3. `20261001000300_admin_rpcs.sql`
-4. `20261001000400_rpc_auth_shims.sql`
+Chạy **3 file** trong `supabase/migrations/`, đúng thứ tự:
 
-**Cách A — SQL Editor (đơn giản):** Supabase → SQL Editor → dán nội dung từng file → Run. Mỗi file chạy lại nhiều lần cũng an toàn (idempotent).
+| File | Nội dung | Chạy riêng được? |
+|---|---|---|
+| `20261001000100_emergency_lockdown.sql` | Khóa các lỗ hổng: thu hồi quyền gọi hàm nguy hiểm, bỏ các policy quá rộng, phân quyền theo cột, chuyển token Strava sang `connected_accounts` | **Có.** Nếu chưa deploy code mới được, hãy chạy file này trước |
+| `20261001000200_ledger_and_rewards.sql` | Sổ cái thống nhất (đối soát số dư đầu kỳ), thưởng bài chạy phía server có trần/ngày, tính lại cấp độ theo tài liệu | Cần file 100 |
+| `20261001000300_secure_rpcs.sql` | Viết lại các RPC: bài chạy GPS, tạo thử thách, quỹ CLB, giới thiệu bạn, duyệt bài, công cụ admin, kết nối Strava | Cần file 200 |
 
-**Cách B — Supabase CLI:**
+**Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
+
+**Cách B — CLI** (trong Codespaces, sau khi đã `link` như lúc dump schema):
 ```bash
-npx supabase link --project-ref <project-ref>
 npx supabase db push
 ```
+Nếu lệnh báo lịch sử migration không khớp (do file `20260601_team_challenges.sql` trước đây chạy tay), chạy lệnh sau rồi push lại:
+```bash
+npx supabase migration repair --status applied 20260601
+```
 
-Sau khi chạy file 4, bảng *Messages* của SQL Editor sẽ liệt kê các RPC đã được "bọc", ví dụ `Đã bọc RPC equip_item(p_item_id uuid)`. Nếu bạn thấy dòng `Không tìm thấy ...`, hãy báo lại cho tôi tên hàm đó.
+### Tác động tới người dùng (cần biết trước)
 
-### Các migration này làm gì
-- **Chặn client sửa Xu/XP/Level/role** và các cột tài sản khác qua API REST. Các RPC hiện có vẫn chạy bình thường.
-- **Tạo hồ sơ phía server:** người dùng mới tự có hồ sơ với 500 Xu chào mừng, client không còn tự đặt số Xu.
-- **Chuyển token Strava** khỏi bảng `profiles` sang schema `private` (client không đọc được).
-- **Admin duyệt bài chạy / lưu cấu hình kinh tế** qua RPC có kiểm tra quyền và ghi nhật ký.
-- **RPC cũ nhận `p_user_id`** (`equip_item`, `submit_and_process_activity`, `create_challenge_with_ledger`) giờ tự lấy người gọi từ phiên đăng nhập. Bản cũ được chuyển sang schema `legacy`, không gọi được từ ngoài.
-- **Quyền admin** được chép từ `profiles.role = 'SYSTEM_ADMIN'` sang bảng `user_roles`. Từ nay cấp quyền admin bằng lệnh:
-  ```sql
-  insert into public.user_roles (user_id, role) values ('<uuid>', 'SYSTEM_ADMIN');
-  ```
+| Thay đổi | Lý do |
+|---|---|
+| **Cấp độ được tính lại theo bảng trong tài liệu** (Lv2 từ 1.000 XP, Lv3 từ 5.000…). Công thức cũ `XP/500 + 1` cho ra cấp rất cao, nên nhiều người sẽ **thấy cấp giảm** | Đúng đặc tả Module 1.3 |
+| **Thưởng chạy:** 1 Xu/km, 10 XP/km, trần 50 Xu/ngày (mặc định). Admin chỉnh được trong trang `/admin` | Công thức cũ 5 Xu + 50 XP/km, không có trần |
+| **Bài chạy GPS bị chuyển sang "chờ duyệt"** nếu không có dữ liệu GPS, pace nhanh hơn 3:00/km, nhảy vị trí > 43 km/h, hoặc quãng đường khai lệch quá 15% so với GPS | Chống gian lận |
+| **Người mời chỉ nhận thưởng khi bạn được mời chạy đủ 3 km.** Chỉ áp dụng lời mời trong 14 ngày đầu sau khi tạo tài khoản | Chống tạo tài khoản ảo |
+| **CLB mới bắt đầu với quỹ 0 Xu** (trước đây được tặng 100 Xu) | Tiền phải có nguồn gốc trong sổ cái |
+| **Người dùng mới bắt đầu với 0 Xu** (giống trigger `handle_new_user` hiện có) | Muốn tặng Xu chào mừng: cấu hình qua `admin_adjust_user_xu` hoặc nhiệm vụ |
 
-Không có bảng hay cột nào bị xóa.
+Số Xu hiện có của từng người **được giữ nguyên**: migration ghi một bút toán "số dư đầu kỳ" cho mỗi người.
+
+### Nếu chỉ chạy file 100 mà chưa deploy code mới
+Hệ thống an toàn ngay, nhưng các chức năng sau sẽ tạm lỗi cho đến khi chạy tiếp file 200, 300 và deploy code: lưu bài chạy GPS (bản cũ vốn đã lỗi với mọi bài hợp lệ), tạo thử thách, kết nối/hủy Strava, người dùng mới tự tạo hồ sơ.
 
 ## Bước 4 — Cấu hình Strava
 
@@ -70,30 +77,24 @@ npm run build
 Checklist kiểm tra thủ công sau khi deploy:
 
 - [ ] **Đăng nhập lại:** phiên đăng nhập nay lưu bằng cookie, nên mọi người cần đăng nhập lại một lần.
-- [ ] **Đăng ký tài khoản mới** → vào Trang chủ thấy 500 Xu, Lv.1.
+- [ ] **Đăng ký tài khoản mới** → vào Trang chủ thấy hồ sơ Lv.1 (0 Xu).
 - [ ] **Tôi → Hồ sơ & Cài đặt → Strava "Liên kết"** → quay về hiện thông báo "Kết nối Strava thành công".
 - [ ] **Chọn Nam/Nữ ở màn Nhân vật** vẫn lưu được.
 - [ ] **Bấm "Hủy" kết nối Strava** → trạng thái trở về chưa kết nối.
 - [ ] **Link mời CLB** `/club/join/<mã>` → vào đúng CLB (trước đây link này bị lỗi luôn nhận mã `undefined`).
 - [ ] **Quên mật khẩu** → email → trang `/reset-password` đặt được mật khẩu mới.
-- [ ] **Tài khoản admin** mở `/admin`, duyệt được bài chạy.
-- [ ] **Kiểm tra bảo mật:** Supabase → SQL Editor, chạy đoạn dưới (giả lập một lệnh ghi trực tiếp từ trình duyệt). Kết quả **phải** báo lỗi `PROTECTED_COLUMN`:
+- [ ] **Chạy thử 1 km bằng nút Chạy** (ngoài trời) → lưu thành công, nhận Xu/XP.
+- [ ] **Tạo thử thách** → bị trừ phí, số dư trên thanh trên cùng giảm đúng.
+- [ ] **Tài khoản admin** mở `/admin`, duyệt được bài chạy, lưu được cấu hình kinh tế.
+- [ ] **Kiểm tra bảo mật** — Supabase → SQL Editor, chạy đoạn dưới. Kết quả **phải** báo lỗi `permission denied`:
   ```sql
   begin;
-  select set_config('request.path', '/profiles', true),
-         set_config('request.jwt.claims', '{"sub":"<uuid của bạn>","role":"authenticated"}', true);
+  select set_config('request.jwt.claims', '{"sub":"<uuid của bạn>","role":"authenticated"}', true);
   set local role authenticated;
   update public.profiles set xu = 999999 where id = '<uuid của bạn>';
   rollback;
   ```
 
-## Bước 6 — Việc tôi cần từ bạn để làm tiếp
+## Bước 6 — Việc tiếp theo
 
-Chạy lệnh sau rồi commit, push:
-
-```bash
-npx supabase db pull
-git add supabase/migrations && git commit -m "chore: pull remote schema" && git push
-```
-
-Khi có schema thật, tôi sẽ viết lại hoàn chỉnh `submit_and_process_activity`, `create_challenge_with_ledger` và các RPC CLB theo thiết kế (sổ cái kép, engine chấm điểm phía server). Xem [docs/architecture/README.md §6](./architecture/README.md#6-lộ-trình-triển-khai-đề-xuất).
+Schema đã được đưa vào repo (`supabase/remote_schema.sql`), và các migration đã được test trên chính schema đó (xem `tests/db/`). Từ nay, mọi thay đổi DB đều viết thành migration, **không sửa trực tiếp trên Dashboard**, để schema trong repo luôn khớp với production.

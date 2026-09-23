@@ -64,9 +64,9 @@ export default function CharacterHub({ userId }: { userId: string }) {
     }
   }
 
-  const handleEquip = async (itemId: string) => {
+  const handleEquip = async (itemId: string, category: string) => {
     try {
-      await equipItemRpc(itemId)
+      await equipItemRpc(itemId, category)
       await loadData()
       setIsInventoryOpen(false)
     } catch (err: any) {
