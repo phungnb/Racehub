@@ -25,7 +25,8 @@ export async function createDb({
   const db = new PGlite({ extensions: { pgcrypto } })
   await db.exec(fs.readFileSync(path.join(__dirname, 'supabase_stub.sql'), 'utf8'))
   await db.exec(sanitize(fs.readFileSync(path.join(ROOT, 'supabase/remote_schema.sql'), 'utf8')))
-  await db.exec(`set search_path = "$user", public, extensions; set row_security = on;`)
+  // Bản dump tắt check_function_bodies → lỗi cú pháp trong hàm chỉ lộ khi gọi. Bật lại cho các migration mới.
+  await db.exec(`set search_path = "$user", public, extensions; set row_security = on; set check_function_bodies = on;`)
   if (seed) await seed(db)            // dữ liệu có sẵn trên production TRƯỚC khi migrate
   if (withMigrations) {
     const dir = path.join(ROOT, 'supabase/migrations')
