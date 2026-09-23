@@ -45,6 +45,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001001100_drop_3d_columns.sql` | Dọn 3 cột của nhân vật 3D không còn dùng (`model_key`, `model_urls`, `color2`) | Cần file 1000 |
 | `20261001001200_item_admin.sql` | **Quản trị vật phẩm:** kho ảnh `character-layers` (chỉ admin tải lên), thêm/sửa/ẩn vật phẩm trong trang Quản trị → Vật phẩm, có nhật ký | Cần file 1100 |
 | `20261001001300_headwear_collection.sql` | **Bộ đồ đội đầu đầu tiên:** 16 món ở ô Mũ (mũ chạy Tempo 4 màu, mũ Neon, mũ Huyền Thoại quà cấp 5, visor 3 màu, băng đô bông 4 màu, băng đô mảnh 3 màu). Ảnh nằm trong `public/character/layers/` nên **cần deploy code mới** | Cần file 1200 |
+| `20261001001400_profile_details.sql` | **Hồ sơ cá nhân:** giới tính (nhân vật đi theo), giới thiệu, ngày sinh / chiều cao / cân nặng (bảng riêng, chỉ chủ tài khoản đọc được), kho ảnh `avatars`, lệnh `update_my_profile` | Cần file 1300 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

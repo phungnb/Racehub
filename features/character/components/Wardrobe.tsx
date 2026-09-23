@@ -2,9 +2,9 @@
 
 import Link from 'next/link'
 import { useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Coins, Lock, RotateCcw, X } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Coins, Lock, RotateCcw, UserRound, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, ConfirmSheet, ErrorState, SegmentedControl, Skeleton } from '@/shared/ui'
+import { Button, ConfirmSheet, ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
@@ -12,12 +12,10 @@ import { characterErrorMessage } from '../api/characterApi'
 import { useBuyItem, useCharacterState, useSaveCharacter } from '../hooks/useCharacter'
 import {
   itemStatus, outfitDiff, RARITY_META, resolveOutfit, SLOTS,
-  type CharacterItem, type CharacterState, type Gender, type Slot,
+  type CharacterItem, type CharacterState, type Slot,
 } from '../model/catalog'
 import { ItemCard } from './ItemCard'
 import { PaperDoll } from './PaperDoll'
-
-const GENDERS: { value: Gender; label: string }[] = [{ value: 'male', label: 'Nam' }, { value: 'female', label: 'Nữ' }]
 
 /** Tủ đồ & Shop: xem nhân vật, thử màu trước khi mua, mua bằng Xu, lưu cả bộ */
 export function Wardrobe() {
@@ -32,7 +30,8 @@ function Editor({ state }: { state: CharacterState }) {
   // Chỉ hiện ô có vật phẩm (ô mới như Mũ/Kính tự xuất hiện khi admin thêm món lớp ảnh)
   const tabs = useMemo(() => SLOTS.filter((s) => items.some((i) => i.slot === s.slot)), [items])
   const [tab, setTab] = useState<Slot>(tabs[0]?.slot ?? 'top')
-  const [gender, setGender] = useState<Gender>(state.gender)
+  // Nhân vật đi theo giới tính trong hồ sơ (Cài đặt), không chọn riêng ở đây
+  const gender = state.gender
   const [draft, setDraft] = useState<Partial<Record<Slot, string>>>(state.equipped)
   const [buying, setBuying] = useState<CharacterItem | null>(null)
   const buyKey = useRef(`shop-${crypto.randomUUID()}`)
@@ -43,18 +42,18 @@ function Editor({ state }: { state: CharacterState }) {
   const outfit = useMemo(() => resolveOutfit(items, draft), [items, draft])
   const diff = outfitDiff(state.equipped, draft)
   const unowned = outfit.filter((i) => !i.owned)
-  const dirty = gender !== state.gender || Object.keys(diff).length > 0
+  const dirty = Object.keys(diff).length > 0
 
   const trying = byCode.get(draft[tab] ?? '')
   const tryingUnowned = trying && !trying.owned ? trying : unowned[0]
 
   const select = (it: CharacterItem) => setDraft((d) => ({ ...d, [it.slot]: it.code }))
   const unequip = (slot: Slot) => setDraft((d) => { const n = { ...d }; delete n[slot]; return n })
-  const reset = () => { setDraft(state.equipped); setGender(state.gender) }
+  const reset = () => setDraft(state.equipped)
 
   const doSave = async () => {
     try {
-      await save.mutateAsync({ look: { gender }, equipped: diff })
+      await save.mutateAsync({ look: {}, equipped: diff })
       toast.success('Đã lưu bộ đồ')
     } catch (e) {
       toast.error(characterErrorMessage(e))
@@ -97,8 +96,9 @@ function Editor({ state }: { state: CharacterState }) {
               Đang thử: {tryingUnowned.name}
             </span>
           )}
-          <SegmentedControl value={gender} onChange={setGender} options={GENDERS}
-            className="absolute right-3 top-3 w-32 bg-bg/85 backdrop-blur" />
+          <Link href={routes.settings} className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-bg/85 px-3 py-1.5 text-xs font-semibold text-fg-muted backdrop-blur hover:text-fg">
+            {gender === 'female' ? 'Nữ' : 'Nam'}<ChevronRight className="size-3.5" aria-hidden />
+          </Link>
         </div>
 
         <nav role="tablist" aria-label="Ô trang phục" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
@@ -111,6 +111,8 @@ function Editor({ state }: { state: CharacterState }) {
           ))}
         </nav>
       </div>
+
+      {state.gender_set === false && <GenderNudge />}
 
       {list.length === 0 ? (
         <p className="py-10 text-center text-sm text-fg-muted">Chưa có vật phẩm cho ô này.</p>
@@ -167,5 +169,19 @@ function Editor({ state }: { state: CharacterState }) {
         title={buying ? `Mua ${buying.name}?` : ''} confirmLabel={buying?.price_xu ? `Mua ${formatCoin(buying.price_xu)} Xu` : 'Nhận'}
         description={buying ? `Ví còn ${formatCoin(state.balance - (buying.price_xu ?? 0))} Xu sau khi mua. Vật phẩm là của bạn vĩnh viễn.` : undefined} />
     </div>
+  )
+}
+
+/** Chưa khai giới tính: nhắc chọn trong Cài đặt để nhân vật đúng với mình */
+export function GenderNudge() {
+  return (
+    <Link href={routes.settings} className="flex items-center gap-3 rounded-2xl border border-brand/40 bg-brand/10 p-3">
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand/20 text-brand"><UserRound className="size-5" aria-hidden /></span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">Chọn giới tính của bạn</span>
+        <span className="block text-xs text-fg-muted">Nhân vật sẽ đổi theo giới tính trong hồ sơ</span>
+      </span>
+      <ChevronRight className="size-5 text-fg-subtle" aria-hidden />
+    </Link>
   )
 }

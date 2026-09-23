@@ -95,6 +95,31 @@ function paint(p: Prepared, tints: [TintSlot, string][]): ImageData {
   return out
 }
 
+/** Vùng chân dung (đầu + vai) trong khung chuẩn, để làm ảnh đại diện */
+const PORTRAIT: Record<Gender, { cx: number; cy: number; side: number }> = {
+  male: { cx: 474, cy: 175, side: 330 },
+  female: { cx: 450, cy: 215, side: 330 },
+}
+
+/** Ảnh chân dung vuông của nhân vật đang mặc bộ đồ (JPEG), dùng làm ảnh đại diện */
+export async function renderPortrait(gender: Gender, items: CharacterItem[], size = 512): Promise<Blob> {
+  const tints = items.filter((i) => i.render_kind === 'TINT' && i.color && isTintSlot(i.slot)).map((i) => [i.slot, i.color!] as [TintSlot, string])
+  const urls = items.map((i) => layerUrl(i, gender)).filter((u): u is string => !!u)
+  const [p, imgs] = await Promise.all([prepare(gender), Promise.all(urls.map(loadLayer))])
+  const full = document.createElement('canvas')
+  full.width = FRAME.width
+  full.height = FRAME.height
+  const fctx = full.getContext('2d')!
+  fctx.putImageData(paint(p, tints), 0, 0)
+  for (const img of imgs) fctx.drawImage(img, 0, 0, FRAME.width, FRAME.height)
+  const { cx, cy, side } = PORTRAIT[gender]
+  const out = document.createElement('canvas')
+  out.width = size
+  out.height = size
+  out.getContext('2d')!.drawImage(full, cx - side / 2, cy - side / 2, side, side, 0, 0, size, size)
+  return new Promise((resolve, reject) => out.toBlob((b) => (b ? resolve(b) : reject(new Error('Không tạo được ảnh'))), 'image/jpeg', 0.9))
+}
+
 /** Nhân vật mặc bộ đồ `items` (đã theo thứ tự lớp, xem resolveOutfit) */
 export function PaperDoll({ gender, items, className, label = 'Nhân vật', fit = 'cover' }: {
   gender: Gender; items: CharacterItem[]; className?: string; label?: string

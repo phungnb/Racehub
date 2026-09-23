@@ -9,6 +9,7 @@ import { characterErrorMessage } from '../api/characterApi'
 import { useCharacterState } from '../hooks/useCharacter'
 import { resolveOutfit } from '../model/catalog'
 import { PaperDoll } from './PaperDoll'
+import { GenderNudge } from './Wardrobe'
 
 /** Thẻ nhân vật trong trang Tôi: xem nhân vật, mở tủ đồ */
 export function CharacterHub() {
@@ -20,6 +21,7 @@ export function CharacterHub() {
   const next = s.items.filter((i) => !i.owned && i.unlock_level > s.level && i.price_xu === 0).sort((a, b) => a.unlock_level - b.unlock_level)[0]
   return (
     <div className="space-y-3">
+      {s.gender_set === false && <GenderNudge />}
       <Card className="overflow-hidden p-0">
         <div className="relative h-96 bg-[#c4c4ce]">
           <PaperDoll gender={s.gender} items={resolveOutfit(s.items, s.equipped)} className="size-full" label="Nhân vật của bạn" />

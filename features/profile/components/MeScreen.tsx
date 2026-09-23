@@ -2,27 +2,24 @@
 
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
-import { ArrowLeft, Check, ChevronRight, Coins, Copy, Gift, LogOut, Pencil, Settings, Share2, Shirt, Watch } from 'lucide-react'
+import { ChevronRight, Coins, Copy, Gift, Pencil, Settings, Share2, Watch } from 'lucide-react'
 import { toast } from 'sonner'
-import { supabase } from '@/shared/lib/supabase'
 import { Button, Card, LevelBadge, ProgressBar, SegmentedControl, Skeleton } from '@/shared/ui'
 import { formatCoin, formatKm, formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import { levelProgress } from '@/features/progression'
-import { useInvalidateProfile } from '@/features/auth'
 import { CharacterHub } from '@/features/character'
 import { BadgeGrid } from '@/features/game'
 import { getAthleteProfile } from '../api/athleteApi'
-import PrivacySettings from './PrivacySettings'
 import type { Profile } from '@/shared/types/profile'
 
-type Tab = 'overview' | 'badges' | 'character'
+type Tab = 'character' | 'overview' | 'badges'
 const TABS: { value: Tab; label: string }[] = [
+  { value: 'character', label: 'Nhân vật' },
   { value: 'overview', label: 'Tổng quan' },
   { value: 'badges', label: 'Huy hiệu' },
-  { value: 'character', label: 'Nhân vật' },
 ]
 const isTab = (v: string | null): v is Tab => TABS.some((t) => t.value === v)
 
@@ -84,30 +81,6 @@ function Header({ profile }: { profile: Profile }) {
         )}
       </div>
     </Card>
-  )
-}
-
-function NameForm({ profile }: { profile: Profile }) {
-  const [name, setName] = useState(profile.display_name ?? '')
-  const invalidate = useInvalidateProfile()
-  const m = useMutation({
-    mutationFn: async () => {
-      const v = name.trim()
-      if (v.length < 2 || v.length > 40) throw new Error('Tên hiển thị cần từ 2 đến 40 ký tự.')
-      const { error } = await supabase.from('profiles').update({ display_name: v, updated_at: new Date().toISOString() }).eq('id', profile.id)
-      if (error) throw error
-    },
-    onSuccess: () => { invalidate(); toast.success('Đã cập nhật tên hiển thị') },
-    onError: (e) => toast.error(e instanceof Error ? e.message : 'Không lưu được'),
-  })
-  const changed = name.trim() !== (profile.display_name ?? '')
-  return (
-    <form onSubmit={(e) => { e.preventDefault(); m.mutate() }} className="flex gap-2">
-      <label className="sr-only" htmlFor="display-name">Tên hiển thị</label>
-      <input id="display-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={40}
-        className="h-11 min-w-0 flex-1 rounded-xl border border-border bg-bg px-3 text-[15px] outline-none focus:border-brand" />
-      <Button type="submit" loading={m.isPending} disabled={!changed}><Check className="size-4" /> Lưu</Button>
-    </form>
   )
 }
 
@@ -176,9 +149,9 @@ export function MeScreen({ profile }: { profile: Profile }) {
   const params = useSearchParams()
   const router = useRouter()
   const fromUrl = params.get('tab')
-  const tab: Tab = isTab(fromUrl) ? fromUrl : 'overview'
-  // Tab nằm trên URL để thông báo mở đúng chỗ (/me?tab=badges)
-  const setTab = (t: Tab) => router.replace(t === 'overview' ? routes.me : `${routes.me}?tab=${t}`, { scroll: false })
+  const tab: Tab = isTab(fromUrl) ? fromUrl : 'character'
+  // Tab nằm trên URL để thông báo mở đúng chỗ (/me?tab=badges); mở trang Tôi là thấy nhân vật trước
+  const setTab = (t: Tab) => router.replace(t === 'character' ? routes.me : `${routes.me}?tab=${t}`, { scroll: false })
   return (
     <div className="space-y-4 animate-fade-in">
       <Header profile={profile} />
@@ -193,37 +166,10 @@ export function MeScreen({ profile }: { profile: Profile }) {
             <Row icon={Watch}>Thiết bị & nguồn dữ liệu</Row>
             <Devices profile={profile} />
           </Card>
-          <button onClick={() => setTab('character')} className="w-full text-left">
-            <Card className="flex items-center gap-3 transition-colors hover:border-fg-subtle">
-              <span className="grid size-10 place-items-center rounded-xl bg-brand/15 text-brand"><Shirt className="size-5" /></span>
-              <div className="flex-1"><p className="font-semibold">Nhân vật & tủ đồ</p><p className="text-xs text-fg-muted">Thay áo, giày, mũ, kính… cho nhân vật 3D</p></div>
-              <ChevronRight className="size-5 text-fg-subtle" />
-            </Card>
-          </button>
         </div>
       )}
 
       {tab === 'character' && <CharacterHub />}
-    </div>
-  )
-}
-
-/** Màn Cài đặt riêng (/me/settings): tên hiển thị, quyền riêng tư, đăng xuất */
-export function SettingsScreen({ profile }: { profile: Profile }) {
-  return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center gap-2">
-        <Link href={routes.me} aria-label="Quay lại" className="-ml-2 grid size-11 place-items-center rounded-full text-fg-muted hover:bg-surface-2">
-          <ArrowLeft className="size-5" aria-hidden />
-        </Link>
-        <h1 className="text-xl font-bold">Cài đặt</h1>
-      </div>
-      <Card className="space-y-3">
-        <Row icon={Pencil}>Tên hiển thị</Row>
-        <NameForm profile={profile} />
-      </Card>
-      <PrivacySettings userId={profile.id} />
-      <Button block variant="danger" onClick={() => supabase.auth.signOut()}><LogOut className="size-4" /> Đăng xuất</Button>
     </div>
   )
 }

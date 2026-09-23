@@ -32,6 +32,8 @@ export interface Look {
 }
 
 export interface CharacterState extends Look {
+  /** Người chơi đã khai giới tính trong hồ sơ chưa (nhân vật đi theo giới tính hồ sơ) */
+  gender_set?: boolean
   level: number
   balance: number
   items: CharacterItem[]
