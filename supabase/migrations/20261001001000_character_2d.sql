@@ -76,7 +76,7 @@ insert into public.avatar_items (code, name, description, category, rarity, asse
 on conflict (code) where code is not null do update set
   name = excluded.name, description = excluded.description, category = excluded.category, rarity = excluded.rarity,
   color = excluded.color, sort = excluded.sort, is_default = excluded.is_default,
-  render_kind = 'TINT', model_key = null, color2 = null
+  render_kind = 'TINT'
   where public.avatar_items.render_kind = 'TINT' and public.avatar_items.layer_urls is null;   -- không ghi đè món admin đã đổi thành lớp ảnh
 
 -- ---------------------------------------------------------------------

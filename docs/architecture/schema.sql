@@ -494,7 +494,6 @@ create table public.items (
   cheer_xp_receiver int,
   effect          jsonb,                        -- FUNCTIONAL: {"xp_multiplier":1.2,"duration_h":24}
   asset_2d_url    text,
-  asset_3d_url    text,                         -- .glb
   partner_sku     text,                         -- Digital Twin (FR42)
   stock           int,                          -- null = không giới hạn
   active          boolean not null default true,

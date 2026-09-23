@@ -60,7 +60,7 @@ values ('top_vn_red', 'Áo Đỏ Cờ', 'Mừng Quốc khánh 2/9', 'top', 'epic
 
 ## 4. Đổi ảnh nhân vật / thêm tư thế
 
-1. Ảnh mới (nền trơn, người đứng giữa) đặt tên `public/avatars/runner_<male|female>.png`.
+1. Ảnh gốc (nền trơn, người đứng giữa) đặt tên `scripts/character/source/runner_<male|female>.png`. Thư mục này không bị deploy, chỉ dùng để sinh tài nguyên.
 2. Chạy lại `python3 scripts/character/segment.py` (cần `pip install pillow numpy`) để sinh `base.webp` và 4 mặt nạ.
    - Ngưỡng màu trong script chỉ đúng cho bộ ảnh hiện tại. Với ảnh mới, tốt nhất họa sĩ **giao kèm 4 mặt nạ vẽ tay** (`top.png`, `bottom.png`, `socks.png`, `shoes.png`) cùng khung. Khi đó chỉ cần chép vào thư mục, không cần chạy script.
 3. **Đổi ảnh nền thì mọi lớp PNG cũ phải vẽ lại theo ảnh mới.** Lớp chỉ khớp với đúng ảnh nền đã dùng để vẽ nó. Vật phẩm đổi màu (TINT) thì không cần làm lại.

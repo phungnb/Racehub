@@ -1,6 +1,6 @@
 """Sinh tài nguyên nhân vật 2D (ADR-017, docs/NHAN_VAT.md).
 
-Từ ảnh gốc public/avatars/runner_<giới tính>.png tạo ra, trong public/character/<giới tính>/:
+Từ ảnh gốc scripts/character/source/runner_<giới tính>.png (không deploy) tạo ra, trong public/character/<giới tính>/:
   base.webp                      ảnh nhân vật đúng KHUNG CHUẨN (FRAME_W x FRAME_H)
   top.png bottom.png socks.png shoes.png
                                  mặt nạ xám cùng khung: trắng = vùng được đổi màu, đen = giữ nguyên
@@ -72,7 +72,7 @@ def regions(gender, a):
 
 
 for gender in ('male', 'female'):
-    src = Image.open(ROOT / f'public/avatars/runner_{gender}.png').convert('RGB')
+    src = Image.open(ROOT / f'scripts/character/source/runner_{gender}.png').convert('RGB')
     im = src.resize((FRAME_W, FRAME_H), Image.LANCZOS)
     out = ROOT / 'public/character' / gender
     out.mkdir(parents=True, exist_ok=True)
