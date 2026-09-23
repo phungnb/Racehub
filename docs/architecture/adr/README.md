@@ -15,3 +15,4 @@ Mỗi ADR ghi lại **một** quyết định: bối cảnh, lựa chọn, lý d
 | [009](./009-mobile-strategy.md) | PWA trước, Expo native cho GPS nền | Đề xuất |
 | [010](./010-realtime.md) | Realtime: Broadcast cho dữ liệu tạm, postgres_changes cho dữ liệu lưu | Đề xuất |
 | [011](./011-virtual-currency-compliance.md) | Ranh giới pháp lý của Xu và cược | Đề xuất — **cần tư vấn luật** |
+| [012](./012-club-hub.md) | CLB là không gian riêng: chat, bảng tin, sự kiện, quỹ, thông báo theo `club_id` | Đề xuất |
