@@ -15,9 +15,10 @@ interface Prepared { base: ImageData; regions: Partial<Record<TintSlot, Region>>
 /** Phần nền mở rộng mỗi bên (px trong khung): ảnh 2:3 thành canvas vuông, lấp kín khung hiển thị */
 const SIDE = (FRAME.height - FRAME.width) / 2
 
-const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
+export const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
   const img = new Image()
   img.decoding = 'async'
+  img.crossOrigin = 'anonymous'          // ảnh lớp trên Supabase Storage (khác tên miền)
   img.onload = () => resolve(img)
   img.onerror = () => reject(new Error(`Không tải được ${src}`))
   img.src = src
@@ -93,8 +94,10 @@ function paint(p: Prepared, tints: [TintSlot, string][]): ImageData {
 }
 
 /** Nhân vật mặc bộ đồ `items` (đã theo thứ tự lớp, xem resolveOutfit) */
-export function PaperDoll({ gender, items, className, label = 'Nhân vật' }: {
+export function PaperDoll({ gender, items, className, label = 'Nhân vật', fit = 'cover' }: {
   gender: Gender; items: CharacterItem[]; className?: string; label?: string
+  /** cover: lấp kín khung (có thể cắt chút đầu/chân); contain: thấy trọn khung ảnh, dùng khi cần soát món đồ */
+  fit?: 'cover' | 'contain'
 }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -132,7 +135,7 @@ export function PaperDoll({ gender, items, className, label = 'Nhân vật' }: {
 
   return (
     <div className={cn('relative', className)}>
-      <canvas ref={ref} role="img" aria-label={label} className={cn('size-full object-cover', status !== 'ready' && 'invisible')} />
+      <canvas ref={ref} role="img" aria-label={label} className={cn('size-full', fit === 'cover' ? 'object-cover' : 'object-contain', status !== 'ready' && 'invisible')} />
       {status === 'loading' && <div className="absolute inset-0 animate-pulse bg-surface-2" aria-hidden />}
       {status === 'error' && (
         // eslint-disable-next-line @next/next/no-img-element -- ảnh tĩnh trong /public, dự phòng khi canvas lỗi

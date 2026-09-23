@@ -4,7 +4,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useInvalidateProfile } from '@/features/auth'
 import type { EconomyPolicy } from '@/shared/lib/economy'
 import {
-  getOverview, grantPass, grantXu, listPasses, listPendingActivities, publishPolicy, reviewActivity, revokePass, searchAccounts,
+  getOverview, grantPass, grantXu, listAvatarItems, listPasses, saveAvatarItem, setAvatarItemActive, listPendingActivities, publishPolicy, reviewActivity, revokePass, searchAccounts,
 } from '../api/adminApi'
 
 export const adminKeys = {
@@ -12,6 +12,7 @@ export const adminKeys = {
   search: (q: string) => ['admin', 'search', q] as const,
   passes: ['admin', 'passes'] as const,
   pending: ['admin', 'pending'] as const,
+  items: ['admin', 'items'] as const,
 }
 
 export const useEconomyOverview = () => useQuery({ queryKey: adminKeys.overview, queryFn: getOverview })
@@ -64,5 +65,29 @@ export function useReviewActivity() {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: 'APPROVED' | 'REJECTED' }) => reviewActivity(id, status),
     onSuccess: () => void qc.invalidateQueries({ queryKey: adminKeys.pending }),
+  })
+}
+
+export const useAvatarItems = () => useQuery({ queryKey: adminKeys.items, queryFn: listAvatarItems })
+
+/** Sau khi sửa danh mục: làm mới cả danh sách quản trị lẫn tủ đồ của chính admin */
+function useRefreshItems() {
+  const qc = useQueryClient()
+  return () => {
+    void qc.invalidateQueries({ queryKey: adminKeys.items })
+    void qc.invalidateQueries({ queryKey: ['character'] })
+  }
+}
+
+export function useSaveAvatarItem() {
+  const refresh = useRefreshItems()
+  return useMutation({ mutationFn: saveAvatarItem, onSuccess: refresh })
+}
+
+export function useSetItemActive() {
+  const refresh = useRefreshItems()
+  return useMutation({
+    mutationFn: ({ code, active }: { code: string; active: boolean }) => setAvatarItemActive(code, active),
+    onSuccess: refresh,
   })
 }

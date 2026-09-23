@@ -3,6 +3,7 @@
 import { Check, Coins, Lock } from 'lucide-react'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin } from '@/shared/lib/format'
+import { LayerThumb } from './LayerThumb'
 import { layerUrl, RARITY_META, SLOTS, type CharacterItem, type Gender, type ItemStatus } from '../model/catalog'
 
 /** Ô vật phẩm: mẫu màu (hoặc ảnh lớp), độ hiếm, trạng thái (đang mặc / đã có / giá / khóa cấp) */
@@ -12,7 +13,7 @@ export function ItemCard({ item, gender, status, selected, onSelect }: {
   const Icon = SLOTS.find((s) => s.slot === item.slot)?.icon
   const r = RARITY_META[item.rarity]
   const layer = layerUrl(item, gender)
-  const swatch = layer ? undefined
+  const swatch = layer ? 'var(--color-surface-2)'
     : item.color ? `radial-gradient(circle at 35% 30%, rgb(255 255 255 / .35), transparent 55%), ${item.color}`
     : 'repeating-linear-gradient(135deg, var(--color-surface-2) 0 6px, var(--color-border) 6px 12px)'
   return (
@@ -21,8 +22,7 @@ export function ItemCard({ item, gender, status, selected, onSelect }: {
         selected ? 'border-brand' : r.border, status === 'LOCKED' && 'opacity-60')}>
       <span className="relative grid size-14 place-items-center rounded-full border border-border" style={{ background: swatch }}>
         {layer ? (
-          // eslint-disable-next-line @next/next/no-img-element -- ảnh lớp vật phẩm (URL tùy ý do admin gắn)
-          <img src={layer} alt="" className="size-full rounded-full object-cover" />
+          <LayerThumb src={layer} className="size-11" />
         ) : !item.color ? (
           <span className="text-xs font-bold text-fg-muted">Gốc</span>
         ) : Icon && <Icon className="size-6 text-white mix-blend-difference" aria-hidden />}

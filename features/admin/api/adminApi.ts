@@ -1,6 +1,7 @@
 // Công cụ admin: mọi thao tác đi qua RPC kiểm tra quyền is_system_admin (migration 000700).
 import { supabase } from '@/shared/lib/supabase'
 import { toPolicy, type EconomyPolicy } from '@/shared/lib/economy'
+import type { CharacterItem, Gender, RenderKind, Rarity, Slot } from '@/features/character'
 
 export type AccountKind = 'USER' | 'CLUB'
 
@@ -126,6 +127,57 @@ export async function reviewActivity(id: string, status: 'APPROVED' | 'REJECTED'
   if (error) throw error
 }
 
+// ---------------------------------------------------------------------
+// Vật phẩm nhân vật (migration 001200)
+// ---------------------------------------------------------------------
+export interface AdminItem extends CharacterItem {
+  is_active: boolean
+  sort: number
+  owners: number
+}
+
+export interface ItemInput {
+  code: string
+  name: string
+  description: string | null
+  slot: Slot
+  rarity: Rarity
+  render_kind: RenderKind
+  color: string | null
+  layer_urls: Partial<Record<Gender, string>> | null
+  price_xu: number
+  unlock_level: number
+  sort: number
+  is_active: boolean
+}
+
+export const LAYER_BUCKET = 'character-layers'
+
+export async function listAvatarItems(): Promise<AdminItem[]> {
+  const { data, error } = await supabase.rpc('admin_list_avatar_items')
+  if (error) throw error
+  return ((data ?? []) as AdminItem[]).map((i) => ({ ...i, price_xu: Number(i.price_xu ?? 0), owners: Number(i.owners ?? 0) }))
+}
+
+export async function saveAvatarItem(item: ItemInput) {
+  const { data, error } = await supabase.rpc('admin_save_avatar_item', { p_item: item })
+  if (error) throw error
+  return data as AdminItem
+}
+
+export async function setAvatarItemActive(code: string, active: boolean) {
+  const { error } = await supabase.rpc('admin_set_avatar_item_active', { p_code: code, p_active: active })
+  if (error) throw error
+}
+
+/** Tải ảnh lớp lên kho; tên file có mốc thời gian để không bị cache ảnh cũ khi thay */
+export async function uploadLayer(code: string, gender: Gender, file: File): Promise<string> {
+  const path = `${code}/${gender}-${Date.now()}.png`
+  const { error } = await supabase.storage.from(LAYER_BUCKET).upload(path, file, { contentType: 'image/png', upsert: false })
+  if (error) throw error
+  return supabase.storage.from(LAYER_BUCKET).getPublicUrl(path).data.publicUrl
+}
+
 const MESSAGES: Record<string, string> = {
   FORBIDDEN: 'Chỉ quản trị viên hệ thống mới làm được việc này.',
   REASON_REQUIRED: 'Hãy ghi lý do (ít nhất 5 ký tự) để lưu nhật ký.',
@@ -139,6 +191,22 @@ const MESSAGES: Record<string, string> = {
   INVALID_TIME_RANGE: 'Hạn dùng phải ở tương lai.',
   PASS_NOT_FOUND: 'Không tìm thấy vé.',
   INVALID_CONFIG: 'Cấu hình không hợp lệ — kiểm tra lại các mốc và đơn giá.',
+  INVALID_CODE: 'Mã vật phẩm chỉ gồm chữ thường không dấu, số và dấu _ (3–48 ký tự).',
+  INVALID_NAME: 'Tên vật phẩm cần 2–60 ký tự.',
+  INVALID_DESCRIPTION: 'Mô tả tối đa 160 ký tự.',
+  INVALID_SLOT: 'Ô trang phục không hợp lệ.',
+  INVALID_RARITY: 'Độ hiếm không hợp lệ.',
+  INVALID_PRICE: 'Giá phải từ 0 đến 100.000 Xu.',
+  INVALID_LEVEL: 'Cấp mở khóa phải từ 1 đến 5.',
+  TINT_SLOT_ONLY: 'Vật phẩm đổi màu chỉ dành cho áo, quần, tất, giày.',
+  INVALID_COLOR: 'Mã màu không hợp lệ.',
+  LAYER_REQUIRED: 'Cần ít nhất một ảnh lớp (Nam hoặc Nữ).',
+  INVALID_LAYER: 'Đường dẫn ảnh lớp không hợp lệ (phải là PNG).',
+  SLOT_LOCKED: 'Đã có người sở hữu món này, không đổi sang ô khác được. Hãy tạo mã mới.',
+  ITEM_REQUIRED: 'Không ngừng bán được bản nguyên bản (bộ mặc định của mọi người).',
+  ITEM_NOT_FOUND: 'Không tìm thấy vật phẩm.',
+  'Payload too large': 'File quá lớn (tối đa 1 MB).',
+  'mime type': 'Chỉ nhận file PNG.',
 }
 
 export function adminErrorMessage(e: unknown): string {

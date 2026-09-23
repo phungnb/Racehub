@@ -40,3 +40,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Ảnh xem thử của công cụ vật phẩm nhân vật
+/scripts/character/out/
+__pycache__/

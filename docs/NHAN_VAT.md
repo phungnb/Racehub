@@ -28,7 +28,11 @@ Nhân vật là **một ảnh thật** (nam hoặc nữ). App vẽ lên canvas t
 
 Không cắt sát (trim) file khi xuất. Chỉ cần giữ nguyên kích thước canvas thì món đồ sẽ luôn khớp.
 
-## 3. Thêm vật phẩm (admin, SQL Editor)
+## 3. Thêm vật phẩm
+
+**Cách dễ nhất:** trang **Quản trị → Vật phẩm → Thêm**. Tải PNG lên, trang tự kiểm tra khung và xem thử trên Nam/Nữ, không cần SQL hay deploy. Quy trình đầy đủ (kể cả nhờ AI vẽ): [docs/vat-pham/HUONG_DAN.md](vat-pham/HUONG_DAN.md).
+
+Hoặc dùng SQL Editor:
 
 **Một màu mới cho áo / quần / tất / giày** chỉ cần thêm một dòng, không cần file ảnh:
 

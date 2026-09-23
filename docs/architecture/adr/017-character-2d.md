@@ -29,10 +29,14 @@ Yêu cầu quan trọng nhất là sau này tự thiết kế thêm vật phẩm
    - `save_character` chỉ nhận `gender`; 4 ô áo / quần / tất / giày bắt buộc.
    - `get_character` trả kèm chi tiết món đang mặc, để hồ sơ hoặc BXH vẽ được nhân vật mà không cần cả danh mục.
 
+**Bổ sung (migration 001200).**
+- Trang **Quản trị → Vật phẩm**: tải lớp PNG lên kho `character-layers`, tự kiểm tra 900 × 1350, xem thử trên Nam/Nữ, ẩn hoặc mở bán.
+- `scripts/character/make-layer.py`: tách món đồ từ ảnh AI (tự căn khung, cân màu), kiểm tra PNG họa sĩ, sinh SQL.
+- Bộ prompt `docs/vat-pham/PROMPT_AI.md` và skill Claude Code `/tao-vat-pham`.
+
 **Hệ quả.**
 - Một dáng đứng cho mỗi giới. Thêm tư thế là thêm ảnh nền mới, và các món LAYER phải vẽ lại cho từng tư thế. Món TINT chỉ cần mặt nạ mới.
 - Chất lượng mặt nạ quyết định độ sạch khi đổi màu. Bộ hiện tại sinh bằng ngưỡng màu, cộng đường viền vẽ tay cho áo nữ (`scripts/character/segment.py`). Ảnh nền mới nên kèm mặt nạ vẽ tay.
 - Còn để sau:
-  - Trang admin tải lớp PNG lên, tự kiểm tra kích thước 900 × 1350 và xem thử trên cả hai giới.
   - Ảnh đại diện chụp từ nhân vật.
   - Vật phẩm theo mùa.

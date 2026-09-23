@@ -43,6 +43,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001000900_character_shop.sql` | **Nhân vật 3D (ADR-016):** 45 vật phẩm (tóc, áo, quần, tất, giày, mũ, kính, đồng hồ, phụ kiện, hiệu ứng), mua bằng Xu, quà lên cấp, lưu bộ đồ. Vật phẩm cũ không có mô hình bị ẩn khỏi shop | Cần file 800 |
 | `20261001001000_character_2d.sql` | **Nhân vật 2D (ADR-017):** thay 3D bằng ảnh nhân vật thật đổi màu áo / quần / tất / giày (35 bộ màu, có bản nguyên bản). Ngừng bán đồ 3D (tóc, mũ, kính, đồng hồ, phụ kiện, hiệu ứng) và **tự hoàn Xu** cho người đã mua, kèm thông báo. Thêm cột `render_kind`, `layer_urls` để sau này xếp lớp PNG | Cần file 900 |
 | `20261001001100_drop_3d_columns.sql` | Dọn 3 cột của nhân vật 3D không còn dùng (`model_key`, `model_urls`, `color2`) | Cần file 1000 |
+| `20261001001200_item_admin.sql` | **Quản trị vật phẩm:** kho ảnh `character-layers` (chỉ admin tải lên), thêm/sửa/ẩn vật phẩm trong trang Quản trị → Vật phẩm, có nhật ký | Cần file 1100 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 
