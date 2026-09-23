@@ -1,3 +1,11 @@
 // Cổng công khai của module club. Code ngoài module chỉ import từ '@/features/club'.
-export { default as ClubsScreen } from './components/ClubsScreen'
-export * from './api/clubApi'
+export { ClubsInboxScreen } from './components/hub/ClubsInboxScreen'
+export { ClubShell } from './components/hub/ClubShell'
+export { ClubFeedScreen } from './components/feed/ClubFeedScreen'
+export { ClubChatScreen } from './components/chat/ClubChatScreen'
+export { ClubLeaderboardScreen } from './components/leaderboard/ClubLeaderboardScreen'
+export { ClubMembersScreen } from './components/members/ClubMembersScreen'
+export { ClubTreasuryScreen } from './components/treasury/ClubTreasuryScreen'
+export { ClubSettingsScreen } from './components/settings/ClubSettingsScreen'
+export { joinClubByCode, clubErrorMessage, type Club } from './api/clubApi'
+export { ROLE_LABEL, isStaff, type ClubRole } from './model/roles'

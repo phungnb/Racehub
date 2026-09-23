@@ -1,10 +1,5 @@
-'use client'
-
-import { ClubsScreen } from '@/features/club'
-import { useInvalidateProfile, useMyProfile } from '@/features/auth'
+import { ClubsInboxScreen } from '@/features/club'
 
 export default function ClubsPage() {
-  const { profile } = useMyProfile()
-  const invalidateProfile = useInvalidateProfile()
-  return <ClubsScreen profile={profile} onProfileUpdated={invalidateProfile} />
+  return <ClubsInboxScreen />
 }

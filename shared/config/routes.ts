@@ -7,7 +7,9 @@ export const routes = {
   challenges: '/challenges',
   run: '/run',
   clubs: '/clubs',
-  club: (id: string) => `/clubs?clubId=${encodeURIComponent(id)}`,
+  club: (id: string) => `/clubs/${encodeURIComponent(id)}`,
+  clubTab: (id: string, tab: 'chat' | 'leaderboard' | 'members' | 'treasury' | 'settings') => `/clubs/${encodeURIComponent(id)}/${tab}`,
+  notifications: '/notifications',
   me: '/me',
   admin: '/admin',
 } as const

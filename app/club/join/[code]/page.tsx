@@ -28,10 +28,16 @@ export default function JoinClubPage({ params }: PageProps<'/club/join/[code]'>)
       try {
         const member = await joinClubByCode(code)
         if (cancelled) return
-        toast.success('Đã gửi yêu cầu tham gia CLB')
-        router.replace(routes.club(member.club_id))
+        toast.success(member.status === 'APPROVED' ? 'Chào mừng bạn đến với CLB!' : 'Đã gửi yêu cầu, chờ ban quản trị duyệt.')
+        router.replace(member.status === 'APPROVED' ? routes.clubTab(member.club_id, 'chat') : routes.club(member.club_id))
       } catch (e) {
-        if (!cancelled) setError(clubErrorMessage(e))
+        if (cancelled) return
+        // Đã là thành viên (bấm lại link mời cũ) → vào thẳng CLB
+        if (e instanceof Error && e.message.includes('ALREADY_MEMBER')) {
+          const { data } = await supabase.from('clubs').select('id').eq('invite_code', code.trim().toLowerCase()).maybeSingle()
+          if (data?.id) { router.replace(routes.club(data.id)); return }
+        }
+        setError(clubErrorMessage(e))
       }
     })()
     return () => { cancelled = true }

@@ -21,6 +21,11 @@ export const serverEnv = {
   get stravaClientIdRequired() {
     return required('NEXT_PUBLIC_STRAVA_CLIENT_ID')
   },
+  get cronSecret() {
+    const secret = required('CRON_SECRET')
+    if (secret.length < 16) throw new Error('[RaceHub] CRON_SECRET phải dài ít nhất 16 ký tự')
+    return secret
+  },
   get oauthStateSecret() {
     const secret = required('OAUTH_STATE_SECRET')
     if (secret.length < 32) throw new Error('[RaceHub] OAUTH_STATE_SECRET phải dài ít nhất 32 ký tự')

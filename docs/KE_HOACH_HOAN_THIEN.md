@@ -84,29 +84,31 @@ Bảy tính năng **chỉ RaceHub có**. Đây là thứ để quảng bá, nên
 | INF-05 | Gắn **Sentry** (client + server) | OPS | Lỗi thử xuất hiện trên Sentry kèm route |
 | INF-06 | Gắn **PostHog**; định nghĩa bộ sự kiện: `run_saved`, `activity_synced`, `club_joined`, `club_message_sent`, `challenge_joined`, `reward_shown`… | OPS | Dashboard North Star có số liệu |
 | INF-07 | Sinh type từ DB: `supabase gen types` → `shared/types/database.ts`; client Supabase có type | API | `supabase.from('clubs')` có gợi ý cột; lệnh sinh type chạy trong CI |
-| INF-08 | Bộ component cơ bản còn thiếu: `Tabs`, `Sheet`, `Dialog/Confirm`, `Input`, `Avatar`, `AvatarStack`, `Chip`; trang `/dev/ui` | UI | Mọi component có đủ 4 trạng thái trên `/dev/ui`, chụp ở 390px |
-| INF-09 | Chuyển chạy định kỳ sang **Vercel Cron** → `/api/cron/*` (bảo vệ bằng `CRON_SECRET`), vì production chưa bật `pg_cron` | OPS | Route cron từ chối request không có secret |
+| 🔄 INF-08 | Bộ component cơ bản còn thiếu: `Tabs`, `Sheet`, `Dialog/Confirm`, `Input`, `Avatar`, `AvatarStack`, `Chip`; trang `/dev/ui` | UI | Mọi component có đủ 4 trạng thái trên `/dev/ui`, chụp ở 390px |
+| ✅ INF-09 | Chuyển chạy định kỳ sang **Vercel Cron** → `/api/cron/*` (bảo vệ bằng `CRON_SECRET`), vì production chưa bật `pg_cron` | OPS | Route cron từ chối request không có secret |
 
 ### Sprint 2: CLB lõi (05/10 → 16/10) · Trụ cột ③ · Mốc M1
+
+> **Trạng thái:** code đã xong trên nhánh, chờ chạy migration 000500 và thử với CLB thí điểm (QA-2). Chưa làm: chia sẻ bài chạy vào chat (chuyển sang CLB-09b, Sprint 3), "đang gõ…" (để sau vì cần Realtime Authorization).
 
 **Mục tiêu:** một CLB thật dùng RaceHub để nói chuyện và theo dõi nhau chạy thay cho Zalo.
 
 | Mã | Việc | Loại | Nghiệm thu |
 |---|---|---|---|
-| CLB-01 | Migration `000500_club_hub_core`:<br>• `private.is_club_member()`<br>• `club_posts` (kind: POST · ANNOUNCEMENT · AUTO_RUN · AUTO_PB · AUTO_LEVEL · RECAP), `club_post_reactions`, `club_post_comments`<br>• `club_messages`, `club_message_reads`<br>• `club_join_requests`, `notifications`, `notification_settings`<br>• chuyển `club_announcements` sang `club_posts`<br>• thêm các bảng vào publication realtime | DB | Chạy 2 lần không lỗi; test RLS: người ngoài không đọc được, thành viên đọc được, chỉ người có quyền `ANNOUNCE` đăng được thông báo |
-| CLB-02 | RPC `create_club_post`, `react_club_post`, `comment_club_post`, `pin_club_post`, `hide_club_content`, `request_join_club`, `review_join_request`, `mark_club_read`, `set_notification_level` | DB | Mỗi RPC có test quyền + nghiệp vụ trong `tests/db/club-hub.test.ts` |
-| CLB-03 | Chat: `insert` trực tiếp qua RLS, giới hạn 20 tin/phút bằng trigger, xóa mềm, `reply_to` | DB | Tin thứ 21 trong 1 phút bị từ chối kèm mã lỗi thân thiện |
-| CLB-04 | Trigger bài tự sinh: bài chạy **APPROVED** → một `AUTO_RUN` trong mỗi CLB của người đó (tôn trọng cài đặt riêng tư) | DB | Đồng bộ một bài Strava → bài đăng xuất hiện trong CLB ≤ 5 giây |
-| CLB-05 | `features/club/api/{postsApi,chatApi,membersApi}.ts`; hook `useClubFeed` (cuộn vô hạn), `useClubChat` (realtime + gửi lạc quan), `useUnread` | API | Hai trình duyệt chat với nhau: tin đến < 1 giây; mất mạng rồi có lại không mất tin |
-| CLB-06 | Route `/clubs` dạng **hộp thư CLB**: tin chưa đọc, hoạt động mới; thuộc đúng 1 CLB thì vào thẳng CLB đó | UI | Đủ 4 trạng thái; có nút tạo CLB / nhập mã mời |
-| CLB-07 | `/clubs/[id]/layout.tsx`: `ClubHeader` + `ClubTabs` (Bảng tin · Trò chuyện · Thử thách · BXH · Thành viên · Cài đặt) | UI | Tab dính khi cuộn; đổi tab không tải lại đầu trang; đúng màu CLB |
-| CLB-08 | Tab **Bảng tin**: thông báo ghim, `PostCard` theo từng loại, `RunCard`, thả cảm xúc, bình luận, soạn bài có ảnh (Storage `club-media`) | UI | Đăng bài có ảnh ≤ 3 giây; thông báo ghim luôn ở đầu |
-| CLB-09 | Tab **Trò chuyện**: `ChatThread`, bong bóng tin, trả lời, nhắc `@tên`, chia sẻ bài chạy, "đang gõ…" (Broadcast) | UI | Cuộn mượt 1.000 tin; nhắc tên tạo thông báo cho người được nhắc |
-| CLB-10 | Tab **Thành viên**: danh sách, vai trò, duyệt đơn gia nhập, mời bằng link / QR; làm lại `ClubMembersManager` và `ClubSettings` theo chuẩn mới | UI | Chủ nhiệm duyệt đơn bằng một chạm; xóa thành viên phải xác nhận |
-| CLB-11 | Tab **BXH**: tuần / tháng theo km, số buổi (view `club_leaderboard_week`) | DB·UI | Dòng của tôi được ghim; số khớp với tổng bài chạy APPROVED |
-| CLB-12 | **Chuông thông báo** trên TopBar + `/notifications`; cài đặt mức thông báo theo CLB | UI | Số chưa đọc cập nhật realtime; mức NONE thì không nhận gì từ CLB đó |
-| CLB-13 | Cron thứ Hai 07:00: bài **Tổng kết tuần** của mỗi CLB (tổng km, top 3, người mới) | DB·OPS | Chạy lại cron không tạo bài trùng |
-| CLB-14 | Xóa `ClubsScreen` cũ (714 dòng), `ClubActivities`, `MyClubsRail` sau khi màn mới thay thế | UI | Không còn file cũ; ESLint không cảnh báo `any` trong `features/club` |
+| ✅ CLB-01 | Migration `000500_club_hub_core`:<br>• `private.is_club_member()`<br>• `club_posts` (kind: POST · ANNOUNCEMENT · AUTO_RUN · AUTO_PB · AUTO_LEVEL · RECAP), `club_post_reactions`, `club_post_comments`<br>• `club_messages`, `club_message_reads`<br>• `club_join_requests`, `notifications`, `notification_settings`<br>• chuyển `club_announcements` sang `club_posts`<br>• thêm các bảng vào publication realtime | DB | Chạy 2 lần không lỗi; test RLS: người ngoài không đọc được, thành viên đọc được, chỉ người có quyền `ANNOUNCE` đăng được thông báo |
+| ✅ CLB-02 | RPC `create_club_post`, `react_club_post`, `comment_club_post`, `pin_club_post`, `hide_club_content`, `request_join_club`, `review_join_request`, `mark_club_read`, `set_notification_level` | DB | Mỗi RPC có test quyền + nghiệp vụ trong `tests/db/club-hub.test.ts` |
+| ✅ CLB-03 | Chat: `insert` trực tiếp qua RLS, giới hạn 20 tin/phút bằng trigger, xóa mềm, `reply_to` | DB | Tin thứ 21 trong 1 phút bị từ chối kèm mã lỗi thân thiện |
+| ✅ CLB-04 | Trigger bài tự sinh: bài chạy **APPROVED** → một `AUTO_RUN` trong mỗi CLB của người đó (tôn trọng cài đặt riêng tư) | DB | Đồng bộ một bài Strava → bài đăng xuất hiện trong CLB ≤ 5 giây |
+| ✅ CLB-05 | `features/club/api/{postsApi,chatApi,membersApi}.ts`; hook `useClubFeed` (cuộn vô hạn), `useClubChat` (realtime + gửi lạc quan), `useUnread` | API | Hai trình duyệt chat với nhau: tin đến < 1 giây; mất mạng rồi có lại không mất tin |
+| ✅ CLB-06 | Route `/clubs` dạng **hộp thư CLB**: tin chưa đọc, hoạt động mới; thuộc đúng 1 CLB thì vào thẳng CLB đó | UI | Đủ 4 trạng thái; có nút tạo CLB / nhập mã mời |
+| ✅ CLB-07 | `/clubs/[id]/layout.tsx`: `ClubHeader` + `ClubTabs` (Bảng tin · Trò chuyện · Thử thách · BXH · Thành viên · Cài đặt) | UI | Tab dính khi cuộn; đổi tab không tải lại đầu trang; đúng màu CLB |
+| ✅ CLB-08 | Tab **Bảng tin**: thông báo ghim, `PostCard` theo từng loại, `RunCard`, thả cảm xúc, bình luận, soạn bài có ảnh (Storage `club-media`) | UI | Đăng bài có ảnh ≤ 3 giây; thông báo ghim luôn ở đầu |
+| ✅ CLB-09 | Tab **Trò chuyện**: `ChatThread`, bong bóng tin, trả lời, nhắc `@tên`, chia sẻ bài chạy, "đang gõ…" (Broadcast) | UI | Cuộn mượt 1.000 tin; nhắc tên tạo thông báo cho người được nhắc |
+| ✅ CLB-10 | Tab **Thành viên**: danh sách, vai trò, duyệt đơn gia nhập, mời bằng link / QR; làm lại `ClubMembersManager` và `ClubSettings` theo chuẩn mới | UI | Chủ nhiệm duyệt đơn bằng một chạm; xóa thành viên phải xác nhận |
+| ✅ CLB-11 | Tab **BXH**: tuần / tháng theo km, số buổi (view `club_leaderboard_week`) | DB·UI | Dòng của tôi được ghim; số khớp với tổng bài chạy APPROVED |
+| ✅ CLB-12 | **Chuông thông báo** trên TopBar + `/notifications`; cài đặt mức thông báo theo CLB | UI | Số chưa đọc cập nhật realtime; mức NONE thì không nhận gì từ CLB đó |
+| ✅ CLB-13 | Cron thứ Hai 07:00: bài **Tổng kết tuần** của mỗi CLB (tổng km, top 3, người mới) | DB·OPS | Chạy lại cron không tạo bài trùng |
+| ✅ CLB-14 | Xóa `ClubsScreen` cũ (714 dòng), `ClubActivities`, `MyClubsRail` sau khi màn mới thay thế | UI | Không còn file cũ; ESLint không cảnh báo `any` trong `features/club` |
 | QA-2 | Kiểm thử cùng CLB thí điểm: 20+ người dùng thật trong 3 ngày | QA | Ghi nhận ≥ 10 góp ý; sửa lỗi chặn trước khi đóng sprint |
 
 ### Sprint 3: Engine thử thách + đội (19/10 → 30/10) · Trụ cột ② · Mốc M2
@@ -236,7 +238,7 @@ Một sprint chỉ được đóng khi đạt đủ các mục sau:
 |---|---|---|---|---|
 | 0–1 | Nền móng an toàn | ✅ Vá bảo mật, sổ cái, đồng bộ Strava, màn Chạy / Thử thách / Hồ sơ, dọn cây thư mục | — | 68 test, build xanh |
 | 1.5 | Hạ tầng | ⬜ | | |
-| 2 | CLB lõi | ⬜ | | |
+| 2 | CLB lõi | ✅ Code xong (CLB-01 → CLB-14): bảng tin, chat realtime, thông báo, BXH, thành viên, quỹ, cài đặt, tổng kết tuần. Còn QA-2 với CLB thí điểm | | Sửa lỗi production: không gán được Quản trị viên, không cấm được thành viên. 91 test |
 | 3 | Thử thách đội | ⬜ | | |
 | 4 | Lớp game | ⬜ | | |
 | 5 | CLB hoàn chỉnh + PWA | ⬜ | | |

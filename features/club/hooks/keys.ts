@@ -1,0 +1,13 @@
+export const clubKeys = {
+  inbox: ['clubs', 'inbox'] as const,
+  search: (q: string) => ['clubs', 'search', q] as const,
+  club: (id: string) => ['club', id] as const,
+  membership: (id: string, uid: string | undefined) => ['club', id, 'membership', uid] as const,
+  members: (id: string) => ['club', id, 'members'] as const,
+  pinned: (id: string) => ['club', id, 'pinned'] as const,
+  posts: (id: string) => ['club', id, 'posts'] as const,
+  comments: (postId: string) => ['club-post', postId, 'comments'] as const,
+  chat: (id: string) => ['club', id, 'chat'] as const,
+  leaderboard: (id: string, period: string) => ['club', id, 'leaderboard', period] as const,
+  treasury: (id: string) => ['club', id, 'treasury'] as const,
+}

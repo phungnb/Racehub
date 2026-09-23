@@ -20,6 +20,7 @@ Sao chép `.env.example` thành `.env.local` (máy local / Codespaces), hoặc �
 | `SUPABASE_SERVICE_ROLE_KEY` | Cùng trang, mục `service_role` | **Bắt buộc**. Chỉ đặt ở server, không có tiền tố `NEXT_PUBLIC_` |
 | `NEXT_PUBLIC_STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET` | strava.com/settings/api | Trước đây Client ID bị hard-code, nay đọc từ biến môi trường |
 | `OAUTH_STATE_SECRET` | Tự tạo bằng `openssl rand -hex 32` | **Mới**, bắt buộc |
+| `CRON_SECRET` | Tự tạo bằng `openssl rand -hex 24` | **Mới (Sprint 2)**. Vercel dùng để gọi `/api/cron/club-recap` (bài Tổng kết tuần, 07:00 sáng thứ Hai). Lịch nằm trong `vercel.json` |
 
 Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo lỗi rõ tên biến bị thiếu, thay vì âm thầm dùng key sai như trước.
 
@@ -27,7 +28,7 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
-Chạy **3 file** trong `supabase/migrations/`, đúng thứ tự:
+Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 
 | File | Nội dung | Chạy riêng được? |
 |---|---|---|
@@ -35,6 +36,7 @@ Chạy **3 file** trong `supabase/migrations/`, đúng thứ tự:
 | `20261001000200_ledger_and_rewards.sql` | Sổ cái thống nhất (đối soát số dư đầu kỳ), thưởng bài chạy phía server có trần/ngày, tính lại cấp độ theo tài liệu | Cần file 100 |
 | `20261001000300_secure_rpcs.sql` | Viết lại các RPC: bài chạy GPS, tạo thử thách, quỹ CLB, giới thiệu bạn, duyệt bài, công cụ admin, kết nối Strava | Cần file 200 |
 | `20261001000400_provider_activity_ingest.sql` | Nhận bài chạy từ Strava: chống trùng, luật hợp lệ kiểu UpRace, thu hồi thưởng khi bài bị xóa | Cần file 300 |
+| `20261001000500_club_hub_core.sql` | **Sprint 2, CLB:** bảng tin, chat, thông báo, BXH CLB, hộp thư, bài tự sinh, bucket ảnh `club-media`; **sửa lỗi không gán được vai trò Quản trị viên / không cấm được thành viên** | Cần file 400 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 
@@ -63,6 +65,10 @@ Số Xu hiện có của từng người **được giữ nguyên**: migration g
 
 ### Nếu chỉ chạy file 100 mà chưa deploy code mới
 Hệ thống an toàn ngay, nhưng các chức năng sau sẽ tạm lỗi cho đến khi chạy tiếp file 200, 300 và deploy code: lưu bài chạy GPS (bản cũ vốn đã lỗi với mọi bài hợp lệ), tạo thử thách, kết nối/hủy Strava, người dùng mới tự tạo hồ sơ.
+
+### Sau khi chạy file 500: bật Realtime cho chat
+
+File 500 đã tự thêm `club_messages`, `club_posts`, `notifications` vào Realtime. Kiểm tra lại trong **Supabase → Database → Publications → supabase_realtime**: ba bảng này phải được bật. Nếu chưa có thì chat vẫn gửi được, nhưng người khác phải tải lại trang mới thấy tin mới.
 
 ## Bước 4 — Cấu hình Strava
 
@@ -111,6 +117,17 @@ Checklist kiểm tra thủ công sau khi deploy:
 - [ ] **Chạy thử 1 km bằng nút Chạy** (ngoài trời) → lưu thành công, nhận Xu/XP.
 - [ ] **Tạo thử thách** → bị trừ phí, số dư trên thanh trên cùng giảm đúng.
 - [ ] **Tài khoản admin** mở `/admin`, duyệt được bài chạy, lưu được cấu hình kinh tế.
+- [ ] **CLB (Sprint 2):** dùng 2 tài khoản trên 2 trình duyệt (hoặc 1 máy tính + 1 điện thoại):
+  - [ ] Tài khoản A **tạo CLB** → vào tab Thành viên → **Mời bạn vào CLB** → sao chép link.
+  - [ ] Tài khoản B mở link → vào CLB (nếu chế độ "Cần duyệt": A thấy chấm đỏ ở tab Thành viên và chuông thông báo → **Duyệt**).
+  - [ ] Tab **Chat**: A gửi tin → B thấy ngay dưới 1 giây, không cần tải lại. Gõ `@` → hiện gợi ý tên → B nhận thông báo "nhắc đến bạn".
+  - [ ] Giữ (hoặc chạm) vào một tin → **Trả lời**, **Thu hồi** hoạt động.
+  - [ ] Ra danh sách CLB: CLB có tin chưa đọc hiện số màu đỏ; mở Chat thì số về 0.
+  - [ ] Tab **Bảng tin**: A (Chủ nhiệm) bật "Đăng thành thông báo ghim" → bài nằm đầu bảng tin, B nhận thông báo. B đăng bài có ảnh, A **Thích** / **Bình luận**.
+  - [ ] B chạy một bài (hoặc đồng bộ Strava) → bài chạy **tự hiện** trên Bảng tin CLB và cộng vào **BXH** tuần.
+  - [ ] Tab **Thành viên**: A cho B làm **Quản trị viên** (trước đây bị lỗi), rồi thôi; thử **Cấm** một tài khoản thử.
+  - [ ] **Cài đặt CLB** (bánh răng): đổi màu CLB, đổi logo, chọn mức thông báo "Tắt" → không nhận thông báo từ CLB đó nữa.
+  - [ ] Kiểm tra cron: `curl -H "Authorization: Bearer $CRON_SECRET" https://<domain>/api/cron/club-recap` → trả về `{"posted": …}`; gọi không có token → 401.
 - [ ] **Kiểm tra bảo mật** — Supabase → SQL Editor, chạy đoạn dưới. Kết quả **phải** báo lỗi `permission denied`:
   ```sql
   begin;
