@@ -53,8 +53,8 @@ Racehub/
 │   ├── remote_schema.sql         Ảnh chụp schema production (nền cho test DB)
 │   └── config.toml
 ├── tests/db/                     Test migration + RLS trên Postgres nhúng (PGlite)
-├── public/models/character/      Mô hình 3D nhân vật (GLB) — chuẩn trong docs/NHAN_VAT_3D.md
-├── scripts/character/            Sinh bộ GLB khởi đầu: `npm run models`
+├── public/character/             Nhân vật 2D: ảnh nền + mặt nạ vùng theo giới tính (khung 900 × 1350, docs/NHAN_VAT.md)
+├── scripts/character/            Sinh ảnh nền + mặt nạ từ ảnh gốc: `python3 scripts/character/segment.py`
 ├── docs/                         Tài liệu (xem §5)
 ├── proxy.ts                      Làm mới phiên đăng nhập (thay middleware ở Next 16)
 └── .github/workflows/ci.yml      lint + typecheck + test + build

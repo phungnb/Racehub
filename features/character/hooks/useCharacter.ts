@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useInvalidateProfile } from '@/features/auth'
 import { buyItem, getCharacter, getCharacterState, saveCharacter } from '../api/characterApi'
-import type { Look, Slot } from '../model/catalog'
+import type { Gender, Slot } from '../model/catalog'
 
 export const characterKeys = {
   state: ['character', 'state'] as const,
@@ -30,7 +30,7 @@ export function useBuyItem() {
 export function useSaveCharacter() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ look, equipped }: { look: Partial<Omit<Look, 'equipped'>>; equipped: Partial<Record<Slot, string | null>> }) =>
+    mutationFn: ({ look, equipped }: { look: { gender?: Gender }; equipped: Partial<Record<Slot, string | null>> }) =>
       saveCharacter(look, equipped),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['character'] }),
   })

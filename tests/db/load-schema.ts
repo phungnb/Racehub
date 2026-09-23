@@ -21,7 +21,8 @@ export async function createDb({
   withMigrations = true,
   runMigrationsTwice = false,
   seed,
-}: { withMigrations?: boolean; runMigrationsTwice?: boolean; seed?: (db: PGlite) => Promise<void> } = {}) {
+  until,
+}: { withMigrations?: boolean; runMigrationsTwice?: boolean; seed?: (db: PGlite) => Promise<void>; until?: string } = {}) {
   const db = new PGlite({ extensions: { pgcrypto } })
   await db.exec(fs.readFileSync(path.join(__dirname, 'supabase_stub.sql'), 'utf8'))
   await db.exec(sanitize(fs.readFileSync(path.join(ROOT, 'supabase/remote_schema.sql'), 'utf8')))
@@ -30,7 +31,8 @@ export async function createDb({
   if (seed) await seed(db)            // dữ liệu có sẵn trên production TRƯỚC khi migrate
   if (withMigrations) {
     const dir = path.join(ROOT, 'supabase/migrations')
-    const files = fs.readdirSync(dir).filter((f) => f >= '20261001').sort()
+    // until: dừng ở migration có tên bắt đầu bằng chuỗi này (để thử dữ liệu cũ trước một migration)
+    const files = fs.readdirSync(dir).filter((f) => f >= '20261001' && (!until || f.slice(0, until.length) <= until)).sort()
     for (let i = 0; i < (runMigrationsTwice ? 2 : 1); i++) {
       for (const f of files) await db.exec(sanitize(fs.readFileSync(path.join(dir, f), 'utf8')))
     }

@@ -31,7 +31,7 @@ Nguyên nhân chủ yếu nằm ở cấu trúc và sự nhất quán, không ph
 | Bản đồ | `maplibre-gl` (+ tile Mapbox/MapTiler) | Mini-map, lộ trình, heatmap cộng đồng |
 | Biểu đồ | `recharts` | Pace/HR (MH 17), thống kê tuần/tháng |
 | Hiệu ứng | `motion` (framer-motion) | Cheer, level up, nút "Breath" (MH 4) |
-| 3D avatar | `three` + `@react-three/fiber` (đang dùng) | **Lazy-load** (`next/dynamic`, `ssr:false`), fallback ảnh 2D |
+| Nhân vật | Canvas 2D: ảnh thật + mặt nạ đổi màu + lớp PNG (ADR-017) | Không cần thư viện; ảnh nền + mặt nạ ≈ 80 KB mỗi giới |
 | Poster chia sẻ | `@vercel/og` (route `/api/og/...`) | Sinh ảnh MH 18 phía server |
 | PWA | `serwist` | Cài lên màn hình chính, offline shell, Web Push |
 | Chất lượng | ESLint, Prettier, Vitest, Playwright, Storybook (tùy chọn) | |
@@ -211,7 +211,7 @@ export function useSendCheer() {
 - **Phản hồi tức thì:** Cheer, like, join dùng optimistic update rồi rollback khi lỗi.
 - **Quyền riêng tư:** mặc định ẩn 200 m đầu/cuối lộ trình. Chế độ Live chia sẻ vị trí phải bật riêng.
 - **Truy cập (a11y):** tương phản tối thiểu 4.5:1 (xanh neon trên nền tối đạt yêu cầu; **không** dùng chữ trắng trên nền neon). Tôn trọng `prefers-reduced-motion` cho hiệu ứng Cheer.
-- **Hiệu năng:** trang 3D avatar và bản đồ được lazy-load. Ảnh dùng `next/image`. Mục tiêu LCP < 2.5 s trên 4G.
+- **Hiệu năng:** bản đồ được lazy-load. Ảnh dùng `next/image`. Mục tiêu LCP < 2.5 s trên 4G.
 
 ## 5. Kế hoạch làm lại frontend (song song với backend GĐ 0–2)
 

@@ -134,9 +134,12 @@ describe('kinh tế & bài chạy (sau migration)', () => {
   it('trần thưởng mỗi ngày theo cấu hình admin', async () => {
     await asUser(db, ADMIN, '/rpc/admin_publish_config',
       `select public.admin_publish_config('economy_global_config', '{"firstKmXu": 20, "extraKmXu": 20, "maxDailyReward": 30}')`)
-    const r = await submit(db, FRIEND, 3, 360, 60)
+    // Hai bài phải cùng một ngày giờ VN: gần nửa đêm thì lùi cả hai về chiều hôm trước
+    const vnMinutes = (Date.now() / 60_000 + 7 * 60) % (24 * 60)
+    const shift = vnMinutes >= 240 ? 0 : Math.ceil(vnMinutes) + 600
+    const r = await submit(db, FRIEND, 3, 360, 60 + shift)
     expect(Number(r.earned_xu)).toBe(30)                     // 20 + 2 × 20 = 60, nhưng trần 30/ngày
-    const r2 = await submit(db, FRIEND, 3, 360, 200)
+    const r2 = await submit(db, FRIEND, 3, 360, 200 + shift)
     expect(Number(r2.earned_xu)).toBe(0)
   })
 

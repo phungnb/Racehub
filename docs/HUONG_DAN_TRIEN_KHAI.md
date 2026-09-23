@@ -41,6 +41,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001000700_economy_admin.sql` | **Kinh tế Xu & điều phối admin (ADR-014):** phí tạo thử thách theo số người (≤ 5 miễn phí · 6–10 người 3 Xu/người · trên 10 người 5 Xu/người), thử thách CLB trả bằng quỹ CLB, vé tạo miễn phí, thưởng chạy mới (km đầu 1 Xu + 0,2 Xu/km, trần 10 Xu/ngày), admin cộng/trừ Xu cho cá nhân hoặc quỹ CLB | Cần file 600 |
 | `20261001000800_game_layer.sql` | **Sprint 4, Game (ADR-015):** nhiệm vụ ngày/tuần, điểm danh, streak tuần + khiên, 27 huy hiệu, league tuần (Đồng → Kim cương), cổ vũ bằng Xu, ví Xu, chuỗi phần thưởng sau bài chạy. Bài chạy bị xóa thì thu hồi cả thưởng game | Cần file 700 |
 | `20261001000900_character_shop.sql` | **Nhân vật 3D (ADR-016):** 45 vật phẩm (tóc, áo, quần, tất, giày, mũ, kính, đồng hồ, phụ kiện, hiệu ứng), mua bằng Xu, quà lên cấp, lưu bộ đồ. Vật phẩm cũ không có mô hình bị ẩn khỏi shop | Cần file 800 |
+| `20261001001000_character_2d.sql` | **Nhân vật 2D (ADR-017):** thay 3D bằng ảnh nhân vật thật đổi màu áo / quần / tất / giày (35 bộ màu, có bản nguyên bản). Ngừng bán đồ 3D (tóc, mũ, kính, đồng hồ, phụ kiện, hiệu ứng) và **tự hoàn Xu** cho người đã mua, kèm thông báo. Thêm cột `render_kind`, `layer_urls` để sau này xếp lớp PNG | Cần file 900 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 
@@ -100,6 +101,12 @@ notify pgrst, 'reload schema';
 select proname from pg_proc where pronamespace = 'public'::regnamespace and proname in (
   'character_state','get_character','buy_avatar_item','save_character') order by 1;
 select count(*) from public.avatar_items where code is not null;
+notify pgrst, 'reload schema';
+
+-- File 1000 phải ra 4 dòng: bottom, shoes, socks, top (mỗi ô có ≥ 6 màu đang bán)
+select category, count(*) from public.avatar_items where is_active and code is not null group by 1 order by 1;
+-- Số lần đã hoàn Xu cho đồ 3D ngừng bán (0 nếu chưa ai mua)
+select count(*) from public.ledger_transactions where type = 'SHOP_REFUND';
 notify pgrst, 'reload schema';
 ```
 

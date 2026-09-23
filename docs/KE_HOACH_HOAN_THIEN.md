@@ -174,7 +174,7 @@ Bảy tính năng **chỉ RaceHub có**. Đây là thứ để quảng bá, nên
 | SS-01 | Migration `000900_seasons`: `seasons`, vật phẩm giới hạn, BXH mùa |
 | SS-02 | **League CLB**: xếp hạng CLB theo km trung bình / thành viên hoạt động, chia hạng, lên xuống hạng cuối mùa |
 | SS-03 | Thử thách **CLB đấu CLB** (lời mời, chấp nhận, BXH hai phía) |
-| ◐ SS-04 | **Cửa hàng** (MH19) + **Tủ đồ** (MH26): ✅ nhân vật 3D GLB, 45 vật phẩm, thử đồ, mua bằng Xu, quà lên cấp (migration 000900, ADR-016). Còn: vật phẩm theo mùa, asset do họa sĩ 3D làm lại theo `docs/NHAN_VAT_3D.md` |
+| ◐ SS-04 | **Cửa hàng** (MH19) + **Tủ đồ** (MH26): ✅ nhân vật 2D từ ảnh thật, đổi màu áo/quần/tất/giày giữ nếp vải, Nam/Nữ, 35 bộ màu, thử trước khi mua, quà lên cấp (migration 000900 + 001000, ADR-017). Còn: món lớp PNG (mũ, kính, áo CLB) theo khung chuẩn `docs/NHAN_VAT.md`, trang admin tải lớp, vật phẩm theo mùa |
 | SS-05 | **Poster chia sẻ** (MH18): ảnh bài chạy / huy hiệu / kết quả thử thách, xuất ảnh cho Story |
 | SS-06 | Thử nghiệm **Expo** cho màn Chạy (GPS nền, giọng HLV): làm bản mẫu, chưa phát hành |
 

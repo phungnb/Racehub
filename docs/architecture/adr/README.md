@@ -18,4 +18,5 @@ Mỗi ADR ghi lại **một** quyết định: bối cảnh, lựa chọn, lý d
 | [012](./012-club-hub.md) | CLB là không gian riêng: chat, bảng tin, sự kiện, quỹ, thông báo theo `club_id` | Đề xuất |
 | [014](./014-xu-economy-admin.md) | Kinh tế Xu: phí thử thách theo số người, quỹ CLB trả phí, vé miễn phí, admin điều phối Xu | Đã chấp nhận |
 | [015](./015-game-layer.md) | Lớp game: nhiệm vụ, streak tuần + khiên, huy hiệu theo luật, league tuần, cổ vũ bằng Xu, chuỗi phần thưởng | Đã chấp nhận |
-| [016](./016-character-3d.md) | Nhân vật 3D mô-đun: GLB theo xương Mixamo, vật liệu tint, tủ đồ + shop | Đã chấp nhận |
+| [016](./016-character-3d.md) | Nhân vật 3D mô-đun: GLB theo xương Mixamo, vật liệu tint, tủ đồ + shop | Bị thay bởi 017 |
+| [017](./017-character-2d.md) | Nhân vật 2D từ ảnh thật: đổi màu theo mặt nạ, xếp lớp PNG khung chuẩn 900 × 1350 | Đã chấp nhận |

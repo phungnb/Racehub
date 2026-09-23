@@ -1,10 +1,11 @@
-// Nhân vật 3D (migration 000900, docs/NHAN_VAT_3D.md): kiểu dữ liệu + hàm thuần.
-import { Footprints, Gem, Glasses, HardHat, Palette, Scissors, Shirt, Sparkles, Watch, type LucideIcon } from 'lucide-react'
+// Nhân vật 2D (migration 001000, ADR-017, docs/NHAN_VAT.md): kiểu dữ liệu + hàm thuần.
+// Nhân vật là ảnh thật trong KHUNG CHUẨN; vật phẩm TINT đổi màu một vùng (theo mặt nạ), LAYER xếp một ảnh PNG cùng khung lên trên.
+import { Footprints, Gem, Glasses, HardHat, Scissors, Shirt, Sparkles, Watch, type LucideIcon } from 'lucide-react'
 
 export type Gender = 'male' | 'female'
 export type Slot = 'hair' | 'top' | 'bottom' | 'socks' | 'shoes' | 'hat' | 'glasses' | 'watch' | 'accessory' | 'effect'
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary'
-export type AnimationName = 'Idle' | 'Run' | 'Wave'
+export type RenderKind = 'TINT' | 'LAYER'
 
 export interface CharacterItem {
   code: string
@@ -12,10 +13,11 @@ export interface CharacterItem {
   description: string | null
   slot: Slot
   rarity: Rarity
-  model_key: string | null
-  model_urls: Partial<Record<Gender, string>> | null
+  render_kind: RenderKind
+  /** Ảnh lớp (PNG trong suốt, đúng khung chuẩn) theo giới tính — chỉ với LAYER */
+  layer_urls: Partial<Record<Gender, string>> | null
+  /** Màu vùng (TINT); null = màu nguyên bản của ảnh */
   color: string | null
-  color2: string | null
   price_xu: number
   unlock_level: number
   is_default: boolean
@@ -24,9 +26,9 @@ export interface CharacterItem {
 
 export interface Look {
   gender: Gender
-  skin_tone: string
-  hair_color: string
   equipped: Partial<Record<Slot, string>>
+  /** Chi tiết các món đang mặc (get_character trả kèm để vẽ được mà không cần cả danh mục) */
+  items?: CharacterItem[]
 }
 
 export interface CharacterState extends Look {
@@ -35,23 +37,30 @@ export interface CharacterState extends Look {
   items: CharacterItem[]
 }
 
-/** Thứ tự ô trong tủ đồ */
+/** Khung chuẩn: mọi ảnh nền, mặt nạ và lớp vật phẩm đều đúng kích thước này */
+export const FRAME = { width: 900, height: 1350 } as const
+export const CHARACTER_BASE = '/character'
+/** Vùng đổi màu được trên ảnh nhân vật (mỗi vùng có một mặt nạ) */
+export const TINT_SLOTS = ['top', 'bottom', 'socks', 'shoes'] as const satisfies readonly Slot[]
+export type TintSlot = (typeof TINT_SLOTS)[number]
+
+export const baseUrl = (g: Gender) => `${CHARACTER_BASE}/${g}/base.webp`
+export const maskUrl = (g: Gender, slot: TintSlot) => `${CHARACTER_BASE}/${g}/${slot}.png`
+export const isTintSlot = (s: Slot): s is TintSlot => (TINT_SLOTS as readonly Slot[]).includes(s)
+
+/** Thứ tự ô trong tủ đồ, cũng là thứ tự xếp lớp ảnh (sau đè trước) */
 export const SLOTS: { slot: Slot; label: string; icon: LucideIcon; required?: boolean }[] = [
-  { slot: 'hair', label: 'Tóc', icon: Scissors, required: true },
   { slot: 'top', label: 'Áo', icon: Shirt, required: true },
   { slot: 'bottom', label: 'Quần', icon: Shirt, required: true },
-  { slot: 'socks', label: 'Tất', icon: Footprints },
+  { slot: 'socks', label: 'Tất', icon: Footprints, required: true },
   { slot: 'shoes', label: 'Giày', icon: Footprints, required: true },
-  { slot: 'hat', label: 'Mũ', icon: HardHat },
-  { slot: 'glasses', label: 'Kính', icon: Glasses },
-  { slot: 'watch', label: 'Đồng hồ', icon: Watch },
   { slot: 'accessory', label: 'Phụ kiện', icon: Gem },
+  { slot: 'watch', label: 'Đồng hồ', icon: Watch },
+  { slot: 'hair', label: 'Tóc', icon: Scissors },
+  { slot: 'glasses', label: 'Kính', icon: Glasses },
+  { slot: 'hat', label: 'Mũ', icon: HardHat },
   { slot: 'effect', label: 'Hiệu ứng', icon: Sparkles },
 ]
-export const LOOK_TAB = { label: 'Ngoại hình', icon: Palette }
-
-export const SKIN_TONES = ['#f6d7c3', '#e9b995', '#d49a6a', '#b57a4f', '#8a5a3b', '#5c3a26']
-export const HAIR_COLORS = ['#1b1210', '#2b1d16', '#5a3522', '#8b4513', '#c68642', '#e6c27a', '#9aa6b8', '#e11d48', '#2f6bff']
 
 export const RARITY_META: Record<Rarity, { label: string; text: string; border: string }> = {
   common: { label: 'Thường', text: 'text-rarity-common', border: 'border-border' },
@@ -60,18 +69,52 @@ export const RARITY_META: Record<Rarity, { label: string; text: string; border: 
   legendary: { label: 'Huyền thoại', text: 'text-rarity-legendary', border: 'border-rarity-legendary/70' },
 }
 
-export const MODEL_BASE = '/models/character'
-export const bodyUrl = (g: Gender) => `${MODEL_BASE}/body_${g}.glb`
-
-/** URL mô hình của vật phẩm theo giới tính: asset riêng (model_urls) ưu tiên, không thì theo model_key */
-export function modelUrl(item: Pick<CharacterItem, 'model_key' | 'model_urls'>, gender: Gender): string | null {
-  const custom = item.model_urls?.[gender]
-  if (custom) return custom
-  return item.model_key ? `${MODEL_BASE}/${item.model_key}_${gender}.glb` : null
+export function hexToRgb(hex: string): [number, number, number] | null {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim())
+  if (!m) return null
+  const n = parseInt(m[1], 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
 }
 
-/** Tên xương chuẩn hóa: bỏ tiền tố "mixamorig", bỏ ký tự đặc biệt ("mixamorig:LeftArm" → "LeftArm") */
-export const normalizeBone = (name: string) => name.replace(/^mixamorig[:_]?/i, '').replace(/[^A-Za-z0-9]/g, '')
+export const luma = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 * b
+
+/**
+ * Đổi màu một điểm ảnh giữ nếp vải: độ sáng tương đối của điểm (so với trung bình vùng) nhân vào màu đích.
+ * Màu rất tối được nâng tối thiểu và cộng thêm độ lệch sáng để vẫn thấy nếp gấp.
+ * alpha = độ phủ của mặt nạ (0..1). Trả về [r, g, b] đã trộn với màu gốc.
+ */
+export function tintPixel(r: number, g: number, b: number, alpha: number, target: readonly [number, number, number], regionMean: number): [number, number, number] {
+  const L = luma(r, g, b)
+  const f = L / Math.max(regionMean, 1)
+  const tl = luma(target[0], target[1], target[2])
+  const lift = Math.max(tl, 25) / Math.max(tl, 1)
+  const detail = tl < 40 ? (L - regionMean) * 0.35 : 0
+  const out = [r, g, b] as [number, number, number]
+  for (let j = 0; j < 3; j++) {
+    const c = tl < 1 ? 25 : target[j] * lift
+    const nv = Math.min(255, Math.max(0, c * f + detail))
+    out[j] = out[j] * (1 - alpha) + nv * alpha
+  }
+  return out
+}
+
+/** Ảnh lớp của vật phẩm theo giới tính (không có bản riêng thì dùng bản của giới còn lại) */
+export function layerUrl(item: Pick<CharacterItem, 'render_kind' | 'layer_urls'>, gender: Gender): string | null {
+  if (item.render_kind !== 'LAYER' || !item.layer_urls) return null
+  return item.layer_urls[gender] ?? item.layer_urls[gender === 'male' ? 'female' : 'male'] ?? null
+}
+
+/** Bộ đồ (mã theo ô) → danh sách món cần vẽ, theo thứ tự xếp lớp */
+export function resolveOutfit(items: CharacterItem[] | undefined, equipped: Partial<Record<Slot, string>>): CharacterItem[] {
+  const byCode = new Map((items ?? []).map((i) => [i.code, i]))
+  const out: CharacterItem[] = []
+  for (const { slot } of SLOTS) {
+    const code = equipped[slot]
+    const it = code ? byCode.get(code) : undefined
+    if (it && it.slot === slot) out.push(it)
+  }
+  return out
+}
 
 /** Trạng thái một vật phẩm với người chơi */
 export type ItemStatus = 'EQUIPPED' | 'OWNED' | 'BUY' | 'LOCKED'

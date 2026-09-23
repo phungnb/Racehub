@@ -7,13 +7,12 @@ import { levelDef } from '@/features/progression'
 import { routes } from '@/shared/config/routes'
 import { characterErrorMessage } from '../api/characterApi'
 import { useCharacterState } from '../hooks/useCharacter'
-import { useViewerItems } from './useOutfit'
-import { Viewer } from './Viewer'
+import { resolveOutfit } from '../model/catalog'
+import { PaperDoll } from './PaperDoll'
 
-/** Thẻ nhân vật trong trang Tôi: xem nhân vật 3D, mở tủ đồ */
+/** Thẻ nhân vật trong trang Tôi: xem nhân vật, mở tủ đồ */
 export function CharacterHub() {
   const q = useCharacterState()
-  const items = useViewerItems(q.data?.items, q.data?.equipped ?? {}, q.data?.gender ?? 'male')
   if (q.isPending) return <Skeleton className="h-[26rem]" />
   if (q.isError) return <ErrorState message={characterErrorMessage(q.error)} onRetry={() => void q.refetch()} />
   const s = q.data
@@ -22,9 +21,9 @@ export function CharacterHub() {
   return (
     <div className="space-y-3">
       <Card className="overflow-hidden p-0">
-        <div className="relative h-80 bg-gradient-to-b from-surface-2 via-surface to-brand/10">
-          <Viewer gender={s.gender} skinTone={s.skin_tone} hairColor={s.hair_color} items={items} className="size-full" />
-          <span className="absolute left-3 top-3 rounded-full bg-bg/70 px-3 py-1 text-xs font-semibold backdrop-blur">
+        <div className="relative h-96 bg-[#c4c4ce]">
+          <PaperDoll gender={s.gender} items={resolveOutfit(s.items, s.equipped)} className="size-full" label="Nhân vật của bạn" />
+          <span className="absolute bottom-3 left-3 rounded-full bg-bg/85 px-3 py-1 text-xs font-semibold backdrop-blur">
             Lv.{s.level} · {levelDef(s.level).name}
           </span>
         </div>

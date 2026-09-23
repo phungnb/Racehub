@@ -1,6 +1,6 @@
 # ADR-016: Nhân vật 3D dạng mô-đun (GLB + xương Mixamo)
 
-**Trạng thái.** Đã chấp nhận (migration `20261001000900_character_shop.sql`). Chuẩn asset: [docs/NHAN_VAT_3D.md](../../NHAN_VAT_3D.md).
+**Trạng thái.** **Bị thay thế bởi [ADR-017](./017-character-2d.md)** (nhân vật 2D từ ảnh thật). Bộ GLB, trình hiển thị three.js và tài liệu chuẩn asset 3D đã gỡ khỏi repo. Bảng và RPC của migration `20261001000900_character_shop.sql` vẫn dùng tiếp.
 
 **Bối cảnh.** Đặc tả Module 3.2–3.3 có avatar thay được áo, quần, giày, mũ, kính và đồng hồ, cùng một shop vật phẩm theo độ hiếm. Trước đây app chỉ có 2 ảnh PNG cố định và một bản 3D ghép từ khối cơ bản. Chủ sản phẩm chọn **3D thật (GLB)**, thay vì vector 2D hoặc ảnh render theo từng bộ đồ.
 

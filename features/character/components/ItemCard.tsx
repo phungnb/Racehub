@@ -3,22 +3,29 @@
 import { Check, Coins, Lock } from 'lucide-react'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin } from '@/shared/lib/format'
-import { RARITY_META, SLOTS, type CharacterItem, type ItemStatus } from '../model/catalog'
+import { layerUrl, RARITY_META, SLOTS, type CharacterItem, type Gender, type ItemStatus } from '../model/catalog'
 
-/** Ô vật phẩm: mẫu màu, độ hiếm, trạng thái (đang mặc / đã có / giá / khóa cấp) */
-export function ItemCard({ item, status, selected, onSelect }: {
-  item: CharacterItem; status: ItemStatus; selected: boolean; onSelect: () => void
+/** Ô vật phẩm: mẫu màu (hoặc ảnh lớp), độ hiếm, trạng thái (đang mặc / đã có / giá / khóa cấp) */
+export function ItemCard({ item, gender, status, selected, onSelect }: {
+  item: CharacterItem; gender: Gender; status: ItemStatus; selected: boolean; onSelect: () => void
 }) {
   const Icon = SLOTS.find((s) => s.slot === item.slot)?.icon
   const r = RARITY_META[item.rarity]
-  const c1 = item.color ?? '#9aa6b8', c2 = item.color2 ?? c1
+  const layer = layerUrl(item, gender)
+  const swatch = layer ? undefined
+    : item.color ? `radial-gradient(circle at 35% 30%, rgb(255 255 255 / .35), transparent 55%), ${item.color}`
+    : 'repeating-linear-gradient(135deg, var(--color-surface-2) 0 6px, var(--color-border) 6px 12px)'
   return (
     <button onClick={onSelect} aria-pressed={selected}
       className={cn('flex w-full flex-col items-center gap-1.5 rounded-2xl border-2 bg-surface p-2.5 text-center transition-colors',
         selected ? 'border-brand' : r.border, status === 'LOCKED' && 'opacity-60')}>
-      <span className="relative grid size-14 place-items-center rounded-full"
-        style={{ background: `linear-gradient(135deg, ${c1} 0 58%, ${c2} 58% 100%)` }}>
-        {Icon && <Icon className="size-6 text-white mix-blend-difference" aria-hidden />}
+      <span className="relative grid size-14 place-items-center rounded-full border border-border" style={{ background: swatch }}>
+        {layer ? (
+          // eslint-disable-next-line @next/next/no-img-element -- ảnh lớp vật phẩm (URL tùy ý do admin gắn)
+          <img src={layer} alt="" className="size-full rounded-full object-cover" />
+        ) : !item.color ? (
+          <span className="text-xs font-bold text-fg-muted">Gốc</span>
+        ) : Icon && <Icon className="size-6 text-white mix-blend-difference" aria-hidden />}
         {status === 'EQUIPPED' && (
           <span className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-brand text-brand-fg"><Check className="size-3" aria-hidden /></span>
         )}
