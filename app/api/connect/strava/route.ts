@@ -1,0 +1,28 @@
+import { NextResponse } from 'next/server'
+import { createSupabaseServerClient } from '@/shared/lib/supabase-server'
+import { createOAuthState, OAUTH_NONCE_COOKIE } from '@/shared/lib/oauth-state'
+import { getPublicOrigin } from '@/shared/lib/request-url'
+import { serverEnv } from '@/shared/config/env.server'
+import { buildStravaAuthorizeUrl } from '@/features/integrations/strava/strava.server'
+
+// Bắt đầu kết nối Strava. Người dùng được xác định từ phiên đăng nhập (cookie),
+// KHÔNG từ tham số URL.
+export async function GET(request: Request) {
+  const origin = getPublicOrigin(request)
+  const supabase = await createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.redirect(new URL('/?strava_error=auth_required', origin))
+  }
+
+  const { state, nonce, maxAge } = createOAuthState(user.id, 'STRAVA', serverEnv.oauthStateSecret)
+  const response = NextResponse.redirect(buildStravaAuthorizeUrl(origin, state))
+  response.cookies.set(OAUTH_NONCE_COOKIE, nonce, {
+    httpOnly: true,
+    secure: origin.startsWith('https'),
+    sameSite: 'lax',
+    path: '/api/strava',
+    maxAge,
+  })
+  return response
+}

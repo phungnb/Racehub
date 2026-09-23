@@ -24,13 +24,11 @@ export default function AdminDashboard({ profile }: { profile: any }) {
   }, [])
 
   const handleValidateActivity = async (activityId: string, status: 'APPROVED' | 'REJECTED') => {
-    const { error } = await supabase
-      .from('activities')
-      .update({ 
-        validation_status: status,
-        status: status === 'APPROVED' ? 'COMPLETED' : 'REJECTED'
-      })
-      .eq('id', activityId)
+    // Duyệt qua RPC: máy chủ kiểm tra quyền admin và ghi nhật ký
+    const { error } = await supabase.rpc('review_activity', {
+      p_activity_id: activityId,
+      p_decision: status,
+    })
 
     if (!error) {
       setPendingActivities(prev => prev.filter(item => item.id !== activityId))

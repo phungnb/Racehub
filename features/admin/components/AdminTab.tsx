@@ -81,13 +81,10 @@ export default function AdminTab({ profile }: AdminTabProps) {
         refMinKmRequired
       };
 
-      const { error } = await supabase.from('system_config_versions').upsert({
-        config_key: 'economy_global_config',
-        version: Math.floor(Date.now() / 1000),
-        status: 'PUBLISHED',
-        config_value: globalConfig,
-        created_by: profile?.id
-      }, { onConflict: 'config_key' });
+      const { error } = await supabase.rpc('admin_publish_config', {
+        p_config_key: 'economy_global_config',
+        p_config_value: globalConfig,
+      });
 
       if (error) throw error;
       setMessage('Đã cập nhật và lưu toàn bộ chính sách kinh tế Xu thành công!');

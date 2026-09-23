@@ -183,7 +183,6 @@ export default function RunTab({ profile, onActivitySaved }: RunTabProps) {
     const endedAt = new Date();
 
     const payload = {
-      p_user_id: profile.id,
       p_title: `Buổi chạy ngày ${new Date().toLocaleDateString('vi-VN')}`,
       p_source: 'DIRECT_GPS',
       p_started_at: startTimeRef.current ? startTimeRef.current.toISOString() : new Date().toISOString(),

@@ -92,11 +92,7 @@ export const outranks = (actor: string | null | undefined, target: string) =>
 
 /** Kiểm tra quyền thông qua hàm RPC has_permission trên Database */
 export async function hasPermission(clubId: string, permissionCode: string): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return false
-
   const { data, error } = await supabase.rpc('has_permission', {
-    p_user_id: user.id,
     p_club_id: clubId,
     p_permission_code: permissionCode,
   })

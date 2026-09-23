@@ -42,32 +42,17 @@ export default function ProfileTab({ profile, t }: { profile: any, t: any }) {
   }
 
   const handleConnectStrava = () => {
-    const clientId = '141757'
-    const redirectUri = `${window.location.origin}/api/strava/callback`
-    const userState = profile?.id
-
-    if (!userState) {
-      alert('Không tìm thấy thông tin tài khoản.')
-      return
-    }
-
-    window.location.href = `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&approval_prompt=force&prompt=login&scope=read,activity:read_all&state=${userState}`
+    // Server tự xác định người dùng từ phiên đăng nhập và tạo state có chữ ký
+    window.location.href = '/api/connect/strava'
   }
+
   const handleDisconnectStrava = async () => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          strava_connected: false,
-          strava_access_token: null,
-          strava_refresh_token: null 
-        })
-        .eq('id', profile.id)
-
-      if (error) throw error
+      const res = await fetch('/api/connect/strava/disconnect', { method: 'POST' })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || res.statusText)
       window.location.reload()
-    } catch (err: any) {
-      alert('Không thể hủy kết nối: ' + err.message)
+    } catch (err: unknown) {
+      alert('Không thể hủy kết nối: ' + (err instanceof Error ? err.message : String(err)))
     }
   }
 

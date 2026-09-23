@@ -38,6 +38,8 @@ const translations = {
 const STRAVA_ERROR_MESSAGES: Record<string, string> = {
   access_denied: 'Bạn đã hủy hoặc từ chối cấp quyền truy cập Strava.',
   account_conflict: 'Tài khoản Strava này đã được liên kết với một tài khoản khác trên hệ thống.',
+  invalid_state: 'Phiên kết nối Strava không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.',
+  auth_required: 'Bạn cần đăng nhập trước khi kết nối Strava.',
   server_error: 'Đã có lỗi hệ thống khi kết nối Strava. Vui lòng thử lại sau.',
 }
 
@@ -134,15 +136,14 @@ export default function RaceHubApp() {
     if (data) {
       setProfile(data)
     } else {
-      const defaultProfile = {
-        id: session.user.id,
-        display_name: session.user.email?.split('@')[0] || 'Runner',
-        xu: 500,
-        xp: 0,
-        level: 1
+      // Hồ sơ + ví + thưởng chào mừng do máy chủ tạo (client không tự đặt số Xu)
+      const { error: ensureError } = await supabase.rpc('ensure_profile')
+      if (ensureError) {
+        console.error('Không tạo được hồ sơ:', ensureError.message)
+      } else {
+        const { data: created } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
+        if (created) setProfile(created)
       }
-      const { error: insertError } = await supabase.from('profiles').insert(defaultProfile)
-      if (!insertError) setProfile(defaultProfile)
     }
 
     const { data: clubData } = await supabase.from('clubs').select('*').order('name', { ascending: true })
