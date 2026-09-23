@@ -81,7 +81,7 @@ describe('kinh tế & bài chạy (sau migration)', () => {
     expect(Math.abs(Number(r.distance_m) - 5000)).toBeLessThan(60)
     expect(Number(r.earned_xu)).toBeCloseTo(1.8, 5)          // 1 Xu km đầu + 4 × 0,2
     expect(Number(r.earned_xp)).toBe(50)                      // 10 XP/km
-    expect(await xu(db, RUNNER)).toBeCloseTo(11.8, 5)
+    expect(await xu(db, RUNNER)).toBeCloseTo(12.8, 5)                // 10 + 1,8 + nhiệm vụ 3 km (000800)
     expect(await ledgerBalance(db, RUNNER)).toBe(await xu(db, RUNNER))
     const p = await db.query<{ current_progress: string; status: string }>(
       `select current_progress, status from public.challenge_participants where profile_id = $1`, [RUNNER])

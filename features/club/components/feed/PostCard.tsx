@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Avatar, Card, ConfirmSheet, LevelBadge, Sheet } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatDuration, formatKm, formatNumber, formatPace, formatRelative } from '@/shared/lib/format'
+import { CheerButton } from '@/features/game'
 import { clubErrorMessage } from '../../api/clubApi'
 import { postImageUrl, type ClubPost } from '../../api/postsApi'
 import { usePostActions } from '../../hooks/useClubFeed'
@@ -117,6 +118,10 @@ function PostActions({ post, onComments }: { post: ClubPost; onComments: (p: Clu
         <MessageCircle className="size-5" aria-hidden />Bình luận
         {post.comment_count > 0 && <span className="font-mono tabular">{formatNumber(post.comment_count)}</span>}
       </button>
+      {post.author_id && (post.kind === 'AUTO_RUN' || post.kind === 'POST') && (
+        <CheerButton className="ml-auto" toUser={post.author_id} toName={post.author?.display_name ?? 'Thành viên'}
+          toAvatar={post.author?.avatar_url} postId={post.id} activityId={post.activity_id} total={Number(post.cheer_xu ?? 0)} />
+      )}
     </footer>
   )
 }

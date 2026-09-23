@@ -28,6 +28,7 @@ export interface ClubPost {
   is_pinned: boolean
   reaction_count: number
   comment_count: number
+  cheer_xu?: number
   created_at: string
   author: MemberProfile | null
   reacted: boolean

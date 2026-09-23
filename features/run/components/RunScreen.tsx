@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { AlertTriangle, CheckCircle2, Clock3, Gauge, Loader2, MapPin, Pause, Play, Satellite, Square, Timer, Volume2, VolumeX, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock3, Gift, Gauge, Loader2, MapPin, Pause, Play, Satellite, Square, Timer, Volume2, VolumeX, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, CoinAmount, HoldButton, XpAmount } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatDuration, formatKm, formatPace } from '@/shared/lib/format'
+import { RewardCascade, useActivityRewards, useMarkSeen } from '@/features/game'
 import { useRunTracker, type GpsState } from '../hooks/useRunTracker'
 
 const GPS_LABEL: Record<GpsState, { text: string; tone: string }> = {
@@ -209,10 +210,31 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
         <div><p className="text-xs text-fg-subtle">Phần thưởng</p><CoinAmount value={r?.earned_xu ?? 0} className="text-xl" /></div>
         <div><p className="text-xs text-fg-subtle">Kinh nghiệm</p><XpAmount value={r?.earned_xp ?? 0} className="text-xl" /></div>
       </Card>
+      {r?.activity_id && r.validation_status === 'APPROVED' && <RunRewards activityId={r.activity_id} />}
       <div className="flex gap-2">
         <Button block variant="secondary" onClick={t.discard}>Chạy tiếp</Button>
         <Link href="/feed" className="flex-1"><Button block>Về trang chủ</Button></Link>
       </div>
     </div>
+  )
+}
+
+/** Tổng kết sau chạy (MH17): tự mở chuỗi phần thưởng một lần, xem lại được */
+function RunRewards({ activityId }: { activityId: string }) {
+  const q = useActivityRewards(activityId)
+  const markSeen = useMarkSeen()
+  // null = chưa thao tác: tự mở khi có từ 2 phần thưởng trở lên
+  const [open, setOpen] = useState<boolean | null>(null)
+  const events = q.data ?? []
+  if (q.isPending) return <div className="h-14 animate-pulse rounded-xl bg-surface-2" aria-label="Đang tính phần thưởng" />
+  if (events.length <= 1) return null
+  const close = () => { setOpen(false); markSeen.mutate(events.map((e) => e.id)) }
+  return (
+    <>
+      <Button block variant="secondary" onClick={() => setOpen(true)}>
+        <Gift className="size-4 text-coin" aria-hidden />Xem {events.length} phần thưởng của bài chạy
+      </Button>
+      <RewardCascade events={events} open={open ?? events.length > 1} onClose={close} title="Tổng kết buổi chạy" />
+    </>
   )
 }

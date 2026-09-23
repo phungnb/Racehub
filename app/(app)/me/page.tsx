@@ -46,7 +46,9 @@ export default function MePage() {
   return (
     <>
       <Suspense fallback={null}><StravaResultNotice /></Suspense>
-      {profile ? <MeScreen profile={profile} /> : <Skeleton className="h-96" />}
+      <Suspense fallback={<Skeleton className="h-96" />}>
+        {profile ? <MeScreen profile={profile} /> : <Skeleton className="h-96" />}
+      </Suspense>
     </>
   )
 }

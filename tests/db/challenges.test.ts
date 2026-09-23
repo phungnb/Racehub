@@ -167,7 +167,8 @@ describe('Engine thử thách (000600)', () => {
     expect((await rpc<{ ok: boolean }>(db, D, `select public.settle_challenge_if_due($1) as ok`, [r.challenge_id]))[0].ok).toBe(true)
     expect((await rpc<{ ok: boolean }>(db, D, `select public.settle_challenge_if_due($1) as ok`, [r.challenge_id]))[0].ok).toBe(false)
     expect(await xu(db, D)).toBe(dBefore + 60)
-    expect(Number((await db.query<{ xp: number }>(`select xp from public.profiles where id = $1`, [D])).rows[0].xp)).toBe(xpBefore + 100)
+    // +100 XP về nhất; huy hiệu "Về đích thử thách" và "Nhà vô địch" (000800) +300 XP
+    expect(Number((await db.query<{ xp: number }>(`select xp from public.profiles where id = $1`, [D])).rows[0].xp)).toBe(xpBefore + 100 + 100 + 200)
     expect(await participant(db, r.challenge_id, D)).toMatchObject({ final_rank: 1 })
     expect((await db.query(`select status from public.challenges where id = $1`, [r.challenge_id])).rows[0]).toMatchObject({ status: 'FINISHED' })
     expect((await asUser(db, D, '/notifications', `select 1 from public.notifications where kind = 'CHALLENGE_RESULT'`)).rows.length).toBeGreaterThan(0)

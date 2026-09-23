@@ -8,6 +8,7 @@ export type RunPhase = 'IDLE' | 'LOCATING' | 'RUNNING' | 'PAUSED' | 'FINISHED' |
 export type GpsState = 'OFF' | 'SEARCHING' | 'GOOD' | 'WEAK' | 'DENIED' | 'UNSUPPORTED'
 
 export interface SaveResult {
+  activity_id?: string
   validation_status: 'APPROVED' | 'PENDING' | 'REJECTED'
   validation_reason: string
   earned_xu: number

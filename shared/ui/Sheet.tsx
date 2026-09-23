@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/shared/lib/cn'
 import { Button } from './Button'
@@ -28,7 +29,8 @@ export function Sheet({ open, onClose, title, description, children, footer, cla
   }, [open, onClose])
 
   if (!open) return null
-  return (
+  // Portal ra body: tránh bị kẹt dưới thanh điều hướng khi cha có transform/animation (tạo stacking context)
+  return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
       <button aria-label="Đóng" data-close tabIndex={-1} onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-[2px] animate-fade-in" />
       <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={titleId}
@@ -48,7 +50,8 @@ export function Sheet({ open, onClose, title, description, children, footer, cla
         <div className="flex-1 overflow-y-auto px-5 pb-4">{children}</div>
         {footer && <div className="border-t border-border px-5 py-3">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

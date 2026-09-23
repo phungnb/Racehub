@@ -2,7 +2,8 @@
 
 import { Users } from 'lucide-react'
 import { useMyProfile } from '@/features/auth'
-import { HomeSummary, ConnectDeviceCard } from '@/features/home'
+import { ConnectDeviceCard } from '@/features/home'
+import { GameHub } from '@/features/game'
 import { ActivityList } from '@/features/activity'
 import { StravaSyncCard } from '@/features/integrations'
 import { EmptyState, SectionTitle, Skeleton } from '@/shared/ui'
@@ -21,7 +22,7 @@ export default function FeedPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <HomeSummary profile={profile} />
+      <GameHub profile={profile} />
       {profile.strava_connected ? <StravaSyncCard /> : <ConnectDeviceCard />}
 
       <section>

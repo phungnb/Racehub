@@ -43,13 +43,13 @@ describe('ingest_provider_activity', () => {
   it('bài chạy hợp lệ được nhập và thưởng ngay', async () => {
     const r = await ingest('1001', run())
     expect(r).toMatchObject({ result: 'IMPORTED', validation_status: 'APPROVED', earned_xu: 1.8, earned_xp: 50 })
-    expect(await xu(U)).toBe(1.8)
+    expect(await xu(U)).toBe(2.8)                // + nhiệm vụ ngày "chạy một bài từ 3 km" (000800)
   })
 
   it('webhook gửi lại cùng bài → không thưởng lần 2; đổi tên → UPDATED', async () => {
     expect((await ingest('1001', run())).result).toBe('DUPLICATE')
     expect((await ingest('1001', run({ title: 'Chạy Hồ Tây' }))).result).toBe('UPDATED')
-    expect(await xu(U)).toBe(1.8)
+    expect(await xu(U)).toBe(2.8)
   })
 
   it('đạp xe / quá ngắn → bỏ qua, không lưu', async () => {
@@ -82,7 +82,7 @@ describe('ingest_provider_activity', () => {
     expect(await xu(U)).toBe(before)
   })
 
-  it('bài bị xóa trên Strava → thu hồi Xu và XP', async () => {
+  it('bài bị xóa trên Strava → thu hồi Xu và XP (cả thưởng nhiệm vụ, huy hiệu của bài đó)', async () => {
     const xpBefore = Number((await db.query<{ xp: number }>(`select xp from public.profiles where id = $1`, [U])).rows[0].xp)
     await db.exec('set role service_role')
     const r = (await db.query<{ r: Record<string, unknown> }>(`select public.remove_provider_activity('STRAVA', '1001') as r`)).rows[0].r
@@ -91,7 +91,9 @@ describe('ingest_provider_activity', () => {
     expect(r).toMatchObject({ result: 'DELETED', reversed_xu: 1.8, reversed_xp: 50 })
     expect(again.result).toBe('ALREADY_DELETED')
     expect(await xu(U)).toBe(0)
-    expect(Number((await db.query<{ xp: number }>(`select xp from public.profiles where id = $1`, [U])).rows[0].xp)).toBe(xpBefore - 50)
+    // 50 XP bài chạy + 30 XP nhiệm vụ + 2 huy hiệu (km đầu tiên, 5K) × 100 XP
+    expect(Number((await db.query<{ xp: number }>(`select xp from public.profiles where id = $1`, [U])).rows[0].xp)).toBe(xpBefore - 280)
+    expect((await db.query(`select 1 from public.user_achievements where user_id = $1`, [U])).rows).toHaveLength(0)
     const sum = await db.query<{ s: string }>(`select coalesce(sum(amount), 0) s from public.ledger_entries`)
     expect(Number(sum.rows[0].s)).toBe(0)
   })

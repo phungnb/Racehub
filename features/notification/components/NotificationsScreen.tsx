@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { AtSign, Bell, CheckCheck, Coins, Heart, Megaphone, MessageCircle, Ticket, Trophy, UserCheck, UserPlus, type LucideIcon } from 'lucide-react'
+import { Award, AtSign, Bell, CheckCheck, Coins, HandCoins, Heart, TrendingUp, Megaphone, MessageCircle, Ticket, Trophy, UserCheck, UserPlus, type LucideIcon } from 'lucide-react'
 import { Avatar, Button, EmptyState, ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatRelative } from '@/shared/lib/format'
@@ -17,6 +17,10 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   CHALLENGE_NEW: { icon: Trophy, tone: 'text-coin' },
   ADMIN_XU: { icon: Coins, tone: 'text-coin' },
   ADMIN_PASS: { icon: Ticket, tone: 'text-brand' },
+  BADGE: { icon: Award, tone: 'text-medal-gold' },
+  LEVEL_UP: { icon: TrendingUp, tone: 'text-brand' },
+  LEAGUE: { icon: Trophy, tone: 'text-coin' },
+  CHEER: { icon: HandCoins, tone: 'text-coin' },
 }
 
 export function NotificationsScreen() {

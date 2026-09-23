@@ -1,20 +1,31 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Check, ChevronRight, Copy, Gift, LogOut, Pencil, Share2, Shield, Shirt, Watch } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/shared/lib/supabase'
-import { Button, Card, LevelBadge, ProgressBar, SegmentedControl, Skeleton } from '@/shared/ui'
+import { Button, Card, LevelBadge, ProgressBar, Skeleton } from '@/shared/ui'
+import { cn } from '@/shared/lib/cn'
 import { formatKm, formatNumber } from '@/shared/lib/format'
 import { levelProgress } from '@/features/progression'
 import { useInvalidateProfile } from '@/features/auth'
 import { CharacterHub } from '@/features/character'
+import { BadgeGrid, WalletView } from '@/features/game'
 import { getAthleteProfile } from '../api/athleteApi'
 import PrivacySettings from './PrivacySettings'
 import type { Profile } from '@/shared/types/profile'
 
-type Tab = 'overview' | 'character' | 'settings'
+type Tab = 'overview' | 'badges' | 'wallet' | 'character' | 'settings'
+const TABS: { value: Tab; label: string }[] = [
+  { value: 'overview', label: 'Tổng quan' },
+  { value: 'badges', label: 'Huy hiệu' },
+  { value: 'wallet', label: 'Ví Xu' },
+  { value: 'character', label: 'Nhân vật' },
+  { value: 'settings', label: 'Cài đặt' },
+]
+const isTab = (v: string | null): v is Tab => TABS.some((t) => t.value === v)
 
 function StatCell({ label, km, runs }: { label: string; km: number; runs?: number }) {
   return (
@@ -150,15 +161,27 @@ function Row({ icon: Icon, children }: { icon: typeof Pencil; children: React.Re
 }
 
 export function MeScreen({ profile }: { profile: Profile }) {
-  const [tab, setTab] = useState<Tab>('overview')
+  const params = useSearchParams()
+  const router = useRouter()
+  const fromUrl = params.get('tab')
+  const tab: Tab = isTab(fromUrl) ? fromUrl : 'overview'
+  // Tab nằm trên URL để thông báo mở đúng chỗ (/me?tab=badges, /me?tab=wallet)
+  const setTab = (t: Tab) => router.replace(t === 'overview' ? '/me' : `/me?tab=${t}`, { scroll: false })
   return (
     <div className="space-y-4 animate-fade-in">
       <Header profile={profile} />
-      <SegmentedControl value={tab} onChange={setTab} options={[
-        { value: 'overview', label: 'Tổng quan' },
-        { value: 'character', label: 'Nhân vật' },
-        { value: 'settings', label: 'Cài đặt' },
-      ]} />
+      <nav role="tablist" aria-label="Trang cá nhân" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+        {TABS.map((t) => (
+          <button key={t.value} role="tab" aria-selected={tab === t.value} onClick={() => setTab(t.value)}
+            className={cn('shrink-0 rounded-full border px-3.5 py-2 text-sm font-semibold',
+              tab === t.value ? 'border-brand bg-brand text-brand-fg' : 'border-border text-fg-muted hover:text-fg')}>
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      {tab === 'badges' && <BadgeGrid />}
+      {tab === 'wallet' && <WalletView />}
 
       {tab === 'overview' && (
         <div className="space-y-3">

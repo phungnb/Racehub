@@ -135,19 +135,21 @@ Bảy tính năng **chỉ RaceHub có**. Đây là thứ để quảng bá, nên
 
 ### Sprint 4: Lớp game (02/11 → 13/11) · Trụ cột ① · Mốc M3 Beta kín
 
+> **Trạng thái:** code xong GM-01 → GM-09, GM-11 (migration 000800, ADR-015, 8 test DB + 3 test logic). **Còn:** GM-10 chi tiết bài chạy có bản đồ; admin sửa nhiệm vụ/huy hiệu trên giao diện (hiện sửa trong bảng `quests`, `achievements`).
+
 | Mã | Việc | Loại | Nghiệm thu |
 |---|---|---|---|
-| GM-01 | Migration `000700_game_layer`: `quests`, `user_quest_progress`, `user_streaks`, cột `achievements.rule` (jsonb), `leagues`, `league_members`, `cheers` | DB | Test mỗi luật: nhiệm vụ, streak, huy hiệu |
-| GM-02 | Động cơ phần thưởng: sau mỗi bài APPROVED → nhiệm vụ → streak → huy hiệu → league; tất cả qua sổ cái, có trần | DB | Một bài chạy trả về **danh sách phần thưởng** (dùng cho `RewardCascade`) |
-| GM-03 | Bộ huy hiệu đầu tiên (≥ 20): km đầu tiên, 10/50/100/500 km, PB 5K/10K/HM/FM, streak 4/10/26 tuần, chạy nhóm 5 lần, hoàn thành thử thách đội đầu tiên | DB·UI | Mỗi huy hiệu có hình, mô tả, điều kiện |
-| GM-04 | **Streak tuần** + khiên (mua bằng Xu BONUS / PAID, tối đa 2) | DB·UI | Mất streak khi hết tuần mà chưa đủ buổi; khiên tự dùng |
-| GM-05 | **League tuần**: cron thứ Hai chia nhóm 30 người cùng hạng; top 7 lên hạng, 5 người cuối xuống hạng | DB·OPS | Người mới vào hạng Đồng; không ai bị xếp 2 nhóm |
-| GM-06 | **Trang chủ = trung tâm game**: `ProgressRing` tuần, streak, nhiệm vụ hôm nay, league, thử thách đang chạy, hoạt động CLB | UI | Mở app thấy "hôm nay cần làm gì" ở màn đầu, không phải cuộn |
-| GM-07 | **Tổng kết sau chạy** (MH17) có `RewardCascade`; bỏ qua được; tôn trọng giảm chuyển động | UI | Có tối đa 6 thẻ, tổng ≤ 6 giây |
-| GM-08 | **Cổ vũ có giá trị**: tặng 1–10 Xu kèm lời, trần 50 Xu/ngày | DB·UI | Không cổ vũ chính mình; có trong lịch sử ví của cả hai bên |
-| GM-09 | **Ví Xu** (MH25): số dư BONUS / PAID, lịch sử từ sổ cái, lọc theo loại | UI | Tổng lịch sử khớp số dư |
+| ✅ GM-01 | Migration `000800_game_layer`: `quests`, `user_quest_progress`, `user_streaks`, cột `achievements.rule` (jsonb), `league_groups`, `league_members`, `cheers`, `game_events` | DB | Test mỗi luật: nhiệm vụ, streak, huy hiệu |
+| ✅ GM-02 | Động cơ phần thưởng: sau mỗi bài APPROVED → nhiệm vụ → streak → huy hiệu → league; tất cả qua sổ cái, có trần | DB | Một bài chạy trả về **danh sách phần thưởng** (dùng cho `RewardCascade`) |
+| ✅ GM-03 | Bộ huy hiệu đầu tiên (27): km đầu tiên, 10/50/100/500/1000 km, 5K/10K/HM/FM, streak 4/10/26 tuần, chim sớm/cú đêm, thử thách (đội, vô địch), cổ vũ, CLB, cấp độ. *Chạy nhóm 5 lần: chờ sự kiện CLB (Sprint 5)* | DB·UI | Mỗi huy hiệu có hình, mô tả, điều kiện |
+| ✅ GM-04 | **Streak tuần** + khiên (mua bằng Xu BONUS / PAID, tối đa 2) | DB·UI | Mất streak khi hết tuần mà chưa đủ buổi; khiên tự dùng |
+| ✅ GM-05 | **League tuần**: cron thứ Hai chia nhóm 30 người cùng hạng; top 7 lên hạng, 5 người cuối xuống hạng | DB·OPS | Người mới vào hạng Đồng; không ai bị xếp 2 nhóm |
+| ✅ GM-06 | **Trang chủ = trung tâm game**: `ProgressRing` tuần, streak, điểm danh, nhiệm vụ hôm nay/tuần, league, phần thưởng chưa xem. *Còn: thẻ thử thách đang chạy, hoạt động CLB* | UI | Mở app thấy "hôm nay cần làm gì" ở màn đầu, không phải cuộn |
+| ✅ GM-07 | **Tổng kết sau chạy** (MH17) có `RewardCascade`; bỏ qua được; tôn trọng giảm chuyển động | UI | Có tối đa 6 thẻ, tổng ≤ 6 giây |
+| ✅ GM-08 | **Cổ vũ có giá trị**: tặng 1–10 Xu kèm lời, trần 50 Xu/ngày | DB·UI | Không cổ vũ chính mình; có trong lịch sử ví của cả hai bên |
+| ✅ GM-09 | **Ví Xu** (MH25): số dư BONUS / PAID, lịch sử từ sổ cái, lọc theo loại | UI | Tổng lịch sử khớp số dư |
 | GM-10 | **Chi tiết bài chạy** (MH6): bản đồ (MapLibre, ẩn 200 m đầu và cuối), splits, nhịp tim, PB, bài đã tính vào thử thách nào | UI | Bài Strava có bản đồ; bài không có GPS hiện lý do |
-| GM-11 | **Huy hiệu và danh hiệu** trong trang Tôi | UI | Huy hiệu chưa mở hiện mờ, kèm điều kiện mở |
+| ✅ GM-11 | **Huy hiệu và danh hiệu** trong trang Tôi | UI | Huy hiệu chưa mở hiện mờ, kèm điều kiện mở |
 | QA-4 | Beta kín: 300 người, 5 CLB, đo D7 | QA | D7 ≥ 35%; không lỗi P0 mở quá 24 giờ |
 
 ### Sprint 5: CLB hoàn chỉnh + PWA (16/11 → 27/11) · ③ + nền · Mốc M4 Ra mắt

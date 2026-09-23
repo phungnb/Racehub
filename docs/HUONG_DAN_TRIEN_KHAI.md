@@ -20,7 +20,7 @@ Sao chép `.env.example` thành `.env.local` (máy local / Codespaces), hoặc �
 | `SUPABASE_SERVICE_ROLE_KEY` | Cùng trang, mục `service_role` | **Bắt buộc**. Chỉ đặt ở server, không có tiền tố `NEXT_PUBLIC_` |
 | `NEXT_PUBLIC_STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET` | strava.com/settings/api | Trước đây Client ID bị hard-code, nay đọc từ biến môi trường |
 | `OAUTH_STATE_SECRET` | Tự tạo bằng `openssl rand -hex 32` | **Mới**, bắt buộc |
-| `CRON_SECRET` | Tự tạo bằng `openssl rand -hex 24` | **Mới (Sprint 2)**. Vercel dùng để gọi `/api/cron/club-recap` (bài Tổng kết tuần, 07:00 sáng thứ Hai). Lịch nằm trong `vercel.json` |
+| `CRON_SECRET` | Tự tạo bằng `openssl rand -hex 24` | **Mới (Sprint 2)**. Vercel dùng để gọi `/api/cron/club-recap` (bài Tổng kết tuần, 07:00 sáng thứ Hai), `/api/cron/challenges` (tất toán thử thách) và `/api/cron/leagues` (chốt league 00:10 thứ Hai). Lịch nằm trong `vercel.json` |
 
 Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo lỗi rõ tên biến bị thiếu, thay vì âm thầm dùng key sai như trước.
 
@@ -39,6 +39,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001000500_club_hub_core.sql` | **Sprint 2, CLB:** bảng tin, chat, thông báo, BXH CLB, hộp thư, bài tự sinh, bucket ảnh `club-media`; **sửa lỗi không gán được vai trò Quản trị viên / không cấm được thành viên** | Cần file 400 |
 | `20261001000600_challenge_engine.sql` | **Sprint 3, Thử thách:** tham gia/rời, đội (4 chế độ), tiến độ tự tính từ bài chạy, BXH realtime, treo thưởng từ ví hoặc quỹ CLB, tất toán tự động. **Sửa lỗi production:** trước đây không có cách tham gia thử thách và không đọc được danh sách người tham gia | Cần file 500 |
 | `20261001000700_economy_admin.sql` | **Kinh tế Xu & điều phối admin (ADR-014):** phí tạo thử thách theo số người (≤ 5 miễn phí · 6–10 người 3 Xu/người · trên 10 người 5 Xu/người), thử thách CLB trả bằng quỹ CLB, vé tạo miễn phí, thưởng chạy mới (km đầu 1 Xu + 0,2 Xu/km, trần 10 Xu/ngày), admin cộng/trừ Xu cho cá nhân hoặc quỹ CLB | Cần file 600 |
+| `20261001000800_game_layer.sql` | **Sprint 4, Game (ADR-015):** nhiệm vụ ngày/tuần, điểm danh, streak tuần + khiên, 27 huy hiệu, league tuần (Đồng → Kim cương), cổ vũ bằng Xu, ví Xu, chuỗi phần thưởng sau bài chạy. Bài chạy bị xóa thì thu hồi cả thưởng game | Cần file 700 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 
@@ -86,6 +87,12 @@ select proname from pg_proc where pronamespace = 'public'::regnamespace and pron
   'quote_challenge','economy_policy','my_challenge_passes','admin_search_accounts','admin_grant_xu',
   'admin_grant_challenge_pass','admin_revoke_challenge_pass','admin_list_passes','admin_economy_overview',
   'admin_publish_config') order by 1;
+notify pgrst, 'reload schema';
+
+-- File 800 phải ra 11 dòng
+select proname from pg_proc where pronamespace = 'public'::regnamespace and proname in (
+  'my_game_state','daily_checkin','set_weekly_goal','buy_streak_shield','send_cheer','activity_rewards',
+  'mark_game_events_seen','my_achievements','league_standings','my_wallet','settle_due_leagues') order by 1;
 notify pgrst, 'reload schema';
 ```
 
@@ -165,7 +172,7 @@ Checklist kiểm tra thủ công sau khi deploy:
   - [ ] **Thử thách (Sprint 3):** tab **Thử thách** → **Tạo** → chọn *Đồng đội* · *Chốt đoàn*, 2 đội, bắt đầu sau 15 phút → tài khoản B mở link, **Chọn đội**. Khi bắt đầu, cả hai chạy/đồng bộ một bài → BXH và thanh đội đổi ngay không cần tải lại.
   - [ ] Chủ nhiệm CLB: tab **Thử thách** trong CLB → **Tạo thử thách CLB**, treo thưởng từ **quỹ CLB** → bảng tin CLB có bài "Thử thách mới", thành viên nhận thông báo, quỹ CLB giảm đúng số Xu.
   - [ ] Thử thách hết hạn quá 2 giờ → mở trang chi tiết là tự tổng kết: người thắng nhận Xu, mọi người nhận thông báo kết quả.
-  - [ ] Kiểm tra cron: `curl -H "Authorization: Bearer $CRON_SECRET" https://<domain>/api/cron/club-recap` → trả về `{"posted": …}`; `/api/cron/challenges` → `{"settled": …}`; gọi không có token → 401.
+  - [ ] Kiểm tra cron: `curl -H "Authorization: Bearer $CRON_SECRET" https://<domain>/api/cron/club-recap` → trả về `{"posted": …}`; `/api/cron/challenges` và `/api/cron/leagues` → `{"settled": …}`; gọi không có token → 401.
 - [ ] **Kiểm tra bảo mật** — Supabase → SQL Editor, chạy đoạn dưới. Kết quả **phải** báo lỗi `permission denied`:
   ```sql
   begin;
