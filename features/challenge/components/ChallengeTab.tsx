@@ -77,7 +77,7 @@ export default function ChallengeTab({ profile }: ChallengeTabProps) {
           <div className="text-center py-8 text-xs text-gray-500">Đang đồng bộ dữ liệu sổ cái...</div>
         ) : challenges.length === 0 ? (
           <div className="bg-[#18191a] border border-[#2f3031] rounded-2xl p-6 text-center text-xs text-gray-400">
-            Chưa có thử thách nào được khởi tạo. Hãy bấm "Tạo Thử Thách" để khám phá ngay!
+            Chưa có thử thách nào được khởi tạo. Hãy bấm &quot;Tạo Thử Thách&quot; để khám phá ngay!
           </div>
         ) : (
           <div className="space-y-3">

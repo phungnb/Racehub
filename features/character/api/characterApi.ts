@@ -1,18 +1,32 @@
 import { supabase } from '@/shared/lib/supabase';
 
-export async function fetchUserAvatar(userId: string) {
-  if (!userId) return null;
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('avatar_url, display_name, level, xp')
-    .eq('id', userId)
-    .maybeSingle();
+export interface UserAvatarSummary {
+  display_name: string | null;
+  avatar_url: string | null;
+  level: number;
+  xp: number;
+  gender: 'male' | 'female' | null;
+}
 
-  if (error) {
-    console.error('Lỗi tải avatar user:', error.message);
+export async function fetchUserAvatar(userId: string): Promise<UserAvatarSummary | null> {
+  if (!userId) return null;
+  const [profileRes, avatarRes] = await Promise.all([
+    supabase.from('profiles').select('avatar_url, display_name, level, xp').eq('id', userId).maybeSingle(),
+    supabase.from('user_avatar').select('gender').eq('user_id', userId).maybeSingle(),
+  ]);
+
+  if (profileRes.error) {
+    console.error('Lỗi tải avatar user:', profileRes.error.message);
     return null;
   }
-  return data;
+  if (!profileRes.data) return null;
+  return {
+    display_name: profileRes.data.display_name ?? null,
+    avatar_url: profileRes.data.avatar_url ?? null,
+    level: profileRes.data.level ?? 1,
+    xp: profileRes.data.xp ?? 0,
+    gender: (avatarRes.data?.gender as 'male' | 'female' | undefined) ?? null,
+  };
 }
 
 export async function fetchUserEquipment(userId: string) {
@@ -33,7 +47,7 @@ export async function fetchUserInventory(userId: string) {
   if (!userId) return [];
   const { data, error } = await supabase
     .from('user_inventory')
-    .select('*')
+    .select('*, avatar_items(*)')
     .eq('user_id', userId);
 
   if (error) {
@@ -43,9 +57,9 @@ export async function fetchUserInventory(userId: string) {
   return data || [];
 }
 
-export async function equipItemRpc(userId: string, itemId: string) {
+export async function equipItemRpc(itemId: string) {
+  // Máy chủ tự xác định người gọi bằng auth.uid() (migration 20261001000400)
   const { data, error } = await supabase.rpc('equip_item', {
-    p_user_id: userId,
     p_item_id: itemId
   });
 

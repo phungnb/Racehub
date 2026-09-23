@@ -35,10 +35,6 @@ export default function AdminTab({ profile }: AdminTabProps) {
 
   const isAdmin = profile?.email === 'admin@racehub.vn' || profile?.is_admin === true || profile?.role === 'SYSTEM_ADMIN';
 
-  useEffect(() => {
-    fetchAdminData();
-  }, []);
-
   const fetchAdminData = async () => {
     try {
       const [challRes, userRes, settingRes] = await Promise.all([
@@ -63,6 +59,10 @@ export default function AdminTab({ profile }: AdminTabProps) {
       console.error(err);
     }
   };
+
+  useEffect(() => {
+    fetchAdminData();
+  }, []);
 
   const handleSaveEconomyConfig = async (e: React.FormEvent) => {
     e.preventDefault();

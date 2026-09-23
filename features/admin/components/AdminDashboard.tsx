@@ -7,10 +7,6 @@ export default function AdminDashboard({ profile }: { profile: any }) {
   const [pendingActivities, setPendingActivities] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchPendingActivities()
-  }, [])
-
   const fetchPendingActivities = async () => {
     setLoading(true)
     const { data, error } = await supabase
@@ -22,6 +18,10 @@ export default function AdminDashboard({ profile }: { profile: any }) {
     if (data) setPendingActivities(data)
     setLoading(false)
   }
+
+  useEffect(() => {
+    fetchPendingActivities()
+  }, [])
 
   const handleValidateActivity = async (activityId: string, status: 'APPROVED' | 'REJECTED') => {
     const { error } = await supabase

@@ -7,8 +7,6 @@
 export { default as ClubTab } from './components/ClubTab'
 export { default as ClubMembersManager } from './components/ClubMembersManager'
 export { default as ClubSettings, ClubAvatar } from './components/ClubSettings'
-export { default as ClubAdminPanel } from './components/ClubAdminPanel'
 export { default as ClubActivities } from './components/ClubActivities'
-export { default as ClubDashboardWithLeaderboard } from './components/ClubDashboardWithLeaderboard'
 
 export * from './api'

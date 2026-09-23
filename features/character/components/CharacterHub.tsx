@@ -62,9 +62,9 @@ export default function CharacterHub({ userId }: { userId: string }) {
     }
   }
 
-  const handleEquip = async (itemId: string, category: string) => {
+  const handleEquip = async (itemId: string) => {
     try {
-      await equipItemRpc(itemId, category)
+      await equipItemRpc(itemId)
       await loadData()
       setIsInventoryOpen(false)
     } catch (err: any) {
@@ -128,9 +128,6 @@ export default function CharacterHub({ userId }: { userId: string }) {
             LV.{currentLevel}
           </div>
 
-          <div className="absolute bottom-3 left-3 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800 text-[11px] font-bold text-slate-200">
-            🪙 {avatar?.coins || 500} Xu
-          </div>
         </div>
 
         {/* Thông tin cấp độ & Thanh XP */}

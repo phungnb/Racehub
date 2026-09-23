@@ -22,9 +22,9 @@ export default function CreateChallengeWizard({ isOpen, onClose, onCreated, prof
   const [minPace, setMinPace] = useState(3.0);
   const [maxPace, setMaxPace] = useState(12.0);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const [todayStr] = useState(() => new Date().toISOString().split('T')[0]);
   const [startDate, setStartDate] = useState(todayStr);
-  const [endDate, setEndDate] = useState(new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(() => new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0]);
   const [regDeadline, setRegDeadline] = useState(todayStr);
 
   const [loading, setLoading] = useState(false);
