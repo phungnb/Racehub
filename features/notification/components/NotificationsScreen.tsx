@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { AtSign, Bell, CheckCheck, Heart, Megaphone, MessageCircle, UserCheck, UserPlus, type LucideIcon } from 'lucide-react'
+import { AtSign, Bell, CheckCheck, Coins, Heart, Megaphone, MessageCircle, Ticket, Trophy, UserCheck, UserPlus, type LucideIcon } from 'lucide-react'
 import { Avatar, Button, EmptyState, ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatRelative } from '@/shared/lib/format'
@@ -14,6 +14,9 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   POST_COMMENT: { icon: MessageCircle, tone: 'text-xp' },
   CLUB_JOIN_REQUEST: { icon: UserPlus, tone: 'text-brand' },
   CLUB_APPROVED: { icon: UserCheck, tone: 'text-brand' },
+  CHALLENGE_NEW: { icon: Trophy, tone: 'text-coin' },
+  ADMIN_XU: { icon: Coins, tone: 'text-coin' },
+  ADMIN_PASS: { icon: Ticket, tone: 'text-brand' },
 }
 
 export function NotificationsScreen() {

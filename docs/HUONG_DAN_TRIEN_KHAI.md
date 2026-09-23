@@ -38,6 +38,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001000400_provider_activity_ingest.sql` | Nhận bài chạy từ Strava: chống trùng, luật hợp lệ kiểu UpRace, thu hồi thưởng khi bài bị xóa | Cần file 300 |
 | `20261001000500_club_hub_core.sql` | **Sprint 2, CLB:** bảng tin, chat, thông báo, BXH CLB, hộp thư, bài tự sinh, bucket ảnh `club-media`; **sửa lỗi không gán được vai trò Quản trị viên / không cấm được thành viên** | Cần file 400 |
 | `20261001000600_challenge_engine.sql` | **Sprint 3, Thử thách:** tham gia/rời, đội (4 chế độ), tiến độ tự tính từ bài chạy, BXH realtime, treo thưởng từ ví hoặc quỹ CLB, tất toán tự động. **Sửa lỗi production:** trước đây không có cách tham gia thử thách và không đọc được danh sách người tham gia | Cần file 500 |
+| `20261001000700_economy_admin.sql` | **Kinh tế Xu & điều phối admin (ADR-014):** phí tạo thử thách theo số người (≤ 5 miễn phí · 6–10 người 3 Xu/người · trên 10 người 5 Xu/người), thử thách CLB trả bằng quỹ CLB, vé tạo miễn phí, thưởng chạy mới (km đầu 1 Xu + 0,2 Xu/km, trần 10 Xu/ngày), admin cộng/trừ Xu cho cá nhân hoặc quỹ CLB | Cần file 600 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 
@@ -56,7 +57,8 @@ npx supabase migration repair --status reverted 20260601
 | Thay đổi | Lý do |
 |---|---|
 | **Cấp độ được tính lại theo bảng trong tài liệu** (Lv2 từ 1.000 XP, Lv3 từ 5.000…). Công thức cũ `XP/500 + 1` cho ra cấp rất cao, nên nhiều người sẽ **thấy cấp giảm** | Đúng đặc tả Module 1.3 |
-| **Thưởng chạy:** 1 Xu/km, 10 XP/km, trần 50 Xu/ngày (mặc định). Admin chỉnh được trong trang `/admin` | Công thức cũ 5 Xu + 50 XP/km, không có trần |
+| **Thưởng chạy (từ file 700):** km đầu 1 Xu, mỗi km tiếp 0,2 Xu, trần 10 Xu/ngày; 10 XP/km. Admin chỉnh trong `/admin` → Chính sách | Công thức cũ 5 Xu + 50 XP/km, không có trần |
+| **Thử thách CLB không còn miễn phí** (từ file 700): phí trừ vào quỹ CLB. Thử thách ≤ 5 người luôn miễn phí; admin có thể tặng vé miễn phí | Chống tạo thử thách tràn lan, Xu có giá trị |
 | **Bài chạy GPS bị chuyển sang "chờ duyệt"** nếu không có dữ liệu GPS, pace nhanh hơn 3:00/km, nhảy vị trí > 43 km/h, hoặc quãng đường khai lệch quá 15% so với GPS | Chống gian lận |
 | **Người mời chỉ nhận thưởng khi bạn được mời chạy đủ 3 km.** Chỉ áp dụng lời mời trong 14 ngày đầu sau khi tạo tài khoản | Chống tạo tài khoản ảo |
 | **CLB mới bắt đầu với quỹ 0 Xu** (trước đây được tặng 100 Xu) | Tiền phải có nguồn gốc trong sổ cái |
@@ -78,7 +80,26 @@ select proname from pg_proc where pronamespace = 'public'::regnamespace and pron
   'get_challenge','list_challenges','challenge_leaderboard','challenge_team_standings','settle_challenge_if_due',
   'settle_due_challenges','challenge_visible') order by 1;
 notify pgrst, 'reload schema';
+
+-- File 700 phải ra 10 dòng
+select proname from pg_proc where pronamespace = 'public'::regnamespace and proname in (
+  'quote_challenge','economy_policy','my_challenge_passes','admin_search_accounts','admin_grant_xu',
+  'admin_grant_challenge_pass','admin_revoke_challenge_pass','admin_list_passes','admin_economy_overview',
+  'admin_publish_config') order by 1;
+notify pgrst, 'reload schema';
 ```
+
+### Sau khi chạy file 700: cấp quyền admin và điều phối Xu
+
+1. Cấp quyền cho tài khoản quản trị (chạy một lần trong SQL Editor, thay email):
+   ```sql
+   update public.profiles set role = 'SYSTEM_ADMIN'
+    where id = (select id from auth.users where email = '<email-cua-ban>');
+   ```
+2. Tải lại app: biểu tượng khiên xuất hiện trên thanh trên cùng → **Quản trị RaceHub**.
+   - **Cộng/Trừ Xu:** tìm người (tên, email, ID) hoặc CLB → nhập số Xu → chọn *Xu thưởng* hay *Xu nạp* → ghi lý do → xác nhận. Có nhật ký, người nhận (hoặc ban quản trị CLB) được báo.
+   - **Vé miễn phí:** tặng N vé cho cá nhân/CLB, mỗi vé dùng cho một thử thách tối đa M người, có hạn dùng; thu hồi được.
+   - **Chính sách:** sửa giá trị 1 Xu, mức thưởng chạy, biểu phí; bảng mô phỏng cho thấy phí trước/sau khi lưu.
 
 ### Sau khi chạy file 500: bật Realtime cho chat
 

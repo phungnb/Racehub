@@ -132,7 +132,7 @@ export function defaultDraft(now = new Date(), clubId: string | null = null): Ch
   return {
     format: 'RANKED', title: '', description: '', audience: clubId ? 'CLUB_ONLY' : 'PUBLIC', clubId,
     objective: 'DISTANCE', gameMode: 'TEAM_AVG', targetValue: 0, minKm: 1, minPace: 3, maxPace: 15, dailyCapKm: 0,
-    teamNames: ['Đội Xanh', 'Đội Đỏ'], teamSize: 0, maxSlots: 100,
+    teamNames: ['Đội Xanh', 'Đội Đỏ'], teamSize: 0, maxSlots: 5,      // ≤ 5 người: miễn phí tạo
     start: start.toISOString(), end: new Date(start.getTime() + 7 * DAY).toISOString(),
     rewardXu: 0, rewardSource: clubId ? 'CLUB' : 'CREATOR', rewardSplit: 'WINNER',
   }
@@ -176,6 +176,17 @@ export function validateDraft(d: ChallengeDraft, step: 1 | 2 | 3, now = new Date
   return e
 }
 
+/** Số người tối đa thực tế (máy chủ tính phí theo số này) */
+export function effectiveSlots(d: Pick<ChallengeDraft, 'format' | 'maxSlots' | 'teamSize' | 'teamNames'>): number {
+  if (d.format === 'DUEL') return 2
+  if (d.format === 'SOLO_GOAL') return 1
+  if (d.format === 'TEAM' && d.teamSize > 0) {
+    const teams = d.teamNames.filter((t) => t.trim()).length
+    return Math.min(d.maxSlots, d.teamSize * Math.max(teams, 1))
+  }
+  return d.maxSlots
+}
+
 /** Dữ liệu gửi lên RPC create_challenge_v2 */
 export function draftToPayload(d: ChallengeDraft) {
   return {
@@ -191,7 +202,7 @@ export function draftToPayload(d: ChallengeDraft) {
     daily_cap_km: d.dailyCapKm || null,
     start_date: d.start,
     end_date: d.end,
-    max_slots: d.format === 'DUEL' ? 2 : d.format === 'SOLO_GOAL' ? 1 : d.maxSlots,
+    max_slots: effectiveSlots(d),
     audience: d.format === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience,
     club_id: d.audience === 'CLUB_ONLY' ? d.clubId : null,
     team_names: d.format === 'TEAM' ? d.teamNames.map((n) => n.trim()).filter(Boolean) : [],

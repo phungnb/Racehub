@@ -16,3 +16,4 @@ Mỗi ADR ghi lại **một** quyết định: bối cảnh, lựa chọn, lý d
 | [010](./010-realtime.md) | Realtime: Broadcast cho dữ liệu tạm, postgres_changes cho dữ liệu lưu | Đề xuất |
 | [011](./011-virtual-currency-compliance.md) | Ranh giới pháp lý của Xu và cược | Đề xuất — **cần tư vấn luật** |
 | [012](./012-club-hub.md) | CLB là không gian riêng: chat, bảng tin, sự kiện, quỹ, thông báo theo `club_id` | Đề xuất |
+| [014](./014-xu-economy-admin.md) | Kinh tế Xu: phí thử thách theo số người, quỹ CLB trả phí, vé miễn phí, admin điều phối Xu | Đã chấp nhận |

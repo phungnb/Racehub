@@ -3,17 +3,19 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useRef, useState, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Check, Coins, Lock, Minus, Plus, Shield, Users, X } from 'lucide-react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { ArrowLeft, Check, Coins, Lock, Minus, Plus, Shield, Ticket, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useMyProfile } from '@/features/auth'
-import { getClub, isStaff, useClubInbox } from '@/features/club'
+import { isStaff, useClubInbox } from '@/features/club'
 import { Button, Card, Field, Input, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
-import { challengeErrorMessage, createChallenge, previewFee } from '../../api/challengeApi'
+import { creationFee, DEFAULT_POLICY, xuToVnd } from '@/shared/lib/economy'
+import { routes } from '@/shared/config/routes'
+import { challengeErrorMessage, createChallenge, quoteChallenge, type ChallengeQuote } from '../../api/challengeApi'
 import {
-  AUDIENCE_LABEL, defaultDraft, FORMAT_META, formatScore, OBJECTIVE_META, rewardSummary, TEAM_MODE_META, validateDraft,
+  AUDIENCE_LABEL, defaultDraft, effectiveSlots, FORMAT_META, formatScore, OBJECTIVE_META, rewardSummary, TEAM_MODE_META, validateDraft,
   type Audience, type ChallengeDraft, type ChallengeFormat, type DraftErrors, type Objective, type TeamMode,
 } from '../../model/challenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
@@ -27,6 +29,20 @@ const toLocalInput = (iso: string) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : '')
+
+/** Ai trả bao nhiêu: phí (sau khi dùng vé) + treo thưởng, tách ví cá nhân / quỹ CLB — khớp create_challenge_v2 */
+function billFor(d: ChallengeDraft, q: ChallengeQuote) {
+  const feeDue = q.pass ? 0 : q.fee
+  const reward = d.rewardXu > 0 ? d.rewardXu : 0
+  const fromWallet = (q.payer === 'USER' ? feeDue : 0) + (d.rewardSource === 'CREATOR' ? reward : 0)
+  const fromClub = (q.payer === 'CLUB' ? feeDue : 0) + (d.rewardSource === 'CLUB' && d.audience === 'CLUB_ONLY' ? reward : 0)
+  return {
+    feeDue, fromWallet, fromClub,
+    walletShort: Math.max(0, fromWallet - q.walletBalance),
+    clubShort: q.payer === 'CLUB' ? Math.max(0, fromClub - q.payerBalance) : 0,
+  }
+}
+type Bill = ReturnType<typeof billFor>
 const fmtWhen = (iso: string) => new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })
 
 export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
@@ -41,12 +57,12 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
   const key = useRef(`web-${crypto.randomUUID()}`)
   const set = (patch: Partial<ChallengeDraft>) => setD((prev) => ({ ...prev, ...patch }))
   const balance = Number(profile?.xu ?? 0)
-  const fee = useQuery({
-    queryKey: ['challenge-fee', d.format, d.maxSlots, d.start, d.end, d.audience],
-    queryFn: () => previewFee(d), enabled: step === 3,
+  const quote = useQuery({
+    queryKey: ['challenge-quote', d.format, effectiveSlots(d), d.audience, d.clubId],
+    queryFn: () => quoteChallenge(d), enabled: step >= 2, placeholderData: keepPreviousData,
   })
-  const cost = (fee.data ?? 0) + (d.rewardXu > 0 && d.rewardSource === 'CREATOR' ? d.rewardXu : 0)
-  const short = step === 3 && fee.isSuccess && cost > balance
+  const bill = quote.data ? billFor(d, quote.data) : null
+  const short = step === 3 && !!bill && (bill.walletShort > 0 || bill.clubShort > 0)
 
   const next = () => {
     if (step < 3) {
@@ -96,15 +112,15 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
 
       {step === 0 && <StepType d={d} set={set} errors={errors} staffClubs={staffClubs} />}
       {step === 1 && <StepRules d={d} set={set} errors={errors} />}
-      {step === 2 && <StepTime d={d} set={set} errors={errors} balance={balance} />}
-      {step === 3 && <StepReview d={d} balance={balance} fee={fee.data} feeLoading={fee.isLoading} cost={cost}
-        clubName={staffClubs.find((c) => c.club_id === d.clubId)?.name} canUseClub={staffClubs.length > 0}
+      {step === 2 && <StepTime d={d} set={set} errors={errors} balance={balance} quote={quote.data} />}
+      {step === 3 && <StepReview d={d} quote={quote.data} bill={bill} loading={quote.isPending} failed={quote.isError}
+        onRetry={() => void quote.refetch()} clubName={staffClubs.find((c) => c.club_id === d.clubId)?.name}
         onEdit={(to, patch) => { if (patch) set(patch); setStep(to) }} />}
 
       <div className="fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-md gap-2 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur-md">
         {step > 0 && <Button variant="secondary" size="lg" className="shrink-0 whitespace-nowrap" onClick={() => setStep(step - 1)} disabled={busy}>Quay lại</Button>}
-        <Button block size="lg" onClick={next} loading={busy} disabled={short || (step === 3 && fee.isLoading)}>
-          {step < 3 ? 'Tiếp tục' : short ? 'Không đủ Xu' : 'Tạo thử thách'}
+        <Button block size="lg" onClick={next} loading={busy} disabled={short || (step === 3 && !bill)}>
+          {step < 3 ? 'Tiếp tục' : short ? (bill?.clubShort ? 'Quỹ CLB không đủ' : 'Không đủ Xu') : 'Tạo thử thách'}
         </Button>
       </div>
     </div>
@@ -165,7 +181,7 @@ function StepType({ d, set, errors, staffClubs }: StepProps & { staffClubs: { cl
                   <span className="flex-1">
                     <span className="block text-sm font-semibold">{AUDIENCE_LABEL[a]}</span>
                     <span className="block text-xs text-fg-muted">
-                      {a === 'PUBLIC' ? 'Hiện ở mục Khám phá, ai cũng vào được' : a === 'INVITE_ONLY' ? 'Ẩn khỏi Khám phá, chỉ vào được bằng link có mã' : 'Chỉ thành viên CLB, miễn phí tạo, thưởng trích quỹ CLB'}
+                      {a === 'PUBLIC' ? 'Hiện ở mục Khám phá, ai cũng vào được' : a === 'INVITE_ONLY' ? 'Ẩn khỏi Khám phá, chỉ vào được bằng link có mã' : 'Chỉ thành viên CLB; phí tạo và thưởng trích quỹ CLB'}
                     </span>
                   </span>
                   {on && <Check className="size-5 text-brand" aria-hidden />}
@@ -294,10 +310,15 @@ function StepRules({ d, set, errors }: StepProps) {
   )
 }
 
-function StepTime({ d, set, errors, balance }: StepProps & { balance: number }) {
+function StepTime({ d, set, errors, balance, quote }: StepProps & { balance: number; quote?: ChallengeQuote }) {
   const quick = [{ label: '1 tuần', days: 7 }, { label: '2 tuần', days: 14 }, { label: '1 tháng', days: 30 }]
-  const clubTreasury = useQuery({ queryKey: ['club', d.clubId], queryFn: () => getClub(d.clubId!), enabled: d.rewardSource === 'CLUB' && !!d.clubId })
-  const fund = d.rewardSource === 'CLUB' ? Number(clubTreasury.data?.treasury_balance ?? 0) : balance
+  const clubPays = d.rewardSource === 'CLUB' && d.audience === 'CLUB_ONLY'
+  const fund = clubPays ? (quote?.payer === 'CLUB' ? quote.payerBalance : 0) : (quote?.walletBalance ?? balance)
+  const policy = quote?.policy ?? DEFAULT_POLICY
+  const f = policy.challengeFee
+  const slotChoices = Array.from(new Set([f.freeMaxSlots, f.midMaxSlots, 20, 50, 100].filter((v) => v >= 2))).sort((a, b) => a - b)
+  const slots = effectiveSlots(d)
+  const fee = creationFee(slots, f)
   return (
     <div className="space-y-5">
       <section className="space-y-3">
@@ -316,15 +337,36 @@ function StepTime({ d, set, errors, balance }: StepProps & { balance: number }) 
       </section>
 
       {d.format !== 'DUEL' && d.format !== 'SOLO_GOAL' && (
-        <NumberField id="c-slots" label="Số người tối đa" value={d.maxSlots} step={10} min={2} max={10000} onChange={(v) => set({ maxSlots: v })}
-          error={errors.maxSlots} hint="Ảnh hưởng tới phí tạo thử thách công khai" />
+        <section className="space-y-2">
+          <NumberField id="c-slots" label="Số người tối đa" value={d.maxSlots} step={1} min={2} max={10000} onChange={(v) => set({ maxSlots: v })}
+            error={errors.maxSlots} unit="người" />
+          <div className="flex flex-wrap gap-2" aria-label="Chọn nhanh số người">
+            {slotChoices.map((v) => {
+              const c = creationFee(v, f)
+              return (
+                <button key={v} type="button" onClick={() => set({ maxSlots: v })} aria-pressed={d.maxSlots === v}
+                  className={cn('rounded-full border px-3 py-1.5 text-xs font-semibold', d.maxSlots === v ? 'border-brand bg-brand/10 text-fg' : 'border-border text-fg-muted')}>
+                  {v} người · <span className={c ? 'text-coin' : 'text-brand'}>{c ? `${formatCoin(c)} Xu` : 'miễn phí'}</span>
+                </button>
+              )
+            })}
+          </div>
+          <p className="flex items-center gap-1.5 text-sm">
+            <Coins className="size-4 text-coin" aria-hidden />
+            <span className="text-fg-muted">Phí tạo:</span>
+            {quote?.pass && fee > 0
+              ? <span className="font-semibold text-brand">dùng 1 vé miễn phí <span className="font-normal text-fg-subtle line-through">{formatCoin(fee)} Xu</span></span>
+              : <span className={cn('font-semibold', fee ? 'text-coin' : 'text-brand')}>{fee ? `${formatCoin(fee)} Xu (${xuToVnd(fee, policy)})` : 'Miễn phí'}</span>}
+            {d.audience === 'CLUB_ONLY' && fee > 0 && !quote?.pass && <span className="text-fg-subtle">· trừ quỹ CLB</span>}
+          </p>
+        </section>
       )}
 
       <section className="space-y-3">
         <p className="text-sm font-medium text-fg-muted">Giải thưởng (không bắt buộc)</p>
         <NumberField id="c-reward" label="Treo thưởng" unit="Xu" step={50} max={100000} value={d.rewardXu} onChange={(v) => set({ rewardXu: v })}
-          error={errors.rewardXu ?? (d.rewardXu > fund ? `${d.rewardSource === 'CLUB' ? 'Quỹ CLB' : 'Ví của bạn'} chỉ có ${formatCoin(fund)} Xu` : undefined)}
-          hint={`Trừ từ ${d.rewardSource === 'CLUB' ? 'quỹ CLB' : 'ví của bạn'} ngay khi tạo, hoàn lại nếu không ai đạt hoặc thử thách bị hủy`} />
+          error={errors.rewardXu ?? (quote && d.rewardXu > fund ? `${clubPays ? 'Quỹ CLB' : 'Ví của bạn'} chỉ có ${formatCoin(fund)} Xu` : undefined)}
+          hint={`Trừ từ ${clubPays ? 'quỹ CLB' : 'ví của bạn'} ngay khi tạo, hoàn lại nếu không ai đạt hoặc thử thách bị hủy`} />
         {d.format === 'RANKED' && d.rewardXu > 0 && (
           <div role="radiogroup" aria-label="Cách chia thưởng" className="grid grid-cols-2 gap-2">
             {(['WINNER', 'TOP3'] as const).map((s) => (
@@ -342,12 +384,11 @@ function StepTime({ d, set, errors, balance }: StepProps & { balance: number }) 
   )
 }
 
-function StepReview({ d, balance, fee, feeLoading, cost, clubName, canUseClub, onEdit }: {
-  d: ChallengeDraft; balance: number; fee?: number; feeLoading: boolean; cost: number; clubName?: string; canUseClub: boolean
+function StepReview({ d, quote, bill, loading, failed, onRetry, clubName, onEdit }: {
+  d: ChallengeDraft; quote?: ChallengeQuote; bill: Bill | null; loading: boolean; failed: boolean; onRetry: () => void; clubName?: string
   onEdit: (step: number, patch?: Partial<ChallengeDraft>) => void
 }) {
-  const reward = d.rewardXu > 0 && d.rewardSource === 'CREATOR' ? d.rewardXu : 0
-  const total = cost
+  const router = useRouter()
   const Icon = FORMAT_ICON[d.format]
   const days = Math.max(1, Math.round((Date.parse(d.end) - Date.parse(d.start)) / DAY))
   const perDay = d.targetValue > 0 ? d.targetValue / days : 0
@@ -371,42 +412,98 @@ function StepReview({ d, balance, fee, feeLoading, cost, clubName, canUseClub, o
         </ul>
       </Card>
 
-      <Card className="space-y-2">
-        <Row label="Phí tạo thử thách" value={feeLoading ? '…' : fee ? `${formatCoin(fee)} Xu` : 'Miễn phí'} />
-        {reward > 0 && <Row label="Treo thưởng từ ví" value={`${formatCoin(reward)} Xu`} />}
-        {d.rewardXu > 0 && d.rewardSource === 'CLUB' && <Row label="Treo thưởng từ quỹ CLB" value={`${formatCoin(d.rewardXu)} Xu`} />}
-        <div className="border-t border-border pt-2">
-          <Row label="Trừ từ ví của bạn" value={`${formatCoin(total)} Xu`} strong />
-          <p className={cn('mt-1 flex items-center gap-1 text-xs', total > balance ? 'text-danger' : 'text-fg-subtle')}>
-            <Coins className="size-3.5" aria-hidden />Ví hiện có {formatCoin(balance)} Xu{total > balance ? ' — không đủ' : ''}
-          </p>
-        </div>
-      </Card>
+      {failed && !quote ? (
+        <Card className="flex items-center justify-between gap-3 border-danger/30 bg-danger/5">
+          <p className="text-sm text-fg-muted">Không tính được phí. Kiểm tra mạng rồi thử lại.</p>
+          <Button size="sm" variant="secondary" onClick={onRetry}>Thử lại</Button>
+        </Card>
+      ) : loading || !quote || !bill ? (
+        <Card className="h-40 animate-pulse bg-surface-2" aria-label="Đang tính phí" />
+      ) : (
+        <CostCard d={d} q={quote} bill={bill} clubName={clubName} />
+      )}
 
-      {!feeLoading && total > balance && (
+      {quote && bill && (bill.walletShort > 0 || bill.clubShort > 0) && (
         <Card className="space-y-3 border-warning/40 bg-warning/5">
-          <p className="font-semibold">Ví chưa đủ {formatCoin(total - balance)} Xu. Bạn có thể:</p>
+          <p className="font-semibold">
+            {bill.clubShort > 0 ? `Quỹ CLB còn thiếu ${formatCoin(bill.clubShort)} Xu` : `Ví còn thiếu ${formatCoin(bill.walletShort)} Xu`}. Bạn có thể:
+          </p>
           <div className="space-y-2">
-            {(fee ?? 0) > 0 && d.format !== 'DUEL' && d.maxSlots > 10 && (
-              <Suggestion title="Giảm số người tối đa" text="Phí tạo tính theo quy mô: thử thách nhỏ rẻ hơn nhiều"
-                action="Sửa" onClick={() => onEdit(2, { maxSlots: 10 })} />
-            )}
-            {reward > 0 && (
-              <Suggestion title="Bỏ hoặc giảm tiền treo thưởng" text={`Đang treo ${formatCoin(reward)} Xu từ ví của bạn`} action="Sửa" onClick={() => onEdit(2)} />
-            )}
-            {canUseClub && d.audience !== 'CLUB_ONLY' && (
-              <Suggestion title="Tạo trong CLB bạn quản lý" text="Thử thách nội bộ CLB miễn phí tạo, thưởng có thể trích quỹ CLB"
-                action="Đổi" onClick={() => onEdit(0)} />
-            )}
-            {d.format !== 'SOLO_GOAL' && (
-              <Suggestion title="Mục tiêu cá nhân luôn miễn phí" text="Tự đặt mục tiêu cho riêng mình, không mất phí"
-                action="Đổi" onClick={() => onEdit(0, { format: 'SOLO_GOAL', audience: 'PUBLIC', targetValue: d.targetValue || 50 })} />
-            )}
-            <p className="text-sm text-fg-muted">Hoặc chạy thêm để kiếm Xu: mỗi km hợp lệ được khoảng 1 Xu.</p>
+            {(() => {
+              const f = quote.policy.challengeFee
+              const slots = effectiveSlots(d)
+              const out: ReactNode[] = []
+              if (bill.feeDue > 0 && d.format !== 'DUEL' && slots > f.freeMaxSlots && f.freeMaxSlots >= 2) {
+                out.push(<Suggestion key="free" title={`Giảm còn ${f.freeMaxSlots} người`} text="Thử thách nhóm nhỏ được tạo miễn phí"
+                  action="Sửa" onClick={() => onEdit(2, { maxSlots: f.freeMaxSlots })} />)
+              }
+              if (bill.feeDue > 0 && d.format !== 'DUEL' && slots > f.midMaxSlots && f.midMaxSlots > f.freeMaxSlots) {
+                out.push(<Suggestion key="mid" title={`Giảm còn ${f.midMaxSlots} người`} text={`Phí chỉ còn ${formatCoin(creationFee(f.midMaxSlots, f))} Xu`}
+                  action="Sửa" onClick={() => onEdit(2, { maxSlots: f.midMaxSlots })} />)
+              }
+              if (d.rewardXu > 0) {
+                out.push(<Suggestion key="reward" title="Bỏ hoặc giảm tiền treo thưởng" text={`Đang treo ${formatCoin(d.rewardXu)} Xu`} action="Sửa" onClick={() => onEdit(2)} />)
+              }
+              if (bill.clubShort > 0 && d.clubId) {
+                out.push(<Suggestion key="fund" title="Góp thêm vào quỹ CLB" text="Thành viên có thể góp Xu vào quỹ ở tab Quỹ"
+                  action="Mở quỹ" onClick={() => router.push(routes.clubTab(d.clubId!, 'treasury'))} />)
+              }
+              if (d.format !== 'SOLO_GOAL' && bill.walletShort > 0) {
+                out.push(<Suggestion key="solo" title="Mục tiêu cá nhân luôn miễn phí" text="Tự đặt mục tiêu cho riêng mình, không mất phí"
+                  action="Đổi" onClick={() => onEdit(0, { format: 'SOLO_GOAL', audience: 'PUBLIC', targetValue: d.targetValue || 50 })} />)
+              }
+              return out
+            })()}
+            <p className="text-sm text-fg-muted">
+              Hoặc chạy thêm để kiếm Xu: km đầu {formatNumber(quote.policy.firstKmXu)} Xu, mỗi km tiếp {formatNumber(quote.policy.extraKmXu)} Xu
+              (tối đa {formatNumber(quote.policy.maxDailyReward)} Xu/ngày).
+            </p>
           </div>
         </Card>
       )}
     </div>
+  )
+}
+
+/** Bảng chi phí: phí theo số người, vé miễn phí, phần trừ ví cá nhân và quỹ CLB */
+function CostCard({ d, q, bill, clubName }: { d: ChallengeDraft; q: ChallengeQuote; bill: Bill; clubName?: string }) {
+  const slots = effectiveSlots(d)
+  const creatorReward = d.rewardXu > 0 && d.rewardSource === 'CREATOR' ? d.rewardXu : 0
+  const clubReward = d.rewardXu > 0 && d.rewardSource === 'CLUB' && d.audience === 'CLUB_ONLY' ? d.rewardXu : 0
+  return (
+    <Card className="space-y-2">
+      <Row label={`Phí tạo (${formatNumber(slots)} người)`} value={q.fee ? `${formatCoin(q.fee)} Xu` : 'Miễn phí'} />
+      {q.fee > 0 && !q.pass && <p className="-mt-1 text-right text-xs text-fg-subtle">{xuToVnd(q.fee, q.policy)}</p>}
+      {q.pass && q.fee > 0 && (
+        <div className="flex items-start gap-2 rounded-xl border border-brand/40 bg-brand/10 p-2.5 text-sm">
+          <Ticket className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Dùng 1 vé tạo miễn phí</span>
+            <span className="block text-xs text-fg-muted">
+              {q.payer === 'CLUB' ? 'Vé của CLB' : 'Vé của bạn'} · còn {q.pass.remaining} vé · cho thử thách tối đa {formatNumber(q.pass.max_slots)} người
+              {q.pass.expires_at ? ` · hạn ${new Date(q.pass.expires_at).toLocaleDateString('vi-VN')}` : ''}
+            </span>
+          </span>
+          <span className="font-mono font-semibold text-brand">−{formatCoin(q.fee)}</span>
+        </div>
+      )}
+      {creatorReward > 0 && <Row label="Treo thưởng từ ví" value={`${formatCoin(creatorReward)} Xu`} />}
+      {clubReward > 0 && <Row label="Treo thưởng từ quỹ CLB" value={`${formatCoin(clubReward)} Xu`} />}
+      {q.payer === 'CLUB' && (
+        <div className="border-t border-border pt-2">
+          <Row label={`Trừ từ quỹ ${clubName ?? 'CLB'}`} value={`${formatCoin(bill.fromClub)} Xu`} strong />
+          <p className={cn('mt-1 flex items-center gap-1 text-xs', bill.clubShort ? 'text-danger' : 'text-fg-subtle')}>
+            <Shield className="size-3.5" aria-hidden />Quỹ hiện có {formatCoin(q.payerBalance)} Xu{bill.clubShort ? ' — không đủ' : ''}
+          </p>
+        </div>
+      )}
+      <div className="border-t border-border pt-2">
+        <Row label="Trừ từ ví của bạn" value={`${formatCoin(bill.fromWallet)} Xu`} strong />
+        <p className={cn('mt-1 flex items-center gap-1 text-xs', bill.walletShort ? 'text-danger' : 'text-fg-subtle')}>
+          <Coins className="size-3.5" aria-hidden />Ví hiện có {formatCoin(q.walletBalance)} Xu{bill.walletShort ? ' — không đủ' : ''}
+        </p>
+      </div>
+    </Card>
   )
 }
 

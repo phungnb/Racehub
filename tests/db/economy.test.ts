@@ -79,9 +79,9 @@ describe('kinh tế & bài chạy (sau migration)', () => {
     const r = await submit(db, RUNNER, 5, 360, 120)
     expect(r.validation_status).toBe('APPROVED')
     expect(Math.abs(Number(r.distance_m) - 5000)).toBeLessThan(60)
-    expect(Number(r.earned_xu)).toBeCloseTo(5, 0)            // kmRate mặc định 1 Xu/km
+    expect(Number(r.earned_xu)).toBeCloseTo(1.8, 5)          // 1 Xu km đầu + 4 × 0,2
     expect(Number(r.earned_xp)).toBe(50)                      // 10 XP/km
-    expect(await xu(db, RUNNER)).toBeCloseTo(15, 0)
+    expect(await xu(db, RUNNER)).toBeCloseTo(11.8, 5)
     expect(await ledgerBalance(db, RUNNER)).toBe(await xu(db, RUNNER))
     const p = await db.query<{ current_progress: string; status: string }>(
       `select current_progress, status from public.challenge_participants where profile_id = $1`, [RUNNER])
@@ -133,9 +133,9 @@ describe('kinh tế & bài chạy (sau migration)', () => {
 
   it('trần thưởng mỗi ngày theo cấu hình admin', async () => {
     await asUser(db, ADMIN, '/rpc/admin_publish_config',
-      `select public.admin_publish_config('economy_global_config', '{"kmRate": 20, "maxDailyReward": 30}')`)
+      `select public.admin_publish_config('economy_global_config', '{"firstKmXu": 20, "extraKmXu": 20, "maxDailyReward": 30}')`)
     const r = await submit(db, FRIEND, 3, 360, 60)
-    expect(Number(r.earned_xu)).toBe(30)                     // 3 km × 20 = 60, nhưng trần 30/ngày
+    expect(Number(r.earned_xu)).toBe(30)                     // 20 + 2 × 20 = 60, nhưng trần 30/ngày
     const r2 = await submit(db, FRIEND, 3, 360, 200)
     expect(Number(r2.earned_xu)).toBe(0)
   })

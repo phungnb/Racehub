@@ -128,6 +128,9 @@ Bảy tính năng **chỉ RaceHub có**. Đây là thứ để quảng bá, nên
 | ✅ TT-09 | **Wizard 4 bước** `/challenges/new`: ① Loại (cá nhân / đội / CLB) → ② Luật (chế độ, km, pace, quãng tối thiểu) → ③ Thời gian và phần thưởng (phí tính trước bằng RPC) → ④ Xem lại | UI | Không tạo được thử thách sai luật; xem trước giống hệt trang chi tiết |
 | ✅ TT-10 | Tab **Thử thách** trong CLB: thử thách nội bộ, chia đội tự động theo pace | UI | Chủ nhiệm tạo thử thách tháng cho CLB trong ≤ 1 phút |
 | ✅ TT-11 | Màn **kết quả**: bục vinh quang, huy chương, chia sẻ | UI | Có trạng thái "đang tổng kết" trong lúc SETTLING |
+| ✅ KT-01 | **Kinh tế Xu (ADR-014):** biểu phí theo số người, thử thách CLB trả bằng quỹ, vé tạo miễn phí, thưởng chạy km đầu + km tiếp, trần ngày | DB | 8 test DB `economy-admin` |
+| ✅ KT-02 | **Bảng điều phối admin** `/admin`: Tổng quan dòng Xu, Cộng/Trừ Xu (cá nhân + quỹ CLB), Vé miễn phí, Chính sách có mô phỏng, Duyệt bài | UI | Mọi thao tác có lý do + nhật ký, không cho âm số dư |
+| ✅ KT-03 | Wizard báo giá bằng `quote_challenge`: ai trả (ví/quỹ), dùng vé, gợi ý khi thiếu Xu | UI | Không bấm được "Tạo" khi không đủ Xu |
 | QA-3 | Chạy thật một thử thách đội 7 ngày với 3 CLB thí điểm | QA | Không có khiếu nại sai điểm |
 
 ### Sprint 4: Lớp game (02/11 → 13/11) · Trụ cột ① · Mốc M3 Beta kín

@@ -53,7 +53,7 @@ describe('Engine thử thách (000600)', () => {
   beforeAll(async () => {
     db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed })
     // Nạp Xu thử nghiệm cho A và B
-    for (const [u, amt] of [[A, 1000], [B, 200]] as const) {
+    for (const [u, amt] of [[A, 5000], [B, 2000]] as const) {
       await db.query(`select private.ledger_post('TEST_SEED', 'seed:' || $1, 'seed', null,
         jsonb_build_array(jsonb_build_object('account_id', $1::uuid, 'coin_kind', 'BONUS', 'amount', $2::numeric),
                           jsonb_build_object('account_id', private.system_account(), 'coin_kind', 'BONUS', 'amount', -$2::numeric)))`, [u, amt])
@@ -210,10 +210,11 @@ describe('Engine thử thách (000600)', () => {
     expect(await fails(db, B, `select public.create_challenge_v2($1::jsonb, 'k-club-no-staff')`,
       [JSON.stringify({ title: 'Nội bộ', format: 'RANKED', audience: 'CLUB_ONLY', club_id: club.id, start_date: iso(0), end_date: iso(48) })]))
       .toContain('FORBIDDEN')
-    const r = await create(db, A, { title: 'Thử thách tháng CLB', format: 'RANKED', audience: 'CLUB_ONLY', club_id: club.id,
+    const r = await create(db, A, { title: 'Thử thách tháng CLB', format: 'RANKED', audience: 'CLUB_ONLY', club_id: club.id, max_slots: 10,
       start_date: iso(-1), end_date: iso(48), reward_xu: 100, reward_source: 'CLUB', reward_split: 'TOP3' })
-    expect(r.fee).toBe(0)
-    expect(await xu(db, club.id)).toBe(50)
+    expect(r.fee).toBe(30)                              // 10 người × 3 Xu, trừ vào quỹ CLB
+    expect(await xu(db, club.id)).toBe(20)              // 150 − 30 phí − 100 treo thưởng
+    expect(await xu(db, A)).toBeGreaterThan(0)
     expect((await db.query(`select kind from public.club_posts where club_id = $1 and kind = 'CHALLENGE'`, [club.id])).rows).toHaveLength(1)
     expect((await asUser(db, B, '/notifications', `select 1 from public.notifications where kind = 'CHALLENGE_NEW'`)).rows).toHaveLength(1)
     expect(await fails(db, OUT, `select public.join_challenge($1)`, [r.challenge_id])).toContain('CLUB_MEMBERS_ONLY')

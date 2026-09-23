@@ -1,7 +1,7 @@
 'use client'
 
 import { ShieldAlert } from 'lucide-react'
-import { AdminDashboard, AdminScreen, isSystemAdmin } from '@/features/admin'
+import { AdminConsole, isSystemAdmin } from '@/features/admin'
 import { useMyProfile } from '@/features/auth'
 import { EmptyState, Skeleton } from '@/shared/ui'
 
@@ -12,10 +12,5 @@ export default function AdminPage() {
   if (!isSystemAdmin(profile)) {
     return <EmptyState icon={ShieldAlert} title="Không có quyền truy cập" description="Khu vực dành cho quản trị viên hệ thống." />
   }
-  return (
-    <div className="space-y-6">
-      <AdminScreen profile={profile} />
-      <AdminDashboard profile={profile} />
-    </div>
-  )
+  return <AdminConsole />
 }

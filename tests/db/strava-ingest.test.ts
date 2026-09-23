@@ -42,14 +42,14 @@ describe('ingest_provider_activity', () => {
 
   it('bài chạy hợp lệ được nhập và thưởng ngay', async () => {
     const r = await ingest('1001', run())
-    expect(r).toMatchObject({ result: 'IMPORTED', validation_status: 'APPROVED', earned_xu: 5, earned_xp: 50 })
-    expect(await xu(U)).toBe(5)
+    expect(r).toMatchObject({ result: 'IMPORTED', validation_status: 'APPROVED', earned_xu: 1.8, earned_xp: 50 })
+    expect(await xu(U)).toBe(1.8)
   })
 
   it('webhook gửi lại cùng bài → không thưởng lần 2; đổi tên → UPDATED', async () => {
     expect((await ingest('1001', run())).result).toBe('DUPLICATE')
     expect((await ingest('1001', run({ title: 'Chạy Hồ Tây' }))).result).toBe('UPDATED')
-    expect(await xu(U)).toBe(5)
+    expect(await xu(U)).toBe(1.8)
   })
 
   it('đạp xe / quá ngắn → bỏ qua, không lưu', async () => {
@@ -88,7 +88,7 @@ describe('ingest_provider_activity', () => {
     const r = (await db.query<{ r: Record<string, unknown> }>(`select public.remove_provider_activity('STRAVA', '1001') as r`)).rows[0].r
     const again = (await db.query<{ r: Record<string, unknown> }>(`select public.remove_provider_activity('STRAVA', '1001') as r`)).rows[0].r
     await db.exec('reset role')
-    expect(r).toMatchObject({ result: 'DELETED', reversed_xu: 5, reversed_xp: 50 })
+    expect(r).toMatchObject({ result: 'DELETED', reversed_xu: 1.8, reversed_xp: 50 })
     expect(again.result).toBe('ALREADY_DELETED')
     expect(await xu(U)).toBe(0)
     expect(Number((await db.query<{ xp: number }>(`select xp from public.profiles where id = $1`, [U])).rows[0].xp)).toBe(xpBefore - 50)

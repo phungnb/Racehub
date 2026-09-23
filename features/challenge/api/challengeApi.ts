@@ -1,7 +1,8 @@
 // Thử thách: mọi thao tác ghi đi qua RPC (migration 000600). Client chỉ đọc và hiển thị.
 import { supabase } from '@/shared/lib/supabase'
 import type { Audience, ChallengeDraft, ChallengeFormat, Objective, RewardSource, RewardSplit, TeamMode } from '../model/challenge'
-import { draftToPayload } from '../model/challenge'
+import { draftToPayload, effectiveSlots } from '../model/challenge'
+import { toPolicy, type EconomyPolicy } from '@/shared/lib/economy'
 
 export type ChallengeTab = 'MINE' | 'DISCOVER' | 'CLUB' | 'ENDED'
 
@@ -149,12 +150,26 @@ export async function createChallenge(draft: ChallengeDraft, idempotencyKey: str
   return data as { challenge_id: string; fee: number; invite_code: string | null }
 }
 
-export async function previewFee(d: ChallengeDraft): Promise<number> {
-  const { data, error } = await supabase.rpc('preview_challenge_fee', {
-    p_format: d.format, p_max_slots: d.maxSlots, p_start: d.start, p_end: d.end, p_club: d.audience === 'CLUB_ONLY',
+export interface ChallengeQuote {
+  fee: number                       // phí theo biểu phí (trước khi dùng vé)
+  payer: 'USER' | 'CLUB'            // thử thách CLB trả bằng quỹ CLB
+  payerBalance: number              // số dư của bên trả phí
+  walletBalance: number             // ví cá nhân người tạo
+  pass: { id: string; remaining: number; max_slots: number; expires_at: string | null } | null
+  policy: EconomyPolicy
+}
+
+/** Báo giá tạo thử thách: phí, ai trả, vé miễn phí đang có (quote_challenge, migration 000700) */
+export async function quoteChallenge(d: ChallengeDraft): Promise<ChallengeQuote> {
+  const { data, error } = await supabase.rpc('quote_challenge', {
+    p_max_slots: effectiveSlots(d), p_format: d.format, p_club_id: d.audience === 'CLUB_ONLY' ? d.clubId : null,
   })
   if (error) throw error
-  return Number(data ?? 0)
+  const q = data as { fee: number; payer: 'USER' | 'CLUB'; payer_balance: number; wallet_balance: number; pass: ChallengeQuote['pass']; xu_vnd: number; policy: unknown }
+  return {
+    fee: Number(q.fee ?? 0), payer: q.payer, payerBalance: Number(q.payer_balance ?? 0), walletBalance: Number(q.wallet_balance ?? 0),
+    pass: q.pass, policy: toPolicy({ xuVnd: q.xu_vnd, challengeFee: q.policy }),
+  }
 }
 
 export async function joinChallenge(id: string, code?: string | null, teamId?: string | null) {
@@ -207,7 +222,7 @@ const MESSAGES: Record<string, string> = {
   INVALID_PACE: 'Khoảng pace không hợp lệ.',
   INVALID_MAX_SLOTS: 'Số người tối đa không hợp lệ.',
   INSUFFICIENT_BALANCE: 'Số Xu trong ví không đủ cho phí tạo và tiền treo thưởng.',
-  INSUFFICIENT_TREASURY: 'Quỹ CLB không đủ để treo thưởng.',
+  INSUFFICIENT_TREASURY: 'Quỹ CLB không đủ cho phí tạo và tiền treo thưởng.',
   INVALID_AMOUNT: 'Số Xu thưởng không hợp lệ.',
   FORBIDDEN: 'Bạn không có quyền làm việc này.',
   RATE_LIMITED: 'Bạn thao tác hơi nhanh, thử lại sau ít phút.',

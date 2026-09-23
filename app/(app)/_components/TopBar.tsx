@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { ShieldCheck } from 'lucide-react'
+import { isSystemAdmin } from '@/features/admin'
 import { NotificationBell } from '@/features/notification'
 import { CoinAmount, LevelBadge } from '@/shared/ui'
 import { routes } from '@/shared/config/routes'
@@ -16,6 +18,12 @@ export function TopBar({ profile }: { profile: Profile | null }) {
         </Link>
         {profile && (
           <div className="flex items-center gap-1">
+            {isSystemAdmin(profile) && (
+              <Link href={routes.admin} aria-label="Quản trị RaceHub"
+                className="grid size-11 place-items-center rounded-full text-fg-muted hover:bg-surface-2 hover:text-fg">
+                <ShieldCheck className="size-5" aria-hidden />
+              </Link>
+            )}
             <NotificationBell userId={profile.id} />
             <Link href={routes.me} className="flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5" aria-label="Hồ sơ của tôi">
               <LevelBadge level={profile.level} />
