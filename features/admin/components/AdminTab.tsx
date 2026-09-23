@@ -171,7 +171,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   <div>
-                    <label className="text-[10px] text-gray-400 block mb-1">Từ</label>
+                    <label className="text-xs text-gray-400 block mb-1">Từ</label>
                     <input 
                       type="number" 
                       value={tier.min} 
@@ -184,7 +184,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-gray-400 block mb-1">Đến</label>
+                    <label className="text-xs text-gray-400 block mb-1">Đến</label>
                     <input 
                       type="number" 
                       value={tier.max === null ? '' : tier.max} 
@@ -199,7 +199,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-gray-400 block mb-1">Phí (Xu)</label>
+                    <label className="text-xs text-gray-400 block mb-1">Phí (Xu)</label>
                     <input 
                       type="number" 
                       value={tier.fee} 

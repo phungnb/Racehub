@@ -126,7 +126,7 @@ export default function TeamRosterManager({ challengeId, isLocked = false }: Tea
                       <button
                         key={t.id}
                         onClick={() => handleAssignMember(member, t.id)}
-                        className="text-[10px] bg-amber-500/20 hover:bg-amber-500 hover:text-white text-amber-300 px-1.5 py-0.5 rounded transition-all"
+                        className="text-xs bg-amber-500/20 hover:bg-amber-500 hover:text-white text-amber-300 px-1.5 py-0.5 rounded transition-all"
                         title={`Chuyển vào ${t.name}`}
                       >
                         {t.name.split(' ')[0]}

@@ -83,7 +83,7 @@ function RoleBadge({ role }: { role: ClubRole }) {
       : role === 'CAPTAIN'
       ? 'bg-brand/20 text-brand'
       : 'bg-surface-2 text-fg'
-  return <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${tone}`}>{ROLE_LABEL[role]}</span>
+  return <span className={`text-xs font-bold px-2 py-0.5 rounded ${tone}`}>{ROLE_LABEL[role]}</span>
 }
 
 export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
@@ -352,7 +352,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
                   <ClubAvatar club={clubDetail} size={48} />
                   <div className="min-w-0">
                     <h2 className="text-sm font-bold text-white truncate">{clubDetail.name}</h2>
-                    <p className="text-[10px] text-fg-muted truncate">
+                    <p className="text-xs text-fg-muted truncate">
                       {clubDetail.member_count}/{clubDetail.member_limit} thành viên
                       {clubDetail.description ? ` · ${clubDetail.description}` : ''}
                     </p>
@@ -361,7 +361,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
                 {staff && (
                   <button
                     onClick={() => setShowInvite((v) => !v)}
-                    className="shrink-0 bg-surface-2 hover:bg-border text-[10px] font-bold px-3 py-1.5 rounded-xl text-brand border border-fg-subtle cursor-pointer"
+                    className="shrink-0 bg-surface-2 hover:bg-border text-xs font-bold px-3 py-1.5 rounded-xl text-brand border border-fg-subtle cursor-pointer"
                   >
                     Mời thành viên
                   </button>
@@ -400,7 +400,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
                 <button
                   key={key}
                   onClick={() => setSubTab(key)}
-                  className={`py-2 text-[10px] font-bold rounded-xl cursor-pointer transition-colors ${
+                  className={`py-2 text-xs font-bold rounded-xl cursor-pointer transition-colors ${
                     subTab === key ? 'bg-brand text-brand-fg shadow-md' : 'text-fg-muted hover:text-white'
                   }`}
                 >
@@ -429,13 +429,13 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
                 {/* Thông báo ghim (đặt trong tab Cài đặt, hiển thị ở đây cho mọi thành viên) */}
                 {clubDetail.announcement && (
                   <div className="bg-brand/10 border border-brand/30 rounded-2xl p-4 space-y-1">
-                    <span className="text-[10px] font-bold text-brand block">Thông báo ghim</span>
+                    <span className="text-xs font-bold text-brand block">Thông báo ghim</span>
                     <p className="text-xs text-fg whitespace-pre-line">{clubDetail.announcement}</p>
                   </div>
                 )}
 
                 <div className="bg-surface p-5 rounded-2xl border border-border space-y-3 shadow-xl">
-                  <span className="text-[10px] text-fg-muted block">Quỹ Câu lạc bộ</span>
+                  <span className="text-xs text-fg-muted block">Quỹ Câu lạc bộ</span>
                   <div className="flex justify-between items-center gap-3">
                     <span className="text-xl font-black text-amber-400">
                       {clubDetail.treasury_balance.toLocaleString('vi-VN')} Xu
@@ -469,7 +469,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
                   </div>
 
                   {myRole && (
-                    <p className="text-[10px] text-fg-subtle">
+                    <p className="text-xs text-fg-subtle">
                       Vai trò của bạn: <span className="text-fg font-bold">{ROLE_LABEL[myRole]}</span>
                     </p>
                   )}
@@ -509,7 +509,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
                               <h4 className="font-bold text-brand-fg truncate">{m.profile?.display_name ?? 'Runner'}</h4>
                               <RoleBadge role={m.role} />
                             </div>
-                            <span className="text-[10px] text-fg-muted">Level {m.profile?.level ?? 1}</span>
+                            <span className="text-xs text-fg-muted">Level {m.profile?.level ?? 1}</span>
                           </div>
                         </div>
                         <span className="text-amber-400 font-bold shrink-0">{(m.profile?.xp ?? 0).toLocaleString('vi-VN')} XP</span>
@@ -568,7 +568,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
         <form onSubmit={handleCreateClub} className="bg-surface border border-brand/50 rounded-2xl p-4 space-y-3 shadow-xl animate-fadeIn">
           <h3 className="text-sm font-bold text-brand">Thành lập Câu lạc bộ mới</h3>
           <div>
-            <label htmlFor="club-name" className="text-[10px] text-fg-muted block mb-1">
+            <label htmlFor="club-name" className="text-xs text-fg-muted block mb-1">
               Tên Câu lạc bộ
             </label>
             <input
@@ -581,7 +581,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
             />
           </div>
           <div>
-            <label htmlFor="club-desc" className="text-[10px] text-fg-muted block mb-1">
+            <label htmlFor="club-desc" className="text-xs text-fg-muted block mb-1">
               Mô tả
             </label>
             <textarea
@@ -665,17 +665,17 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
                       <span className="block font-bold text-[13px] text-brand-fg group-hover:text-brand transition-colors truncate">
                         {club.name}
                       </span>
-                      <span className="block text-[10px] text-fg-muted truncate">
+                      <span className="block text-xs text-fg-muted truncate">
                         {club.description || 'Câu lạc bộ tập luyện cộng đồng.'}
                       </span>
-                      <span className="block text-[10px] text-fg-subtle mt-0.5">
+                      <span className="block text-xs text-fg-subtle mt-0.5">
                         {club.member_count}/{club.member_limit} thành viên
                       </span>
                     </span>
                   </button>
 
                   <div className="flex flex-col items-end gap-1.5 shrink-0">
-                    <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-lg font-bold">
+                    <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-lg font-bold">
                       {club.treasury_balance.toLocaleString('vi-VN')} Xu
                     </span>
                     {status === 'PENDING' ? (

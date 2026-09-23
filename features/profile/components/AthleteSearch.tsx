@@ -76,7 +76,7 @@ export default function AthleteSearch() {
                     <AthleteAvatar name={a.display_name || 'Runner'} url={a.avatar_url} size={40} />
                     <span className="min-w-0 flex-1">
                       <span className="block font-bold text-white truncate">{a.display_name || 'Runner'}</span>
-                      <span className="block text-[10px] text-fg-subtle">
+                      <span className="block text-xs text-fg-subtle">
                         Level {a.level ?? 1}
                         {a.region ? ` • ${a.region}` : ''}
                       </span>

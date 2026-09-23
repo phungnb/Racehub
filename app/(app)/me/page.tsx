@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import ProfileTab from '@/features/profile/components/ProfileTab'
+import { MeScreen } from '@/features/profile/components/MeScreen'
 import { useInvalidateProfile, useMyProfile } from '@/features/auth/model/session'
 import { Skeleton } from '@/shared/ui'
 
@@ -46,7 +46,7 @@ export default function MePage() {
   return (
     <>
       <Suspense fallback={null}><StravaResultNotice /></Suspense>
-      {profile ? <ProfileTab profile={profile} t={{ displayName: 'Tên hiển thị' }} /> : <Skeleton className="h-96" />}
+      {profile ? <MeScreen profile={profile} /> : <Skeleton className="h-96" />}
     </>
   )
 }

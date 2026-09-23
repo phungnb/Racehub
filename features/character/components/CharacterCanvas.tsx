@@ -166,10 +166,10 @@ export default function CharacterCanvas({ avatar, equipment }: CharacterCanvasPr
     <div className="relative w-full max-w-xs mx-auto h-56 bg-gradient-to-b from-surface via-bg to-brand/10 rounded-3xl border border-brand/30 shadow-2xl overflow-hidden flex flex-col items-center">
       {/* Header thông tin nhanh trên Canvas */}
       <div className="absolute top-3 left-4 right-4 flex justify-between items-center z-10">
-        <span className="text-[10px] font-black uppercase tracking-wider text-brand bg-surface/80 px-2.5 py-1 rounded-full border border-border">
+        <span className="text-xs font-black uppercase tracking-wider text-brand bg-surface/80 px-2.5 py-1 rounded-full border border-border">
           3D Runner Studio
         </span>
-        <span className="text-[10px] font-black bg-brand text-brand-fg px-2.5 py-1 rounded-full shadow-md">
+        <span className="text-xs font-black bg-brand text-brand-fg px-2.5 py-1 rounded-full shadow-md">
           LV.{level}
         </span>
       </div>
@@ -192,7 +192,7 @@ export default function CharacterCanvas({ avatar, equipment }: CharacterCanvasPr
       </div>
 
       {/* Footer chú thích hướng dẫn tương tác */}
-      <div className="absolute bottom-2 text-[9px] text-fg-muted font-medium tracking-wide bg-bg/80 px-3 py-0.5 rounded-full border border-border">
+      <div className="absolute bottom-2 text-xs text-fg-muted font-medium tracking-wide bg-bg/80 px-3 py-0.5 rounded-full border border-border">
         🖱️ Xoay để xem nhân vật 3D đa chiều
       </div>
     </div>

@@ -53,7 +53,7 @@ export default function AdminDashboard({ profile }: { profile: any }) {
       <div className="bg-surface border border-border rounded-2xl p-5 space-y-4">
         <div className="flex justify-between items-center">
           <h2 className="text-sm font-black text-brand uppercase tracking-wider">Khu vực Quản trị & Duyệt Bài</h2>
-          <span className="text-[10px] bg-brand/20 text-brand px-2 py-0.5 rounded-full font-bold">
+          <span className="text-xs bg-brand/20 text-brand px-2 py-0.5 rounded-full font-bold">
             {profile.role}
           </span>
         </div>

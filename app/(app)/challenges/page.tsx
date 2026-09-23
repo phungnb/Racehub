@@ -1,9 +1,9 @@
 'use client'
 
-import ChallengeTab from '@/features/challenge/components/ChallengeTab'
+import { ChallengesScreen } from '@/features/challenge/components/ChallengesScreen'
 import { useMyProfile } from '@/features/auth/model/session'
 
 export default function ChallengesPage() {
   const { profile } = useMyProfile()
-  return <ChallengeTab profile={profile} />
+  return <ChallengesScreen profile={profile} />
 }

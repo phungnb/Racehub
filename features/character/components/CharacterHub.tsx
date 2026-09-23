@@ -93,7 +93,7 @@ export default function CharacterHub({ userId }: { userId: string }) {
         
         {/* Header thông tin & nút chuyển đổi Nam/Nữ to rõ */}
         <div className="flex justify-between items-center relative z-20">
-          <span className="text-[10px] font-black uppercase tracking-widest text-brand bg-brand/10 px-3 py-1 rounded-full border border-brand/20">
+          <span className="text-xs font-black uppercase tracking-widest text-brand bg-brand/10 px-3 py-1 rounded-full border border-brand/20">
             {currentRunner.name}
           </span>
 

@@ -15,13 +15,13 @@ export default function CharacterSelector({ selectedGender, onSelectGender }: { 
         <div className="bg-bg p-1 rounded-xl border border-border flex items-center space-x-1">
           <button
             onClick={() => onSelectGender('male')}
-            className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${selectedGender === 'male' ? 'bg-brand text-brand-fg shadow-md' : 'text-fg-muted hover:text-white'}`}
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${selectedGender === 'male' ? 'bg-brand text-brand-fg shadow-md' : 'text-fg-muted hover:text-white'}`}
           >
             👦 Nam
           </button>
           <button
             onClick={() => onSelectGender('female')}
-            className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${selectedGender === 'female' ? 'bg-brand text-brand-fg shadow-md' : 'text-fg-muted hover:text-white'}`}
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${selectedGender === 'female' ? 'bg-brand text-brand-fg shadow-md' : 'text-fg-muted hover:text-white'}`}
           >
             👧 Nữ
           </button>
@@ -39,10 +39,10 @@ export default function CharacterSelector({ selectedGender, onSelectGender }: { 
         </div>
         <div className="space-y-1 flex-1">
           <span className="text-xs font-black text-white block">{currentRunner.name}</span>
-          <p className="text-[10px] text-fg-muted leading-relaxed">
+          <p className="text-xs text-fg-muted leading-relaxed">
             Hệ thống 3D Studio đồng bộ trang phục và chỉ số chuẩn game hóa RaceHub.
           </p>
-          <span className="inline-block text-[9px] bg-brand/20 text-brand px-2 py-0.5 rounded font-bold">
+          <span className="inline-block text-xs bg-brand/20 text-brand px-2 py-0.5 rounded font-bold">
             Đang kích hoạt
           </span>
         </div>

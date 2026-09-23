@@ -62,7 +62,7 @@ interface Props {
 const card = 'bg-surface border border-border rounded-2xl p-4 space-y-3 shadow-xl'
 const input =
   'w-full bg-bg border border-border rounded-xl p-2.5 text-xs text-white outline-none focus:border-brand'
-const label = 'text-[10px] text-fg-muted block mb-1'
+const label = 'text-xs text-fg-muted block mb-1'
 
 export default function ClubSettings({ club, myRole, onChanged, onDeleted, notify }: Props) {
   const isOwner = myRole === 'OWNER'
@@ -147,7 +147,7 @@ export default function ClubSettings({ club, myRole, onChanged, onDeleted, notif
             )}
           </div>
         </div>
-        <p className="text-[10px] text-fg-subtle">JPG, PNG hoặc WebP, tối đa 2 MB. Ảnh vuông hiển thị đẹp nhất.</p>
+        <p className="text-xs text-fg-subtle">JPG, PNG hoặc WebP, tối đa 2 MB. Ảnh vuông hiển thị đẹp nhất.</p>
       </div>
 
       {/* --------------------------- Hồ sơ ----------------------------- */}
@@ -186,7 +186,7 @@ export default function ClubSettings({ club, myRole, onChanged, onDeleted, notif
       {/* ----------------------- Thông báo ghim ------------------------ */}
       <div className={card}>
         <h3 className="text-sm font-bold text-fg">Thông báo ghim</h3>
-        <p className="text-[10px] text-fg-subtle">Hiện ở đầu tab Tổng quan cho mọi thành viên.</p>
+        <p className="text-xs text-fg-subtle">Hiện ở đầu tab Tổng quan cho mọi thành viên.</p>
         <textarea
           value={announcement}
           maxLength={500}
@@ -259,7 +259,7 @@ export default function ClubSettings({ club, myRole, onChanged, onDeleted, notif
             </div>
 
             {joinPolicy === 'OPEN' && club.join_policy !== 'OPEN' && (
-              <p className="text-[10px] text-amber-400">
+              <p className="text-xs text-amber-400">
                 Chuyển sang chế độ này sẽ duyệt luôn toàn bộ người đang chờ.
               </p>
             )}

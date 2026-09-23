@@ -1,18 +1,17 @@
 'use client'
 
-import { toast } from 'sonner'
-import RunTab from '@/features/run/components/RunTab'
-import { useInvalidateProfile, useMyProfile } from '@/features/auth/model/session'
+import { useQueryClient } from '@tanstack/react-query'
+import { RunScreen } from '@/features/run/components/RunScreen'
+import { useInvalidateProfile } from '@/features/auth/model/session'
 
 export default function RunPage() {
-  const { profile } = useMyProfile()
+  const qc = useQueryClient()
   const invalidateProfile = useInvalidateProfile()
   return (
-    <RunTab
-      profile={profile}
-      onActivitySaved={() => {
+    <RunScreen
+      onSaved={() => {
         invalidateProfile()
-        toast.success('Đã lưu buổi chạy')
+        qc.invalidateQueries({ queryKey: ['activities'] })
       }}
     />
   )

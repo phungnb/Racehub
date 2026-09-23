@@ -1,4 +1,4 @@
-'./use client';
+'use client';
 
 import { useState } from 'react';
 import { Trophy, Users, AlertTriangle, X } from 'lucide-react';
@@ -124,7 +124,7 @@ export default function CreateChallengeWizard({ isOpen, onClose, onCreated, prof
           {/* Quy mô & Phí dự kiến */}
           <div className="grid grid-cols-2 gap-3 bg-surface-2 p-3 rounded-2xl border border-[#3a3b3c]">
             <div>
-              <label className="block text-[10px] font-semibold text-amber-400 mb-1">Quy Mô / Giới Hạn VĐV</label>
+              <label className="block text-xs font-semibold text-amber-400 mb-1">Quy Mô / Giới Hạn VĐV</label>
               <select 
                 value={maxSlots}
                 onChange={(e) => setMaxSlots(parseInt(e.target.value, 10))}
@@ -136,10 +136,10 @@ export default function CreateChallengeWizard({ isOpen, onClose, onCreated, prof
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 mb-1">Phí Dự Kiến (Sổ Cái)</label>
+              <label className="block text-xs font-semibold text-gray-400 mb-1">Phí Dự Kiến (Sổ Cái)</label>
               <div className="w-full bg-surface border border-[#3a3b3c] rounded-xl px-2.5 py-2 text-xs text-amber-400 font-bold flex items-center justify-between">
                 <span>🪙 ~{estimatedFee} Xu</span>
-                <span className="text-[10px] text-gray-400">(Ví: {userXu} Xu)</span>
+                <span className="text-xs text-gray-400">(Ví: {userXu} Xu)</span>
               </div>
             </div>
           </div>
@@ -178,7 +178,7 @@ export default function CreateChallengeWizard({ isOpen, onClose, onCreated, prof
           {challengeType === 'TEAM' && (
             <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded-2xl space-y-3 animate-fadeIn">
               <div>
-                <label className="block text-[10px] font-semibold text-amber-400 mb-1">Thể Thức Đồng Đội (Game Mode)</label>
+                <label className="block text-xs font-semibold text-amber-400 mb-1">Thể Thức Đồng Đội (Game Mode)</label>
                 <select 
                   value={gameMode}
                   onChange={(e) => setGameMode(e.target.value as any)}
@@ -191,7 +191,7 @@ export default function CreateChallengeWizard({ isOpen, onClose, onCreated, prof
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-gray-400 mb-1">Số Thành Viên Tối Thiểu / Đội</label>
+                <label className="block text-xs font-semibold text-gray-400 mb-1">Số Thành Viên Tối Thiểu / Đội</label>
                 <input 
                   type="number" 
                   min="2"
@@ -219,15 +219,15 @@ export default function CreateChallengeWizard({ isOpen, onClose, onCreated, prof
           {/* Ngày tháng */}
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 mb-1">Hạn Đăng Ký</label>
+              <label className="block text-xs font-semibold text-gray-400 mb-1">Hạn Đăng Ký</label>
               <input type="date" value={regDeadline} onChange={(e) => setRegDeadline(e.target.value)} className="w-full bg-surface-2 border border-[#3a3b3c] rounded-xl px-2 py-2 text-[11px] text-white" />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 mb-1">Ngày Bắt Đầu</label>
+              <label className="block text-xs font-semibold text-gray-400 mb-1">Ngày Bắt Đầu</label>
               <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-surface-2 border border-[#3a3b3c] rounded-xl px-2 py-2 text-[11px] text-white" />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 mb-1">Ngày Kết Thúc</label>
+              <label className="block text-xs font-semibold text-gray-400 mb-1">Ngày Kết Thúc</label>
               <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-surface-2 border border-[#3a3b3c] rounded-xl px-2 py-2 text-[11px] text-white" />
             </div>
           </div>
@@ -235,15 +235,15 @@ export default function CreateChallengeWizard({ isOpen, onClose, onCreated, prof
           {/* Cự ly & Pace */}
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 mb-1">Cự ly tối thiểu (Km)</label>
+              <label className="block text-xs font-semibold text-gray-400 mb-1">Cự ly tối thiểu (Km)</label>
               <input type="number" step="0.1" value={minKm} onChange={(e) => setMinKm(parseFloat(e.target.value))} className="w-full bg-surface-2 border border-[#3a3b3c] rounded-xl px-2 py-2 text-xs text-white" />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 mb-1">Min Pace (phút/km)</label>
+              <label className="block text-xs font-semibold text-gray-400 mb-1">Min Pace (phút/km)</label>
               <input type="number" step="0.1" value={minPace} onChange={(e) => setMinPace(parseFloat(e.target.value))} className="w-full bg-surface-2 border border-[#3a3b3c] rounded-xl px-2 py-2 text-xs text-white" />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 mb-1">Max Pace (phút/km)</label>
+              <label className="block text-xs font-semibold text-gray-400 mb-1">Max Pace (phút/km)</label>
               <input type="number" step="0.1" value={maxPace} onChange={(e) => setMaxPace(parseFloat(e.target.value))} className="w-full bg-surface-2 border border-[#3a3b3c] rounded-xl px-2 py-2 text-xs text-white" />
             </div>
           </div>

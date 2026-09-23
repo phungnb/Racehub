@@ -118,14 +118,14 @@ export default function ClubMembersManager({ clubId, myRole, notify }: Props) {
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-white">{displayName}</h4>
-                      <p className="text-[10px] text-fg-muted">
+                      <p className="text-xs text-fg-muted">
                         Level {m.profile?.level || 1} • Tham gia: {new Date(m.joined_at).toLocaleDateString('vi-VN')}
                       </p>
                     </div>
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold ${
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${
                       m.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
                     }`}>
                       {m.status === 'APPROVED' ? (ROLE_LABEL[m.role] || m.role) : 'Đang chờ duyệt'}

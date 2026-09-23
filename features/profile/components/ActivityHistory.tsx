@@ -59,11 +59,11 @@ export default function ActivityHistory({ userId }: Props) {
             <div key={act.id} className="bg-bg p-3 rounded-xl border border-border/80 flex items-center justify-between">
               <div>
                 <p className="font-bold text-white">{act.name || 'Chạy bộ'}</p>
-                <p className="text-[10px] text-fg-subtle">{new Date(act.start_date || act.created_at).toLocaleDateString('vi-VN')}</p>
+                <p className="text-xs text-fg-subtle">{new Date(act.start_date || act.created_at).toLocaleDateString('vi-VN')}</p>
               </div>
               <div className="text-right">
                 <p className="font-bold text-brand">{fmtKm(act.distance_m || act.distance || 0)} km</p>
-                <p className="text-[10px] text-fg-muted">{fmtDuration(act.time_s || act.moving_time || 0)} • {fmtPace(pace)}/km</p>
+                <p className="text-xs text-fg-muted">{fmtDuration(act.time_s || act.moving_time || 0)} • {fmtPace(pace)}/km</p>
               </div>
             </div>
           )

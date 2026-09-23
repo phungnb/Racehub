@@ -23,12 +23,12 @@ export default function InventoryModal({ isOpen, onClose, inventory, onEquip }: 
                   <span className="text-2xl">🛡️</span>
                   <div>
                     <h4 className="text-xs font-bold text-white">{inv.avatar_items?.name}</h4>
-                    <span className="text-[10px] text-brand uppercase font-semibold">{inv.avatar_items?.category} • {inv.avatar_items?.rarity}</span>
+                    <span className="text-xs text-brand uppercase font-semibold">{inv.avatar_items?.category} • {inv.avatar_items?.rarity}</span>
                   </div>
                 </div>
                 <button 
                   onClick={() => onEquip(inv.item_id, inv.avatar_items?.category)}
-                  className="bg-brand hover:bg-brand-strong text-brand-fg text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all"
+                  className="bg-brand hover:bg-brand-strong text-brand-fg text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
                 >
                   Trang bị
                 </button>

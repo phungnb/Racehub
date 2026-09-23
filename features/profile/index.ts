@@ -1,2 +1,2 @@
-export { default as ProfileTab } from './components/ProfileTab'
+export { MeScreen } from './components/MeScreen'
 export * from './lib/profileTypes'

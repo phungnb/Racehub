@@ -181,7 +181,7 @@ export default function MemberActionModal({
               {isMe && <span className="ml-1.5 text-brand font-bold">(Bạn)</span>}
             </h3>
             <span
-              className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded ${
+              className={`inline-block mt-1 text-xs font-bold px-2 py-0.5 rounded ${
                 member.role === 'OWNER'
                   ? 'bg-amber-500/20 text-amber-400'
                   : member.role === 'MEMBER'

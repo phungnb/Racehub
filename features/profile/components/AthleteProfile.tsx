@@ -206,7 +206,7 @@ export default function AthleteProfile({ userId, onClose }: Props) {
                           ['Pace TB', `${fmtPace(pace)}/km`],
                         ].map(([k, v]) => (
                           <div key={k} className="bg-bg rounded-xl p-2.5">
-                            <dt className="text-[10px] text-fg-subtle">{k}</dt>
+                            <dt className="text-xs text-fg-subtle">{k}</dt>
                             <dd className="text-sm font-bold text-white mt-0.5">{v}</dd>
                           </div>
                         ))}

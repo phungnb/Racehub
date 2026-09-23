@@ -41,7 +41,7 @@ export function StravaSyncCard() {
       <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#fc4c02]/15 text-sm font-black text-[#fc4c02]" aria-hidden>S</span>
       <div className="min-w-0 flex-1">
         <p className="font-semibold">Strava đã kết nối</p>
-        <p className="text-sm text-fg-muted">Bài chạy mới tự về sau vài phút. Bấm để lấy ngay.</p>
+        <p className="text-sm text-fg-muted">Bài chạy mới tự động về</p>
       </div>
       <Button size="sm" variant="secondary" loading={m.isPending} onClick={() => m.mutate()}>
         {!m.isPending && <RefreshCw className="size-4" aria-hidden />} Đồng bộ

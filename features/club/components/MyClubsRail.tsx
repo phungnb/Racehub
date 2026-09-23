@@ -97,7 +97,7 @@ export default function MyClubsRail({ items, activeId, loading, onSelect, onOpen
                 {isStaff(role) && (
                   <span
                     title={ROLE_LABEL[role]}
-                    className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-brand text-brand-fg border-2 border-bg flex items-center justify-center text-[10px]"
+                    className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-brand text-brand-fg border-2 border-bg flex items-center justify-center text-xs"
                   >
                     {role === 'OWNER' ? '★' : '🛡'}
                   </span>
@@ -133,7 +133,7 @@ export default function MyClubsRail({ items, activeId, loading, onSelect, onOpen
             <ClubAvatar club={active.club} size={48} />
             <div className="min-w-0 flex-1">
               <h3 className="text-sm font-black text-white truncate">{active.club.name}</h3>
-              <p className="text-[10px] text-fg-muted">Bạn là {ROLE_LABEL[active.role].toLowerCase()}</p>
+              <p className="text-xs text-fg-muted">Bạn là {ROLE_LABEL[active.role].toLowerCase()}</p>
             </div>
           </div>
 
@@ -145,17 +145,17 @@ export default function MyClubsRail({ items, activeId, loading, onSelect, onOpen
 
           <dl className="grid grid-cols-2 gap-2">
             <div className="bg-bg rounded-xl p-3">
-              <dt className="text-[10px] text-fg-muted">Thành viên</dt>
+              <dt className="text-xs text-fg-muted">Thành viên</dt>
               <dd className="text-base font-black text-white mt-0.5">
                 {active.club.member_count}
-                <span className="text-fg-subtle text-[10px] font-bold">/{active.club.member_limit}</span>
+                <span className="text-fg-subtle text-xs font-bold">/{active.club.member_limit}</span>
               </dd>
             </div>
             <div className="bg-bg rounded-xl p-3">
-              <dt className="text-[10px] text-fg-muted">Quỹ CLB</dt>
+              <dt className="text-xs text-fg-muted">Quỹ CLB</dt>
               <dd className="text-base font-black text-amber-400 mt-0.5">
                 {active.club.treasury_balance.toLocaleString('vi-VN')}
-                <span className="text-[10px] font-bold"> Xu</span>
+                <span className="text-xs font-bold"> Xu</span>
               </dd>
             </div>
           </dl>

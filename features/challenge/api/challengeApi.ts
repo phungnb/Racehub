@@ -1,4 +1,6 @@
 import { supabase } from '@/shared/lib/supabase';
+import { errorMessage } from '@/shared/lib/errors';
+import type { ChallengeRow } from '../model/challenge';
 
 export interface CreateChallengePayload {
   title: string;
@@ -48,8 +50,7 @@ export async function createChallengeInSupabase(payload: CreateChallengePayload)
   });
 
   if (error) {
-    console.error('Lỗi Sổ cái Ledger:', error.message);
-    throw new Error(error.message);
+    throw new Error(errorMessage(error));
   }
 
   return data;
@@ -58,13 +59,11 @@ export async function createChallengeInSupabase(payload: CreateChallengePayload)
 export async function getChallengesFromSupabase() {
   const { data, error } = await supabase
     .from('challenges')
-    .select('*')
-    .order('created_at', { ascending: false });
+    .select('id, title, challenge_type, game_mode, target_km, min_km, max_slots, start_date, end_date, created_by, target_audience, calculated_fee')
+    .neq('status', 'ARCHIVED')
+    .order('start_date', { ascending: false })
+    .limit(100);
 
-  if (error) {
-    console.error('Lỗi tải danh sách challenge:', error.message);
-    return [];
-  }
-
-  return data || [];
+  if (error) throw error;
+  return (data ?? []) as ChallengeRow[];
 }

@@ -129,7 +129,7 @@ export default function TeamLeaderboard({ challengeId, gameMode = 'TEAM_SUM' }: 
             {/* Các chỉ số thống kê theo Mode */}
             <div className="flex items-center space-x-6 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0 border-[#3a3b3c]">
               <div className="text-right">
-                <div className="text-[10px] uppercase text-gray-400 font-semibold">
+                <div className="text-xs uppercase text-gray-400 font-semibold">
                   {currentMode === 'TEAM_SUM' && 'Tổng cự ly'}
                   {currentMode === 'TEAM_AVG' && 'Trung bình / VĐV'}
                   {currentMode === 'TEAM_GAP' && 'Chỉ số Gap'}
