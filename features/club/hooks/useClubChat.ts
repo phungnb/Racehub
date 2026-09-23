@@ -50,7 +50,9 @@ export function useClubChat(clubId: string, enabled: boolean) {
   const scheduleRead = useCallback(() => {
     if (markRead.current) clearTimeout(markRead.current)
     markRead.current = setTimeout(() => {
-      void markClubRead(clubId).then(() => qc.invalidateQueries({ queryKey: clubKeys.inbox }))
+      markClubRead(clubId)
+        .then(() => qc.invalidateQueries({ queryKey: clubKeys.inbox }))
+        .catch((e) => console.error('[CLB] Không đánh dấu đã đọc được:', e?.code, e?.message))
     }, 800)
   }, [clubId, qc])
 
