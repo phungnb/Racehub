@@ -113,19 +113,21 @@ Bảy tính năng **chỉ RaceHub có**. Đây là thứ để quảng bá, nên
 
 ### Sprint 3: Engine thử thách + đội (19/10 → 30/10) · Trụ cột ② · Mốc M2
 
+> **Trạng thái:** code xong (TT-01 → TT-11), 12 test DB + 8 test logic. Làm theo phạm vi: mục tiêu cá nhân, xếp hạng, 1-1 (không cược), đồng đội 4 chế độ, cộng đồng, nội bộ CLB (thưởng trích quỹ). **Để sau:** cược giữa người chơi (chờ pháp lý — ADR-011), tiếp sức, săn mồi, bí mật, Pace Breaker, Negative Split (cần phân tích từng km — TT-12…TT-16). Chat riêng của đội (TT-08 phần chat) chuyển sang Sprint 5 cùng Web Push.
+
 | Mã | Việc | Loại | Nghiệm thu |
 |---|---|---|---|
-| TT-01 | Migration `000600_challenge_engine`:<br>• `challenge_teams` (captain, club_id, invite_code, màu)<br>• `challenge_participants.team_id`<br>• `challenge_progress_events` (một dòng cho mỗi bài chạy tính vào thử thách)<br>• trạng thái vòng đời `DRAFT → OPEN → RUNNING → SETTLING → FINISHED / CANCELLED` | DB | Test: bài chạy ngoài khung giờ, sai pace, dưới quãng tối thiểu **không** được tính |
-| TT-02 | `private.apply_activity_to_challenges(activity_id)` được gọi từ luồng thưởng; thu hồi khi bài bị xóa | DB | Xóa bài trên Strava → tiến độ thử thách giảm tương ứng |
-| TT-03 | `model/scoring.ts` + SQL tương ứng cho 8 chế độ: `ACCUMULATE`, `DISTANCE_TARGET`, `MILESTONE`, `STREAK`, `TEAM_SUM`, `TEAM_AVG`, `TEAM_GAP`, `LAST_MEMBER`; **trần km mỗi người mỗi ngày** trong thử thách đội | DB·API | Bảng test cùng dữ liệu cho kết quả giống nhau ở TypeScript và SQL |
-| TT-04 | RPC `join_challenge`, `leave_challenge`, `create_team`, `join_team_by_code`, `kick_from_team`, `cancel_challenge` (hoàn Xu qua sổ cái) | DB | Idempotent; rời thử thách sau khi bắt đầu không được hoàn phí |
-| TT-05 | Tất toán `settle_challenge` (cron mỗi 15 phút): huy chương, Xu, XP, huy hiệu | DB·OPS | Chạy 2 lần không trao 2 lần; đúng thứ tự khi bằng điểm |
-| TT-06 | `/challenges/[id]`: hero (ảnh, `Countdown`), luật rõ ràng, `ProgressRing` của tôi, nút Tham gia / Rời (giữ để rời) | UI | Người chưa đăng nhập xem được luật; nút tham gia hiện phí và số Xu còn lại |
-| TT-07 | BXH realtime: cá nhân · đội (`TeamVersus`) · CLB; ghim dòng của tôi / đội tôi | UI | Bạn chạy xong → hạng đổi trên máy người khác ≤ 5 giây |
-| TT-08 | Màn **đội**: lập đội, mời bằng mã / link, đội trưởng xếp người, chat đội (dùng lại chat CLB với `scope = team`) | UI | Đội đủ người thì khóa danh sách lúc thử thách bắt đầu |
-| TT-09 | **Wizard 4 bước** `/challenges/new`: ① Loại (cá nhân / đội / CLB) → ② Luật (chế độ, km, pace, quãng tối thiểu) → ③ Thời gian và phần thưởng (phí tính trước bằng RPC) → ④ Xem lại | UI | Không tạo được thử thách sai luật; xem trước giống hệt trang chi tiết |
-| TT-10 | Tab **Thử thách** trong CLB: thử thách nội bộ, chia đội tự động theo pace | UI | Chủ nhiệm tạo thử thách tháng cho CLB trong ≤ 1 phút |
-| TT-11 | Màn **kết quả**: bục vinh quang, huy chương, chia sẻ | UI | Có trạng thái "đang tổng kết" trong lúc SETTLING |
+| ✅ TT-01 | Migration `000600_challenge_engine`:<br>• `challenge_teams` (captain, club_id, invite_code, màu)<br>• `challenge_participants.team_id`<br>• `challenge_progress_events` (một dòng cho mỗi bài chạy tính vào thử thách)<br>• trạng thái vòng đời `DRAFT → OPEN → RUNNING → SETTLING → FINISHED / CANCELLED` | DB | Test: bài chạy ngoài khung giờ, sai pace, dưới quãng tối thiểu **không** được tính |
+| ✅ TT-02 | `private.apply_activity_to_challenges(activity_id)` được gọi từ luồng thưởng; thu hồi khi bài bị xóa | DB | Xóa bài trên Strava → tiến độ thử thách giảm tương ứng |
+| ✅ TT-03 | `model/scoring.ts` + SQL tương ứng cho 8 chế độ: `ACCUMULATE`, `DISTANCE_TARGET`, `MILESTONE`, `STREAK`, `TEAM_SUM`, `TEAM_AVG`, `TEAM_GAP`, `LAST_MEMBER`; **trần km mỗi người mỗi ngày** trong thử thách đội | DB·API | Bảng test cùng dữ liệu cho kết quả giống nhau ở TypeScript và SQL |
+| ✅ TT-04 | RPC `join_challenge`, `leave_challenge`, `create_team`, `join_team_by_code`, `kick_from_team`, `cancel_challenge` (hoàn Xu qua sổ cái) | DB | Idempotent; rời thử thách sau khi bắt đầu không được hoàn phí |
+| ✅ TT-05 | Tất toán `settle_challenge` (cron mỗi 15 phút): huy chương, Xu, XP, huy hiệu | DB·OPS | Chạy 2 lần không trao 2 lần; đúng thứ tự khi bằng điểm |
+| ✅ TT-06 | `/challenges/[id]`: hero (ảnh, `Countdown`), luật rõ ràng, `ProgressRing` của tôi, nút Tham gia / Rời (giữ để rời) | UI | Người chưa đăng nhập xem được luật; nút tham gia hiện phí và số Xu còn lại |
+| ✅ TT-07 | BXH realtime: cá nhân · đội (`TeamVersus`) · CLB; ghim dòng của tôi / đội tôi | UI | Bạn chạy xong → hạng đổi trên máy người khác ≤ 5 giây |
+| ✅ TT-08 | Màn **đội**: lập đội, mời bằng mã / link, đội trưởng xếp người, chat đội (dùng lại chat CLB với `scope = team`) | UI | Đội đủ người thì khóa danh sách lúc thử thách bắt đầu |
+| ✅ TT-09 | **Wizard 4 bước** `/challenges/new`: ① Loại (cá nhân / đội / CLB) → ② Luật (chế độ, km, pace, quãng tối thiểu) → ③ Thời gian và phần thưởng (phí tính trước bằng RPC) → ④ Xem lại | UI | Không tạo được thử thách sai luật; xem trước giống hệt trang chi tiết |
+| ✅ TT-10 | Tab **Thử thách** trong CLB: thử thách nội bộ, chia đội tự động theo pace | UI | Chủ nhiệm tạo thử thách tháng cho CLB trong ≤ 1 phút |
+| ✅ TT-11 | Màn **kết quả**: bục vinh quang, huy chương, chia sẻ | UI | Có trạng thái "đang tổng kết" trong lúc SETTLING |
 | QA-3 | Chạy thật một thử thách đội 7 ngày với 3 CLB thí điểm | QA | Không có khiếu nại sai điểm |
 
 ### Sprint 4: Lớp game (02/11 → 13/11) · Trụ cột ① · Mốc M3 Beta kín
@@ -239,7 +241,7 @@ Một sprint chỉ được đóng khi đạt đủ các mục sau:
 | 0–1 | Nền móng an toàn | ✅ Vá bảo mật, sổ cái, đồng bộ Strava, màn Chạy / Thử thách / Hồ sơ, dọn cây thư mục | — | 68 test, build xanh |
 | 1.5 | Hạ tầng | ⬜ | | |
 | 2 | CLB lõi | ✅ Code xong (CLB-01 → CLB-14): bảng tin, chat realtime, thông báo, BXH, thành viên, quỹ, cài đặt, tổng kết tuần. Còn QA-2 với CLB thí điểm | | Sửa lỗi production: không gán được Quản trị viên, không cấm được thành viên. 91 test |
-| 3 | Thử thách đội | ⬜ | | |
+| 3 | Thử thách đội | ✅ Code xong: engine phía server, đội 4 chế độ, BXH realtime, wizard 4 bước, tab Thử thách trong CLB, tất toán + thưởng | | Sửa lỗi production: không tham gia được thử thách, BXH không đọc được. 108 test |
 | 4 | Lớp game | ⬜ | | |
 | 5 | CLB hoàn chỉnh + PWA | ⬜ | | |
 | 6 | Mùa giải | ⬜ | | |

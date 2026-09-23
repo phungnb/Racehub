@@ -2,12 +2,17 @@
 import { supabase } from '@/shared/lib/supabase'
 import type { MemberProfile } from './clubApi'
 
-export type PostKind = 'POST' | 'ANNOUNCEMENT' | 'AUTO_RUN' | 'AUTO_JOIN' | 'RECAP'
+export type PostKind = 'POST' | 'ANNOUNCEMENT' | 'AUTO_RUN' | 'AUTO_JOIN' | 'RECAP' | 'CHALLENGE'
 
 export interface RunMeta { distance_m: number; moving_s: number; avg_pace_s: number; elevation_gain_m?: number; source?: string; started_at?: string }
 export interface RecapMeta {
   week: string; distance_m: number; run_count: number; active_members: number; new_members: number
   top: { user_id: string; name: string; distance_m: number }[]
+}
+
+export interface ChallengeMeta {
+  challenge_id: string; format: string; objective?: string; target_value?: number; start_date?: string; end_date?: string
+  reward_xu?: number; result?: boolean
 }
 
 export interface ClubPost {
@@ -19,7 +24,7 @@ export interface ClubPost {
   body: string
   image_paths: string[]
   activity_id: string | null
-  meta: Partial<RunMeta & RecapMeta>
+  meta: Partial<RunMeta & RecapMeta & ChallengeMeta>
   is_pinned: boolean
   reaction_count: number
   comment_count: number

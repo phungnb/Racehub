@@ -1,7 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
-import { Crown, Flame, Heart, Megaphone, MessageCircle, MoreHorizontal, Pin, PinOff, Trash2, Trophy, UserPlus } from 'lucide-react'
+import { ChevronRight, Crown, Flame, Heart, Megaphone, MessageCircle, MoreHorizontal, Pin, PinOff, Trash2, Trophy, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Card, ConfirmSheet, LevelBadge, Sheet } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -15,6 +16,7 @@ export function PostCard({ post, meId, isStaff, onComments, highlight }: {
 }) {
   if (post.kind === 'AUTO_JOIN') return <JoinRow post={post} meId={meId} />
   if (post.kind === 'RECAP') return <RecapCard post={post} />
+  if (post.kind === 'CHALLENGE') return <ChallengePost post={post} onComments={onComments} />
 
   const isRun = post.kind === 'AUTO_RUN'
   const isAnnouncement = post.kind === 'ANNOUNCEMENT'
@@ -210,6 +212,36 @@ function RecapCard({ post }: { post: ClubPost }) {
         </ol>
       )}
       {!!m.new_members && <p className="text-sm text-fg-muted">Chào mừng {m.new_members} thành viên mới trong tuần.</p>}
+    </Card>
+  )
+}
+
+function ChallengePost({ post, onComments }: { post: ClubPost; onComments: (p: ClubPost) => void }) {
+  const m = post.meta
+  const result = !!m.result
+  return (
+    <Card id={`post-${post.id}`} className={cn('space-y-3', result ? 'border-coin/40 bg-gradient-to-br from-coin/10 to-transparent' : 'border-brand/30 bg-gradient-to-br from-brand/10 to-transparent')}>
+      <header className="flex items-center gap-2">
+        <Trophy className={cn('size-5', result ? 'text-coin' : 'text-brand')} aria-hidden />
+        <p className="text-sm font-semibold">{result ? 'Kết quả thử thách' : 'Thử thách mới của CLB'}</p>
+        <span className="ml-auto text-xs text-fg-subtle">{formatRelative(post.created_at)}</span>
+      </header>
+      <h3 className="text-lg font-bold leading-snug">{post.title}</h3>
+      {post.body && <p className="whitespace-pre-line text-[15px] leading-relaxed text-fg-muted">{post.body}</p>}
+      {!result && m.end_date && (
+        <p className="text-sm text-fg-muted">
+          {new Date(m.start_date ?? post.created_at).toLocaleDateString('vi-VN')} → {new Date(m.end_date).toLocaleDateString('vi-VN')}
+          {Number(m.reward_xu) > 0 && <span className="ml-2 font-semibold text-coin">· Thưởng {formatNumber(m.reward_xu)} Xu</span>}
+        </p>
+      )}
+      {m.challenge_id && (
+        <Link href={`/challenges/${m.challenge_id}`}
+          className={cn('flex min-h-11 items-center justify-center gap-1 rounded-xl text-sm font-semibold',
+            result ? 'bg-surface-2 text-fg hover:bg-border' : 'bg-brand text-brand-fg hover:bg-brand-strong')}>
+          {result ? 'Xem bảng xếp hạng' : 'Xem và tham gia'}<ChevronRight className="size-4" aria-hidden />
+        </Link>
+      )}
+      <PostActions post={post} onComments={onComments} />
     </Card>
   )
 }

@@ -37,6 +37,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001000300_secure_rpcs.sql` | Viết lại các RPC: bài chạy GPS, tạo thử thách, quỹ CLB, giới thiệu bạn, duyệt bài, công cụ admin, kết nối Strava | Cần file 200 |
 | `20261001000400_provider_activity_ingest.sql` | Nhận bài chạy từ Strava: chống trùng, luật hợp lệ kiểu UpRace, thu hồi thưởng khi bài bị xóa | Cần file 300 |
 | `20261001000500_club_hub_core.sql` | **Sprint 2, CLB:** bảng tin, chat, thông báo, BXH CLB, hộp thư, bài tự sinh, bucket ảnh `club-media`; **sửa lỗi không gán được vai trò Quản trị viên / không cấm được thành viên** | Cần file 400 |
+| `20261001000600_challenge_engine.sql` | **Sprint 3, Thử thách:** tham gia/rời, đội (4 chế độ), tiến độ tự tính từ bài chạy, BXH realtime, treo thưởng từ ví hoặc quỹ CLB, tất toán tự động. **Sửa lỗi production:** trước đây không có cách tham gia thử thách và không đọc được danh sách người tham gia | Cần file 500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 
@@ -66,9 +67,22 @@ Số Xu hiện có của từng người **được giữ nguyên**: migration g
 ### Nếu chỉ chạy file 100 mà chưa deploy code mới
 Hệ thống an toàn ngay, nhưng các chức năng sau sẽ tạm lỗi cho đến khi chạy tiếp file 200, 300 và deploy code: lưu bài chạy GPS (bản cũ vốn đã lỗi với mọi bài hợp lệ), tạo thử thách, kết nối/hủy Strava, người dùng mới tự tạo hồ sơ.
 
+### Luôn kiểm tra migration đã chạy đủ
+
+SQL Editor có thể dừng giữa chừng mà không báo rõ (đã xảy ra với file 500). Sau mỗi file, chạy câu kiểm tra tương ứng:
+
+```sql
+-- File 500 phải ra 16 dòng; file 600 phải ra 13 dòng
+select proname from pg_proc where pronamespace = 'public'::regnamespace and proname in (
+  'create_challenge_v2','preview_challenge_fee','join_challenge','leave_challenge','change_challenge_team','cancel_challenge',
+  'get_challenge','list_challenges','challenge_leaderboard','challenge_team_standings','settle_challenge_if_due',
+  'settle_due_challenges','challenge_visible') order by 1;
+notify pgrst, 'reload schema';
+```
+
 ### Sau khi chạy file 500: bật Realtime cho chat
 
-File 500 đã tự thêm `club_messages`, `club_posts`, `notifications` vào Realtime. Kiểm tra lại trong **Supabase → Database → Publications → supabase_realtime**: ba bảng này phải được bật. Nếu chưa có thì chat vẫn gửi được, nhưng người khác phải tải lại trang mới thấy tin mới.
+File 500 đã tự thêm `club_messages`, `club_posts`, `notifications` vào Realtime; file 600 thêm `challenge_participants` (BXH thử thách cập nhật tức thì). Kiểm tra lại trong **Supabase → Database → Publications → supabase_realtime**: ba bảng này phải được bật. Nếu chưa có thì chat vẫn gửi được, nhưng người khác phải tải lại trang mới thấy tin mới.
 
 ## Bước 4 — Cấu hình Strava
 
@@ -127,7 +141,10 @@ Checklist kiểm tra thủ công sau khi deploy:
   - [ ] B chạy một bài (hoặc đồng bộ Strava) → bài chạy **tự hiện** trên Bảng tin CLB và cộng vào **BXH** tuần.
   - [ ] Tab **Thành viên**: A cho B làm **Quản trị viên** (trước đây bị lỗi), rồi thôi; thử **Cấm** một tài khoản thử.
   - [ ] **Cài đặt CLB** (bánh răng): đổi màu CLB, đổi logo, chọn mức thông báo "Tắt" → không nhận thông báo từ CLB đó nữa.
-  - [ ] Kiểm tra cron: `curl -H "Authorization: Bearer $CRON_SECRET" https://<domain>/api/cron/club-recap` → trả về `{"posted": …}`; gọi không có token → 401.
+  - [ ] **Thử thách (Sprint 3):** tab **Thử thách** → **Tạo** → chọn *Đồng đội* · *Chốt đoàn*, 2 đội, bắt đầu sau 15 phút → tài khoản B mở link, **Chọn đội**. Khi bắt đầu, cả hai chạy/đồng bộ một bài → BXH và thanh đội đổi ngay không cần tải lại.
+  - [ ] Chủ nhiệm CLB: tab **Thử thách** trong CLB → **Tạo thử thách CLB**, treo thưởng từ **quỹ CLB** → bảng tin CLB có bài "Thử thách mới", thành viên nhận thông báo, quỹ CLB giảm đúng số Xu.
+  - [ ] Thử thách hết hạn quá 2 giờ → mở trang chi tiết là tự tổng kết: người thắng nhận Xu, mọi người nhận thông báo kết quả.
+  - [ ] Kiểm tra cron: `curl -H "Authorization: Bearer $CRON_SECRET" https://<domain>/api/cron/club-recap` → trả về `{"posted": …}`; `/api/cron/challenges` → `{"settled": …}`; gọi không có token → 401.
 - [ ] **Kiểm tra bảo mật** — Supabase → SQL Editor, chạy đoạn dưới. Kết quả **phải** báo lỗi `permission denied`:
   ```sql
   begin;

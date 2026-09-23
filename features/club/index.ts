@@ -7,5 +7,7 @@ export { ClubLeaderboardScreen } from './components/leaderboard/ClubLeaderboardS
 export { ClubMembersScreen } from './components/members/ClubMembersScreen'
 export { ClubTreasuryScreen } from './components/treasury/ClubTreasuryScreen'
 export { ClubSettingsScreen } from './components/settings/ClubSettingsScreen'
-export { joinClubByCode, clubErrorMessage, type Club } from './api/clubApi'
+export { joinClubByCode, clubErrorMessage, getClub, type Club } from './api/clubApi'
+export { useClubInbox } from './hooks/useClub'
+export type { InboxClub } from './api/hubApi'
 export { ROLE_LABEL, isStaff, type ClubRole } from './model/roles'
