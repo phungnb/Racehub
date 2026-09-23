@@ -39,6 +39,11 @@ export function useNotificationStream(userId: string | undefined) {
         (payload) => {
           const n = payload.new as AppNotification
           qc.invalidateQueries({ queryKey: notificationKeys.all })
+          // Được duyệt vào CLB → mở khóa ngay không gian CLB đang xem (không cần tải lại trang)
+          if (n.kind === 'CLUB_APPROVED' && n.club_id) {
+            qc.invalidateQueries({ queryKey: ['club', n.club_id] })
+            qc.invalidateQueries({ queryKey: ['clubs'] })
+          }
           // Không làm phiền khi đang ở đúng màn hình mà thông báo trỏ tới
           if (n.link && window.location.pathname === n.link.split('?')[0]) return
           toast(n.title, { description: n.body ?? undefined })
