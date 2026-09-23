@@ -232,17 +232,17 @@ export default function RunTab({ profile, onActivitySaved }: RunTabProps) {
   return (
     <div className="space-y-6 animate-fadeIn text-center py-4">
       {trackState === 'IDLE' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6">
-          <div className="w-20 h-20 bg-orange-500/20 text-orange-400 rounded-full mx-auto flex items-center justify-center text-3xl shadow-inner">
+        <div className="bg-surface border border-border rounded-3xl p-6 shadow-2xl space-y-6">
+          <div className="w-20 h-20 bg-brand/20 text-brand rounded-full mx-auto flex items-center justify-center text-3xl shadow-inner">
             ⚡
           </div>
           <div>
             <h2 className="text-xl font-bold">Tracking Trực Tiếp</h2>
-            <p className="text-xs text-slate-400 mt-1">Bật GPS và sẵn sàng ghi lại buổi chạy chuẩn RaceHub Engine.</p>
+            <p className="text-xs text-fg-muted mt-1">Bật GPS và sẵn sàng ghi lại buổi chạy chuẩn RaceHub Engine.</p>
           </div>
           <button 
             onClick={() => setTrackState('STARTING')}
-            className="w-full bg-orange-500 hover:bg-orange-600 text-slate-950 font-black py-4 rounded-2xl text-base transition-all shadow-xl shadow-orange-500/30 cursor-pointer"
+            className="w-full bg-brand hover:bg-brand-strong text-brand-fg font-black py-4 rounded-2xl text-base transition-all shadow-xl shadow-brand/30 cursor-pointer"
           >
             BẮT ĐẦU CHẠY 🚀
           </button>
@@ -250,10 +250,10 @@ export default function RunTab({ profile, onActivitySaved }: RunTabProps) {
       )}
 
     {trackState === 'STARTING' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
+        <div className="bg-surface border border-border rounded-3xl p-6 text-center space-y-4 shadow-2xl">
           <div className="text-3xl animate-bounce">📡</div>
-          <h3 className="text-sm font-bold text-orange-400">Đang tìm tín hiệu GPS & xin quyền định vị...</h3>
-          <p className="text-xs text-slate-400">Vui lòng cho phép quyền truy cập vị trí trên trình duyệt.</p>
+          <h3 className="text-sm font-bold text-brand">Đang tìm tín hiệu GPS & xin quyền định vị...</h3>
+          <p className="text-xs text-fg-muted">Vui lòng cho phép quyền truy cập vị trí trên trình duyệt.</p>
           
           {/* NÚT GIẢ LẬP DỰ PHÒNG KHI TEST TRÊN MÁY TÍNH / BỊ CHẶN GPS */}
           <button 
@@ -264,7 +264,7 @@ export default function RunTab({ profile, onActivitySaved }: RunTabProps) {
               setGpsStatus('GOOD');
               setTrackState('RUNNING');
             }}
-            className="w-full bg-slate-800 hover:bg-slate-700 text-orange-400 font-bold py-2.5 rounded-xl text-xs cursor-pointer border border-orange-500/30"
+            className="w-full bg-surface-2 hover:bg-border text-brand font-bold py-2.5 rounded-xl text-xs cursor-pointer border border-brand/30"
           >
             ⚡ Bỏ qua GPS (Chế độ giả lập test)
           </button>
@@ -272,28 +272,28 @@ export default function RunTab({ profile, onActivitySaved }: RunTabProps) {
       )}
 
       {(trackState === 'RUNNING' || trackState === 'PAUSED') && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6">
+        <div className="bg-surface border border-border rounded-3xl p-6 shadow-2xl space-y-6">
           <div className="flex justify-between items-center px-2">
             <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${gpsStatus === 'GOOD' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
               GPS: {gpsStatus}
             </span>
-            <span className="text-xs text-slate-400 uppercase font-bold tracking-widest">{trackState}</span>
+            <span className="text-xs text-fg-muted uppercase font-bold tracking-widest">{trackState}</span>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
-              <span className="text-[10px] text-slate-500 block uppercase">Quãng đường</span>
+            <div className="bg-bg p-4 rounded-2xl border border-border">
+              <span className="text-[10px] text-fg-subtle block uppercase">Quãng đường</span>
               <span className="text-3xl font-black text-white">{(distanceMeters / 1000).toFixed(2)}</span>
-              <span className="text-xs text-slate-400 ml-1">km</span>
+              <span className="text-xs text-fg-muted ml-1">km</span>
             </div>
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
-              <span className="text-[10px] text-slate-500 block uppercase">Moving Time</span>
-              <span className="text-2xl font-black text-orange-400 font-mono">{formatTime(movingSeconds)}</span>
+            <div className="bg-bg p-4 rounded-2xl border border-border">
+              <span className="text-[10px] text-fg-subtle block uppercase">Moving Time</span>
+              <span className="text-2xl font-black text-brand font-mono">{formatTime(movingSeconds)}</span>
             </div>
           </div>
 
-          <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
-            <span className="text-[10px] text-slate-500 block uppercase">Pace Trung Bình (Moving)</span>
+          <div className="bg-bg p-3 rounded-2xl border border-border">
+            <span className="text-[10px] text-fg-subtle block uppercase">Pace Trung Bình (Moving)</span>
             <span className="text-xl font-bold text-amber-400 font-mono">
               {formatPace(distanceMeters > 0 ? movingSeconds / (distanceMeters / 1000) : 0)} /km
             </span>
@@ -326,23 +326,23 @@ export default function RunTab({ profile, onActivitySaved }: RunTabProps) {
       )}
 
       {trackState === 'FINISHED' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
-          <h2 className="text-lg font-bold text-orange-400">🏁 Tổng kết buổi chạy</h2>
-          <div className="space-y-2 bg-slate-950 p-4 rounded-2xl text-left text-xs">
-            <div className="flex justify-between py-1 border-b border-slate-800">
-              <span className="text-slate-400">Tổng quãng đường:</span>
+        <div className="bg-surface border border-border rounded-3xl p-6 shadow-2xl space-y-5">
+          <h2 className="text-lg font-bold text-brand">🏁 Tổng kết buổi chạy</h2>
+          <div className="space-y-2 bg-bg p-4 rounded-2xl text-left text-xs">
+            <div className="flex justify-between py-1 border-b border-border">
+              <span className="text-fg-muted">Tổng quãng đường:</span>
               <span className="font-bold text-white">{(distanceMeters / 1000).toFixed(2)} km</span>
             </div>
-            <div className="flex justify-between py-1 border-b border-slate-800">
-              <span className="text-slate-400">Moving Time:</span>
+            <div className="flex justify-between py-1 border-b border-border">
+              <span className="text-fg-muted">Moving Time:</span>
               <span className="font-bold text-white">{formatTime(movingSeconds)}</span>
             </div>
-            <div className="flex justify-between py-1 border-b border-slate-800">
-              <span className="text-slate-400">Elapsed Time:</span>
+            <div className="flex justify-between py-1 border-b border-border">
+              <span className="text-fg-muted">Elapsed Time:</span>
               <span className="font-bold text-white">{formatTime(elapsedSeconds)}</span>
             </div>
             <div className="flex justify-between py-1">
-              <span className="text-slate-400">Pace trung bình:</span>
+              <span className="text-fg-muted">Pace trung bình:</span>
               <span className="font-bold text-amber-400">
                 {formatPace(distanceMeters > 0 ? movingSeconds / (distanceMeters / 1000) : 0)} /km
               </span>
@@ -352,13 +352,13 @@ export default function RunTab({ profile, onActivitySaved }: RunTabProps) {
           <div className="flex gap-3">
             <button 
               onClick={() => setTrackState('RUNNING')}
-              className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-xl text-xs cursor-pointer"
+              className="flex-1 bg-surface-2 hover:bg-border text-fg font-bold py-3 rounded-xl text-xs cursor-pointer"
             >
               Tiếp tục chạy
             </button>
             <button 
               onClick={handleSaveActivity}
-              className="flex-2 bg-orange-500 hover:bg-orange-600 text-slate-950 font-black py-3 rounded-xl text-xs cursor-pointer shadow-lg"
+              className="flex-2 bg-brand hover:bg-brand-strong text-brand-fg font-black py-3 rounded-xl text-xs cursor-pointer shadow-lg"
             >
               Đồng bộ lên Server 💾
             </button>
@@ -367,7 +367,7 @@ export default function RunTab({ profile, onActivitySaved }: RunTabProps) {
       )}
 
       {trackState === 'SAVING' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-10 text-center text-slate-400 space-y-3">
+        <div className="bg-surface border border-border rounded-3xl p-10 text-center text-fg-muted space-y-3">
           <div className="text-2xl animate-spin">⏳</div>
           <p className="text-xs">Đang thực hiện Server Transaction: Validation Engine, Reward Ledger & Challenge Engine...</p>
         </div>

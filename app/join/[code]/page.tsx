@@ -1,67 +1,50 @@
 'use client'
 
-import { useEffect, useState, use } from 'react'
+import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { Gift, Loader2 } from 'lucide-react'
 import { supabase } from '@/shared/lib/supabase'
 import { applyReferral, referralErrorMessage } from '@/features/referral/api'
+import { savePendingReferral } from '@/features/auth/model/pending-actions'
+import { Button, EmptyState } from '@/shared/ui'
+import { routes } from '@/shared/config/routes'
 
-export default function ReferralPage({ params }: { params: Promise<{ code: string }> }) {
+export default function ReferralPage({ params }: PageProps<'/join/[code]'>) {
+  const { code: referrerId } = use(params)
   const router = useRouter()
-  const resolvedParams = use(params)
-  const referrerId = resolvedParams.code
-
-  const [status, setStatus] = useState<'checking-auth' | 'loading' | 'error'>('checking-auth')
-  const [message, setMessage] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-
-    async function run() {
+    ;(async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (cancelled) return
-
       if (!session) {
-        sessionStorage.setItem('pending_referral_id', referrerId)
-        router.replace('/')
+        savePendingReferral(referrerId)
+        router.replace(routes.login)
         return
       }
-
-      setStatus('loading')
       try {
         await applyReferral(referrerId)
         if (cancelled) return
-        router.replace('/?referral_success=true')
+        toast.success('Nhận thưởng giới thiệu thành công! 🎉')
+        router.replace(routes.home)
       } catch (e) {
-        if (cancelled) return
-        setStatus('error')
-        setMessage(referralErrorMessage(e))
+        if (!cancelled) setError(referralErrorMessage(e))
       }
-    }
-
-    run()
+    })()
     return () => { cancelled = true }
   }, [referrerId, router])
 
-  if (status === 'error') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-6">
-        <div className="bg-slate-900 border border-rose-900/60 rounded-2xl p-6 max-w-sm w-full text-center space-y-3">
-          <h1 className="text-sm font-bold text-rose-400">Không thể áp dụng lời mời</h1>
-          <p className="text-xs text-slate-400">{message}</p>
-          <button
-            onClick={() => router.replace('/')}
-            className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 rounded-xl text-xs cursor-pointer"
-          >
-            Về trang chủ
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950">
-      <p className="text-xs text-slate-400">Đang xử lý lời mời giới thiệu…</p>
+    <div className="mx-auto grid min-h-dvh max-w-md place-items-center p-4">
+      {error ? (
+        <EmptyState icon={Gift} title="Không thể áp dụng lời mời" description={error}
+          action={<Button variant="secondary" onClick={() => router.replace(routes.home)}>Về trang chủ</Button>} />
+      ) : (
+        <p className="flex items-center gap-2 text-sm text-fg-muted"><Loader2 className="size-4 animate-spin" /> Đang xử lý lời mời giới thiệu…</p>
+      )}
     </div>
   )
 }

@@ -19,10 +19,10 @@ export const DEFAULT_TIERS: Tier[] = [
 // Lưu ý: đây chỉ để ẩn/hiện giao diện. Quyền thật được kiểm tra trong DB (RLS + RPC).
 export type Role = 'SYSTEM_ADMIN' | 'CLUB_ADMIN' | string;
 
-export const isSystemAdmin = (profile?: { role?: Role } | null) =>
+export const isSystemAdmin = (profile?: { role?: Role | null } | null) =>
   profile?.role === 'SYSTEM_ADMIN';
 
-export const canReviewActivities = (profile?: { role?: Role } | null) =>
+export const canReviewActivities = (profile?: { role?: Role | null } | null) =>
   profile?.role === 'SYSTEM_ADMIN' || profile?.role === 'CLUB_ADMIN';
 
 // ---------- Chuẩn hóa dữ liệu đọc từ DB ----------

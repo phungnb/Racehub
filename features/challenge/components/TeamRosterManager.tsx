@@ -56,10 +56,10 @@ export default function TeamRosterManager({ challengeId, isLocked = false }: Tea
   };
 
   return (
-    <div className="bg-[#18191a] border border-[#2f3031] rounded-2xl p-6 text-white space-y-6 shadow-xl max-w-5xl mx-auto">
+    <div className="bg-surface border border-border rounded-2xl p-6 text-white space-y-6 shadow-xl max-w-5xl mx-auto">
       
       {/* Header Module */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-[#2f3031] pb-4 gap-4">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-border pb-4 gap-4">
         <div>
           <h2 className="text-lg font-bold flex items-center space-x-2">
             <Users className="w-5 h-5 text-amber-500" />
@@ -86,13 +86,13 @@ export default function TeamRosterManager({ challengeId, isLocked = false }: Tea
 
       {/* Form tạo Team mới (chỉ hiện khi chưa khóa) */}
       {!locked && (
-        <form onSubmit={handleAddTeam} className="flex gap-3 bg-[#242526] p-4 rounded-xl border border-[#3a3b3c]">
+        <form onSubmit={handleAddTeam} className="flex gap-3 bg-surface-2 p-4 rounded-xl border border-[#3a3b3c]">
           <input 
             type="text"
             value={newTeamName}
             onChange={(e) => setNewTeamName(e.target.value)}
             placeholder="Nhập tên đội mới (VD: Đội C - Sấm Sét)..."
-            className="flex-1 bg-[#18191a] border border-[#3a3b3c] rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+            className="flex-1 bg-surface border border-[#3a3b3c] rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
           />
           <button 
             type="submit"
@@ -118,7 +118,7 @@ export default function TeamRosterManager({ challengeId, isLocked = false }: Tea
         ) : (
           <div className="flex flex-wrap gap-2">
             {unassignedMembers.map((member, idx) => (
-              <div key={idx} className="bg-[#242526] border border-[#3a3b3c] px-3 py-1.5 rounded-lg flex items-center space-x-2 text-xs">
+              <div key={idx} className="bg-surface-2 border border-[#3a3b3c] px-3 py-1.5 rounded-lg flex items-center space-x-2 text-xs">
                 <span>{member}</span>
                 {!locked && teams.length > 0 && (
                   <div className="flex items-center space-x-1 pl-2 border-l border-[#3a3b3c]">
@@ -143,13 +143,13 @@ export default function TeamRosterManager({ challengeId, isLocked = false }: Tea
       {/* Lưới hiển thị các Đội và Thành viên */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {teams.map((team) => (
-          <div key={team.id} className="bg-[#242526] border border-[#3a3b3c] rounded-xl p-4 space-y-3">
+          <div key={team.id} className="bg-surface-2 border border-[#3a3b3c] rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between border-b border-[#3a3b3c] pb-2.5">
               <div className="flex items-center space-x-2">
-                <Shield className="w-4 h-4 text-orange-400" />
+                <Shield className="w-4 h-4 text-brand" />
                 <span className="font-bold text-sm">{team.name}</span>
               </div>
-              <span className="text-[11px] bg-[#18191a] px-2 py-0.5 rounded-full text-gray-400 border border-[#3a3b3c]">
+              <span className="text-[11px] bg-surface px-2 py-0.5 rounded-full text-gray-400 border border-[#3a3b3c]">
                 {team.members.length} thành viên
               </span>
             </div>
@@ -160,7 +160,7 @@ export default function TeamRosterManager({ challengeId, isLocked = false }: Tea
                 <p className="text-xs text-gray-500 italic py-3 text-center">Chưa có thành viên nào trong đội.</p>
               ) : (
                 team.members.map((member, mIdx) => (
-                  <div key={mIdx} className="flex items-center justify-between bg-[#18191a] px-3 py-2 rounded-lg text-xs border border-[#2f3031]">
+                  <div key={mIdx} className="flex items-center justify-between bg-surface px-3 py-2 rounded-lg text-xs border border-border">
                     <span className="text-gray-200">{member}</span>
                     {!locked && (
                       <button

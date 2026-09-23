@@ -81,8 +81,8 @@ function RoleBadge({ role }: { role: ClubRole }) {
     role === 'OWNER'
       ? 'bg-amber-500/20 text-amber-400'
       : role === 'CAPTAIN'
-      ? 'bg-orange-500/20 text-orange-400'
-      : 'bg-slate-800 text-slate-300'
+      ? 'bg-brand/20 text-brand'
+      : 'bg-surface-2 text-fg'
   return <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${tone}`}>{ROLE_LABEL[role]}</span>
 }
 
@@ -335,24 +335,24 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
 
         <button
           onClick={() => setSelectedClubId(null)}
-          className="text-xs text-orange-400 font-bold flex items-center gap-1 cursor-pointer bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800"
+          className="text-xs text-brand font-bold flex items-center gap-1 cursor-pointer bg-surface px-3 py-1.5 rounded-xl border border-border"
         >
           ← Quay lại danh sách Câu lạc bộ
         </button>
 
         {loading ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-10 text-center text-slate-400">
+          <div className="bg-surface border border-border rounded-2xl p-10 text-center text-fg-muted">
             Đang tải dữ liệu Câu lạc bộ…
           </div>
         ) : !clubDetail ? null : (
           <>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+            <div className="bg-surface border border-border rounded-2xl p-4 shadow-xl">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center space-x-3 min-w-0">
                   <ClubAvatar club={clubDetail} size={48} />
                   <div className="min-w-0">
                     <h2 className="text-sm font-bold text-white truncate">{clubDetail.name}</h2>
-                    <p className="text-[10px] text-slate-400 truncate">
+                    <p className="text-[10px] text-fg-muted truncate">
                       {clubDetail.member_count}/{clubDetail.member_limit} thành viên
                       {clubDetail.description ? ` · ${clubDetail.description}` : ''}
                     </p>
@@ -361,7 +361,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
                 {staff && (
                   <button
                     onClick={() => setShowInvite((v) => !v)}
-                    className="shrink-0 bg-slate-800 hover:bg-slate-700 text-[10px] font-bold px-3 py-1.5 rounded-xl text-orange-400 border border-slate-700 cursor-pointer"
+                    className="shrink-0 bg-surface-2 hover:bg-border text-[10px] font-bold px-3 py-1.5 rounded-xl text-brand border border-fg-subtle cursor-pointer"
                   >
                     Mời thành viên
                   </button>
@@ -369,16 +369,16 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
               </div>
 
               {showInvite && (
-                <div className="mt-3 pt-3 border-t border-slate-800 flex gap-2">
+                <div className="mt-3 pt-3 border-t border-border flex gap-2">
                   <input
                     readOnly
                     value={inviteLink}
                     onFocus={(e) => e.currentTarget.select()}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 outline-none"
+                    className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-xs text-fg outline-none"
                   />
                   <button
                     onClick={copyInvite}
-                    className="bg-orange-500 text-slate-950 font-bold px-3 py-2 rounded-xl text-xs whitespace-nowrap cursor-pointer"
+                    className="bg-brand text-brand-fg font-bold px-3 py-2 rounded-xl text-xs whitespace-nowrap cursor-pointer"
                   >
                     Sao chép
                   </button>
@@ -401,7 +401,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
                   key={key}
                   onClick={() => setSubTab(key)}
                   className={`py-2 text-[10px] font-bold rounded-xl cursor-pointer transition-colors ${
-                    subTab === key ? 'bg-orange-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                    subTab === key ? 'bg-brand text-brand-fg shadow-md' : 'text-fg-muted hover:text-white'
                   }`}
                 >
                   {label}
@@ -428,14 +428,14 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
               <div className="space-y-4 animate-fadeIn">
                 {/* Thông báo ghim (đặt trong tab Cài đặt, hiển thị ở đây cho mọi thành viên) */}
                 {clubDetail.announcement && (
-                  <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-4 space-y-1">
-                    <span className="text-[10px] font-bold text-orange-400 block">Thông báo ghim</span>
-                    <p className="text-xs text-slate-200 whitespace-pre-line">{clubDetail.announcement}</p>
+                  <div className="bg-brand/10 border border-brand/30 rounded-2xl p-4 space-y-1">
+                    <span className="text-[10px] font-bold text-brand block">Thông báo ghim</span>
+                    <p className="text-xs text-fg whitespace-pre-line">{clubDetail.announcement}</p>
                   </div>
                 )}
 
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3 shadow-xl">
-                  <span className="text-[10px] text-slate-400 block">Quỹ Câu lạc bộ</span>
+                <div className="bg-surface p-5 rounded-2xl border border-border space-y-3 shadow-xl">
+                  <span className="text-[10px] text-fg-muted block">Quỹ Câu lạc bộ</span>
                   <div className="flex justify-between items-center gap-3">
                     <span className="text-xl font-black text-amber-400">
                       {clubDetail.treasury_balance.toLocaleString('vi-VN')} Xu
@@ -445,7 +445,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
                       <button
                         onClick={handleContribute}
                         disabled={busy === 'contribute'}
-                        className="bg-orange-500/25 hover:bg-orange-500/35 disabled:opacity-50 text-orange-400 text-xs font-bold px-3.5 py-2 rounded-xl cursor-pointer border border-orange-500/30"
+                        className="bg-brand/25 hover:bg-brand/35 disabled:opacity-50 text-brand text-xs font-bold px-3.5 py-2 rounded-xl cursor-pointer border border-brand/30"
                       >
                         {busy === 'contribute' ? 'Đang góp…' : `Góp ${CONTRIBUTION} Xu`}
                       </button>
@@ -461,7 +461,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
                       <button
                         onClick={handleJoin}
                         disabled={busy === 'join'}
-                        className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg cursor-pointer"
+                        className="bg-brand hover:bg-brand-strong disabled:opacity-50 text-brand-fg text-xs font-bold px-4 py-2 rounded-xl shadow-lg cursor-pointer"
                       >
                         {busy === 'join' ? 'Đang gửi…' : 'Tham gia'}
                       </button>
@@ -469,8 +469,8 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
                   </div>
 
                   {myRole && (
-                    <p className="text-[10px] text-slate-500">
-                      Vai trò của bạn: <span className="text-slate-300 font-bold">{ROLE_LABEL[myRole]}</span>
+                    <p className="text-[10px] text-fg-subtle">
+                      Vai trò của bạn: <span className="text-fg font-bold">{ROLE_LABEL[myRole]}</span>
                     </p>
                   )}
                 </div>
@@ -489,27 +489,27 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
 
             {/* ---------------------- XẾP HẠNG ---------------------- */}
             {subTab === 'leaderboard' && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-xl animate-fadeIn">
-                <h3 className="text-sm font-bold text-slate-300">Xếp hạng theo XP</h3>
+              <div className="bg-surface border border-border rounded-2xl p-4 space-y-3 shadow-xl animate-fadeIn">
+                <h3 className="text-sm font-bold text-fg">Xếp hạng theo XP</h3>
                 {approved.length === 0 ? (
-                  <p className="text-slate-500 text-center py-4">Chưa có thành viên chính thức.</p>
+                  <p className="text-fg-subtle text-center py-4">Chưa có thành viên chính thức.</p>
                 ) : (
                   <div className="space-y-2">
                     {approved.map((m, i) => (
                       <div
                         key={m.id}
                         className={`p-3 rounded-xl border flex justify-between items-center ${
-                          m.user_id === userId ? 'bg-orange-500/10 border-orange-500/40' : 'bg-slate-950 border-slate-800'
+                          m.user_id === userId ? 'bg-brand/10 border-brand/40' : 'bg-bg border-border'
                         }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <span className="font-black text-orange-400 w-5 shrink-0">{i + 1}</span>
+                          <span className="font-black text-brand w-5 shrink-0">{i + 1}</span>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <h4 className="font-bold text-white truncate">{m.profile?.display_name ?? 'Runner'}</h4>
+                              <h4 className="font-bold text-brand-fg truncate">{m.profile?.display_name ?? 'Runner'}</h4>
                               <RoleBadge role={m.role} />
                             </div>
-                            <span className="text-[10px] text-slate-400">Level {m.profile?.level ?? 1}</span>
+                            <span className="text-[10px] text-fg-muted">Level {m.profile?.level ?? 1}</span>
                           </div>
                         </div>
                         <span className="text-amber-400 font-bold shrink-0">{(m.profile?.xp ?? 0).toLocaleString('vi-VN')} XP</span>
@@ -522,9 +522,9 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
 
             {/* ---------------------- THỬ THÁCH ---------------------- */}
             {subTab === 'activities' && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center space-y-2 shadow-xl animate-fadeIn">
-                <h3 className="text-sm font-bold text-slate-300">Chưa có thử thách nào</h3>
-                <p className="text-slate-400 text-xs">
+              <div className="bg-surface border border-border rounded-2xl p-6 text-center space-y-2 shadow-xl animate-fadeIn">
+                <h3 className="text-sm font-bold text-fg">Chưa có thử thách nào</h3>
+                <p className="text-fg-muted text-xs">
                   Thử thách do Ban Chủ nhiệm phát hành sẽ xuất hiện ở đây.
                 </p>
               </div>
@@ -555,20 +555,20 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
       <Toast toast={toast} />
 
       <div className="flex justify-between items-center gap-3">
-        <h2 className="text-base font-bold text-white">Câu lạc bộ</h2>
+        <h2 className="text-base font-bold text-brand-fg">Câu lạc bộ</h2>
         <button
           onClick={() => setIsCreating((v) => !v)}
-          className="text-xs bg-orange-500 hover:bg-orange-600 text-white font-bold px-3.5 py-2 rounded-xl shadow-md cursor-pointer shrink-0"
+          className="text-xs bg-brand hover:bg-brand-strong text-brand-fg font-bold px-3.5 py-2 rounded-xl shadow-md cursor-pointer shrink-0"
         >
           {isCreating ? 'Đóng' : 'Thành lập CLB'}
         </button>
       </div>
 
       {isCreating && (
-        <form onSubmit={handleCreateClub} className="bg-slate-900 border border-orange-500/50 rounded-2xl p-4 space-y-3 shadow-xl animate-fadeIn">
-          <h3 className="text-sm font-bold text-orange-400">Thành lập Câu lạc bộ mới</h3>
+        <form onSubmit={handleCreateClub} className="bg-surface border border-brand/50 rounded-2xl p-4 space-y-3 shadow-xl animate-fadeIn">
+          <h3 className="text-sm font-bold text-brand">Thành lập Câu lạc bộ mới</h3>
           <div>
-            <label htmlFor="club-name" className="text-[10px] text-slate-400 block mb-1">
+            <label htmlFor="club-name" className="text-[10px] text-fg-muted block mb-1">
               Tên Câu lạc bộ
             </label>
             <input
@@ -577,11 +577,11 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
               onChange={(e) => setNewClubName(e.target.value)}
               maxLength={60}
               placeholder="Tây Hồ Runners"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500"
+              className="w-full bg-bg border border-border rounded-xl p-2.5 text-xs text-brand-fg outline-none focus:border-brand"
             />
           </div>
           <div>
-            <label htmlFor="club-desc" className="text-[10px] text-slate-400 block mb-1">
+            <label htmlFor="club-desc" className="text-[10px] text-fg-muted block mb-1">
               Mô tả
             </label>
             <textarea
@@ -590,13 +590,13 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
               onChange={(e) => setNewClubDesc(e.target.value)}
               maxLength={200}
               placeholder="Nơi giao lưu của các runner khu vực Tây Hồ"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500 h-20 resize-none"
+              className="w-full bg-bg border border-border rounded-xl p-2.5 text-xs text-brand-fg outline-none focus:border-brand h-20 resize-none"
             />
           </div>
           <button
             type="submit"
             disabled={busy === 'create' || !newClubName.trim()}
-            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-slate-950 font-black py-2.5 rounded-xl text-xs cursor-pointer shadow-lg shadow-orange-500/20"
+            className="w-full bg-brand hover:bg-brand-strong disabled:opacity-40 text-brand-fg font-black py-2.5 rounded-xl text-xs cursor-pointer shadow-lg shadow-brand/20"
           >
             {busy === 'create' ? 'Đang tạo…' : 'Thành lập'}
           </button>
@@ -605,9 +605,9 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
 
       {/* ══════════ 1. CLB CỦA TÔI (luôn ở trên cùng) ══════════ */}
       <section aria-labelledby="my-clubs" className="space-y-2">
-        <h3 id="my-clubs" className="text-sm font-bold text-white">
+        <h3 id="my-clubs" className="text-sm font-bold text-brand-fg">
           CLB của tôi
-          {myApproved.length > 0 && <span className="ml-1.5 text-slate-500 font-medium">{myApproved.length}</span>}
+          {myApproved.length > 0 && <span className="ml-1.5 text-fg-subtle font-medium">{myApproved.length}</span>}
         </h3>
         <MyClubsRail
           items={myApproved.map((m) => ({ club: m.club, role: m.role }))}
@@ -622,7 +622,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
 
       {/* ══════════ 2. KHÁM PHÁ ══════════ */}
       <section ref={discoverRef} aria-labelledby="discover" className="space-y-3 scroll-mt-4">
-        <h3 id="discover" className="text-sm font-bold text-white">
+        <h3 id="discover" className="text-sm font-bold text-brand-fg">
           Khám phá Câu lạc bộ
         </h3>
 
@@ -635,11 +635,11 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
           }}
           placeholder="Tìm Câu lạc bộ theo tên…"
           aria-label="Tìm Câu lạc bộ theo tên"
-          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-orange-500"
+          className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-xs text-brand-fg outline-none focus:border-brand"
         />
 
         {discover.length === 0 ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center text-xs text-slate-400">
+          <div className="bg-surface border border-border rounded-2xl p-8 text-center text-xs text-fg-muted">
             {search
               ? 'Không tìm thấy Câu lạc bộ nào khớp.'
               : myApproved.length > 0
@@ -654,7 +654,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
               return (
                 <li
                   key={club.id}
-                  className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 flex items-center gap-3 shadow-lg"
+                  className="bg-surface border border-border rounded-2xl p-3.5 flex items-center gap-3 shadow-lg"
                 >
                   <button
                     onClick={() => setSelectedClubId(club.id)}
@@ -662,13 +662,13 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
                   >
                     <ClubAvatar club={club} size={44} />
                     <span className="min-w-0">
-                      <span className="block font-bold text-[13px] text-white group-hover:text-orange-400 transition-colors truncate">
+                      <span className="block font-bold text-[13px] text-brand-fg group-hover:text-brand transition-colors truncate">
                         {club.name}
                       </span>
-                      <span className="block text-[10px] text-slate-400 truncate">
+                      <span className="block text-[10px] text-fg-muted truncate">
                         {club.description || 'Câu lạc bộ tập luyện cộng đồng.'}
                       </span>
-                      <span className="block text-[10px] text-slate-500 mt-0.5">
+                      <span className="block text-[10px] text-fg-subtle mt-0.5">
                         {club.member_count}/{club.member_limit} thành viên
                       </span>
                     </span>
@@ -683,12 +683,12 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
                     ) : status === 'BANNED' ? (
                       <span className="text-[11px] text-rose-400 font-bold py-1">Bị hạn chế</span>
                     ) : full ? (
-                      <span className="text-[11px] text-slate-500 font-bold py-1">Đã đầy</span>
+                      <span className="text-[11px] text-fg-subtle font-bold py-1">Đã đầy</span>
                     ) : (
                       <button
                         onClick={() => handleQuickJoin(club.id)}
                         disabled={busy === `join:${club.id}`}
-                        className="border border-orange-500 text-orange-400 hover:bg-orange-500 hover:text-slate-950 disabled:opacity-50 font-bold text-[11px] px-3 py-1 rounded-lg cursor-pointer transition-colors"
+                        className="border border-brand text-brand hover:bg-brand-strong hover:text-slate-950 disabled:opacity-50 font-bold text-[11px] px-3 py-1 rounded-lg cursor-pointer transition-colors"
                       >
                         {busy === `join:${club.id}` ? 'Đang gửi…' : 'Tham gia'}
                       </button>
@@ -703,7 +703,7 @@ export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
         {discover.length > shown.length && (
           <button
             onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
-            className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-semibold py-2.5 rounded-xl cursor-pointer"
+            className="w-full bg-surface hover:bg-surface-2 border border-border text-fg font-semibold py-2.5 rounded-xl cursor-pointer"
           >
             Xem thêm ({discover.length - shown.length})
           </button>

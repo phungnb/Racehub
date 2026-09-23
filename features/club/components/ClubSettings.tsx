@@ -35,7 +35,7 @@ export function ClubAvatar({
         alt=""
         style={style}
         onError={() => setBroken(true)}
-        className={`shrink-0 rounded-xl object-cover bg-slate-800 ${className}`}
+        className={`shrink-0 rounded-xl object-cover bg-surface-2 ${className}`}
       />
     )
   }
@@ -59,10 +59,10 @@ interface Props {
   notify: (text: string, tone?: 'ok' | 'err') => void
 }
 
-const card = 'bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-xl'
+const card = 'bg-surface border border-border rounded-2xl p-4 space-y-3 shadow-xl'
 const input =
-  'w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-orange-500'
-const label = 'text-[10px] text-slate-400 block mb-1'
+  'w-full bg-bg border border-border rounded-xl p-2.5 text-xs text-white outline-none focus:border-brand'
+const label = 'text-[10px] text-fg-muted block mb-1'
 
 export default function ClubSettings({ club, myRole, onChanged, onDeleted, notify }: Props) {
   const isOwner = myRole === 'OWNER'
@@ -113,7 +113,7 @@ export default function ClubSettings({ club, myRole, onChanged, onDeleted, notif
     <div className="space-y-4 animate-fadeIn">
       {/* ------------------------- Ảnh đại diện ------------------------- */}
       <div className={card}>
-        <h3 className="text-sm font-bold text-slate-300">Ảnh đại diện</h3>
+        <h3 className="text-sm font-bold text-fg">Ảnh đại diện</h3>
         <div className="flex items-center gap-4">
           <ClubAvatar club={club} size={64} />
           <div className="flex flex-col gap-1.5">
@@ -127,7 +127,7 @@ export default function ClubSettings({ club, myRole, onChanged, onDeleted, notif
             <button
               onClick={() => fileRef.current?.click()}
               disabled={busy === 'avatar'}
-              className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 text-[11px] font-bold px-3 py-1.5 rounded-lg cursor-pointer"
+              className="bg-surface-2 hover:bg-border disabled:opacity-50 text-fg text-[11px] font-bold px-3 py-1.5 rounded-lg cursor-pointer"
             >
               {busy === 'avatar' ? 'Đang tải lên…' : 'Chọn ảnh mới'}
             </button>
@@ -140,26 +140,26 @@ export default function ClubSettings({ club, myRole, onChanged, onDeleted, notif
                   })
                 }
                 disabled={busy === 'avatar-del'}
-                className="text-[11px] text-slate-400 hover:text-rose-400 font-bold px-3 py-1 rounded-lg cursor-pointer text-left"
+                className="text-[11px] text-fg-muted hover:text-rose-400 font-bold px-3 py-1 rounded-lg cursor-pointer text-left"
               >
                 Gỡ ảnh
               </button>
             )}
           </div>
         </div>
-        <p className="text-[10px] text-slate-500">JPG, PNG hoặc WebP, tối đa 2 MB. Ảnh vuông hiển thị đẹp nhất.</p>
+        <p className="text-[10px] text-fg-subtle">JPG, PNG hoặc WebP, tối đa 2 MB. Ảnh vuông hiển thị đẹp nhất.</p>
       </div>
 
       {/* --------------------------- Hồ sơ ----------------------------- */}
       <div className={card}>
-        <h3 className="text-sm font-bold text-slate-300">Hồ sơ Câu lạc bộ</h3>
+        <h3 className="text-sm font-bold text-fg">Hồ sơ Câu lạc bộ</h3>
         <div>
           <label htmlFor="set-name" className={label}>Tên</label>
           <input id="set-name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} className={input} />
         </div>
         <div>
           <label htmlFor="set-desc" className={label}>
-            Mô tả <span className="text-slate-600">({description.length}/300)</span>
+            Mô tả <span className="text-fg-subtle">({description.length}/300)</span>
           </label>
           <textarea
             id="set-desc"
@@ -177,7 +177,7 @@ export default function ClubSettings({ club, myRole, onChanged, onDeleted, notif
             })
           }
           disabled={busy === 'profile' || !profileDirty || !name.trim()}
-          className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-slate-950 font-black py-2.5 rounded-xl text-xs cursor-pointer"
+          className="w-full bg-brand hover:bg-brand-strong disabled:opacity-40 text-brand-fg font-black py-2.5 rounded-xl text-xs cursor-pointer"
         >
           {busy === 'profile' ? 'Đang lưu…' : 'Lưu hồ sơ'}
         </button>
@@ -185,8 +185,8 @@ export default function ClubSettings({ club, myRole, onChanged, onDeleted, notif
 
       {/* ----------------------- Thông báo ghim ------------------------ */}
       <div className={card}>
-        <h3 className="text-sm font-bold text-slate-300">Thông báo ghim</h3>
-        <p className="text-[10px] text-slate-500">Hiện ở đầu tab Tổng quan cho mọi thành viên.</p>
+        <h3 className="text-sm font-bold text-fg">Thông báo ghim</h3>
+        <p className="text-[10px] text-fg-subtle">Hiện ở đầu tab Tổng quan cho mọi thành viên.</p>
         <textarea
           value={announcement}
           maxLength={500}
@@ -203,14 +203,14 @@ export default function ClubSettings({ club, myRole, onChanged, onDeleted, notif
               })
             }
             disabled={busy === 'ann' || announcement === (club.announcement ?? '')}
-            className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-slate-950 font-black py-2.5 rounded-xl text-xs cursor-pointer"
+            className="flex-1 bg-brand hover:bg-brand-strong disabled:opacity-40 text-brand-fg font-black py-2.5 rounded-xl text-xs cursor-pointer"
           >
             {busy === 'ann' ? 'Đang lưu…' : 'Ghim thông báo'}
           </button>
           {club.announcement && (
             <button
               onClick={() => setAnnouncement('')}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-3 rounded-xl text-xs cursor-pointer"
+              className="bg-surface-2 hover:bg-border text-fg font-bold px-3 rounded-xl text-xs cursor-pointer"
             >
               Xoá nội dung
             </button>
@@ -222,13 +222,13 @@ export default function ClubSettings({ club, myRole, onChanged, onDeleted, notif
       {isOwner && (
         <>
           <div className={card}>
-            <h3 className="text-sm font-bold text-slate-300">Cách nhận thành viên</h3>
+            <h3 className="text-sm font-bold text-fg">Cách nhận thành viên</h3>
             <div className="space-y-1.5">
               {(Object.keys(JOIN_POLICY_LABEL) as JoinPolicy[]).map((p) => (
                 <label
                   key={p}
                   className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-colors ${
-                    joinPolicy === p ? 'bg-orange-500/10 border-orange-500/40' : 'bg-slate-950 border-slate-800'
+                    joinPolicy === p ? 'bg-brand/10 border-brand/40' : 'bg-bg border-border'
                   }`}
                 >
                   <input
@@ -236,9 +236,9 @@ export default function ClubSettings({ club, myRole, onChanged, onDeleted, notif
                     name="join-policy"
                     checked={joinPolicy === p}
                     onChange={() => setJoinPolicy(p)}
-                    className="accent-orange-500"
+                    className="accent-brand"
                   />
-                  <span className="text-xs text-slate-200">{JOIN_POLICY_LABEL[p]}</span>
+                  <span className="text-xs text-fg">{JOIN_POLICY_LABEL[p]}</span>
                 </label>
               ))}
             </div>
@@ -277,7 +277,7 @@ export default function ClubSettings({ club, myRole, onChanged, onDeleted, notif
                 })
               }
               disabled={busy === 'policy' || !policyDirty}
-              className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-slate-950 font-black py-2.5 rounded-xl text-xs cursor-pointer"
+              className="w-full bg-brand hover:bg-brand-strong disabled:opacity-40 text-brand-fg font-black py-2.5 rounded-xl text-xs cursor-pointer"
             >
               {busy === 'policy' ? 'Đang lưu…' : 'Lưu cài đặt'}
             </button>
@@ -285,7 +285,7 @@ export default function ClubSettings({ club, myRole, onChanged, onDeleted, notif
 
           <div className="bg-rose-950/30 border border-rose-900/60 rounded-2xl p-4 space-y-3">
             <h3 className="text-sm font-bold text-rose-400">Giải thể Câu lạc bộ</h3>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-fg-muted">
               Toàn bộ thành viên, quỹ và lịch sử hoạt động sẽ bị xoá vĩnh viễn.
             </p>
             <button

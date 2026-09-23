@@ -66,7 +66,7 @@ export default function ClubMembersManager({ clubId, myRole, notify }: Props) {
 
   if (!isStaff(myRole)) {
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center text-xs text-slate-400">
+      <div className="bg-surface border border-border rounded-2xl p-6 text-center text-xs text-fg-muted">
         Bạn cần có quyền quản trị để xem và quản lý thành viên.
       </div>
     )
@@ -75,31 +75,31 @@ export default function ClubMembersManager({ clubId, myRole, notify }: Props) {
   return (
     <div className="space-y-4 animate-fadeIn">
       {/* Bộ lọc trạng thái */}
-      <div className="flex gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
+      <div className="flex gap-2 bg-surface p-1.5 rounded-xl border border-border">
         <button
           onClick={() => setFilterStatus('ALL')}
-          className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${filterStatus === 'ALL' ? 'bg-orange-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+          className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${filterStatus === 'ALL' ? 'bg-brand text-brand-fg' : 'text-fg-muted hover:text-white'}`}
         >
           Tất cả ({members.length})
         </button>
         <button
           onClick={() => setFilterStatus('PENDING')}
-          className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${filterStatus === 'PENDING' ? 'bg-orange-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+          className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${filterStatus === 'PENDING' ? 'bg-brand text-brand-fg' : 'text-fg-muted hover:text-white'}`}
         >
           Chờ duyệt ({members.filter(m => m.status === 'PENDING').length})
         </button>
         <button
           onClick={() => setFilterStatus('APPROVED')}
-          className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${filterStatus === 'APPROVED' ? 'bg-orange-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+          className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${filterStatus === 'APPROVED' ? 'bg-brand text-brand-fg' : 'text-fg-muted hover:text-white'}`}
         >
           Chính thức ({members.filter(m => m.status === 'APPROVED').length})
         </button>
       </div>
 
       {loading ? (
-        <div className="text-center py-8 text-xs text-slate-500">Đang tải danh sách thành viên…</div>
+        <div className="text-center py-8 text-xs text-fg-subtle">Đang tải danh sách thành viên…</div>
       ) : filteredMembers.length === 0 ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center text-xs text-slate-400">
+        <div className="bg-surface border border-border rounded-2xl p-6 text-center text-xs text-fg-muted">
           Không có thành viên nào trong danh sách này.
         </div>
       ) : (
@@ -110,7 +110,7 @@ export default function ClubMembersManager({ clubId, myRole, notify }: Props) {
             const displayName = m.profile?.display_name || `Runner (${m.user_id.substring(0, 6)})`
 
             return (
-              <div key={m.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3 shadow-lg">
+              <div key={m.id} className="bg-surface border border-border rounded-2xl p-4 flex flex-col gap-3 shadow-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl flex items-center justify-center text-white font-bold text-sm">
@@ -118,7 +118,7 @@ export default function ClubMembersManager({ clubId, myRole, notify }: Props) {
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-white">{displayName}</h4>
-                      <p className="text-[10px] text-slate-400">
+                      <p className="text-[10px] text-fg-muted">
                         Level {m.profile?.level || 1} • Tham gia: {new Date(m.joined_at).toLocaleDateString('vi-VN')}
                       </p>
                     </div>
@@ -135,7 +135,7 @@ export default function ClubMembersManager({ clubId, myRole, notify }: Props) {
 
                 {/* Khu vực nút bấm thao tác */}
                 {canManage && (
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/80 flex-wrap">
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/80 flex-wrap">
                     {m.status === 'PENDING' ? (
                       <>
                         <button
@@ -148,7 +148,7 @@ export default function ClubMembersManager({ clubId, myRole, notify }: Props) {
                         <button
                           disabled={isBusy}
                           onClick={() => handleAction(m.id, () => setMemberStatus(m.id, 'REJECTED'), 'Đã từ chối yêu cầu.')}
-                          className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-rose-400 font-bold text-[11px] px-3 py-1.5 rounded-lg cursor-pointer"
+                          className="bg-surface-2 hover:bg-border disabled:opacity-50 text-rose-400 font-bold text-[11px] px-3 py-1.5 rounded-lg cursor-pointer"
                         >
                           Từ chối
                         </button>
@@ -161,7 +161,7 @@ export default function ClubMembersManager({ clubId, myRole, notify }: Props) {
                               disabled={isBusy}
                               value={m.role}
                               onChange={(e) => handleAction(m.id, () => setMemberRole(m.id, e.target.value), 'Đã cập nhật vai trò thành viên.')}
-                              className="bg-slate-950 border border-slate-800 text-xs text-orange-400 font-bold px-2.5 py-1 rounded-lg outline-none cursor-pointer"
+                              className="bg-bg border border-border text-xs text-brand font-bold px-2.5 py-1 rounded-lg outline-none cursor-pointer"
                             >
                               <option value="VICE_OWNER">Phó Chủ nhiệm</option>
                               <option value="CONTENT_ADMIN">Quản trị Nội dung</option>

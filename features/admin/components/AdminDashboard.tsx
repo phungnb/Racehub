@@ -40,40 +40,40 @@ export default function AdminDashboard({ profile }: { profile: any }) {
   // Kiểm tra quyền truy cập (Chỉ SYSTEM_ADMIN hoặc CLUB_ADMIN mới được vào)
   if (profile?.role !== 'SYSTEM_ADMIN' && profile?.role !== 'CLUB_ADMIN') {
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center space-y-2">
+      <div className="bg-surface border border-border rounded-2xl p-6 text-center space-y-2">
         <span className="text-2xl">🔒</span>
         <h3 className="text-sm font-bold text-red-400">Truy cập bị từ chối</h3>
-        <p className="text-xs text-slate-400">Bạn không có quyền quản trị viên (Admin) để xem khu vực này.</p>
+        <p className="text-xs text-fg-muted">Bạn không có quyền quản trị viên (Admin) để xem khu vực này.</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+      <div className="bg-surface border border-border rounded-2xl p-5 space-y-4">
         <div className="flex justify-between items-center">
-          <h2 className="text-sm font-black text-orange-500 uppercase tracking-wider">Khu vực Quản trị & Duyệt Bài</h2>
-          <span className="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full font-bold">
+          <h2 className="text-sm font-black text-brand uppercase tracking-wider">Khu vực Quản trị & Duyệt Bài</h2>
+          <span className="text-[10px] bg-brand/20 text-brand px-2 py-0.5 rounded-full font-bold">
             {profile.role}
           </span>
         </div>
 
-        <p className="text-xs text-slate-400">Duyệt các hoạt động chạy của thành viên để cộng điểm XP và tích lũy vào hệ thống giải đấu.</p>
+        <p className="text-xs text-fg-muted">Duyệt các hoạt động chạy của thành viên để cộng điểm XP và tích lũy vào hệ thống giải đấu.</p>
 
         {loading ? (
-          <div className="text-center py-6 text-xs text-slate-500">Đang tải danh sách chờ duyệt...</div>
+          <div className="text-center py-6 text-xs text-fg-subtle">Đang tải danh sách chờ duyệt...</div>
         ) : pendingActivities.length === 0 ? (
-          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center text-xs text-slate-500">
+          <div className="bg-bg p-4 rounded-xl border border-border text-center text-xs text-fg-subtle">
             Không có hoạt động nào đang chờ duyệt.
           </div>
         ) : (
           <div className="space-y-3">
             {pendingActivities.map((act) => (
-              <div key={act.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+              <div key={act.id} className="bg-bg p-4 rounded-xl border border-border space-y-2">
                 <div className="flex justify-between items-start">
                   <div>
                     <h4 className="text-xs font-bold text-white">{act.title || 'Buổi chạy training'}</h4>
-                    <p className="text-[11px] text-slate-400">Runner: <span className="text-orange-400 font-semibold">{act.profiles?.display_name || 'Thành viên'}</span></p>
+                    <p className="text-[11px] text-fg-muted">Runner: <span className="text-brand font-semibold">{act.profiles?.display_name || 'Thành viên'}</span></p>
                   </div>
                   <span className="text-xs font-black text-amber-400">{(act.distance_m / 1000).toFixed(2)} km</span>
                 </div>

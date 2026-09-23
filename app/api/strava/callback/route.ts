@@ -7,8 +7,7 @@ import { serverEnv } from '@/shared/config/env.server'
 import { exchangeStravaCode } from '@/features/integrations/strava/strava.server'
 
 function back(origin: string, params: Record<string, string>) {
-  const url = new URL('/', origin)
-  url.searchParams.set('tab', 'profile')
+  const url = new URL('/me', origin)
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
   const res = NextResponse.redirect(url)
   res.cookies.set(OAUTH_NONCE_COOKIE, '', { path: '/api/strava', maxAge: 0 })

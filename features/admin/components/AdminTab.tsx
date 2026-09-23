@@ -97,7 +97,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
 
   if (!isAdmin) {
     return (
-      <div className="bg-[#18191a] border border-[#2f3031] rounded-2xl p-8 text-center space-y-3">
+      <div className="bg-surface border border-border rounded-2xl p-8 text-center space-y-3">
         <ShieldAlert className="w-10 h-10 text-rose-500 mx-auto" />
         <h3 className="text-sm font-bold text-white">Truy Cập Bị Từ Chối</h3>
         <p className="text-xs text-gray-400">Khu vực dành riêng cho Quản trị viên hệ thống.</p>
@@ -107,7 +107,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
 
   return (
     <div className="space-y-6 text-white p-4">
-      <div className="border-b border-[#2f3031] pb-4">
+      <div className="border-b border-border pb-4">
         <h2 className="text-lg font-bold flex items-center space-x-2">
           <Settings className="w-5 h-5 text-amber-500" />
           <span>Quản Trị Kinh Tế Xu & Tăng Trưởng</span>
@@ -116,7 +116,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
       </div>
 
       {/* THANH TAB CHUYỂN ĐỔI */}
-      <div className="flex bg-[#18191a] p-1 rounded-2xl border border-[#2f3031] gap-1">
+      <div className="flex bg-surface p-1 rounded-2xl border border-border gap-1">
         <button
           onClick={() => setActiveSubTab('fees')}
           className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 cursor-pointer ${
@@ -157,13 +157,13 @@ export default function AdminTab({ profile }: AdminTabProps) {
         
         {/* TAB 1: BIỂU PHÍ GIẢI ĐẤU */}
         {activeSubTab === 'fees' && (
-          <div className="bg-[#18191a] border border-[#2f3031] rounded-2xl p-5 space-y-4">
+          <div className="bg-surface border border-border rounded-2xl p-5 space-y-4">
             <h3 className="text-sm font-bold text-amber-400 flex items-center space-x-2">
               <Trophy className="w-4 h-4" />
               <span>Cấu Hình Biểu Phí Theo Quy Mô VĐV</span>
             </h3>
             {tiers.map((tier, idx) => (
-              <div key={idx} className="bg-[#242526] border border-[#3a3b3c] rounded-xl p-3.5 space-y-2">
+              <div key={idx} className="bg-surface-2 border border-[#3a3b3c] rounded-xl p-3.5 space-y-2">
                 <div className="flex justify-between items-center text-xs font-bold">
                   <span className="text-amber-300">{tier.name}</span>
                   <span className="text-gray-400 text-[11px]">{tier.min} – {tier.max === null ? '∞' : tier.max} VĐV</span>
@@ -179,7 +179,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
                         updated[idx].min = Number(e.target.value);
                         setTiers(updated);
                       }}
-                      className="w-full bg-[#18191a] border border-[#3a3b3c] rounded-lg px-2 py-1.5 text-white"
+                      className="w-full bg-surface border border-[#3a3b3c] rounded-lg px-2 py-1.5 text-white"
                     />
                   </div>
                   <div>
@@ -194,7 +194,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
                         updated[idx].max = val;
                         setTiers(updated);
                       }}
-                      className="w-full bg-[#18191a] border border-[#3a3b3c] rounded-lg px-2 py-1.5 text-white"
+                      className="w-full bg-surface border border-[#3a3b3c] rounded-lg px-2 py-1.5 text-white"
                     />
                   </div>
                   <div>
@@ -207,7 +207,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
                         updated[idx].fee = Number(e.target.value);
                         setTiers(updated);
                       }}
-                      className="w-full bg-[#18191a] border border-amber-500/50 rounded-lg px-2 py-1.5 text-amber-400 font-bold"
+                      className="w-full bg-surface border border-amber-500/50 rounded-lg px-2 py-1.5 text-amber-400 font-bold"
                     />
                   </div>
                 </div>
@@ -218,7 +218,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
 
         {/* TAB 2: THƯỞNG CÀY KM */}
         {activeSubTab === 'reward' && (
-          <div className="bg-[#18191a] border border-[#2f3031] rounded-2xl p-5 space-y-4">
+          <div className="bg-surface border border-border rounded-2xl p-5 space-y-4">
             <h3 className="text-sm font-bold text-amber-400 flex items-center space-x-2">
               <Flame className="w-4 h-4" />
               <span>Chính Sách Thưởng Tự Động Theo Cự Ly (Auto-Reward)</span>
@@ -231,7 +231,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
                   step="0.1"
                   value={kmRate}
                   onChange={(e) => setKmRate(Number(e.target.value))}
-                  className="w-full bg-[#242526] border border-[#3a3b3c] rounded-xl px-3 py-2 text-amber-400 font-bold"
+                  className="w-full bg-surface-2 border border-[#3a3b3c] rounded-xl px-3 py-2 text-amber-400 font-bold"
                 />
               </div>
               <div>
@@ -240,7 +240,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
                   type="number" 
                   value={maxDailyReward}
                   onChange={(e) => setMaxDailyReward(Number(e.target.value))}
-                  className="w-full bg-[#242526] border border-[#3a3b3c] rounded-xl px-3 py-2 text-white font-bold"
+                  className="w-full bg-surface-2 border border-[#3a3b3c] rounded-xl px-3 py-2 text-white font-bold"
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -251,7 +251,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
                     step="0.1"
                     value={minValidPace}
                     onChange={(e) => setMinValidPace(Number(e.target.value))}
-                    className="w-full bg-[#242526] border border-[#3a3b3c] rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-surface-2 border border-[#3a3b3c] rounded-xl px-3 py-2 text-white"
                   />
                 </div>
                 <div>
@@ -261,7 +261,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
                     step="0.1"
                     value={maxValidPace}
                     onChange={(e) => setMaxValidPace(Number(e.target.value))}
-                    className="w-full bg-[#242526] border border-[#3a3b3c] rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-surface-2 border border-[#3a3b3c] rounded-xl px-3 py-2 text-white"
                   />
                 </div>
               </div>
@@ -271,7 +271,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
 
         {/* TAB 3: THƯỞNG GIỚI THIỆU */}
         {activeSubTab === 'referral' && (
-          <div className="bg-[#18191a] border border-[#2f3031] rounded-2xl p-5 space-y-4">
+          <div className="bg-surface border border-border rounded-2xl p-5 space-y-4">
             <h3 className="text-sm font-bold text-amber-400 flex items-center space-x-2">
               <Share2 className="w-4 h-4" />
               <span>Chính Sách Giới Thiệu Tăng Trưởng (Referral Funnel)</span>
@@ -283,7 +283,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
                   type="number" 
                   value={refBonusInviter}
                   onChange={(e) => setRefBonusInviter(Number(e.target.value))}
-                  className="w-full bg-[#242526] border border-[#3a3b3c] rounded-xl px-3 py-2 text-amber-400 font-bold"
+                  className="w-full bg-surface-2 border border-[#3a3b3c] rounded-xl px-3 py-2 text-amber-400 font-bold"
                 />
               </div>
               <div>
@@ -292,7 +292,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
                   type="number" 
                   value={refBonusReferee}
                   onChange={(e) => setRefBonusReferee(Number(e.target.value))}
-                  className="w-full bg-[#242526] border border-[#3a3b3c] rounded-xl px-3 py-2 text-amber-400 font-bold"
+                  className="w-full bg-surface-2 border border-[#3a3b3c] rounded-xl px-3 py-2 text-amber-400 font-bold"
                 />
               </div>
               <div>
@@ -302,7 +302,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
                   step="0.5"
                   value={refMinKmRequired}
                   onChange={(e) => setRefMinKmRequired(Number(e.target.value))}
-                  className="w-full bg-[#242526] border border-[#3a3b3c] rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-surface-2 border border-[#3a3b3c] rounded-xl px-3 py-2 text-white"
                 />
               </div>
             </div>
@@ -312,7 +312,7 @@ export default function AdminTab({ profile }: AdminTabProps) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:opacity-95 text-slate-950 font-black py-2.5 rounded-xl text-xs shadow-lg transition-all cursor-pointer"
+          className="w-full bg-gradient-to-r from-amber-500 to-brand-strong hover:opacity-95 text-slate-950 font-black py-2.5 rounded-xl text-xs shadow-lg transition-all cursor-pointer"
         >
           {loading ? 'Đang lưu cấu hình...' : 'Lưu & Xuất Bản Toàn Bộ Chính Sách'}
         </button>

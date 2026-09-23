@@ -37,13 +37,13 @@ function Row({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-xs font-bold text-slate-300">{label}</label>
-      <p className="text-[11px] text-slate-500 mb-1.5">{hint}</p>
+      <label htmlFor={id} className="block text-xs font-bold text-fg">{label}</label>
+      <p className="text-[11px] text-fg-subtle mb-1.5">{hint}</p>
       <select
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value as Visibility)}
-        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-orange-500"
+        className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-brand"
       >
         {OPTIONS.map(([v, l]) => (
           <option key={v} value={v}>{l}</option>
@@ -98,15 +98,15 @@ export default function PrivacySettings({ userId }: { userId: string }) {
     }
   }
 
-  if (loading) return <div className="h-48 rounded-2xl bg-slate-900 animate-pulse" aria-hidden />
+  if (loading) return <div className="h-48 rounded-2xl bg-surface animate-pulse" aria-hidden />
 
   return (
-    <section aria-labelledby="privacy-title" className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 shadow-xl">
+    <section aria-labelledby="privacy-title" className="bg-surface border border-border rounded-2xl p-4 space-y-4 shadow-xl">
       <h3 id="privacy-title" className="text-sm font-bold text-white">Quyền riêng tư</h3>
 
       <div>
-        <label htmlFor="region" className="block text-xs font-bold text-slate-300">Khu vực</label>
-        <p className="text-[11px] text-slate-500 mb-1.5">Chỉ nên ghi tỉnh hoặc thành phố. Không ghi địa chỉ nhà.</p>
+        <label htmlFor="region" className="block text-xs font-bold text-fg">Khu vực</label>
+        <p className="text-[11px] text-fg-subtle mb-1.5">Chỉ nên ghi tỉnh hoặc thành phố. Không ghi địa chỉ nhà.</p>
         <input
           id="region"
           list="region-list"
@@ -114,7 +114,7 @@ export default function PrivacySettings({ userId }: { userId: string }) {
           maxLength={40}
           onChange={(e) => set('region', e.target.value)}
           placeholder="Ví dụ: Đà Nẵng"
-          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-slate-600 outline-none focus:border-orange-500"
+          className="w-full bg-bg border border-border rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-fg-subtle outline-none focus:border-brand"
         />
         <datalist id="region-list">
           {REGION_SUGGESTIONS.map((r) => <option key={r} value={r} />)}
@@ -134,7 +134,7 @@ export default function PrivacySettings({ userId }: { userId: string }) {
             type="checkbox"
             checked={understood}
             onChange={(e) => setUnderstood(e.target.checked)}
-            className="accent-orange-500 mt-0.5"
+            className="accent-brand mt-0.5"
           />
           <span className="text-[11px] text-amber-200">
             Tôi hiểu đường chạy thường bắt đầu và kết thúc gần nơi ở hoặc nơi làm việc, và đồng ý chia sẻ với nhóm đã chọn.
@@ -151,7 +151,7 @@ export default function PrivacySettings({ userId }: { userId: string }) {
       <button
         onClick={save}
         disabled={!canSave}
-        className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-slate-950 font-black py-2.5 rounded-xl text-xs cursor-pointer"
+        className="w-full bg-brand hover:bg-brand-strong disabled:opacity-40 text-brand-fg font-black py-2.5 rounded-xl text-xs cursor-pointer"
       >
         {saving ? 'Đang lưu…' : 'Lưu cài đặt'}
       </button>

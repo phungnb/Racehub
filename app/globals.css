@@ -1,26 +1,72 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* =========================================================
+   RaceHub design tokens — xem docs/architecture/frontend.md §4
+   Dùng qua class Tailwind: bg-bg, bg-surface, text-fg-muted,
+   bg-brand, text-coin, border-border ...
+   ========================================================= */
+@theme {
+  --color-bg: #0a0d12;
+  --color-surface: #121720;
+  --color-surface-2: #1a2130;
+  --color-border: #263042;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-fg: #f2f5f9;
+  --color-fg-muted: #9aa6b8;
+  --color-fg-subtle: #6b7689;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --color-brand: #b6ff3b;        /* Action Green */
+  --color-brand-strong: #9be52a;
+  --color-brand-fg: #0a0d12;     /* chữ trên nền brand */
+  --color-coin: #ffb020;         /* Xu / RaceCoin */
+  --color-xp: #7c9cff;
+  --color-live: #ff3b5c;
+
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+
+  --color-rarity-common: #9aa6b8;
+  --color-rarity-rare: #3b82f6;
+  --color-rarity-epic: #a855f7;
+  --color-rarity-legendary: #f59e0b;
+
+  --radius-card: 16px;
+
+  --font-sans: var(--font-be-vietnam), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+
+  --animate-fade-in: fade-in 0.25s ease-out both;
+  --animate-breath: breath 2.4s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes breath {
+    0%, 100% { box-shadow: 0 0 0 0 rgb(182 255 59 / 0.45); }
+    50%      { box-shadow: 0 0 0 10px rgb(182 255 59 / 0); }
   }
 }
 
+/* Tương thích class cũ `animate-fadeIn` đang dùng trong các component hiện có */
+.animate-fadeIn { animation: fade-in 0.25s ease-out both; }
+
+html { color-scheme: dark; }
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Số liệu thể thao: chữ số đều nhau để không "nhảy" khi cập nhật */
+.tabular { font-variant-numeric: tabular-nums; }
+
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

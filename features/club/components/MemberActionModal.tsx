@@ -57,7 +57,7 @@ const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString('vi-V
 
 /* Avatar chữ cái, màu ổn định theo tên – dùng chung với ClubMembersManager */
 const TONES = [
-  'from-orange-600 to-amber-500',
+  'from-brand to-amber-500',
   'from-indigo-500 to-blue-600',
   'from-emerald-500 to-teal-600',
   'from-rose-500 to-pink-600',
@@ -166,27 +166,27 @@ export default function MemberActionModal({
       aria-modal="true"
       aria-label={`Thành viên ${name}`}
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4 animate-fadeIn"
+      className="fixed inset-0 z-50 bg-bg/80 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4 animate-fadeIn"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+        className="bg-surface border border-border rounded-t-3xl sm:rounded-3xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
       >
         {/* Header */}
-        <div className="p-5 flex items-center gap-3 border-b border-slate-800">
+        <div className="p-5 flex items-center gap-3 border-b border-border">
           <MemberAvatar name={name} size={56} />
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-black text-white truncate">
               {name}
-              {isMe && <span className="ml-1.5 text-orange-400 font-bold">(Bạn)</span>}
+              {isMe && <span className="ml-1.5 text-brand font-bold">(Bạn)</span>}
             </h3>
             <span
               className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded ${
                 member.role === 'OWNER'
                   ? 'bg-amber-500/20 text-amber-400'
                   : member.role === 'MEMBER'
-                  ? 'bg-slate-800 text-slate-300'
-                  : 'bg-orange-500/20 text-orange-400'
+                  ? 'bg-surface-2 text-fg'
+                  : 'bg-brand/20 text-brand'
               }`}
             >
               {ROLE_LABEL[member.role]}
@@ -195,7 +195,7 @@ export default function MemberActionModal({
           <button
             onClick={onClose}
             aria-label="Đóng"
-            className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center text-xs font-bold cursor-pointer"
+            className="w-8 h-8 rounded-full bg-surface-2 hover:bg-border text-fg flex items-center justify-center text-xs font-bold cursor-pointer"
           >
             ✕
           </button>
@@ -210,8 +210,8 @@ export default function MemberActionModal({
               ['Tham gia', fmtDate(member.joined_at)],
               ['Trạng thái', STATUS_LABEL[member.status] ?? member.status],
             ].map(([k, v]) => (
-              <div key={k} className="bg-slate-950 rounded-xl p-3">
-                <dt className="text-slate-500">{k}</dt>
+              <div key={k} className="bg-bg rounded-xl p-3">
+                <dt className="text-fg-subtle">{k}</dt>
                 <dd className="text-white font-bold mt-0.5">{v}</dd>
               </div>
             ))}
@@ -219,22 +219,22 @@ export default function MemberActionModal({
 
           <button
             onClick={() => setShowAthlete(true)}
-            className="w-full flex items-center justify-between bg-slate-950 hover:bg-slate-800 border border-slate-800 text-white font-bold px-3.5 py-3 rounded-xl cursor-pointer transition-colors"
+            className="w-full flex items-center justify-between bg-bg hover:bg-surface-2 border border-border text-white font-bold px-3.5 py-3 rounded-xl cursor-pointer transition-colors"
           >
             <span>Xem hồ sơ và hoạt động</span>
-            <span className="text-slate-500" aria-hidden>›</span>
+            <span className="text-fg-subtle" aria-hidden>›</span>
           </button>
 
           {/* Xác nhận thao tác nguy hiểm */}
           {pending ? (
             <div className="bg-rose-950/30 border border-rose-900/60 rounded-2xl p-4 space-y-3">
               <p className="text-sm font-bold text-white">{pending.title}</p>
-              <p className="text-slate-400">{pending.body}</p>
+              <p className="text-fg-muted">{pending.body}</p>
               <div className="flex gap-2">
                 <button
                   onClick={() => setConfirm(null)}
                   disabled={busy}
-                  className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 rounded-xl cursor-pointer"
+                  className="flex-1 bg-surface-2 hover:bg-border text-fg font-bold py-2.5 rounded-xl cursor-pointer"
                 >
                   Hủy
                 </button>
@@ -252,15 +252,15 @@ export default function MemberActionModal({
               {/* Chọn vai trò */}
               {canChangeRole && (
                 <section className="space-y-2" aria-labelledby="role-title">
-                  <h4 id="role-title" className="font-bold text-slate-300">Vai trò trong CLB</h4>
+                  <h4 id="role-title" className="font-bold text-fg">Vai trò trong CLB</h4>
                   <div role="radiogroup" className="space-y-1.5">
                     {ASSIGNABLE.map((r) => (
                       <label
                         key={r}
                         className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-colors ${
                           selectedRole === r
-                            ? 'bg-orange-500/10 border-orange-500/40'
-                            : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                            ? 'bg-brand/10 border-brand/40'
+                            : 'bg-bg border-border hover:border-fg-subtle'
                         }`}
                       >
                         <input
@@ -268,11 +268,11 @@ export default function MemberActionModal({
                           name="member-role"
                           checked={selectedRole === r}
                           onChange={() => setSelectedRole(r)}
-                          className="accent-orange-500 mt-0.5"
+                          className="accent-brand mt-0.5"
                         />
                         <span>
-                          <span className="block font-bold text-slate-100">{ROLE_LABEL[r]}</span>
-                          <span className="block text-[11px] text-slate-500">{ROLE_HINT[r]}</span>
+                          <span className="block font-bold text-fg">{ROLE_LABEL[r]}</span>
+                          <span className="block text-[11px] text-fg-subtle">{ROLE_HINT[r]}</span>
                         </span>
                       </label>
                     ))}
@@ -282,7 +282,7 @@ export default function MemberActionModal({
                       run(() => setMemberRole(member.id, selectedRole), 'Đã cập nhật vai trò.')
                     }
                     disabled={busy || selectedRole === member.role}
-                    className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-slate-950 font-black py-2.5 rounded-xl cursor-pointer"
+                    className="w-full bg-brand hover:bg-brand-strong disabled:opacity-40 text-brand-fg font-black py-2.5 rounded-xl cursor-pointer"
                   >
                     {busy ? 'Đang lưu…' : 'Lưu vai trò'}
                   </button>
@@ -295,7 +295,7 @@ export default function MemberActionModal({
                   {canTransfer && (
                     <button
                       onClick={() => setConfirm('transfer')}
-                      className="w-full text-left bg-slate-950 hover:bg-slate-800 border border-slate-800 text-amber-400 font-bold px-3.5 py-3 rounded-xl cursor-pointer"
+                      className="w-full text-left bg-bg hover:bg-surface-2 border border-border text-amber-400 font-bold px-3.5 py-3 rounded-xl cursor-pointer"
                     >
                       Trao quyền Chủ nhiệm
                     </button>
@@ -304,13 +304,13 @@ export default function MemberActionModal({
                     <>
                       <button
                         onClick={() => setConfirm('ban')}
-                        className="w-full text-left bg-slate-950 hover:bg-slate-800 border border-slate-800 text-rose-400 font-bold px-3.5 py-3 rounded-xl cursor-pointer"
+                        className="w-full text-left bg-bg hover:bg-surface-2 border border-border text-rose-400 font-bold px-3.5 py-3 rounded-xl cursor-pointer"
                       >
                         Chặn khỏi CLB
                       </button>
                       <button
                         onClick={() => setConfirm('remove')}
-                        className="w-full text-left bg-slate-950 hover:bg-slate-800 border border-slate-800 text-rose-400 font-bold px-3.5 py-3 rounded-xl cursor-pointer"
+                        className="w-full text-left bg-bg hover:bg-surface-2 border border-border text-rose-400 font-bold px-3.5 py-3 rounded-xl cursor-pointer"
                       >
                         Xóa khỏi CLB
                       </button>
@@ -320,7 +320,7 @@ export default function MemberActionModal({
               )}
 
               {!hasAdminArea && (
-                <p className="text-center text-[11px] text-slate-500 bg-slate-950/50 border border-slate-800/60 rounded-xl p-3">
+                <p className="text-center text-[11px] text-fg-subtle bg-bg/50 border border-border/60 rounded-xl p-3">
                   Bạn chỉ có thể xem thông tin thành viên này.
                 </p>
               )}

@@ -49,10 +49,10 @@ export default function TeamLeaderboard({ challengeId, gameMode = 'TEAM_SUM' }: 
   ];
 
   return (
-    <div className="bg-[#18191a] border border-[#2f3031] rounded-2xl p-6 text-white space-y-6 shadow-xl max-w-5xl mx-auto">
+    <div className="bg-surface border border-border rounded-2xl p-6 text-white space-y-6 shadow-xl max-w-5xl mx-auto">
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-[#2f3031] pb-4 gap-4">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-border pb-4 gap-4">
         <div>
           <h2 className="text-lg font-bold flex items-center space-x-2">
             <Trophy className="w-5 h-5 text-amber-500" />
@@ -62,7 +62,7 @@ export default function TeamLeaderboard({ challengeId, gameMode = 'TEAM_SUM' }: 
         </div>
 
         {/* Chuyển đổi nhanh các chế độ xem Game Mode */}
-        <div className="flex bg-[#242526] p-1 rounded-xl border border-[#3a3b3c] text-xs">
+        <div className="flex bg-surface-2 p-1 rounded-xl border border-[#3a3b3c] text-xs">
           {[
             { id: 'TEAM_SUM', label: 'Cộng Dồn' },
             { id: 'TEAM_AVG', label: 'Trung Bình' },
