@@ -334,9 +334,11 @@ sequenceDiagram
 
 ## 6. Lộ trình triển khai đề xuất
 
+Tiến độ thực hiện và các bước triển khai: [../HUONG_DAN_TRIEN_KHAI.md](../HUONG_DAN_TRIEN_KHAI.md).
+
 | Giai đoạn | Mục tiêu | Hạng mục |
 |---|---|---|
-| **0. Ổn định** (1–2 tuần) | Build xanh, an toàn | Sửa 11 lỗi TS; `supabase db pull` đưa schema vào migrations; sửa OAuth state; chặn client ghi `profiles.xu/xp/role`; bỏ `p_user_id`; xóa `racehubEngine.ts` phía client; thêm CI (lint + typecheck + build) |
+| **0. Ổn định** (1–2 tuần) ✅ *phần code đã xong, chờ áp migration* | Build xanh, an toàn | Sửa 11 lỗi TS; `supabase db pull` đưa schema vào migrations; sửa OAuth state; chặn client ghi `profiles.xu/xp/role`; bỏ `p_user_id`; xóa `racehubEngine.ts` phía client; thêm CI (lint + typecheck + build) |
 | **1. Nền tảng** (3–4 tuần) | Kiến trúc đích | Ledger kép; pipeline ingest Strava webhook; App Router theo route; design system; sinh type từ DB |
 | **2. Core loop** (4–6 tuần) | MVP có thể ra mắt | Thử thách: Volume, Distance, Streak, Pace Breaker, 1-1 có cược, Đồng đội SUM/AVG; Feed tự động; Cheer; Shop + Avatar; XP/Level; BXH |
 | **3. Mở rộng** | Giữ chân user | App native (Expo) chạy GPS nền + Live mode; Relay, Hunter, Bí mật; Chat; Club treasury/score; level decay; Garmin/Coros |
