@@ -41,7 +41,7 @@ export const POST_MEDIA_BUCKET = 'club-media'
 export const MAX_POST_IMAGES = 4
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-const POST_SELECT = '*, author:profiles ( id, display_name, level, avatar_url )'
+const POST_SELECT = '*, author:profiles!club_posts_author_id_fkey ( id, display_name, level, avatar_url )'
 
 type Row = Omit<ClubPost, 'author' | 'reacted'> & { author: MemberProfile | MemberProfile[] | null }
 const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? v[0] ?? null : v)
@@ -116,7 +116,7 @@ export async function toggleReaction(postId: string): Promise<{ reacted: boolean
 
 export async function listComments(postId: string): Promise<PostComment[]> {
   const { data, error } = await supabase.from('club_post_comments')
-    .select('id, post_id, author_id, body, created_at, author:profiles ( id, display_name, level, avatar_url )')
+    .select('id, post_id, author_id, body, created_at, author:profiles!club_post_comments_author_id_fkey ( id, display_name, level, avatar_url )')
     .eq('post_id', postId).order('created_at', { ascending: true }).limit(200)
   if (error) throw error
   return ((data ?? []) as unknown as (Omit<PostComment, 'author'> & { author: MemberProfile | MemberProfile[] | null })[])

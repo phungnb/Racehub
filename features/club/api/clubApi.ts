@@ -66,7 +66,7 @@ export async function getMyMembership(clubId: string, userId: string): Promise<M
 
 export async function listMembers(clubId: string): Promise<ClubMember[]> {
   const { data, error } = await supabase.from('club_members')
-    .select('id, club_id, user_id, role, status, joined_at, profile:profiles ( id, display_name, level, avatar_url )')
+    .select('id, club_id, user_id, role, status, joined_at, profile:profiles!fk_club_members_profiles ( id, display_name, level, avatar_url )')
     .eq('club_id', clubId)
     .in('status', ['APPROVED', 'PENDING', 'BANNED'])
     .order('joined_at', { ascending: true })
@@ -86,7 +86,7 @@ export async function searchClubs(search: string, limit = 20): Promise<Club[]> {
 
 export async function listTreasury(clubId: string, limit = 50): Promise<TreasuryEntry[]> {
   const { data, error } = await supabase.from('club_treasury_log')
-    .select('id, amount, kind, note, created_at, user:profiles ( id, display_name, level, avatar_url )')
+    .select('id, amount, kind, note, created_at, user:profiles!club_treasury_log_user_id_fkey ( id, display_name, level, avatar_url )')
     .eq('club_id', clubId).order('created_at', { ascending: false }).limit(limit)
   if (error) throw error
   return ((data ?? []) as unknown as (Omit<TreasuryEntry, 'user'> & { user: MemberProfile | MemberProfile[] | null })[])
