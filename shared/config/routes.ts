@@ -13,6 +13,8 @@ export const routes = {
   clubTab: (id: string, tab: 'chat' | 'challenges' | 'leaderboard' | 'members' | 'treasury' | 'settings') => `/clubs/${encodeURIComponent(id)}/${tab}`,
   notifications: '/notifications',
   me: '/me',
+  settings: '/me/settings',
+  wallet: '/wallet',
   admin: '/admin',
 } as const
 

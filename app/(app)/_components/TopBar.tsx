@@ -25,7 +25,7 @@ export function TopBar({ profile }: { profile: Profile | null }) {
               </Link>
             )}
             <NotificationBell userId={profile.id} />
-            <Link href={routes.me} className="flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5" aria-label="Hồ sơ của tôi">
+            <Link href={routes.wallet} className="flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5" aria-label="Ví Xu của tôi">
               <LevelBadge level={profile.level} />
               <CoinAmount value={profile.xu} className="text-sm" />
             </Link>

@@ -3,27 +3,26 @@
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Check, ChevronRight, Copy, Gift, LogOut, Pencil, Share2, Shield, Shirt, Watch } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowLeft, Check, ChevronRight, Coins, Copy, Gift, LogOut, Pencil, Settings, Share2, Shirt, Watch } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/shared/lib/supabase'
-import { Button, Card, LevelBadge, ProgressBar, Skeleton } from '@/shared/ui'
-import { cn } from '@/shared/lib/cn'
-import { formatKm, formatNumber } from '@/shared/lib/format'
+import { Button, Card, LevelBadge, ProgressBar, SegmentedControl, Skeleton } from '@/shared/ui'
+import { formatCoin, formatKm, formatNumber } from '@/shared/lib/format'
+import { routes } from '@/shared/config/routes'
 import { levelProgress } from '@/features/progression'
 import { useInvalidateProfile } from '@/features/auth'
 import { CharacterHub } from '@/features/character'
-import { BadgeGrid, WalletView } from '@/features/game'
+import { BadgeGrid } from '@/features/game'
 import { getAthleteProfile } from '../api/athleteApi'
 import PrivacySettings from './PrivacySettings'
 import type { Profile } from '@/shared/types/profile'
 
-type Tab = 'overview' | 'badges' | 'wallet' | 'character' | 'settings'
+type Tab = 'overview' | 'badges' | 'character'
 const TABS: { value: Tab; label: string }[] = [
   { value: 'overview', label: 'Tổng quan' },
   { value: 'badges', label: 'Huy hiệu' },
-  { value: 'wallet', label: 'Ví Xu' },
   { value: 'character', label: 'Nhân vật' },
-  { value: 'settings', label: 'Cài đặt' },
 ]
 const isTab = (v: string | null): v is Tab => TABS.some((t) => t.value === v)
 
@@ -50,8 +49,21 @@ function Header({ profile }: { profile: Profile }) {
           {profile.avatar_url ? <img src={profile.avatar_url} alt="" className="size-full object-cover" /> : initial}
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-bold">{profile.display_name || 'Runner'}</h1>
-          <p className="flex items-center gap-2 text-sm text-fg-muted"><LevelBadge level={p.current.level} /> {p.current.name}</p>
+          <div className="flex items-start gap-2">
+            <h1 className="min-w-0 flex-1 truncate text-xl font-bold">{profile.display_name || 'Runner'}</h1>
+            <Link href={routes.settings} aria-label="Cài đặt"
+              className="-mr-2 -mt-2 grid size-11 shrink-0 place-items-center rounded-full text-fg-muted hover:bg-surface-2 hover:text-fg">
+              <Settings className="size-5" aria-hidden />
+            </Link>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-fg-muted">
+            <LevelBadge level={p.current.level} /> <span className="truncate">{p.current.name}</span>
+          </div>
+          <Link href={routes.wallet} aria-label="Mở ví Xu"
+            className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-coin/40 bg-coin/10 px-3 text-sm font-semibold text-coin hover:bg-coin/15">
+            <Coins className="size-4" aria-hidden /><span className="font-mono">{formatCoin(profile.xu)}</span> Xu
+            <ChevronRight className="size-4" aria-hidden />
+          </Link>
           <div className="mt-2 space-y-1">
             <ProgressBar value={p.value} max={p.span} tone="xp" />
             <p className="text-xs text-fg-subtle">
@@ -165,23 +177,14 @@ export function MeScreen({ profile }: { profile: Profile }) {
   const router = useRouter()
   const fromUrl = params.get('tab')
   const tab: Tab = isTab(fromUrl) ? fromUrl : 'overview'
-  // Tab nằm trên URL để thông báo mở đúng chỗ (/me?tab=badges, /me?tab=wallet)
-  const setTab = (t: Tab) => router.replace(t === 'overview' ? '/me' : `/me?tab=${t}`, { scroll: false })
+  // Tab nằm trên URL để thông báo mở đúng chỗ (/me?tab=badges)
+  const setTab = (t: Tab) => router.replace(t === 'overview' ? routes.me : `${routes.me}?tab=${t}`, { scroll: false })
   return (
     <div className="space-y-4 animate-fade-in">
       <Header profile={profile} />
-      <nav role="tablist" aria-label="Trang cá nhân" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
-        {TABS.map((t) => (
-          <button key={t.value} role="tab" aria-selected={tab === t.value} onClick={() => setTab(t.value)}
-            className={cn('shrink-0 rounded-full border px-3.5 py-2 text-sm font-semibold',
-              tab === t.value ? 'border-brand bg-brand text-brand-fg' : 'border-border text-fg-muted hover:text-fg')}>
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      <SegmentedControl value={tab} onChange={setTab} options={TABS} />
 
       {tab === 'badges' && <BadgeGrid />}
-      {tab === 'wallet' && <WalletView />}
 
       {tab === 'overview' && (
         <div className="space-y-3">
@@ -201,20 +204,26 @@ export function MeScreen({ profile }: { profile: Profile }) {
       )}
 
       {tab === 'character' && <CharacterHub userId={profile.id} />}
+    </div>
+  )
+}
 
-      {tab === 'settings' && (
-        <div className="space-y-3">
-          <Card className="space-y-3">
-            <Row icon={Pencil}>Tên hiển thị</Row>
-            <NameForm profile={profile} />
-          </Card>
-          <Card className="space-y-3">
-            <Row icon={Shield}>Quyền riêng tư</Row>
-            <PrivacySettings userId={profile.id} />
-          </Card>
-          <Button block variant="danger" onClick={() => supabase.auth.signOut()}><LogOut className="size-4" /> Đăng xuất</Button>
-        </div>
-      )}
+/** Màn Cài đặt riêng (/me/settings): tên hiển thị, quyền riêng tư, đăng xuất */
+export function SettingsScreen({ profile }: { profile: Profile }) {
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div className="flex items-center gap-2">
+        <Link href={routes.me} aria-label="Quay lại" className="-ml-2 grid size-11 place-items-center rounded-full text-fg-muted hover:bg-surface-2">
+          <ArrowLeft className="size-5" aria-hidden />
+        </Link>
+        <h1 className="text-xl font-bold">Cài đặt</h1>
+      </div>
+      <Card className="space-y-3">
+        <Row icon={Pencil}>Tên hiển thị</Row>
+        <NameForm profile={profile} />
+      </Card>
+      <PrivacySettings userId={profile.id} />
+      <Button block variant="danger" onClick={() => supabase.auth.signOut()}><LogOut className="size-4" /> Đăng xuất</Button>
     </div>
   )
 }

@@ -877,7 +877,7 @@ begin
   perform private.award(p_to_user, 'CHEER_IN', v_name || ' cổ vũ bạn ' || v_amount || ' Xu', v_msg, 0, v_xp,
     'cheer_in:' || v_id, p_activity_id, jsonb_build_object('from', v_uid, 'amount', v_amount));
   perform private.notify(p_to_user, v_club, 'CHEER', v_name || ' cổ vũ bạn ' || v_amount || ' Xu',
-    coalesce(v_msg, 'Tiếp tục chạy thật tốt nhé!'), case when v_club is not null then '/clubs/' || v_club else '/me?tab=wallet' end, v_uid, true);
+    coalesce(v_msg, 'Tiếp tục chạy thật tốt nhé!'), case when v_club is not null then '/clubs/' || v_club else '/wallet' end, v_uid, true);
   perform private.quest_progress(v_uid, 'CHEERS_SENT', 1, 'ADD', now(), null);
   perform private.quest_progress(p_to_user, 'CHEERS_RECEIVED', 1, 'ADD', now(), null);
   perform private.evaluate_achievements(v_uid, null);

@@ -22,6 +22,9 @@ function StravaResultNotice() {
   const handled = useRef<string | null>(null)
 
   useEffect(() => {
+    // Link cũ (thông báo đã gửi trước đây): ?tab=wallet / ?tab=settings → màn riêng
+    const legacy = params.get('tab')
+    if (legacy === 'wallet' || legacy === 'settings') { router.replace(legacy === 'wallet' ? '/wallet' : '/me/settings'); return }
     const ok = params.get('strava_success')
     const err = params.get('strava_error')
     if (!ok && !err) return
