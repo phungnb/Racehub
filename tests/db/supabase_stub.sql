@@ -17,6 +17,11 @@ create function auth.uid() returns uuid language sql stable as
 grant execute on function auth.uid() to public;
 
 create table storage.objects (id uuid default gen_random_uuid(), bucket_id text, name text);
+create table storage.buckets (id text primary key, name text, public boolean default false,
+  file_size_limit bigint, allowed_mime_types text[]);
+create function storage.foldername(name text) returns text[] language sql immutable as
+  $$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
+grant usage on schema storage to authenticated;
 
 -- uuid-ossp: chỉ cần uuid_generate_v4
 create function extensions.uuid_generate_v4() returns uuid language sql as 'select gen_random_uuid()';
