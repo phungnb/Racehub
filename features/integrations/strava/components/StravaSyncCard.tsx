@@ -5,7 +5,7 @@ import { RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card } from '@/shared/ui'
 import { formatCoin } from '@/shared/lib/format'
-import { useInvalidateProfile } from '@/features/auth/model/session'
+import { useInvalidateProfile } from '@/features/auth'
 import type { SyncSummary } from '../mapping'
 
 async function syncNow(): Promise<SyncSummary> {

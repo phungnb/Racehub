@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/shared/lib/supabase-server'
-import { syncStravaActivities } from '@/features/integrations/strava/strava.server'
+import { syncStravaActivities } from '@/features/integrations/server'
 
 // Nút "Đồng bộ ngay": kéo bài chạy mới từ Strava cho người đang đăng nhập.
 export const maxDuration = 60

@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/shared/lib/supabase-server'
 import { createOAuthState, OAUTH_NONCE_COOKIE } from '@/shared/lib/oauth-state'
 import { getPublicOrigin } from '@/shared/lib/request-url'
 import { serverEnv } from '@/shared/config/env.server'
-import { buildStravaAuthorizeUrl } from '@/features/integrations/strava/strava.server'
+import { buildStravaAuthorizeUrl } from '@/features/integrations/server'
 
 // Bắt đầu kết nối Strava. Người dùng được xác định từ phiên đăng nhập (cookie),
 // KHÔNG từ tham số URL.

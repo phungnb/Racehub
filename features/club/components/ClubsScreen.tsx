@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 
 // Import components từ cổng xuất chuẩn hoặc đường dẫn tính năng
-import ClubMembersManager from '@/features/club/components/ClubMembersManager'
+import ClubMembersManager from './ClubMembersManager'
 import ClubSettings, { ClubAvatar } from './ClubSettings'
 import MyClubsRail from './MyClubsRail'
 
@@ -25,9 +25,9 @@ import {
   listMyClubMemberships, // MỚI: xem hướng dẫn thêm vào ../api
   removeMember,
   type MyClubMembership,
-} from '../api'
+} from '../api/clubApi'
 
-interface ClubTabProps {
+interface ClubsScreenProps {
   profile: any
   onProfileUpdated: () => void
   initialClubId?: string | null
@@ -86,7 +86,7 @@ function RoleBadge({ role }: { role: ClubRole }) {
   return <span className={`text-xs font-bold px-2 py-0.5 rounded ${tone}`}>{ROLE_LABEL[role]}</span>
 }
 
-export default function ClubTab({ profile, onProfileUpdated }: ClubTabProps) {
+export default function ClubsScreen({ profile, onProfileUpdated }: ClubsScreenProps) {
   const userId: string | undefined = profile?.id
 
   const { toast, show } = useToast()

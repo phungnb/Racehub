@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/shared/lib/supabase-server'
-import { deauthorizeStrava } from '@/features/integrations/strava/strava.server'
+import { deauthorizeStrava } from '@/features/integrations/server'
 
 export async function POST() {
   const supabase = await createSupabaseServerClient()

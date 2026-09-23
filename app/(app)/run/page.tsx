@@ -1,8 +1,8 @@
 'use client'
 
 import { useQueryClient } from '@tanstack/react-query'
-import { RunScreen } from '@/features/run/components/RunScreen'
-import { useInvalidateProfile } from '@/features/auth/model/session'
+import { RunScreen } from '@/features/run'
+import { useInvalidateProfile } from '@/features/auth'
 
 export default function RunPage() {
   const qc = useQueryClient()

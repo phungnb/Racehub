@@ -1,4 +1,3 @@
-// Đặt tại: src/shared/lib/adminConfig.ts
 
 export const CONFIG_KEY_FEE_TIERS = 'challenge_fee_tiers';
 

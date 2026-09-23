@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { Club, ClubRole, JoinPolicy } from '../api'
+import type { Club, ClubRole, JoinPolicy } from '../api/clubApi'
 import {
   clubErrorMessage,
   JOIN_POLICY_LABEL,
@@ -11,7 +11,7 @@ import {
   updateClub,
   updateClubPolicy,
   uploadClubAvatar,
-} from '../api'
+} from '../api/clubApi'
 
 /** Ảnh đại diện CLB, tự lùi về chữ cái đầu khi chưa có ảnh. */
 export function ClubAvatar({

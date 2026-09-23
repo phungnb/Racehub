@@ -8,7 +8,7 @@ import type {
   CharacterAvatarData,
   CharacterEquipmentData,
   EquipmentRarity,
-} from '../lib/characterTypes';
+} from '../model/characterTypes';
 
 interface RunnerAvatarProps {
   avatar?: CharacterAvatarData;

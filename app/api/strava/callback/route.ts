@@ -4,7 +4,7 @@ import { createSupabaseAdminClient, createSupabaseServerClient } from '@/shared/
 import { OAUTH_NONCE_COOKIE, verifyOAuthState } from '@/shared/lib/oauth-state'
 import { getPublicOrigin } from '@/shared/lib/request-url'
 import { serverEnv } from '@/shared/config/env.server'
-import { exchangeStravaCode, syncStravaActivities } from '@/features/integrations/strava/strava.server'
+import { exchangeStravaCode, syncStravaActivities } from '@/features/integrations/server'
 
 function back(origin: string, params: Record<string, string>) {
   const url = new URL('/me', origin)

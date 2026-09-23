@@ -3,8 +3,8 @@
 import { Suspense, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { MeScreen } from '@/features/profile/components/MeScreen'
-import { useInvalidateProfile, useMyProfile } from '@/features/auth/model/session'
+import { MeScreen } from '@/features/profile'
+import { useInvalidateProfile, useMyProfile } from '@/features/auth'
 import { Skeleton } from '@/shared/ui'
 
 const STRAVA_ERRORS: Record<string, string> = {

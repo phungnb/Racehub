@@ -42,9 +42,10 @@ Chạy **3 file** trong `supabase/migrations/`, đúng thứ tự:
 ```bash
 npx supabase db push
 ```
-Nếu lệnh báo lịch sử migration không khớp (do file `20260601_team_challenges.sql` trước đây chạy tay), chạy lệnh sau rồi push lại:
+File `20260601_team_challenges.sql` cũ **đã bị xóa** khỏi repo (chưa từng tạo bảng trên production; mô hình đội sẽ làm lại ở migration 000600). Nếu `db push` báo *"Remote migration versions not found in local migrations directory"* với mã `20260601`, chạy lệnh sau rồi push lại:
+
 ```bash
-npx supabase migration repair --status applied 20260601
+npx supabase migration repair --status reverted 20260601
 ```
 
 ### Tác động tới người dùng (cần biết trước)

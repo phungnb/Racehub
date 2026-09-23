@@ -1,7 +1,7 @@
 'use client'
 
 import { ClubAvatar } from './ClubSettings'
-import { ROLE_LABEL, isStaff, type Club, type ClubRole } from '../api'
+import { ROLE_LABEL, isStaff, type Club, type ClubRole } from '../api/clubApi'
 
 /**
  * "CLB của tôi": thanh biểu tượng cuộn ngang + thẻ tóm tắt CLB đang chọn.

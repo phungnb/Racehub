@@ -2,8 +2,7 @@
 
 import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import AuthScreen from '@/features/auth/components/AuthScreen'
-import { useSession } from '@/features/auth/model/session'
+import { AuthScreen, useSession } from '@/features/auth'
 import { safeNext } from '@/shared/config/routes'
 
 function LoginInner() {

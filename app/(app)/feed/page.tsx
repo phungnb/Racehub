@@ -1,10 +1,10 @@
 'use client'
 
 import { Users } from 'lucide-react'
-import { useMyProfile } from '@/features/auth/model/session'
-import { HomeSummary, ConnectDeviceCard } from '@/features/home/components/HomeSummary'
-import { ActivityList } from '@/features/activity/components/ActivityList'
-import { StravaSyncCard } from '@/features/integrations/strava/components/StravaSyncCard'
+import { useMyProfile } from '@/features/auth'
+import { HomeSummary, ConnectDeviceCard } from '@/features/home'
+import { ActivityList } from '@/features/activity'
+import { StravaSyncCard } from '@/features/integrations'
 import { EmptyState, SectionTitle, Skeleton } from '@/shared/ui'
 
 export default function FeedPage() {

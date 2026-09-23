@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from 'react'
 import { fetchUserAvatar, fetchUserEquipment, fetchUserInventory, equipItemRpc } from '../api/characterApi'
 import InventoryModal from './InventoryModal'
-import { PRESET_RUNNERS } from '../lib/characterConfig'
+import { PRESET_RUNNERS } from '../model/characterConfig'
 import { supabase } from '@/shared/lib/supabase'
-import { levelProgress, MAX_XP } from '@/features/progression/model/levels'
+import { levelProgress, MAX_XP } from '@/features/progression'
 import { formatNumber } from '@/shared/lib/format'
 
 export default function CharacterHub({ userId }: { userId: string }) {

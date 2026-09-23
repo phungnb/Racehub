@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/shared/lib/supabase';
 import { ShieldAlert, Settings, Coins, Users, Trophy, CheckCircle2, Flame, Share2, Award } from 'lucide-react';
 
-interface AdminTabProps {
+interface AdminScreenProps {
   profile?: any;
 }
 
-export default function AdminTab({ profile }: AdminTabProps) {
+export default function AdminScreen({ profile }: AdminScreenProps) {
   const [activeSubTab, setActiveSubTab] = useState<'fees' | 'reward' | 'referral'>('fees');
   
   // State cấu hình Biểu phí thử thách

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Watch } from 'lucide-react'
 import { Button, Card, CoinAmount, LevelBadge, ProgressBar, StatTile } from '@/shared/ui'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
-import { levelProgress } from '@/features/progression/model/levels'
+import { levelProgress } from '@/features/progression'
 import type { Profile } from '@/shared/types/profile'
 
 export function HomeSummary({ profile }: { profile: Profile }) {

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { KeyRound } from 'lucide-react'
 import { supabase } from '@/shared/lib/supabase'
-import { useSession } from '@/features/auth/model/session'
+import { useSession } from '@/features/auth'
 import { Button, Card } from '@/shared/ui'
 import { routes } from '@/shared/config/routes'
 

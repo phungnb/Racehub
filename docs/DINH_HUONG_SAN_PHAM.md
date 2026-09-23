@@ -1,6 +1,7 @@
 # Định hướng hoàn thiện RaceHub
 
 > Tài liệu này là **chuẩn chung** cho mọi quyết định về sản phẩm, thiết kế và kỹ thuật. Một tính năng chỉ được coi là "xong" khi đạt chuẩn ở §6 và §9.
+> Kế hoạch thực thi chi tiết: [KE_HOACH_HOAN_THIEN.md](./KE_HOACH_HOAN_THIEN.md) · Cấu trúc code: [CAU_TRUC_THU_MUC.md](./CAU_TRUC_THU_MUC.md)
 > Tài liệu liên quan: [benchmark](./architecture/benchmark.md) · [kiến trúc](./architecture/README.md) · [ADR-012 CLB là một không gian riêng](./architecture/adr/012-club-hub.md) · [bảo mật](./BAO_CAO_BAO_MAT.md)
 
 ## 1. RaceHub khác các app chạy bộ ở đâu
@@ -87,7 +88,7 @@ Game hóa không phải một màn hình. Nó là **lớp phản hồi** xuất 
 
 ### 4.3 Dữ liệu cần bổ sung
 
-Hiện **chưa có mô hình đội**: `challenge_participants` không có `team_id`, còn `TeamRosterManager` và `TeamLeaderboard` chưa có dữ liệu thật phía sau. Cần:
+Hiện **chưa có mô hình đội**: `challenge_participants` không có `team_id`, còn các màn đội cũ chỉ dùng dữ liệu giả (đã xóa, xem [Cấu trúc thư mục §6](./CAU_TRUC_THU_MUC.md#6-những-gì-đã-dọn-commit-này)). Cần:
 
 `challenge_teams` (id, challenge_id, name, captain_id, club_id, invite_code) · `challenge_participants.team_id` · `challenge_progress_events` (bút toán tiến độ theo từng bài chạy, để thu hồi khi bài bị xóa) · view hoặc bảng BXH cá nhân, đội và CLB · RPC `join_challenge`, `leave_challenge`, `create_team`, `join_team`, `settle_challenge`.
 

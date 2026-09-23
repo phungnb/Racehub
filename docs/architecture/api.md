@@ -119,7 +119,7 @@ Ký hiệu: **Q** = query/view, **C** = command RPC, **R** = REST route, 🔒 = 
 
 ### 3.6 Club (MH 21–22)
 
-Giữ các RPC đã có trong `features/club/api.ts` (`create_club`, `join_club`, `join_club_by_code`, `set_member_status`, `set_member_role`, `remove_member`, `transfer_ownership`, `contribute_treasury`, `update_club`, `update_club_policy`, `rotate_invite_code`, `delete_club`, `leave_club`) và bổ sung:
+Giữ các RPC đã có trong `features/club/api/clubApi.ts` (`create_club`, `join_club`, `join_club_by_code`, `set_member_status`, `set_member_role`, `remove_member`, `transfer_ownership`, `contribute_treasury`, `update_club`, `update_club_policy`, `rotate_invite_code`, `delete_club`, `leave_club`) và bổ sung:
 
 | API | Loại | Input | Output / Ghi chú |
 |---|---|---|---|

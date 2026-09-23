@@ -1,10 +1,8 @@
 'use client'
 
 import { ShieldAlert } from 'lucide-react'
-import AdminTab from '@/features/admin/components/AdminTab'
-import AdminDashboard from '@/features/admin/components/AdminDashboard'
-import { useMyProfile } from '@/features/auth/model/session'
-import { isSystemAdmin } from '@/shared/lib/adminConfig'
+import { AdminDashboard, AdminScreen, isSystemAdmin } from '@/features/admin'
+import { useMyProfile } from '@/features/auth'
 import { EmptyState, Skeleton } from '@/shared/ui'
 
 // Ẩn/hiện giao diện; quyền thật được kiểm tra trong RPC (is_system_admin)
@@ -16,7 +14,7 @@ export default function AdminPage() {
   }
   return (
     <div className="space-y-6">
-      <AdminTab profile={profile} />
+      <AdminScreen profile={profile} />
       <AdminDashboard profile={profile} />
     </div>
   )

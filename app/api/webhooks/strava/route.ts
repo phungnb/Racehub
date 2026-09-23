@@ -1,6 +1,6 @@
 import { NextResponse, after } from 'next/server'
 import { createSupabaseAdminClient } from '@/shared/lib/supabase-server'
-import { handleStravaWebhookEvent } from '@/features/integrations/strava/strava.server'
+import { handleStravaWebhookEvent } from '@/features/integrations/server'
 
 // Strava Webhook Events API: https://developers.strava.com/docs/webhooks/
 // Đăng ký: xem docs/HUONG_DAN_TRIEN_KHAI.md (Bước "Webhook Strava").
