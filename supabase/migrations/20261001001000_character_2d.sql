@@ -9,6 +9,7 @@
 -- Vật phẩm 3D không còn hiển thị được (tóc, mũ, kính, đồng hồ, phụ kiện, hiệu ứng, bản trùng màu)
 -- bị ngừng bán; ai đã mua được hoàn lại đúng số Xu (đúng loại Xu thưởng / Xu nạp đã trả).
 -- Phụ thuộc: 000900. Idempotent. INTO luôn đặt cuối câu SELECT (xem ghi chú ở migration 000700).
+-- Không dùng khối DO $$ và LIMIT trong thân hàm: SQL Editor của Supabase cắt nhầm câu lệnh.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -80,9 +81,11 @@ on conflict (code) where code is not null do update set
 -- 4. Hoàn Xu cho đồ đã mua nay ngừng bán, rồi thu hồi khỏi tủ đồ
 --    Tìm đúng giao dịch mua để hoàn đúng loại Xu (thưởng/nạp); không tìm thấy thì hoàn bằng Xu thưởng.
 -- ---------------------------------------------------------------------
-do $$
+create or replace function private.refund_retired_items() returns integer
+language plpgsql security definer set search_path = public as $$
 declare
   r record;
+  v_count integer := 0;
   v_tx uuid;
   v_entries jsonb;
 begin
@@ -95,10 +98,8 @@ begin
     v_tx := null;
     v_entries := null;
     if r.price_xu > 0 then
-      select t.id from public.ledger_transactions t
+      select (array_agg(t.id order by t.created_at))[1] from public.ledger_transactions t
        where t.type = 'SHOP_ITEM' and t.created_by = r.user_id and t.reason = 'Mua ' || r.name
-       order by t.created_at
-       limit 1
         into v_tx;
       if v_tx is not null then
         select jsonb_agg(jsonb_build_object('account_id', e.account_id, 'coin_kind', e.coin_kind, 'amount', -e.amount))
@@ -116,8 +117,11 @@ begin
         r.name || ' ngừng bán khi nhân vật đổi sang kiểu mới. Xu đã về ví của bạn.', '/wallet');
     end if;
     delete from public.user_inventory where user_id = r.user_id and item_id = r.item_id;
+    v_count := v_count + 1;
   end loop;
+  return v_count;
 end $$;
+select private.refund_retired_items();
 
 -- ---------------------------------------------------------------------
 -- 5. Hàm nội bộ và RPC
@@ -226,15 +230,19 @@ begin
 end $$;
 
 -- Người đang mặc đồ ngừng bán: đưa về bộ hợp lệ ngay (không chờ lần mở tủ đồ tiếp theo)
-do $$
-declare r record;
+create or replace function private.fix_all_equipment() returns integer
+language plpgsql security definer set search_path = public as $$
+declare r record; v_count integer := 0;
 begin
   for r in select user_id from public.user_equipment loop
     perform private.ensure_character(r.user_id);
+    v_count := v_count + 1;
   end loop;
+  return v_count;
 end $$;
+select private.fix_all_equipment();
 
-revoke all on function private.character_required_slots(), private.ensure_character(uuid), private.item_json(public.avatar_items),
+revoke all on function private.refund_retired_items(), private.fix_all_equipment(), private.character_required_slots(), private.ensure_character(uuid), private.item_json(public.avatar_items),
   private.character_look(uuid) from public, anon, authenticated;
 
 notify pgrst, 'reload schema';
