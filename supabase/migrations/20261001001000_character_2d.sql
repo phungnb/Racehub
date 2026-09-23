@@ -8,8 +8,10 @@
 --            (mũ, kính, áo CLB...). Đường dẫn trong layer_urls = {"male": url, "female": url}.
 -- Vật phẩm 3D không còn hiển thị được (tóc, mũ, kính, đồng hồ, phụ kiện, hiệu ứng, bản trùng màu)
 -- bị ngừng bán; ai đã mua được hoàn lại đúng số Xu (đúng loại Xu thưởng / Xu nạp đã trả).
--- Phụ thuộc: 000900. Idempotent. INTO luôn đặt cuối câu SELECT (xem ghi chú ở migration 000700).
--- Không dùng khối DO $$ và LIMIT trong thân hàm: SQL Editor của Supabase cắt nhầm câu lệnh.
+-- Phụ thuộc: 000900. Idempotent.
+-- Viết để chạy được trong SQL Editor của Supabase (trình này đọc sai một số mẫu câu):
+--   * không dùng SELECT ... INTO, mà gán v := (select ...)
+--   * không dùng khối DO $$ và LIMIT trong thân hàm
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -98,13 +100,11 @@ begin
     v_tx := null;
     v_entries := null;
     if r.price_xu > 0 then
-      select (array_agg(t.id order by t.created_at))[1] from public.ledger_transactions t
-       where t.type = 'SHOP_ITEM' and t.created_by = r.user_id and t.reason = 'Mua ' || r.name
-        into v_tx;
+      v_tx := (select (array_agg(t.id order by t.created_at))[1] from public.ledger_transactions t
+               where t.type = 'SHOP_ITEM' and t.created_by = r.user_id and t.reason = 'Mua ' || r.name);
       if v_tx is not null then
-        select jsonb_agg(jsonb_build_object('account_id', e.account_id, 'coin_kind', e.coin_kind, 'amount', -e.amount))
-          from public.ledger_entries e where e.transaction_id = v_tx
-          into v_entries;
+        v_entries := (select jsonb_agg(jsonb_build_object('account_id', e.account_id, 'coin_kind', e.coin_kind, 'amount', -e.amount))
+                        from public.ledger_entries e where e.transaction_id = v_tx);
       end if;
       if v_entries is null or jsonb_array_length(v_entries) < 2 then
         v_entries := jsonb_build_array(
@@ -139,10 +139,10 @@ begin
   perform private.grant_free_items(p_user);
   insert into public.user_equipment (user_id) values (p_user) on conflict (user_id) do nothing;
   foreach k in array private.character_slots() loop
-    select (to_jsonb(e) ->> (k || '_item_id'))::uuid from public.user_equipment e where e.user_id = p_user into v_id;
+    v_id := (select (to_jsonb(e) ->> (k || '_item_id'))::uuid from public.user_equipment e where e.user_id = p_user);
     if v_id is not null and exists (select 1 from public.avatar_items where id = v_id and is_active) then continue; end if;
     if k = any(private.character_required_slots()) then
-      select id from public.avatar_items where code = k || '_original' into v_id;
+      v_id := (select id from public.avatar_items where code = k || '_original');
     else
       if v_id is null then continue; end if;
       v_id := null;
@@ -184,11 +184,10 @@ language plpgsql security definer set search_path = public as $$
 declare v_uid uuid := private.require_uid(); v_items jsonb;
 begin
   perform private.ensure_character(v_uid);
-  select coalesce(jsonb_agg(private.item_json(i) || jsonb_build_object('owned', inv.item_id is not null) order by i.category, i.sort, i.name), '[]'::jsonb)
-    from public.avatar_items i
-    left join public.user_inventory inv on inv.item_id = i.id and inv.user_id = v_uid
-   where i.is_active and i.code is not null
-    into v_items;
+  v_items := (select coalesce(jsonb_agg(private.item_json(i) || jsonb_build_object('owned', inv.item_id is not null) order by i.category, i.sort, i.name), '[]'::jsonb)
+                from public.avatar_items i
+                left join public.user_inventory inv on inv.item_id = i.id and inv.user_id = v_uid
+               where i.is_active and i.code is not null);
   return (private.character_look(v_uid) - 'items') || jsonb_build_object(
     'level', coalesce((select level from public.profiles where id = v_uid), 1),
     'balance', private.balance(v_uid),
@@ -217,10 +216,9 @@ begin
         if k = any(private.character_required_slots()) then raise exception 'SLOT_REQUIRED'; end if;
         v_id := null;
       else
-        select i.id from public.avatar_items i
-          join public.user_inventory inv on inv.item_id = i.id and inv.user_id = v_uid
-         where i.code = v_code and i.category = k and i.is_active
-          into v_id;
+        v_id := (select i.id from public.avatar_items i
+                   join public.user_inventory inv on inv.item_id = i.id and inv.user_id = v_uid
+                  where i.code = v_code and i.category = k and i.is_active);
         if v_id is null then raise exception 'ITEM_NOT_OWNED'; end if;
       end if;
       execute format('update public.user_equipment set %I = $1, updated_at = now() where user_id = $2', k || '_item_id') using v_id, v_uid;
