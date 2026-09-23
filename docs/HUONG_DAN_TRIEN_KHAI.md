@@ -40,6 +40,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001000600_challenge_engine.sql` | **Sprint 3, Thử thách:** tham gia/rời, đội (4 chế độ), tiến độ tự tính từ bài chạy, BXH realtime, treo thưởng từ ví hoặc quỹ CLB, tất toán tự động. **Sửa lỗi production:** trước đây không có cách tham gia thử thách và không đọc được danh sách người tham gia | Cần file 500 |
 | `20261001000700_economy_admin.sql` | **Kinh tế Xu & điều phối admin (ADR-014):** phí tạo thử thách theo số người (≤ 5 miễn phí · 6–10 người 3 Xu/người · trên 10 người 5 Xu/người), thử thách CLB trả bằng quỹ CLB, vé tạo miễn phí, thưởng chạy mới (km đầu 1 Xu + 0,2 Xu/km, trần 10 Xu/ngày), admin cộng/trừ Xu cho cá nhân hoặc quỹ CLB | Cần file 600 |
 | `20261001000800_game_layer.sql` | **Sprint 4, Game (ADR-015):** nhiệm vụ ngày/tuần, điểm danh, streak tuần + khiên, 27 huy hiệu, league tuần (Đồng → Kim cương), cổ vũ bằng Xu, ví Xu, chuỗi phần thưởng sau bài chạy. Bài chạy bị xóa thì thu hồi cả thưởng game | Cần file 700 |
+| `20261001000900_character_shop.sql` | **Nhân vật 3D (ADR-016):** 45 vật phẩm (tóc, áo, quần, tất, giày, mũ, kính, đồng hồ, phụ kiện, hiệu ứng), mua bằng Xu, quà lên cấp, lưu bộ đồ. Vật phẩm cũ không có mô hình bị ẩn khỏi shop | Cần file 800 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 
@@ -93,6 +94,12 @@ notify pgrst, 'reload schema';
 select proname from pg_proc where pronamespace = 'public'::regnamespace and proname in (
   'my_game_state','daily_checkin','set_weekly_goal','buy_streak_shield','send_cheer','activity_rewards',
   'mark_game_events_seen','my_achievements','league_standings','my_wallet','settle_due_leagues') order by 1;
+notify pgrst, 'reload schema';
+
+-- File 900 phải ra 4 dòng (và bảng avatar_items có ≥ 45 vật phẩm có mã)
+select proname from pg_proc where pronamespace = 'public'::regnamespace and proname in (
+  'character_state','get_character','buy_avatar_item','save_character') order by 1;
+select count(*) from public.avatar_items where code is not null;
 notify pgrst, 'reload schema';
 ```
 

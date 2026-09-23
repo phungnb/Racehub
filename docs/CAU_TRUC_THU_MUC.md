@@ -53,6 +53,8 @@ Racehub/
 │   ├── remote_schema.sql         Ảnh chụp schema production (nền cho test DB)
 │   └── config.toml
 ├── tests/db/                     Test migration + RLS trên Postgres nhúng (PGlite)
+├── public/models/character/      Mô hình 3D nhân vật (GLB) — chuẩn trong docs/NHAN_VAT_3D.md
+├── scripts/character/            Sinh bộ GLB khởi đầu: `npm run models`
 ├── docs/                         Tài liệu (xem §5)
 ├── proxy.ts                      Làm mới phiên đăng nhập (thay middleware ở Next 16)
 └── .github/workflows/ci.yml      lint + typecheck + test + build

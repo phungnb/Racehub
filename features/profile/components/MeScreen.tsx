@@ -196,14 +196,14 @@ export function MeScreen({ profile }: { profile: Profile }) {
           <button onClick={() => setTab('character')} className="w-full text-left">
             <Card className="flex items-center gap-3 transition-colors hover:border-fg-subtle">
               <span className="grid size-10 place-items-center rounded-xl bg-brand/15 text-brand"><Shirt className="size-5" /></span>
-              <div className="flex-1"><p className="font-semibold">Nhân vật & tủ đồ</p><p className="text-xs text-fg-muted">Trang phục mở khóa theo cấp độ</p></div>
+              <div className="flex-1"><p className="font-semibold">Nhân vật & tủ đồ</p><p className="text-xs text-fg-muted">Thay áo, giày, mũ, kính… cho nhân vật 3D</p></div>
               <ChevronRight className="size-5 text-fg-subtle" />
             </Card>
           </button>
         </div>
       )}
 
-      {tab === 'character' && <CharacterHub userId={profile.id} />}
+      {tab === 'character' && <CharacterHub />}
     </div>
   )
 }
