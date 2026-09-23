@@ -52,7 +52,7 @@ export function useClubChat(clubId: string, enabled: boolean) {
     markRead.current = setTimeout(() => {
       markClubRead(clubId)
         .then(() => qc.invalidateQueries({ queryKey: clubKeys.inbox }))
-        .catch((e) => console.error('[CLB] Không đánh dấu đã đọc được:', e?.code, e?.message))
+        .catch((e) => console.warn('[CLB] Không đánh dấu đã đọc được:', e?.code, e?.message))
     }, 800)
   }, [clubId, qc])
 

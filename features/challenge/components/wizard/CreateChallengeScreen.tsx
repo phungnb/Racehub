@@ -40,6 +40,13 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
   const [busy, setBusy] = useState(false)
   const key = useRef(`web-${crypto.randomUUID()}`)
   const set = (patch: Partial<ChallengeDraft>) => setD((prev) => ({ ...prev, ...patch }))
+  const balance = Number(profile?.xu ?? 0)
+  const fee = useQuery({
+    queryKey: ['challenge-fee', d.format, d.maxSlots, d.start, d.end, d.audience],
+    queryFn: () => previewFee(d), enabled: step === 3,
+  })
+  const cost = (fee.data ?? 0) + (d.rewardXu > 0 && d.rewardSource === 'CREATOR' ? d.rewardXu : 0)
+  const short = step === 3 && fee.isSuccess && cost > balance
 
   const next = () => {
     if (step < 3) {
@@ -89,12 +96,16 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
 
       {step === 0 && <StepType d={d} set={set} errors={errors} staffClubs={staffClubs} />}
       {step === 1 && <StepRules d={d} set={set} errors={errors} />}
-      {step === 2 && <StepTime d={d} set={set} errors={errors} balance={Number(profile?.xu ?? 0)} />}
-      {step === 3 && <StepReview d={d} balance={Number(profile?.xu ?? 0)} clubName={staffClubs.find((c) => c.club_id === d.clubId)?.name} />}
+      {step === 2 && <StepTime d={d} set={set} errors={errors} balance={balance} />}
+      {step === 3 && <StepReview d={d} balance={balance} fee={fee.data} feeLoading={fee.isLoading} cost={cost}
+        clubName={staffClubs.find((c) => c.club_id === d.clubId)?.name} canUseClub={staffClubs.length > 0}
+        onEdit={(to, patch) => { if (patch) set(patch); setStep(to) }} />}
 
       <div className="fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-md gap-2 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur-md">
         {step > 0 && <Button variant="secondary" size="lg" className="shrink-0 whitespace-nowrap" onClick={() => setStep(step - 1)} disabled={busy}>Quay lại</Button>}
-        <Button block size="lg" onClick={next} loading={busy}>{step < 3 ? 'Tiếp tục' : 'Tạo thử thách'}</Button>
+        <Button block size="lg" onClick={next} loading={busy} disabled={short || (step === 3 && fee.isLoading)}>
+          {step < 3 ? 'Tiếp tục' : short ? 'Không đủ Xu' : 'Tạo thử thách'}
+        </Button>
       </div>
     </div>
   )
@@ -331,10 +342,12 @@ function StepTime({ d, set, errors, balance }: StepProps & { balance: number }) 
   )
 }
 
-function StepReview({ d, balance, clubName }: { d: ChallengeDraft; balance: number; clubName?: string }) {
-  const fee = useQuery({ queryKey: ['challenge-fee', d.format, d.maxSlots, d.start, d.end, d.audience], queryFn: () => previewFee(d) })
+function StepReview({ d, balance, fee, feeLoading, cost, clubName, canUseClub, onEdit }: {
+  d: ChallengeDraft; balance: number; fee?: number; feeLoading: boolean; cost: number; clubName?: string; canUseClub: boolean
+  onEdit: (step: number, patch?: Partial<ChallengeDraft>) => void
+}) {
   const reward = d.rewardXu > 0 && d.rewardSource === 'CREATOR' ? d.rewardXu : 0
-  const total = (fee.data ?? 0) + reward
+  const total = cost
   const Icon = FORMAT_ICON[d.format]
   const days = Math.max(1, Math.round((Date.parse(d.end) - Date.parse(d.start)) / DAY))
   const perDay = d.targetValue > 0 ? d.targetValue / days : 0
@@ -359,7 +372,7 @@ function StepReview({ d, balance, clubName }: { d: ChallengeDraft; balance: numb
       </Card>
 
       <Card className="space-y-2">
-        <Row label="Phí tạo thử thách" value={fee.isLoading ? '…' : fee.data ? `${formatCoin(fee.data)} Xu` : 'Miễn phí'} />
+        <Row label="Phí tạo thử thách" value={feeLoading ? '…' : fee ? `${formatCoin(fee)} Xu` : 'Miễn phí'} />
         {reward > 0 && <Row label="Treo thưởng từ ví" value={`${formatCoin(reward)} Xu`} />}
         {d.rewardXu > 0 && d.rewardSource === 'CLUB' && <Row label="Treo thưởng từ quỹ CLB" value={`${formatCoin(d.rewardXu)} Xu`} />}
         <div className="border-t border-border pt-2">
@@ -369,6 +382,30 @@ function StepReview({ d, balance, clubName }: { d: ChallengeDraft; balance: numb
           </p>
         </div>
       </Card>
+
+      {!feeLoading && total > balance && (
+        <Card className="space-y-3 border-warning/40 bg-warning/5">
+          <p className="font-semibold">Ví chưa đủ {formatCoin(total - balance)} Xu. Bạn có thể:</p>
+          <div className="space-y-2">
+            {(fee ?? 0) > 0 && d.format !== 'DUEL' && d.maxSlots > 10 && (
+              <Suggestion title="Giảm số người tối đa" text="Phí tạo tính theo quy mô: thử thách nhỏ rẻ hơn nhiều"
+                action="Sửa" onClick={() => onEdit(2, { maxSlots: 10 })} />
+            )}
+            {reward > 0 && (
+              <Suggestion title="Bỏ hoặc giảm tiền treo thưởng" text={`Đang treo ${formatCoin(reward)} Xu từ ví của bạn`} action="Sửa" onClick={() => onEdit(2)} />
+            )}
+            {canUseClub && d.audience !== 'CLUB_ONLY' && (
+              <Suggestion title="Tạo trong CLB bạn quản lý" text="Thử thách nội bộ CLB miễn phí tạo, thưởng có thể trích quỹ CLB"
+                action="Đổi" onClick={() => onEdit(0)} />
+            )}
+            {d.format !== 'SOLO_GOAL' && (
+              <Suggestion title="Mục tiêu cá nhân luôn miễn phí" text="Tự đặt mục tiêu cho riêng mình, không mất phí"
+                action="Đổi" onClick={() => onEdit(0, { format: 'SOLO_GOAL', audience: 'PUBLIC', targetValue: d.targetValue || 50 })} />
+            )}
+            <p className="text-sm text-fg-muted">Hoặc chạy thêm để kiếm Xu: mỗi km hợp lệ được khoảng 1 Xu.</p>
+          </div>
+        </Card>
+      )}
     </div>
   )
 }
@@ -379,5 +416,14 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
       <span className="text-fg-muted">{label}</span>
       <span className={cn('font-mono tabular', strong ? 'text-lg font-bold text-coin' : 'font-semibold')}>{value}</span>
     </p>
+  )
+}
+
+function Suggestion({ title, text, action, onClick }: { title: string; text: string; action: string; onClick: () => void }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3">
+      <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{title}</span><span className="block text-xs text-fg-muted">{text}</span></span>
+      <Button size="sm" variant="secondary" onClick={onClick}>{action}</Button>
+    </div>
   )
 }
