@@ -5,12 +5,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowDownLeft, ArrowUpRight, Gift, HandCoins, Wallet } from 'lucide-react'
 import { toast } from 'sonner'
 import { useInvalidateProfile, useMyProfile } from '@/features/auth'
-import { Avatar, Button, Card, CoinAmount, EmptyState, ErrorState, Field, Input, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
+import { Avatar, Button, Card, CoinAmount, EmptyState, ErrorState, Field, Input, SectionTitle, SegmentedControl, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatRelative } from '@/shared/lib/format'
 import { clubErrorMessage, contributeTreasury, type TreasuryEntry } from '../../api/clubApi'
 import { useClub, useTreasury } from '../../hooks/useClub'
 import { clubKeys } from '../../hooks/keys'
+import { ClubFinance } from './ClubFinance'
 
 const KIND: Record<TreasuryEntry['kind'], { label: string; icon: typeof Gift; tone: string; sign: string }> = {
   CONTRIBUTE: { label: 'Góp quỹ', icon: ArrowDownLeft, tone: 'text-brand', sign: '+' },
@@ -18,8 +19,19 @@ const KIND: Record<TreasuryEntry['kind'], { label: string; icon: typeof Gift; to
   REWARD: { label: 'Thưởng thử thách', icon: Gift, tone: 'text-coin', sign: '−' },
 }
 
+/** Tab Quỹ: thu chi tiền VND (phí thành viên, khoản chi có hóa đơn) và quỹ Xu (treo thưởng thử thách) */
+export function ClubTreasuryScreen({ clubId, openDue }: { clubId: string; openDue?: string | null }) {
+  const [tab, setTab] = useState<'cash' | 'xu'>('cash')
+  return (
+    <div className="space-y-4">
+      <SegmentedControl value={tab} onChange={setTab} options={[{ value: 'cash', label: 'Thu chi' }, { value: 'xu', label: 'Quỹ Xu' }]} />
+      {tab === 'cash' ? <ClubFinance clubId={clubId} openDue={openDue} /> : <XuTreasury clubId={clubId} />}
+    </div>
+  )
+}
+
 /** Quỹ CLB bằng Xu (MH21): số dư minh bạch, ai góp bao nhiêu, chi vào đâu */
-export function ClubTreasuryScreen({ clubId }: { clubId: string }) {
+function XuTreasury({ clubId }: { clubId: string }) {
   const { club } = useClub(clubId)
   const log = useTreasury(clubId)
   const [open, setOpen] = useState(false)

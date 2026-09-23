@@ -154,13 +154,15 @@ Bảy tính năng **chỉ RaceHub có**. Đây là thứ để quảng bá, nên
 
 ### Sprint 5: CLB hoàn chỉnh + PWA (16/11 → 27/11) · ③ + nền · Mốc M4 Ra mắt
 
+> **Trạng thái:** xong CLB-20 → CLB-23 và bình chọn (migration 001500, 10 test DB + 6 test logic). Nhắc sự kiện gửi vào chuông thông báo; Web Push chờ PWA-02. **Còn:** album ảnh theo sự kiện, PWA, Web Push, onboarding.
+
 | Mã | Việc | Loại | Nghiệm thu |
 |---|---|---|---|
-| CLB-20 | Migration `000800_club_events_treasury`: `club_events`, `club_event_rsvps` (`checked_in_at`, cách điểm danh), `club_dues`, `club_due_payments`, `club_expenses`, `club_polls`, `club_poll_votes` | DB | Test RLS: chỉ thủ quỹ ghi quỹ; thành viên chỉ xem |
-| CLB-21 | Tab **Lịch**: tạo sự kiện (giờ, điểm hẹn trên bản đồ, cự ly, pace nhóm), RSVP, nhắc trước 12 giờ | UI | Có trong chuông thông báo và Web Push |
-| CLB-22 | **Điểm danh**: QR ký HMAC có hạn 15 phút + **tự điểm danh** từ bài chạy (±30 phút, ≤ 500 m) | DB·UI | Thử 3 trường hợp: đúng giờ đúng chỗ, đúng giờ sai chỗ, QR hết hạn |
-| CLB-23 | Tab **Quỹ**: kỳ thu phí, ai đã đóng / chưa đóng, nhắc đóng phí, mã **VietQR** theo tài khoản CLB, khoản chi có ảnh hóa đơn, xuất CSV | UI | Số dư = tổng thu − tổng chi; mọi thay đổi có nhật ký |
-| CLB-24 | **Bình chọn** và **album ảnh** sự kiện | UI | Bình chọn có hạn chót; kết quả ẩn / hiện theo cài đặt |
+| ✅ CLB-20 | Migration `001500_club_events_finance` (thay tên cũ `000800_club_events_treasury`): `club_events`, `club_event_rsvps` (`checked_in_at`, cách điểm danh), `club_dues`, `club_due_payments`, `club_expenses`, `club_polls`, `club_poll_votes` | DB | Test RLS: chỉ thủ quỹ ghi quỹ; thành viên chỉ xem |
+| ✅ CLB-21 | Tab **Lịch**: tạo sự kiện (giờ, điểm hẹn trên bản đồ, cự ly, pace nhóm), RSVP, nhắc trước 12 giờ | UI | Có trong chuông thông báo và Web Push |
+| ✅ CLB-22 | **Điểm danh**: QR ký HMAC có hạn 15 phút + **tự điểm danh** từ bài chạy (±30 phút, ≤ 500 m) | DB·UI | Thử 3 trường hợp: đúng giờ đúng chỗ, đúng giờ sai chỗ, QR hết hạn |
+| ✅ CLB-23 | Tab **Quỹ**: kỳ thu phí, ai đã đóng / chưa đóng, nhắc đóng phí, mã **VietQR** theo tài khoản CLB, khoản chi có ảnh hóa đơn, xuất CSV | UI | Số dư = tổng thu − tổng chi; mọi thay đổi có nhật ký |
+| ◐ CLB-24 | **Bình chọn** ✅ và **album ảnh** sự kiện (album: dùng ảnh bài đăng CLB, chưa gom theo sự kiện) | UI | Bình chọn có hạn chót; kết quả ẩn / hiện theo cài đặt |
 | PWA-01 | Manifest, icon, splash, service worker (cache khung app), nút "Cài lên màn hình chính" | OPS·UI | Lighthouse PWA đạt; mở offline thấy khung app và thông báo "mất mạng" |
 | PWA-02 | **Web Push**: tin nhắc tên, thông báo CLB, sự kiện sắp tới, thử thách sắp hết, bị vượt hạng | OPS | Nhận push trên Android Chrome và iOS (bản PWA đã cài) |
 | ONB-01 | **Onboarding 3 bước** (MH1–MH4): đăng nhập Google/Apple → kết nối Strava → chọn / nhập mã CLB → tạo nhân vật | UI | Người mới tới được trang chủ trong ≤ 90 giây |

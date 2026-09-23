@@ -33,6 +33,7 @@ export function ClubShell({ clubId, children }: { clubId: string; children: Reac
   const tabs = [
     { href: base, label: 'Bảng tin' },
     { href: `${base}/chat`, label: 'Chat', badge: unread },
+    { href: `${base}/events`, label: 'Lịch' },
     { href: `${base}/challenges`, label: 'Thử thách' },
     { href: `${base}/leaderboard`, label: 'BXH' },
     { href: `${base}/members`, label: 'Thành viên', badge: pending },

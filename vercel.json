@@ -1,8 +1,21 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
-    { "path": "/api/cron/club-recap", "schedule": "0 0 * * 1" },
-    { "path": "/api/cron/challenges", "schedule": "5 17 * * *" },
-    { "path": "/api/cron/leagues", "schedule": "10 17 * * 0" }
+    {
+      "path": "/api/cron/club-recap",
+      "schedule": "0 0 * * 1"
+    },
+    {
+      "path": "/api/cron/challenges",
+      "schedule": "5 17 * * *"
+    },
+    {
+      "path": "/api/cron/leagues",
+      "schedule": "10 17 * * 0"
+    },
+    {
+      "path": "/api/cron/events",
+      "schedule": "0 23 * * *"
+    }
   ]
 }
