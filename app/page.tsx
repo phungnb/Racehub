@@ -19,6 +19,9 @@ export default async function RootPage({ searchParams }: PageProps<'/'>) {
   if (!user) redirect(routes.login)
 
   if (tab === 'profile') redirect(`${routes.me}${qs}`)
-  if (tab === 'club') redirect(`${routes.clubs}${qs}`)
+  if (tab === 'club') {
+    const clubId = typeof params.clubId === 'string' ? params.clubId : null
+    redirect(clubId ? routes.club(clubId) : routes.clubs)
+  }
   redirect(routes.home)
 }
