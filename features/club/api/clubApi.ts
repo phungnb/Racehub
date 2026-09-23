@@ -245,7 +245,9 @@ const MESSAGES: Record<string, string> = {
 }
 
 export function clubErrorMessage(e: unknown): string {
-  const err = e as { message?: string; code?: string } | null
+  const err = e as { message?: string; code?: string; details?: string; hint?: string } | null
+  // Ghi lỗi gốc ra Console (F12) để chẩn đoán; người dùng chỉ thấy câu tiếng Việt
+  console.error('[CLB] Lỗi gốc:', err?.code, err?.message, err?.details ?? '', err?.hint ?? '')
   const raw = err?.message ?? ''
   const key = Object.keys(MESSAGES).find((k) => raw.includes(k))
   if (key) return MESSAGES[key]
