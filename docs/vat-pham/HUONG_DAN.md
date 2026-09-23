@@ -12,7 +12,45 @@ Tài liệu gồm 3 bước: **thiết kế → tách lớp → đưa lên shop*
 | **Mũ / visor / băng đô theo màu** | Thêm một dòng vào `CATALOG` trong `scripts/character/items/headwear.py` rồi chạy script (vẽ theo hình khối đầu, có bóng và tóc mái) | Chỉ cần mã màu |
 | **Để AI làm hết** | Mở Claude Code, gõ `/tao-vat-pham mũ lưỡi trai đỏ` | Ảnh AI đã vẽ (hoặc mô tả món đồ) |
 
-## 1. Thiết kế bằng AI
+## 1a. Mũ / visor / băng đô vẽ bằng code (không cần AI)
+
+Bộ đồ đội đầu hiện có (16 món, ô `hat`) được vẽ bằng `scripts/character/items/headwear.py`:
+- Vẽ theo hình khối đầu đo từ ảnh nền, có ánh sáng studio và bóng đổ.
+- **Băng đô:** tóc mái nam đè lên băng.
+- **Mũ:** đuôi tóc nữ luồn qua lỗ sau; tóc thò ra ngoài thân mũ được vẽ lại nền để che.
+
+| Kiểu | Mã hiện có | Hàm |
+|---|---|---|
+| Mũ chạy | `hat_cap_tempo_black/white/red/navy`, `hat_cap_neon`, `hat_cap_legend` (quà cấp 5) | `cap(g, màu, under=màu mặt dưới lưỡi, logo=màu logo)` |
+| Visor | `hat_visor_sun_white/black/pink` | `visor(g, màu, under=..., logo=...)` |
+| Băng đô bông | `hat_band_terry_red/white/black/blue` | `headband(g, màu, 'terry', logo=..., under_hair=g == 'male')` |
+| Băng đô mảnh | `hat_band_thin_black/lime/pink` | `headband(g, màu, 'thin', logo=..., under_hair=g == 'male')` |
+
+**Thêm màu mới:**
+
+1. Thêm một dòng vào `CATALOG` trong `headwear.py`, ví dụ:
+   ```python
+   ('hat_cap_tempo_green', 'Mũ chạy Tempo Xanh Lá', 'Mũ vải mỏng, lỗ thoáng hai bên', 'rare', 60, 1,
+    lambda g: cap(g, '#15803d', under='#1d2128', logo='#ffffff')),
+   ```
+2. Chạy lệnh vẽ, chỉ vẽ mã mới:
+   ```bash
+   python3 scripts/character/items/headwear.py hat_cap_tempo_green
+   ```
+3. Xem thử ghép lên đầu:
+   ```bash
+   python3 scripts/character/items/preview.py /tmp/xem.png public/character/layers/hat_cap_tempo_green_male.png public/character/layers/hat_cap_tempo_green_female.png
+   ```
+4. Đưa lên shop bằng một trong hai cách:
+   - Trang Quản trị: tải 2 file PNG lên.
+   - SQL: `make-layer.py sql --code hat_cap_tempo_green ...` rồi deploy.
+
+**Lưu ý:**
+- **Sửa lại ảnh của món đã bán** (giữ nguyên tên file): tăng số phiên bản trong đường dẫn (`?v=1` → `?v=2`) để trình duyệt tải ảnh mới.
+- **Không dùng lại mã của đồ 3D cũ đã ngừng bán:** `hat_cap_black`, `hat_visor_white`, `hat_headband_red`, `hat_beanie_green`, các mã `glasses_*`, `watch_*`, `accessory_*`, `effect_*` cũ.
+- **Số đo đầu nằm ở `HEAD` trong script.** Đổi ảnh nhân vật thì phải đo lại.
+
+## 1b. Thiết kế bằng AI
 
 1. `python3 scripts/character/make-layer.py prepare`: lấy 2 ảnh nhân vật 1024×1536.
 2. Mở ChatGPT hoặc Gemini, đính kèm ảnh, dán prompt khung ở [PROMPT_AI.md](PROMPT_AI.md) mục 1, thay mô tả món đồ ở mục 2.

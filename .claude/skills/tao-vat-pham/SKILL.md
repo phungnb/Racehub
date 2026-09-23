@@ -20,6 +20,16 @@ Từ mô tả, chốt các thông tin sau. Chỉ hỏi lại khi thật sự mơ
 - **Tên tiếng Việt:** ≤ 60 ký tự.
 - **Độ hiếm và giá (Xu):** thường 10–30 · hiếm 40–80 · sử thi 120–200 · huyền thoại 400. Quà lên cấp thì giá 0 và cấp 2–5.
 
+## Bước 1b: Mũ / visor / băng đô chỉ khác màu?
+
+Nếu món mới chỉ là **màu khác** của mũ chạy, visor, băng đô bông hoặc băng đô mảnh, thì **không cần AI**:
+1. Thêm dòng vào `CATALOG` trong `scripts/character/items/headwear.py`, theo mẫu các dòng có sẵn.
+2. Chạy `python3 scripts/character/items/headwear.py <code>`.
+3. Ghép thử bằng `python3 scripts/character/items/preview.py <ảnh ra> public/character/layers/<code>_male.png public/character/layers/<code>_female.png`, rồi mở ảnh ra xem.
+4. Sang bước 4.
+
+Không dùng lại mã đồ 3D cũ đã ngừng bán (xem `docs/vat-pham/HUONG_DAN.md` mục 1a).
+
 ## Bước 2: Có ảnh chưa?
 
 - **Người dùng đã đưa ảnh AI** (ảnh nhân vật đã vẽ thêm món đồ) → sang bước 3.
@@ -29,7 +39,7 @@ Từ mô tả, chốt các thông tin sau. Chỉ hỏi lại khi thật sự mơ
   ```
 - **Chưa có ảnh:**
   1. Chạy `python3 scripts/character/make-layer.py prepare`.
-  2. Ghép prompt hoàn chỉnh từ `docs/vat-pham/PROMPT_AI.md`: mục 1 (khung) cộng mô tả mục 2, thay màu/chi tiết theo yêu cầu.
+  2. Ghép prompt hoàn chỉnh từ `docs/vat-pham/PROMPT_AI.md`: mục 1 (khung) cộng mô tả mục 2, thay màu và chi tiết theo yêu cầu. Soát theo danh sách "Những lỗi hay gặp" ở mục 2 trước khi đưa prompt.
   3. Đưa người dùng: prompt, đường dẫn 2 ảnh `scripts/character/out/nhan_vat_*_1024x1536.png`, và dặn dùng tính năng chọn vùng nếu có.
   4. Dừng lại, chờ người dùng gửi ảnh AI.
 

@@ -38,20 +38,35 @@ Strict rules:
 
 ## 2. Prompt theo loại món (thay vào `{MÔ TẢ MÓN ĐỒ}`)
 
+Mô tả dưới đây viết theo **đặc điểm của sản phẩm chạy bộ thật** (xem mục 6). Món đồ trông "đúng chất" hơn hẳn so với mô tả chung chung như "a cap".
+
 | Ô (`slot`) | Món | Mô tả gợi ý |
 |---|---|---|
-| `hat` | Mũ lưỡi trai | `a {red} running cap with a curved brim, worn forward, sitting naturally on the hair, small {white} RaceHub "RH" logo on the front` |
-| `hat` | Mũ nửa đầu (visor) | `a {white} sports visor with a {blue} band, hair visible on top` |
-| `hat` | Băng đô | `a {black} elastic sports headband across the forehead, hair tucked behind it` |
-| `glasses` | Kính thể thao | `wrap-around sports sunglasses with {black} frame and {mirrored blue} lenses, resting on the nose` |
-| `watch` | Đồng hồ GPS | `a {black} GPS running watch with a round face on the character's visible wrist` |
+| `hat` | Mũ chạy (kiểu Ciele GOCap / Nike AeroBill) | `a lightweight unstructured 6-panel running cap in {black} technical fabric, low-profile crown, short slightly curved brim, a {olive} contrast color under the brim, small laser-cut vent holes on the side panels, a small {lime} lightning-bolt logo on the front, sitting low on the forehead` |
+| `hat` | Visor | `a {white} running visor: soft terry sweatband around the head and a short curved brim, NO crown so the top of the hair stays visible, a small {blue} lightning-bolt logo on the band` |
+| `hat` | Băng đô bông (kiểu Halo / Nike) | `a {red} terry-cloth sweatband about 5 cm wide across the forehead just above the eyebrows, slightly fuzzy texture, small {white} lightning-bolt logo in the center; let a few front hair strands fall naturally over the band` |
+| `hat` | Băng đô thun mảnh (kiểu Buff) | `a thin {black} elastic sports headband about 2 cm wide along the hairline, subtle ribbed texture, tiny {lime} logo` |
+| `glasses` | Kính chắn một mảnh (kiểu Oakley Sutro) | `oversized single-shield sport sunglasses with a {white} frame and {mirrored blue} lens covering both eyes, resting on the nose, temples going back over the ears` |
+| `glasses` | Kính gọng tròn (kiểu goodr) | `lightweight {black} sport sunglasses with rounded rectangular lenses in {dark smoke}, matte non-slip frame` |
+| `watch` | Đồng hồ GPS | `a {black} GPS running watch with a round face and a slim silicone strap on the character's visible wrist, screen showing a pace number` |
 | `accessory` | Số đeo ngực | `a race bib pinned on the chest of the shirt, white paper with number "{2026}" in bold black, four safety pins` |
 | `accessory` | Huy chương | `a gold finisher medal on a {red} ribbon hanging around the neck, resting on the chest` |
 | `accessory` | Áo nước trail | `a lightweight {teal} trail running hydration vest over the shirt with two soft flasks in the front pockets` |
 | `accessory` | Túi đeo tay | `a {black} running phone armband on the upper arm` |
 | `effect` | Hào quang | `a soft glowing {lime green} energy ring on the floor around the feet, light particles rising, subtle glow on the legs` |
 
-Khi làm món cho **Nữ**, thêm câu: `The character is female, keep her ponytail visible.` (với mũ).
+- **Món cho Nữ đội mũ:** thêm câu `The character is female; her ponytail comes out through the back opening of the cap.`
+- **Visor và băng đô cho Nữ:** thêm câu `Keep her bangs and ponytail; the band sits over the hair.`
+- **Logo:** chỉ dùng tia chớp RaceHub hoặc logo CLB. Không để AI vẽ logo thương hiệu thật (Nike, Oakley…).
+
+### Những lỗi hay gặp làm món đồ trông "giả", cần tránh
+
+- **Vòng quanh đầu vẽ cong xuống hình chữ U.** Nhìn ngang tầm mắt, mũ và băng đô phải hơi cong hình vòm (giữa trán cao, hai bên thấp dần).
+- **Món đồ rộng quá đầu, lơ lửng.** Hai đầu dải phải khuất ra sau đầu, không chìa ra ngoài.
+- **Không có bóng.** Cần bóng mềm dưới mép băng đô và bóng lưỡi trai đổ xuống trán.
+- **Có khe hở giữa thân mũ và lưỡi trai,** hoặc lưỡi trai quá dày. Nhìn ngang, lưỡi trai chỉ là một dải cong mỏng, thấy mặt dưới.
+- **Tóc thò ra ngoài thân mũ ở phía trên.** Mũ phải ép gọn tóc.
+- **Vải quá lấm tấm.** Vải kỹ thuật màu sáng gần như trơn.
 
 ## 3. Áo CLB có logo (gửi kèm ảnh logo)
 
@@ -94,3 +109,19 @@ Mở `scripts/character/out/hat_cap_red_male_preview.png` để xem 3 ảnh cạ
 | Cảnh báo "ảnh AI lệch dáng nhiều" | AI đã vẽ lại người. Tạo lại ảnh (nên dùng chọn vùng) |
 
 Ưng ý thì đưa lên shop theo [HUONG_DAN.md](HUONG_DAN.md) mục 3.
+
+## 6. Tham khảo sản phẩm thật (nghiên cứu 9/2026)
+
+| Loại | Mẫu tham khảo | Đặc điểm nên giữ khi thiết kế |
+|---|---|---|
+| Mũ chạy | Ciele GOCap, Nike AeroBill Featherlight | Vải mỏng không cứng, thân mũ thấp, lưỡi ngắn hơi cong, lưới hoặc lỗ laser hai bên, logo phản quang nhỏ, mặt dưới lưỡi thường khác màu |
+| Visor | Ciele ALZvisor, Nike AeroBill visor | Băng thấm mồ hôi quanh đầu + lưỡi trai, hở đỉnh đầu |
+| Băng đô bông | Halo, Nike Swoosh headband | Bản 4–5 cm, vải bông xù, có dải chặn mồ hôi |
+| Băng đô mảnh | Buff CoolNet, Nike Flex | Thun gân mảnh 2–3 cm, không trượt |
+| Kính | Oakley Sutro (mắt chắn một mảnh lớn), goodr (gọng tròn, giá rẻ, chống trượt) | Kính chắn một mảnh là "dáng" đặc trưng của dân chạy |
+
+Nguồn:
+- [Treeline Review: running hats](https://www.treelinereview.com/gearreviews/best-running-hats)
+- [The Run Testers: running caps](https://theruntesters.com/best-running-caps/)
+- [Garage Gym Reviews: running headbands](https://www.garagegymreviews.com/best-running-headbands)
+- [Treeline Review: running sunglasses](https://www.treelinereview.com/gearreviews/best-running-sunglasses)
