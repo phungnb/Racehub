@@ -20,9 +20,9 @@ export function ItemCard({ item, gender, status, selected, onSelect }: {
     <button onClick={onSelect} aria-pressed={selected}
       className={cn('flex w-full flex-col items-center gap-1.5 rounded-2xl border-2 bg-surface p-2.5 text-center transition-colors',
         selected ? 'border-brand' : r.border, status === 'LOCKED' && 'opacity-60')}>
-      <span className="relative grid size-14 place-items-center rounded-full border border-border" style={{ background: swatch }}>
+      <span className="relative grid size-14 place-items-center overflow-visible rounded-full border border-border" style={{ background: swatch }}>
         {layer ? (
-          <LayerThumb src={layer} className="size-11" />
+          <LayerThumb src={layer} gender={gender} className="size-full rounded-full" />
         ) : !item.color ? (
           <span className="text-xs font-bold text-fg-muted">Gốc</span>
         ) : Icon && <Icon className="size-6 text-white mix-blend-difference" aria-hidden />}

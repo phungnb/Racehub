@@ -13,7 +13,9 @@ interface Region { idx: Uint32Array; alpha: Float32Array; mean: number }
 interface Prepared { base: ImageData; regions: Partial<Record<TintSlot, Region>> }
 
 /** Phần nền mở rộng mỗi bên (px trong khung): ảnh 2:3 thành canvas vuông, lấp kín khung hiển thị */
-const SIDE = (FRAME.height - FRAME.width) / 2
+const SIDE = (FRAME.height - FRAME.width) / 2 + 20
+/** Nền mở rộng phía trên: chừa chỗ cho mũ khi khung hiển thị cắt bớt trên/dưới */
+const TOP = 70
 
 export const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
   const img = new Image()
@@ -117,13 +119,14 @@ export function PaperDoll({ gender, items, className, label = 'Nhân vật', fit
         if (cancelled || !cv) return
         const { width: W, height: H } = FRAME
         cv.width = W + 2 * SIDE
-        cv.height = H
+        cv.height = H + TOP
         const ctx = cv.getContext('2d')!
-        ctx.putImageData(paint(p, tints), SIDE, 0)
-        for (const img of imgs) ctx.drawImage(img, SIDE, 0, W, H)
-        // Nền hai bên: kéo dãn cột mép ảnh để khung rộng vẫn liền màu nền
-        ctx.drawImage(cv, SIDE, 0, 1, H, 0, 0, SIDE, H)
-        ctx.drawImage(cv, SIDE + W - 1, 0, 1, H, SIDE + W, 0, SIDE, H)
+        ctx.putImageData(paint(p, tints), SIDE, TOP)
+        for (const img of imgs) ctx.drawImage(img, SIDE, TOP, W, H)
+        // Nền mở rộng: kéo dãn hàng/cột mép ảnh (nền xám trơn) để khung nào cũng liền màu
+        ctx.drawImage(cv, SIDE, TOP, W, 1, SIDE, 0, W, TOP)
+        ctx.drawImage(cv, SIDE, 0, 1, H + TOP, 0, 0, SIDE, H + TOP)
+        ctx.drawImage(cv, SIDE + W - 1, 0, 1, H + TOP, SIDE + W, 0, SIDE, H + TOP)
         setStatus('ready')
       } catch (e) {
         console.warn('[Nhân vật] Không vẽ được:', e)

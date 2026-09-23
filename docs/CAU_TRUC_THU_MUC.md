@@ -54,7 +54,7 @@ Racehub/
 │   └── config.toml
 ├── tests/db/                     Test migration + RLS trên Postgres nhúng (PGlite)
 ├── public/character/             Nhân vật 2D: ảnh nền + mặt nạ vùng theo giới tính (khung 900 × 1350, docs/NHAN_VAT.md)
-├── scripts/character/            Ảnh gốc nhân vật (source/, không deploy); segment.py sinh ảnh nền + mặt nạ; make-layer.py làm vật phẩm lớp ảnh
+├── scripts/character/            Ảnh gốc nhân vật (source/, không deploy); segment.py sinh ảnh nền + mặt nạ; make-layer.py làm vật phẩm lớp ảnh; items/headwear.py vẽ bộ đồ đội đầu
 ├── .claude/skills/tao-vat-pham/  Skill Claude Code: `/tao-vat-pham <mô tả>` làm trọn quy trình vật phẩm (docs/vat-pham/)
 ├── docs/                         Tài liệu (xem §5)
 ├── proxy.ts                      Làm mới phiên đăng nhập (thay middleware ở Next 16)

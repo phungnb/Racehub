@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { Button, Card, EmptyState, ErrorState, Input, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin } from '@/shared/lib/format'
-import { LayerThumb, layerUrl, RARITY_META, SLOTS, type Slot } from '@/features/character'
+import { LayerThumb, RARITY_META, SLOTS, type Slot } from '@/features/character'
 import { adminErrorMessage, type AdminItem } from '../../api/adminApi'
 import { useAvatarItems, useSetItemActive } from '../../hooks/useAdmin'
 import { ItemEditor } from './ItemEditor'
@@ -71,14 +71,14 @@ export function ItemsTab() {
         <ul className="space-y-2">
           {shown.map((it) => {
             const slot = SLOTS.find((s) => s.slot === it.slot)
-            const layer = layerUrl(it, 'male') ?? layerUrl(it, 'female')
+            const layer = it.layer_urls?.male ?? it.layer_urls?.female ?? null
             return (
               <li key={it.code}>
                 <Card className={cn('flex items-center gap-3 p-3', !it.is_active && 'opacity-70')}>
                   <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-border"
                     style={{ background: layer ? 'var(--color-surface-2)' : it.color ?? 'repeating-linear-gradient(135deg, var(--color-surface-2) 0 6px, var(--color-border) 6px 12px)' }}>
                     {layer ? (
-                      <LayerThumb src={layer} className="size-10" />
+                      <LayerThumb src={layer} gender={it.layer_urls?.male ? 'male' : 'female'} className="size-full" />
                     ) : !it.color ? <span className="text-xs font-bold text-fg-muted">Gốc</span> : null}
                   </span>
                   <div className="min-w-0 flex-1">

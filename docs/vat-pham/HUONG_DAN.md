@@ -9,6 +9,7 @@ Tài liệu gồm 3 bước: **thiết kế → tách lớp → đưa lên shop*
 | **Màu mới** cho áo / quần / tất / giày | Trang **Quản trị → Vật phẩm → Thêm → Đổi màu** | Chỉ chọn màu, không cần ảnh |
 | **Mũ, kính, đồng hồ, phụ kiện, hiệu ứng, logo CLB** | AI vẽ → `make-layer.py extract` → Quản trị tải PNG lên | Ảnh AI + máy có Python |
 | Họa sĩ vẽ tay | Họa sĩ giao PNG 900×1350 → `make-layer.py check` → Quản trị tải lên | File PNG đúng khung |
+| **Mũ / visor / băng đô theo màu** | Thêm một dòng vào `CATALOG` trong `scripts/character/items/headwear.py` rồi chạy script (vẽ theo hình khối đầu, có bóng và tóc mái) | Chỉ cần mã màu |
 | **Để AI làm hết** | Mở Claude Code, gõ `/tao-vat-pham mũ lưỡi trai đỏ` | Ảnh AI đã vẽ (hoặc mô tả món đồ) |
 
 ## 1. Thiết kế bằng AI
