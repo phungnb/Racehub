@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/shared/lib/supabase'
@@ -65,8 +65,9 @@ export function useMyProfile() {
   return { ...query, profile: query.data ?? null }
 }
 
+/** Hàm ổn định giữa các lần render — an toàn khi đặt trong deps của useEffect. */
 export function useInvalidateProfile() {
   const qc = useQueryClient()
-  const { session } = useSession()
-  return () => qc.invalidateQueries({ queryKey: profileQueryKey(session?.user.id) })
+  const uid = useSession().session?.user.id
+  return useCallback(() => qc.invalidateQueries({ queryKey: profileQueryKey(uid) }), [qc, uid])
 }

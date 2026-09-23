@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect } from 'react'
+import { Suspense, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import ProfileTab from '@/features/profile/components/ProfileTab'
@@ -19,11 +19,16 @@ function StravaResultNotice() {
   const params = useSearchParams()
   const router = useRouter()
   const invalidateProfile = useInvalidateProfile()
+  const handled = useRef<string | null>(null)
 
   useEffect(() => {
     const ok = params.get('strava_success')
     const err = params.get('strava_error')
     if (!ok && !err) return
+    // Chỉ xử lý mỗi kết quả một lần (URL chưa kịp đổi thì effect có thể chạy lại)
+    const key = params.toString()
+    if (handled.current === key) return
+    handled.current = key
     if (ok) {
       toast.success('Kết nối Strava thành công!')
       invalidateProfile()
