@@ -38,8 +38,8 @@ RARITIES = ['common', 'rare', 'epic', 'legendary']
 # Vùng mặc định để tìm món đồ (tỉ lệ x0, y0, x1, y1 của khung). Nới bằng --region nếu món đồ to hơn.
 REGIONS = {
     'hat': (0, 0, 1, 0.30), 'hair': (0, 0, 1, 0.36), 'glasses': (0.2, 0.08, 0.8, 0.28),
-    'watch': (0, 0.28, 1, 0.62), 'accessory': (0, 0.14, 1, 0.75), 'top': (0, 0.15, 1, 0.52),
-    'bottom': (0, 0.35, 1, 0.7), 'socks': (0, 0.74, 1, 0.93), 'shoes': (0, 0.78, 1, 1), 'effect': (0, 0, 1, 1),
+    'watch': (0, 0.28, 1, 0.62), 'accessory': (0, 0.14, 1, 0.75), 'top': (0, 0.14, 1, 0.56),
+    'bottom': (0, 0.34, 1, 0.72), 'socks': (0, 0.72, 1, 0.94), 'shoes': (0, 0.78, 1, 1), 'effect': (0, 0, 1, 1),
 }
 
 

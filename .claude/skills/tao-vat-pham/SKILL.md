@@ -15,6 +15,7 @@ Từ mô tả, chốt các thông tin sau. Chỉ hỏi lại khi thật sự mơ
 - `slot`: một trong `top`, `bottom`, `socks`, `shoes`, `accessory`, `watch`, `hair`, `glasses`, `hat`, `effect`.
 - **Kiểu vật phẩm:**
   - Chỉ đổi màu áo / quần / tất / giày → **TINT**, không cần ảnh. Nhảy tới bước 4 (SQL hoặc trang Quản trị với `color`).
+  - Kiểu áo / quần / tất / giày mới (ba lỗ, dài tay, áo gió, quần bó, váy, giày carbon…) → **LAYER** ở đúng ô đó. AI vẽ lại cả món. Mỗi màu là một món riêng.
   - Còn lại → **LAYER**.
 - `code`: `<slot>_<mô tả không dấu>`, chữ thường, số, `_`, 3–48 ký tự. Ví dụ `hat_cap_red`.
 - **Tên tiếng Việt:** ≤ 60 ký tự.
@@ -39,7 +40,7 @@ Không dùng lại mã đồ 3D cũ đã ngừng bán (xem `docs/vat-pham/HUONG_
   ```
 - **Chưa có ảnh:**
   1. Chạy `python3 scripts/character/make-layer.py prepare`.
-  2. Ghép prompt hoàn chỉnh từ `docs/vat-pham/PROMPT_AI.md`: mục 1 (khung) cộng mô tả mục 2, thay màu và chi tiết theo yêu cầu. Soát theo danh sách "Những lỗi hay gặp" ở mục 2 trước khi đưa prompt.
+  2. Lấy prompt hoàn chỉnh của đúng món trong `docs/vat-pham/PROMPT_AI.md`: mục 1–10 theo ô, thay màu và chi tiết trong `{ngoặc nhọn}`. Nếu món chưa có mẫu, viết theo cấu trúc của món gần nhất. Soát theo danh sách "Những lỗi hay gặp" ở mục 11. Ghi kèm `--slot`, `--region` gợi ý của món đó.
   3. Đưa người dùng: prompt, đường dẫn 2 ảnh `scripts/character/out/nhan_vat_*_1024x1536.png`, và dặn dùng tính năng chọn vùng nếu có.
   4. Dừng lại, chờ người dùng gửi ảnh AI.
 

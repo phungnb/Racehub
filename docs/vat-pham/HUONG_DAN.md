@@ -7,7 +7,7 @@ Tài liệu gồm 3 bước: **thiết kế → tách lớp → đưa lên shop*
 | Loại vật phẩm | Cách nhanh nhất | Cần gì |
 |---|---|---|
 | **Màu mới** cho áo / quần / tất / giày | Trang **Quản trị → Vật phẩm → Thêm → Đổi màu** | Chỉ chọn màu, không cần ảnh |
-| **Mũ, kính, đồng hồ, phụ kiện, hiệu ứng, logo CLB** | AI vẽ → `make-layer.py extract` → Quản trị tải PNG lên | Ảnh AI + máy có Python |
+| **Kiểu áo / quần / tất / giày mới, mũ, kính, đồng hồ, phụ kiện, tóc, hiệu ứng, áo CLB** | AI vẽ → `make-layer.py extract` → Quản trị tải PNG lên | Ảnh AI + máy có Python |
 | Họa sĩ vẽ tay | Họa sĩ giao PNG 900×1350 → `make-layer.py check` → Quản trị tải lên | File PNG đúng khung |
 | **Mũ / visor / băng đô theo màu** | Thêm một dòng vào `CATALOG` trong `scripts/character/items/headwear.py` rồi chạy script (vẽ theo hình khối đầu, có bóng và tóc mái) | Chỉ cần mã màu |
 | **Để AI làm hết** | Mở Claude Code, gõ `/tao-vat-pham mũ lưỡi trai đỏ` | Ảnh AI đã vẽ (hoặc mô tả món đồ) |
@@ -53,7 +53,7 @@ Bộ đồ đội đầu hiện có (16 món, ô `hat`) được vẽ bằng `sc
 ## 1b. Thiết kế bằng AI
 
 1. `python3 scripts/character/make-layer.py prepare`: lấy 2 ảnh nhân vật 1024×1536.
-2. Mở ChatGPT hoặc Gemini, đính kèm ảnh, dán prompt khung ở [PROMPT_AI.md](PROMPT_AI.md) mục 1, thay mô tả món đồ ở mục 2.
+2. Mở ChatGPT hoặc Gemini, đính kèm ảnh, dán prompt của đúng món trong [PROMPT_AI.md](PROMPT_AI.md). Mục 1–10 theo ô: áo, quần, tất, giày, đồ đội đầu, kính, đồng hồ, phụ kiện, tóc, hiệu ứng. Mỗi món ghi sẵn `--slot` và `--region`.
 3. Tải ảnh AI trả về. Làm cho cả Nam và Nữ.
 
 ## 2. Tách lớp

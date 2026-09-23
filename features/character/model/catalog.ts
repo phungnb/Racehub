@@ -48,7 +48,7 @@ export const baseUrl = (g: Gender) => `${CHARACTER_BASE}/${g}/base.webp`
 export const maskUrl = (g: Gender, slot: TintSlot) => `${CHARACTER_BASE}/${g}/${slot}.png`
 export const isTintSlot = (s: Slot): s is TintSlot => (TINT_SLOTS as readonly Slot[]).includes(s)
 
-/** Thứ tự ô trong tủ đồ, cũng là thứ tự xếp lớp ảnh (sau đè trước) */
+/** Thứ tự ô trong tủ đồ */
 export const SLOTS: { slot: Slot; label: string; icon: LucideIcon; required?: boolean }[] = [
   { slot: 'top', label: 'Áo', icon: Shirt, required: true },
   { slot: 'bottom', label: 'Quần', icon: Shirt, required: true },
@@ -104,11 +104,14 @@ export function layerUrl(item: Pick<CharacterItem, 'render_kind' | 'layer_urls'>
   return item.layer_urls[gender] ?? item.layer_urls[gender === 'male' ? 'female' : 'male'] ?? null
 }
 
+/** Thứ tự xếp lớp ảnh (sau đè trước): quần → tất → giày → áo (vạt áo, áo khoác nằm trên quần) → phụ kiện → ... */
+export const LAYER_ORDER: Slot[] = ['bottom', 'socks', 'shoes', 'top', 'accessory', 'watch', 'hair', 'glasses', 'hat', 'effect']
+
 /** Bộ đồ (mã theo ô) → danh sách món cần vẽ, theo thứ tự xếp lớp */
 export function resolveOutfit(items: CharacterItem[] | undefined, equipped: Partial<Record<Slot, string>>): CharacterItem[] {
   const byCode = new Map((items ?? []).map((i) => [i.code, i]))
   const out: CharacterItem[] = []
-  for (const { slot } of SLOTS) {
+  for (const slot of LAYER_ORDER) {
     const code = equipped[slot]
     const it = code ? byCode.get(code) : undefined
     if (it && it.slot === slot) out.push(it)

@@ -8,7 +8,7 @@ Nhân vật là **một ảnh thật** (nam hoặc nữ). App vẽ lên canvas t
 
 1. **Ảnh nền** `public/character/<male|female>/base.webp`.
 2. **Đổi màu vùng (TINT).** Mỗi vùng áo / quần / tất / giày có một **mặt nạ** xám cùng kích thước: trắng là vùng được đổi màu, đen là giữ nguyên, xám là trộn một phần (mép mềm). App lấy độ sáng từng điểm so với độ sáng trung bình của vùng rồi nhân vào màu mới, nên nếp vải, bóng đổ và ánh sáng vẫn giữ nguyên.
-3. **Xếp lớp (LAYER).** Ảnh PNG trong suốt cùng khung được vẽ chồng lên, theo thứ tự: áo, quần, tất, giày, phụ kiện, đồng hồ, tóc, kính, mũ, hiệu ứng. Dùng cho mũ, kính, áo CLB có logo…
+3. **Xếp lớp (LAYER).** Ảnh PNG trong suốt cùng khung được vẽ chồng lên, theo thứ tự: quần, tất, giày, áo (vạt áo và áo khoác nằm trên quần), phụ kiện, đồng hồ, tóc, kính, mũ, hiệu ứng. Dùng cho mũ, kính, áo CLB có logo…
 
 ## 2. Khung chuẩn: quy tắc để đồ không bị lệch
 

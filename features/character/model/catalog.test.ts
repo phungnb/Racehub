@@ -34,9 +34,10 @@ describe('nhân vật 2D — hàm thuần', () => {
   })
 
   it('bộ đồ → món cần vẽ theo thứ tự lớp, bỏ mã lạ hoặc sai ô', () => {
-    const items = [it0({ code: 'hat', slot: 'hat' }), it0({ code: 'top' }), it0({ code: 'shoes', slot: 'shoes' })]
-    expect(resolveOutfit(items, { hat: 'hat', top: 'top', shoes: 'shoes', socks: 'khong_co', bottom: 'top' }).map((i) => i.code))
-      .toEqual(['top', 'shoes', 'hat'])
+    const items = [it0({ code: 'hat', slot: 'hat' }), it0({ code: 'top' }), it0({ code: 'shoes', slot: 'shoes' }), it0({ code: 'tights', slot: 'bottom' })]
+    expect(resolveOutfit(items, { hat: 'hat', top: 'top', shoes: 'shoes', socks: 'khong_co', bottom: 'tights' }).map((i) => i.code))
+      .toEqual(['tights', 'shoes', 'top', 'hat'])                 // áo nằm trên quần
+    expect(resolveOutfit(items, { bottom: 'top' })).toEqual([])  // sai ô thì bỏ
   })
 
   it('trạng thái vật phẩm và phần thay đổi của bộ đồ', () => {
