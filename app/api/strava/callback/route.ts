@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { cookies } from 'next/headers'
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/shared/lib/supabase-server'
 import { OAUTH_NONCE_COOKIE, verifyOAuthState } from '@/shared/lib/oauth-state'
 import { getPublicOrigin } from '@/shared/lib/request-url'
 import { serverEnv } from '@/shared/config/env.server'
-import { exchangeStravaCode } from '@/features/integrations/strava/strava.server'
+import { exchangeStravaCode, syncStravaActivities } from '@/features/integrations/strava/strava.server'
 
 function back(origin: string, params: Record<string, string>) {
   const url = new URL('/me', origin)
@@ -63,6 +63,15 @@ export async function GET(request: Request) {
       console.error('[strava/callback] link_provider_connection:', error.message)
       return back(origin, { strava_error: 'server_error' })
     }
+    // Kéo luôn bài chạy 30 ngày gần nhất (chạy sau khi đã chuyển hướng người dùng)
+    after(async () => {
+      try {
+        const summary = await syncStravaActivities(admin, user.id)
+        console.info('[strava/callback] backfill', JSON.stringify(summary))
+      } catch (err) {
+        console.error('[strava/callback] backfill', err instanceof Error ? err.message : err)
+      }
+    })
     return back(origin, { strava_success: 'true' })
   } catch (err) {
     console.error('[strava/callback]', err instanceof Error ? err.message : err)

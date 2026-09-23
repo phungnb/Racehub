@@ -9,6 +9,7 @@
 | [database.md](./database.md) | Lược đồ CSDL (ERD), nguyên tắc RLS, sổ cái kép, kế hoạch migrate |
 | [schema.sql](./schema.sql) | DDL tham chiếu cho lược đồ đích (chưa phải migration, xem hướng dẫn trong file) |
 | [frontend.md](./frontend.md) | Kiến trúc frontend, design system, cấu trúc thư mục, chuẩn UI |
+| [benchmark.md](./benchmark.md) | So sánh với Strava, Garmin, NRC, UpRace…: khoảng trống theo module và lộ trình sprint |
 | [adr/](./adr/) | Các quyết định kiến trúc quan trọng (ADR-001 … ADR-011) |
 
 ---

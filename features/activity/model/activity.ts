@@ -8,6 +8,8 @@ export interface ActivitySummary {
   distanceM: number
   movingS: number
   status: string | null
+  source: string | null
+  reason: string | null
 }
 
 type Row = Record<string, unknown>
@@ -22,5 +24,7 @@ export function normalizeActivity(r: Row): ActivitySummary {
     distanceM: num(r.distance_m, r.distance),
     movingS: num(r.moving_time_s, r.time_s, r.moving_time, r.moving_s),
     status: str(r.validation_status, r.status),
+    source: str(r.source),
+    reason: str(r.validation_reason),
   }
 }

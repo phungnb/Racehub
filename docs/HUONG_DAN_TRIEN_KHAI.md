@@ -34,6 +34,7 @@ Chạy **3 file** trong `supabase/migrations/`, đúng thứ tự:
 | `20261001000100_emergency_lockdown.sql` | Khóa các lỗ hổng: thu hồi quyền gọi hàm nguy hiểm, bỏ các policy quá rộng, phân quyền theo cột, chuyển token Strava sang `connected_accounts` | **Có.** Nếu chưa deploy code mới được, hãy chạy file này trước |
 | `20261001000200_ledger_and_rewards.sql` | Sổ cái thống nhất (đối soát số dư đầu kỳ), thưởng bài chạy phía server có trần/ngày, tính lại cấp độ theo tài liệu | Cần file 100 |
 | `20261001000300_secure_rpcs.sql` | Viết lại các RPC: bài chạy GPS, tạo thử thách, quỹ CLB, giới thiệu bạn, duyệt bài, công cụ admin, kết nối Strava | Cần file 200 |
+| `20261001000400_provider_activity_ingest.sql` | Nhận bài chạy từ Strava: chống trùng, luật hợp lệ kiểu UpRace, thu hồi thưởng khi bài bị xóa | Cần file 300 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 
@@ -63,6 +64,29 @@ Số Xu hiện có của từng người **được giữ nguyên**: migration g
 Hệ thống an toàn ngay, nhưng các chức năng sau sẽ tạm lỗi cho đến khi chạy tiếp file 200, 300 và deploy code: lưu bài chạy GPS (bản cũ vốn đã lỗi với mọi bài hợp lệ), tạo thử thách, kết nối/hủy Strava, người dùng mới tự tạo hồ sơ.
 
 ## Bước 4 — Cấu hình Strava
+
+### 4a. Webhook Strava (bài chạy tự về, không cần bấm "Đồng bộ")
+Cần một địa chỉ **công khai** (domain production, hoặc cổng 3000 của Codespaces đặt *Public* trong tab Ports). Mỗi app Strava chỉ có **1** subscription, nên khi đổi domain phải xóa rồi tạo lại.
+
+```bash
+# 1. Tạo mã xác minh và thêm vào .env.local (hoặc biến môi trường trên Vercel)
+echo "STRAVA_WEBHOOK_VERIFY_TOKEN=$(openssl rand -hex 16)" >> .env.local
+# (khởi động lại app để nhận biến mới)
+
+# 2. Đăng ký (thay <domain>; lệnh đọc secret từ .env.local, không in ra màn hình)
+set -a; . ./.env.local; set +a
+curl -s -X POST https://www.strava.com/api/v3/push_subscriptions \
+  -F client_id=$NEXT_PUBLIC_STRAVA_CLIENT_ID -F client_secret=$STRAVA_CLIENT_SECRET \
+  -F callback_url=https://<domain>/api/webhooks/strava -F verify_token=$STRAVA_WEBHOOK_VERIFY_TOKEN
+# → {"id": 12345}  ⇒ thêm STRAVA_WEBHOOK_SUBSCRIPTION_ID=12345 vào biến môi trường
+
+# Xem / xóa subscription hiện có
+curl -s "https://www.strava.com/api/v3/push_subscriptions?client_id=$NEXT_PUBLIC_STRAVA_CLIENT_ID&client_secret=$STRAVA_CLIENT_SECRET"
+curl -s -X DELETE "https://www.strava.com/api/v3/push_subscriptions/<id>?client_id=$NEXT_PUBLIC_STRAVA_CLIENT_ID&client_secret=$STRAVA_CLIENT_SECRET"
+```
+Chưa đăng ký webhook thì app vẫn chạy: khi vừa kết nối Strava, app tự kéo 30 ngày gần nhất, và người dùng có thể bấm **Đồng bộ** ở Trang chủ.
+
+### 4b. Callback domain
 
 strava.com/settings/api → **Authorization Callback Domain** = domain của app (ví dụ `racehub.vn`, hoặc domain Codespaces/Vercel khi thử nghiệm). Đường dẫn callback giữ nguyên: `/api/strava/callback`.
 

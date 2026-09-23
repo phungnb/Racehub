@@ -6,6 +6,8 @@ import { listMyRecentActivities } from '../api/activities'
 import { Card, EmptyState, ErrorState, Skeleton } from '@/shared/ui'
 import { formatDuration, formatKm, formatPace, formatRelative, paceFrom } from '@/shared/lib/format'
 
+const SOURCE_LABEL: Record<string, string> = { STRAVA: 'Strava', DIRECT_GPS: 'GPS RaceHub', GARMIN: 'Garmin', COROS: 'COROS' }
+
 export function ActivityList({ userId }: { userId: string }) {
   const q = useQuery({ queryKey: ['activities', 'mine', userId], queryFn: () => listMyRecentActivities(userId) })
 
@@ -25,8 +27,13 @@ export function ActivityList({ userId }: { userId: string }) {
               <p className="truncate font-semibold">{a.title}</p>
               <p className="text-xs text-fg-subtle">
                 {formatRelative(a.startedAt)}
+                {a.source && <span className="ml-2">· {SOURCE_LABEL[a.source] ?? a.source}</span>}
                 {a.status === 'PENDING' && <span className="ml-2 rounded bg-warning/15 px-1.5 py-0.5 text-warning">Chờ xác thực</span>}
+                {a.status === 'REJECTED' && <span className="ml-2 rounded bg-danger/15 px-1.5 py-0.5 text-danger">Không hợp lệ</span>}
               </p>
+              {(a.status === 'PENDING' || a.status === 'REJECTED') && a.reason && (
+                <p className="mt-0.5 text-xs text-fg-muted">{a.reason}</p>
+              )}
             </div>
             <div className="shrink-0 text-right">
               <p className="font-mono tabular text-lg font-bold text-brand">{formatKm(a.distanceM)}<span className="ml-0.5 text-xs text-fg-muted">km</span></p>

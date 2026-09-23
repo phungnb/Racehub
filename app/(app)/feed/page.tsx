@@ -4,6 +4,7 @@ import { Users } from 'lucide-react'
 import { useMyProfile } from '@/features/auth/model/session'
 import { HomeSummary, ConnectDeviceCard } from '@/features/home/components/HomeSummary'
 import { ActivityList } from '@/features/activity/components/ActivityList'
+import { StravaSyncCard } from '@/features/integrations/strava/components/StravaSyncCard'
 import { EmptyState, SectionTitle, Skeleton } from '@/shared/ui'
 
 export default function FeedPage() {
@@ -21,7 +22,7 @@ export default function FeedPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <HomeSummary profile={profile} />
-      {!profile.strava_connected && <ConnectDeviceCard />}
+      {profile.strava_connected ? <StravaSyncCard /> : <ConnectDeviceCard />}
 
       <section>
         <SectionTitle>Hoạt động của bạn</SectionTitle>

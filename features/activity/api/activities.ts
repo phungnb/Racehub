@@ -8,7 +8,8 @@ export async function listMyRecentActivities(userId: string, limit = 10): Promis
     .from('activities')
     .select('*')
     .eq('user_id', userId)
-    .order('created_at', { ascending: false })
+    .neq('status', 'DELETED')
+    .order('started_at', { ascending: false, nullsFirst: false })
     .limit(limit)
   if (error) throw error
   return (data ?? []).map(normalizeActivity)
