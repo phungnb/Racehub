@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { Compass, Plus, Shield, Trophy } from 'lucide-react'
+import { ChevronRight, Compass, Flag, Plus, Shield, Trophy } from 'lucide-react'
 import { Button, EmptyState, ErrorState, SegmentedControl, Skeleton } from '@/shared/ui'
 import type { ChallengeTab } from '../api/challengeApi'
 import { useChallengeList } from '../hooks/useChallenge'
@@ -35,6 +35,13 @@ export function ChallengesScreen() {
         </div>
         <Link href="/challenges/new"><Button size="sm"><Plus className="size-4" aria-hidden />Tạo</Button></Link>
       </div>
+
+      <Link href="/races" className="flex items-center gap-3 rounded-[var(--radius-card)] border border-brand/30 bg-gradient-to-r from-brand/15 to-surface p-3 hover:border-brand/60">
+        <span className="grid size-10 place-items-center rounded-xl bg-brand/20 text-brand"><Flag className="size-5" aria-hidden /></span>
+        <span className="flex-1"><span className="block font-semibold">Giải chạy ảo</span>
+          <span className="block text-xs text-fg-muted">Đăng ký nhận BIB · 5K · 10K · Half · Full · giấy chứng nhận</span></span>
+        <ChevronRight className="size-5 text-fg-subtle" aria-hidden />
+      </Link>
 
       <SegmentedControl value={tab} onChange={setTab} options={TABS} />
 

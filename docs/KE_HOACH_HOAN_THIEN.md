@@ -176,8 +176,8 @@ Bảy tính năng **chỉ RaceHub có**. Đây là thứ để quảng bá, nên
 | Mã | Việc |
 |---|---|
 | SS-01 | Migration `000900_seasons`: `seasons`, vật phẩm giới hạn, BXH mùa |
-| SS-02 | **League CLB**: xếp hạng CLB theo km trung bình / thành viên hoạt động, chia hạng, lên xuống hạng cuối mùa |
-| SS-03 | Thử thách **CLB đấu CLB** (lời mời, chấp nhận, BXH hai phía) |
+| ✅ SS-02 | **Xếp hạng CLB** (migration 002600): tuần / tháng theo km trung bình mỗi thành viên, hạng Đồng → Kim cương. *Lên / xuống hạng theo mùa: chờ SS-01 (chưa làm mùa giải)* |
+| ✅ SS-03 | **CLB đấu CLB** (migration 002600): lời thách đấu, nhận / từ chối, tổng km hoặc km TB / thành viên, bảng hai phía + top 5 mỗi bên, tất toán + thông báo |
 | ◐ SS-04 | **Cửa hàng** (MH19) + **Tủ đồ** (MH26): ✅ nhân vật 2D từ ảnh thật, đổi màu áo/quần/tất/giày giữ nếp vải, Nam/Nữ, 35 bộ màu, thử trước khi mua, quà lên cấp (migration 000900 + 001000, ADR-017). Có trang Quản trị → Vật phẩm (tải lớp PNG, xem thử, ẩn/bán; migration 001200), công cụ tách lớp từ ảnh AI + bộ prompt (`docs/vat-pham/`). Đã có 16 món đồ đội đầu (mũ chạy, visor, băng đô; migration 001300, `scripts/character/items/headwear.py`). Còn: kính, áo CLB, vật phẩm theo mùa |
 | SS-05 | **Poster chia sẻ** (MH18): ảnh bài chạy / huy hiệu / kết quả thử thách, xuất ảnh cho Story |
 | SS-06 | Thử nghiệm **Expo** cho màn Chạy (GPS nền, giọng HLV): làm bản mẫu, chưa phát hành |
@@ -186,8 +186,8 @@ Bảy tính năng **chỉ RaceHub có**. Đây là thứ để quảng bá, nên
 
 | Mã | Việc |
 |---|---|
-| RV-01 | Gói **CLB Pro**: nhiều quản trị viên, báo cáo chuyên cần và quỹ, link mời riêng, không giới hạn album |
-| RV-02 | **Dashboard ban tổ chức** giải ảo: tạo giải, BIB (MH20), xuất CSV kết quả |
+| ◐ RV-01 | Gói **CLB Pro** (migration 002800): ✅ không giới hạn quản trị viên (miễn phí: 2), link mời riêng `/c/<slug>`, báo cáo chuyên cần CSV, admin bật / gia hạn. Còn: thanh toán trong app (RV-03), album không giới hạn |
+| ✅ RV-02 | **Giải chạy ảo** (migration 002700): tạo giải nhiều cự ly, đăng ký nhận BIB, tự ghi thành tích từ bài hợp lệ, kết quả theo cự ly, dashboard BTC + CSV, giấy chứng nhận |
 | RV-03 | Thanh toán (sau khi có ý kiến pháp lý theo ADR-011) |
 
 ## 5. Phụ thuộc giữa các việc

@@ -43,10 +43,10 @@ describe('Nhân vật 2D: tủ đồ & shop (000900 + 001000)', () => {
       equipped: { top: 'top_original', bottom: 'bottom_original', socks: 'socks_original', shoes: 'shoes_original' } })
     expect(Object.keys(m.equipped).sort()).toEqual(['bottom', 'shoes', 'socks', 'top'])
     expect(new Set(m.items.filter((i) => i.render_kind === 'TINT').map((i) => i.slot))).toEqual(new Set(['top', 'bottom', 'socks', 'shoes']))
-    // bộ đồ đội đầu (001300): 16 món lớp ảnh ở ô Mũ, có bản Nam + Nữ
-    const hats = m.items.filter((i) => i.render_kind === 'LAYER')
-    expect(hats).toHaveLength(16)
-    expect(hats.every((i) => i.slot === 'hat')).toBe(true)
+    // bộ đồ đội đầu (001300): 16 món + bộ CLB NBNR (002500): mũ, băng đô, áo, quần, tất — đều là lớp ảnh Nam + Nữ
+    const layers = m.items.filter((i) => i.render_kind === 'LAYER')
+    expect(layers.filter((i) => i.slot === 'hat')).toHaveLength(18)
+    expect(layers.filter((i) => i.code.includes('nbnr')).map((i) => i.slot).sort()).toEqual(['bottom', 'hat', 'hat', 'socks', 'top'])
     expect(m.items.find((i) => i.code === 'hat_cap_legend')).toMatchObject({ unlock_level: 5, price_xu: 0, owned: false })
     expect(m.items.find((i) => i.code === 'top_original')).toMatchObject({ owned: true, color: null })
     expect(m.items.find((i) => i.code === 'top_crop_coral')?.owned).toBe(true)          // bộ màu miễn phí ai cũng có

@@ -18,6 +18,8 @@ import { useClub, useClubMembers } from '../../hooks/useClub'
 import { clubKeys } from '../../hooks/keys'
 import { ClubAvatar } from '../hub/ClubAvatar'
 import { InvitePanel } from '../members/InvitePanel'
+import { ProSection } from './ProSection'
+import { proActive } from '../../model/roles'
 
 export function ClubSettingsScreen({ clubId }: { clubId: string }) {
   const { club, role, isStaff } = useClub(clubId)
@@ -26,6 +28,7 @@ export function ClubSettingsScreen({ clubId }: { clubId: string }) {
     <div className="space-y-8 pb-6">
       <InviteSection club={club} canRotate={role === 'OWNER'} />
       <NotificationSection clubId={clubId} />
+      {isStaff && <ProSection club={club} />}
       {isStaff && <ProfileSection club={club} />}
       {role === 'OWNER' && <PolicySection club={club} />}
       <DangerSection club={club} isOwner={role === 'OWNER'} />
@@ -142,6 +145,7 @@ function ProfileSection({ club }: { club: Club }) {
 }
 
 function InviteSection({ club, canRotate }: { club: Club; canRotate: boolean }) {
+  const [now] = useState(() => Date.now())
   const refresh = useRefreshClub(club.id)
   const [ask, setAsk] = useState(false)
   const rotate = useMutation({
@@ -153,7 +157,7 @@ function InviteSection({ club, canRotate }: { club: Club; canRotate: boolean }) 
     <section>
       <SectionTitle>Mời vào CLB</SectionTitle>
       <Card className="space-y-4">
-        <InvitePanel code={club.invite_code} name={club.name} />
+        <InvitePanel code={club.invite_code} name={club.name} slug={proActive(club, now) ? club.slug : null} />
         {canRotate && (
           <Button variant="ghost" block onClick={() => setAsk(true)}>
             <RefreshCw className="size-4" aria-hidden />Đổi mã mời (vô hiệu link và QR cũ)

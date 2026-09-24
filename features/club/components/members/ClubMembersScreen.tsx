@@ -8,7 +8,7 @@ import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Input, Leve
 import { cn } from '@/shared/lib/cn'
 import { formatRelative } from '@/shared/lib/format'
 import { clubErrorMessage, removeMember, setMemberRole, setMemberStatus, type ClubMember } from '../../api/clubApi'
-import { canManage, ROLE_LABEL } from '../../model/roles'
+import { canManage, proActive, ROLE_LABEL } from '../../model/roles'
 import { useClub, useClubMembers } from '../../hooks/useClub'
 import { clubKeys } from '../../hooks/keys'
 import { MenuItem } from '../feed/PostCard'
@@ -25,6 +25,7 @@ export function ClubMembersScreen({ clubId }: { clubId: string }) {
   const [menu, setMenu] = useState<ClubMember | null>(null)
   const [confirm, setConfirm] = useState<Pending>(null)
   const [invite, setInvite] = useState(false)
+  const [now] = useState(() => Date.now())
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: clubKeys.members(clubId) })
@@ -173,7 +174,7 @@ export function ClubMembersScreen({ clubId }: { clubId: string }) {
         confirmLabel={confirm?.kind === 'ban' ? 'Cấm' : 'Mời rời CLB'}
         onConfirm={() => confirm && act.mutate({ type: confirm.kind, m: confirm.m })} />
 
-      {club && <InviteSheet open={invite} onClose={() => setInvite(false)} code={club.invite_code} name={club.name} />}
+      {club && <InviteSheet open={invite} onClose={() => setInvite(false)} code={club.invite_code} name={club.name} slug={proActive(club, now) ? club.slug : null} />}
     </div>
   )
 }

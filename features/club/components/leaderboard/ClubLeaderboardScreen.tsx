@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Crown, Trophy } from 'lucide-react'
 import { Avatar, EmptyState, ErrorState, LevelBadge, SegmentedControl, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -8,6 +9,8 @@ import { formatDuration, formatKm } from '@/shared/lib/format'
 import type { LeaderboardPeriod, LeaderboardRow } from '../../api/hubApi'
 import { useClub } from '../../hooks/useClub'
 import { useClubLeaderboard } from '../../hooks/useLeaderboard'
+import { ClubBattles } from './ClubBattles'
+import { ClubRankings } from './ClubRankings'
 
 const PERIODS: { value: LeaderboardPeriod; label: string }[] = [
   { value: 'WEEK', label: 'Tuần này' },
@@ -15,7 +18,38 @@ const PERIODS: { value: LeaderboardPeriod; label: string }[] = [
   { value: 'ALL', label: 'Tất cả' },
 ]
 
+type View = 'members' | 'battles' | 'clubs'
+const VIEWS: { value: View; label: string }[] = [
+  { value: 'members', label: 'Thành viên' },
+  { value: 'battles', label: 'Đấu CLB' },
+  { value: 'clubs', label: 'Xếp hạng CLB' },
+]
+
+/** Tab BXH: thành viên trong CLB · CLB đấu CLB · xếp hạng CLB toàn hệ thống (?tab=battles|clubs từ thông báo) */
 export function ClubLeaderboardScreen({ clubId }: { clubId: string }) {
+  const sp = useSearchParams()
+  const initial = sp.get('tab') === 'battles' ? 'battles' : sp.get('tab') === 'clubs' ? 'clubs' : 'members'
+  const [view, setView] = useState<View>(initial)
+  const { isStaff } = useClub(clubId)
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]" role="tablist" aria-label="Bảng xếp hạng">
+        {VIEWS.map((v) => (
+          <button key={v.value} role="tab" aria-selected={view === v.value} onClick={() => setView(v.value)}
+            className={cn('shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-semibold',
+              view === v.value ? 'border-brand bg-brand text-brand-fg' : 'border-border text-fg-muted hover:text-fg')}>
+            {v.label}
+          </button>
+        ))}
+      </div>
+      {view === 'battles' ? <ClubBattles clubId={clubId} isStaff={isStaff} />
+        : view === 'clubs' ? <ClubRankings clubId={clubId} />
+        : <MemberLeaderboard clubId={clubId} />}
+    </div>
+  )
+}
+
+function MemberLeaderboard({ clubId }: { clubId: string }) {
   const { uid } = useClub(clubId)
   const [period, setPeriod] = useState<LeaderboardPeriod>('WEEK')
   const lb = useClubLeaderboard(clubId, period)
