@@ -168,9 +168,9 @@ export async function setClubAccent(clubId: string, color: string | null) {
   if (error) throw error
 }
 
-export async function updateClubPolicy(clubId: string, fields: { joinPolicy?: JoinPolicy; memberLimit?: number }): Promise<Club> {
+export async function updateClubPolicy(clubId: string, fields: { joinPolicy?: JoinPolicy }): Promise<Club> {
   const { data, error } = await supabase.rpc('update_club_policy', {
-    p_club_id: clubId, p_join_policy: fields.joinPolicy ?? null, p_member_limit: fields.memberLimit ?? null,
+    p_club_id: clubId, p_join_policy: fields.joinPolicy ?? null, p_member_limit: null,
   })
   if (error) throw error
   return data as Club

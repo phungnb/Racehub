@@ -17,12 +17,14 @@ import { accentOf, CLUB_ACCENTS, JOIN_POLICY_LABEL, type JoinPolicy } from '../.
 import { useClub, useClubMembers } from '../../hooks/useClub'
 import { clubKeys } from '../../hooks/keys'
 import { ClubAvatar } from '../hub/ClubAvatar'
+import { InvitePanel } from '../members/InvitePanel'
 
 export function ClubSettingsScreen({ clubId }: { clubId: string }) {
   const { club, role, isStaff } = useClub(clubId)
   if (!club) return <Skeleton className="h-64" />
   return (
     <div className="space-y-8 pb-6">
+      <InviteSection club={club} canRotate={role === 'OWNER'} />
       <NotificationSection clubId={clubId} />
       {isStaff && <ProfileSection club={club} />}
       {role === 'OWNER' && <PolicySection club={club} />}
@@ -118,7 +120,8 @@ function ProfileSection({ club }: { club: Club }) {
           <Textarea id="c-desc" value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={300} />
         </Field>
         <div>
-          <p className="mb-2 text-sm font-medium text-fg-muted">Màu CLB</p>
+          <p className="text-sm font-medium text-fg-muted">Màu CLB</p>
+          <p className="mb-2 text-xs text-fg-subtle">Nhận diện CLB: nền đầu trang CLB, gạch chân tab, tên người gửi trong chat và logo chữ khi chưa tải logo.</p>
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Màu CLB">
             {CLUB_ACCENTS.map((c) => {
               const on = accentOf(club) === c
@@ -138,23 +141,42 @@ function ProfileSection({ club }: { club: Club }) {
   )
 }
 
-function PolicySection({ club }: { club: Club }) {
+function InviteSection({ club, canRotate }: { club: Club; canRotate: boolean }) {
   const refresh = useRefreshClub(club.id)
-  const [limit, setLimit] = useState(String(club.member_limit))
-  const policy = useMutation({
-    mutationFn: (p: { joinPolicy?: JoinPolicy; memberLimit?: number }) => updateClubPolicy(club.id, p),
-    onSuccess: () => { toast.success('Đã lưu'); refresh() },
-    onError: (e) => toast.error(clubErrorMessage(e)),
-  })
+  const [ask, setAsk] = useState(false)
   const rotate = useMutation({
     mutationFn: () => rotateInviteCode(club.id),
-    onSuccess: () => { toast.success('Đã đổi mã mời. Link cũ không còn dùng được.'); refresh() },
+    onSuccess: () => { toast.success('Đã đổi mã mời. Link và QR cũ không còn dùng được.'); setAsk(false); refresh() },
+    onError: (e) => toast.error(clubErrorMessage(e)),
+  })
+  return (
+    <section>
+      <SectionTitle>Mời vào CLB</SectionTitle>
+      <Card className="space-y-4">
+        <InvitePanel code={club.invite_code} name={club.name} />
+        {canRotate && (
+          <Button variant="ghost" block onClick={() => setAsk(true)}>
+            <RefreshCw className="size-4" aria-hidden />Đổi mã mời (vô hiệu link và QR cũ)
+          </Button>
+        )}
+      </Card>
+      <ConfirmSheet open={ask} onClose={() => setAsk(false)} onConfirm={() => rotate.mutate()} loading={rotate.isPending}
+        title="Đổi mã mời?" description="Link và mã QR đã gửi trước đây sẽ không dùng được nữa. Thành viên hiện tại không bị ảnh hưởng." confirmLabel="Đổi mã" />
+    </section>
+  )
+}
+
+function PolicySection({ club }: { club: Club }) {
+  const refresh = useRefreshClub(club.id)
+  const policy = useMutation({
+    mutationFn: (p: { joinPolicy?: JoinPolicy }) => updateClubPolicy(club.id, p),
+    onSuccess: () => { toast.success('Đã lưu'); refresh() },
     onError: (e) => toast.error(clubErrorMessage(e)),
   })
   return (
     <section>
       <SectionTitle>Tham gia CLB</SectionTitle>
-      <Card className="space-y-4">
+      <Card>
         <div role="radiogroup" aria-label="Chế độ tham gia" className="space-y-2">
           {(Object.keys(JOIN_POLICY_LABEL) as JoinPolicy[]).map((p) => {
             const on = club.join_policy === p
@@ -168,17 +190,6 @@ function PolicySection({ club }: { club: Club }) {
             )
           })}
         </div>
-        <form className="flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); policy.mutate({ memberLimit: Number(limit) }) }}>
-          <div className="flex-1">
-            <Field label="Số thành viên tối đa" htmlFor="c-limit" hint="Từ 2 đến 1000">
-              <Input id="c-limit" inputMode="numeric" value={limit} onChange={(e) => setLimit(e.target.value.replace(/\D/g, '').slice(0, 4))} />
-            </Field>
-          </div>
-          <Button type="submit" variant="secondary" disabled={Number(limit) === club.member_limit || !limit} className="mb-[22px]">Lưu</Button>
-        </form>
-        <Button variant="secondary" block onClick={() => rotate.mutate()} loading={rotate.isPending}>
-          <RefreshCw className="size-4" aria-hidden />Đổi mã mời (vô hiệu link cũ)
-        </Button>
       </Card>
     </section>
   )

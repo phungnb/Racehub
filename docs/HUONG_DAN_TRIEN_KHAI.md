@@ -54,6 +54,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001001800_onboarding.sql` | **Màn chào mừng người mới** (hồ sơ → Strava → CLB → thông báo). Tài khoản đang có được coi là đã xong, chỉ người đăng ký mới thấy | Cần file 1700 |
 | `20261001001900_activity_detail.sql` | **Chi tiết bài chạy:** lưu tuyến chạy + từng km (từ Strava), trang `/activities/<id>` có bản đồ, nhịp tim, so sánh với bài trước; ảnh chia sẻ. Bản đồ của người khác vẫn theo cài đặt quyền riêng tư (mặc định riêng tư) | Cần file 1800 |
 | `20261001002000_challenge_pledges.sql` | **Mục tiêu tự đăng ký:** thử thách tuần của CLB (mỗi người chọn mốc 21/42/60/100 km…, xếp hạng theo % mục tiêu) và đua đội theo mục tiêu (đăng ký km → quản trị chia đội cân bằng hoặc ngẫu nhiên, giới hạn % chạy vượt được tính) | Cần file 1900 |
+| `20261001002100_club_no_member_limit.sql` | **Bỏ giới hạn thành viên CLB:** CLB không còn số thành viên tối đa (cài đặt CLB đã bỏ ô này) | Chạy độc lập |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 
