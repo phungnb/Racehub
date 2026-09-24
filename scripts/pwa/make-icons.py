@@ -114,7 +114,8 @@ def main():
     # Biểu tượng trong suốt để đặt trong giao diện (thanh trên, màn chào)
     save(render(scaled(base, 0.96), bg=False, glow=False), 256, f'{V}-mark-256.png', rgb=False)
     # favicon.ico (16/32/48)
-    fav = render(scaled(base, 0.78)).convert('RGB')
+    # Phải là RGBA: trình dựng của Next.js (Turbopack) không đọc được .ico chứa PNG RGB
+    fav = render(scaled(base, 0.78)).convert('RGBA')
     fav.resize((48, 48), Image.LANCZOS).save(ROOT / 'app' / 'favicon.ico', sizes=[(16, 16), (32, 32), (48, 48)])
     print('Đã ghi icon vào', OUT)
 
