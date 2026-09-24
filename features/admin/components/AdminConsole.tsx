@@ -36,10 +36,10 @@ export function AdminConsole() {
         <h1 className="text-2xl font-bold">Quản trị RaceHub</h1>
         <p className="text-sm text-fg-muted">Điều phối Xu, vé tạo thử thách, chính sách kinh tế và vật phẩm</p>
       </div>
-      <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]" role="tablist" aria-label="Khu vực quản trị">
+      <nav className="flex flex-wrap gap-2" role="tablist" aria-label="Khu vực quản trị">
         {TABS.map((t) => (
           <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}
-            className={cn('flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-semibold',
+            className={cn('flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold',
               tab === t.id ? 'border-brand bg-brand text-brand-fg' : 'border-border text-fg-muted hover:text-fg')}>
             <t.icon className="size-4" aria-hidden />{t.label}
           </button>

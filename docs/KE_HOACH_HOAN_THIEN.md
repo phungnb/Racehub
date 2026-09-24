@@ -148,7 +148,7 @@ Bảy tính năng **chỉ RaceHub có**. Đây là thứ để quảng bá, nên
 | ✅ GM-07 | **Tổng kết sau chạy** (MH17) có `RewardCascade`; bỏ qua được; tôn trọng giảm chuyển động | UI | Có tối đa 6 thẻ, tổng ≤ 6 giây |
 | ✅ GM-08 | **Cổ vũ có giá trị**: tặng 1–10 Xu kèm lời, trần 50 Xu/ngày | DB·UI | Không cổ vũ chính mình; có trong lịch sử ví của cả hai bên |
 | ✅ GM-09 | **Ví Xu** (MH25): số dư BONUS / PAID, lịch sử từ sổ cái, lọc theo loại | UI | Tổng lịch sử khớp số dư |
-| GM-10 | **Chi tiết bài chạy** (MH6): bản đồ (MapLibre, ẩn 200 m đầu và cuối), splits, nhịp tim, PB, bài đã tính vào thử thách nào | UI | Bài Strava có bản đồ; bài không có GPS hiện lý do |
+| ✅ GM-10 | **Chi tiết bài chạy** (MH6): bản đồ (MapLibre, ẩn 200 m đầu và cuối), splits, nhịp tim, PB, bài đã tính vào thử thách nào | UI | Bài Strava có bản đồ; bài không có GPS hiện lý do |
 | ✅ GM-11 | **Huy hiệu và danh hiệu** trong trang Tôi | UI | Huy hiệu chưa mở hiện mờ, kèm điều kiện mở |
 | QA-4 | Beta kín: 300 người, 5 CLB, đo D7 | QA | D7 ≥ 35%; không lỗi P0 mở quá 24 giờ |
 
@@ -179,7 +179,7 @@ Bảy tính năng **chỉ RaceHub có**. Đây là thứ để quảng bá, nên
 | ✅ SS-02 | **Xếp hạng CLB** (migration 002600): tuần / tháng theo km trung bình mỗi thành viên, hạng Đồng → Kim cương. *Lên / xuống hạng theo mùa: chờ SS-01 (chưa làm mùa giải)* |
 | ✅ SS-03 | **CLB đấu CLB** (migration 002600): lời thách đấu, nhận / từ chối, tổng km hoặc km TB / thành viên, bảng hai phía + top 5 mỗi bên, tất toán + thông báo |
 | ◐ SS-04 | **Cửa hàng** (MH19) + **Tủ đồ** (MH26): ✅ nhân vật 2D từ ảnh thật, đổi màu áo/quần/tất/giày giữ nếp vải, Nam/Nữ, 35 bộ màu, thử trước khi mua, quà lên cấp (migration 000900 + 001000, ADR-017). Có trang Quản trị → Vật phẩm (tải lớp PNG, xem thử, ẩn/bán; migration 001200), công cụ tách lớp từ ảnh AI + bộ prompt (`docs/vat-pham/`). Đã có 16 món đồ đội đầu (mũ chạy, visor, băng đô; migration 001300, `scripts/character/items/headwear.py`). Còn: kính, áo CLB, vật phẩm theo mùa |
-| SS-05 | **Poster chia sẻ** (MH18): ảnh bài chạy / huy hiệu / kết quả thử thách, xuất ảnh cho Story |
+| ✅ SS-05 | **Poster chia sẻ** (MH18): ảnh bài chạy / huy hiệu / kết quả thử thách, xuất ảnh cho Story |
 | SS-06 | Thử nghiệm **Expo** cho màn Chạy (GPS nền, giọng HLV): làm bản mẫu, chưa phát hành |
 
 ### Sprint 7: Doanh thu (14/12 → 25/12) · Mốc M6
