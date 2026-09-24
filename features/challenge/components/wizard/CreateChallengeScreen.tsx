@@ -15,11 +15,12 @@ import { capacityTier, creationFee, DEFAULT_POLICY, runPolicyText, xuToVnd } fro
 import { routes } from '@/shared/config/routes'
 import { challengeErrorMessage, createChallenge, quoteChallenge, setChallengeOptions, setChallengePledge, type ChallengeQuote } from '../../api/challengeApi'
 import {
-  AUDIENCE_LABEL, defaultDraft, effectiveSlots, FORMAT_META, formatScore, OBJECTIVE_META, pledgePayload, pledgeSupported, rewardSummary,
+  AUDIENCE_LABEL, defaultDraft, draftFromTemplate, effectiveSlots, FORMAT_META, formatScore, OBJECTIVE_META, pledgePayload, pledgeSupported, rewardSummary,
   isTeamPledge, TEAM_MODE_META, validateDraft, weeklyPreset,
   type Audience, type ChallengeDraft, type ChallengeFormat, type DraftErrors, type Objective, type TeamMode,
 } from '../../model/challenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
+import { TemplatePicker } from './TemplatePicker'
 
 const STEPS = ['Loại', 'Luật chơi', 'Thời gian & thưởng', 'Xem lại'] as const
 const DAY = 86_400_000
@@ -117,6 +118,13 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
         ))}
       </ol>
 
+      {step === 0 && (
+        <TemplatePicker onPick={(t) => {
+          setD(draftFromTemplate(t, staffClubs.map((c) => c.club_id)))
+          setErrors({})
+          toast.success(`Đã chép luật từ "${t.title}" — kiểm tra lại rồi tạo`)
+        }} />
+      )}
       {step === 0 && <StepType d={d} set={set} errors={errors} staffClubs={staffClubs} />}
       {step === 1 && <StepRules d={d} set={set} errors={errors} />}
       {step === 2 && <StepTime d={d} set={set} errors={errors} balance={balance} quote={quote.data} />}

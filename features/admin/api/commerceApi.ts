@@ -2,6 +2,7 @@
 import { supabase } from '@/shared/lib/supabase'
 import { toOrder, type Order, type OrderStatus } from '@/features/billing'
 import type { AccountKind } from './adminApi'
+import type { MetricsMonth } from '../model/metrics'
 
 async function call<T>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
   const { data, error } = await supabase.rpc(fn, args)
@@ -41,3 +42,11 @@ export const listGifts = async () => ((await call<AdminGift[]>('admin_list_gifts
   ...g, price_xu: Number(g.price_xu), vip_tier: Number(g.vip_tier), sort: Number(g.sort), sent_30d: Number(g.sent_30d ?? 0), burn_30d: Number(g.burn_30d ?? 0),
 }))
 export const saveGift = (g: Omit<AdminGift, 'sent_30d' | 'burn_30d'>) => call<void>('admin_save_gift', { p: g })
+
+
+export interface EconomyMetrics { months: MetricsMonth[]; snapshot: { supply: number; holders: number; median_balance: number; p90_balance: number } }
+export async function getEconomyMetrics(months: number): Promise<EconomyMetrics> {
+  const r = await call<{ months: Record<string, unknown>[]; snapshot: Record<string, unknown> }>('admin_economy_metrics', { p_months: months })
+  const num = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, k === 'month' ? v : v === null ? null : Number(v)]))
+  return { months: (r.months ?? []).map((m) => num(m) as unknown as MetricsMonth), snapshot: num(r.snapshot ?? {}) as unknown as EconomyMetrics['snapshot'] }
+}

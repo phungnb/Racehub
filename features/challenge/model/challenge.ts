@@ -335,3 +335,35 @@ export function rewardSummary(c: { reward_xu?: number | string | null; reward_sp
     default: return `${amount} cho người về nhất`
   }
 }
+
+/** Dựng bản nháp từ một thử thách cũ (mẫu): giữ luật chơi, dời thời gian về từ giờ tới + đúng số ngày cũ */
+export function draftFromTemplate(t: {
+  title: string; description: string | null; format: string; objective: string | null; game_mode: string | null; target_value: number | string
+  min_km: number | string | null; min_pace: number | string | null; max_pace: number | string | null; daily_cap_km: number | string | null
+  require_hr: boolean; max_slots: number; audience: string; club_id: string | null; team_size: number | null; reward_xu: number | string
+  reward_split: string | null; days: number
+  pledge: { enabled: boolean; options: (number | string)[]; min_km: number | string | null; max_km: number | string | null; cap_pct: number | string | null; team_size: number | null }
+  team_names: string[]
+}, allowedClubs: string[], now = new Date()): ChallengeDraft {
+  const base = defaultDraft(now, null)
+  const num = (v: unknown, d: number) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Number(v))
+  const format = (['SOLO_GOAL', 'RANKED', 'TEAM', 'DUEL', 'COLLECTIVE'] as string[]).includes(t.format) ? (t.format as ChallengeFormat) : base.format
+  const club = t.audience === 'CLUB_ONLY' && t.club_id && allowedClubs.includes(t.club_id) ? t.club_id : null
+  const start = new Date(base.start)
+  return {
+    ...base, format, title: t.title, description: t.description ?? '',
+    audience: club ? 'CLUB_ONLY' : t.audience === 'INVITE_ONLY' ? 'INVITE_ONLY' : 'PUBLIC', clubId: club,
+    objective: (t.objective as Objective) ?? base.objective, gameMode: (t.game_mode as TeamMode) ?? base.gameMode,
+    targetValue: num(t.target_value, 0), minKm: num(t.min_km, base.minKm), minPace: num(t.min_pace, base.minPace), maxPace: num(t.max_pace, base.maxPace),
+    dailyCapKm: num(t.daily_cap_km, 0), requireHr: !!t.require_hr,
+    teamNames: t.team_names.length ? t.team_names : base.teamNames, teamSize: num(t.team_size, 0), maxSlots: num(t.max_slots, base.maxSlots),
+    end: new Date(start.getTime() + Math.max(1, num(t.days, 7)) * DAY).toISOString(),
+    rewardXu: club ? num(t.reward_xu, 0) : 0, rewardSource: club ? 'CLUB' : 'NONE',
+    rewardSplit: t.reward_split === 'TOP3' ? 'TOP3' : 'WINNER',
+    pledge: t.pledge?.enabled ? {
+      enabled: true, options: (t.pledge.options ?? []).map(Number), minKm: num(t.pledge.min_km, DEFAULT_PLEDGE.minKm),
+      maxKm: num(t.pledge.max_km, DEFAULT_PLEDGE.maxKm), capPct: t.pledge.cap_pct === null ? null : num(t.pledge.cap_pct, 20),
+      teamSize: num(t.pledge.team_size, DEFAULT_PLEDGE.teamSize),
+    } : { ...DEFAULT_PLEDGE },
+  }
+}

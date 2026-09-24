@@ -190,6 +190,21 @@ export async function quoteChallenge(d: ChallengeDraft): Promise<ChallengeQuote>
   }
 }
 
+/** Thử thách mình đã tạo, dùng làm mẫu (VIP2 — migration 004000) */
+export interface ChallengeTemplate {
+  id: string; title: string; description: string | null; format: string; objective: string | null; game_mode: string | null
+  target_value: number; min_km: number | null; min_pace: number | null; max_pace: number | null; daily_cap_km: number | null
+  require_hr: boolean; max_slots: number; audience: string; club_id: string | null; team_size: number | null
+  reward_xu: number; reward_split: string | null; days: number; start_date: string; status: string
+  pledge: { enabled: boolean; options: number[]; min_km: number | null; max_km: number | null; cap_pct: number | null; team_size: number | null }
+  team_names: string[]
+}
+export async function getChallengeTemplates(): Promise<ChallengeTemplate[]> {
+  const { data, error } = await supabase.rpc('my_challenge_templates')
+  if (error) throw error
+  return (data ?? []) as ChallengeTemplate[]
+}
+
 export async function joinChallenge(id: string, code?: string | null, teamId?: string | null) {
   const { error } = await supabase.rpc('join_challenge', { p_challenge_id: id, p_code: code ?? null, p_team_id: teamId ?? null })
   if (error) throw error
@@ -268,6 +283,7 @@ export async function setChallengePledge(id: string, p: ReturnType<typeof pledge
 }
 
 const MESSAGES: Record<string, string> = {
+  VIP_REQUIRED: 'Nhân bản thử thách cũ dành cho VIP2 trở lên.',
   REWARD_NOT_ALLOWED: 'Chỉ thử thách CLB mới treo thưởng được (trích quỹ CLB). Thử thách cá nhân không treo thưởng Xu.',
   PLEDGES_MISSING: 'Còn thành viên chưa đăng ký mục tiêu. Nhắc họ, hoặc chia đội luôn (người chưa đăng ký tính 0 km).',
   PLEDGE_LOCKED: 'Mục tiêu đã khóa (đã xuất phát hoặc đã chia đội).',

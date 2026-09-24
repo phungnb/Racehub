@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Activity, CheckCircle2, Flag, Gift, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Tags, Ticket, type LucideIcon } from 'lucide-react'
+import { Activity, BarChart3, CheckCircle2, Flag, Gift, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Tags, Ticket, type LucideIcon } from 'lucide-react'
 import { ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { adminErrorMessage } from '../api/adminApi'
@@ -17,11 +17,13 @@ import { SystemTab } from './SystemTab'
 import { OrdersTab } from './commerce/OrdersTab'
 import { PlansTab } from './commerce/PlansTab'
 import { GiftsTab, OrganizersTab } from './commerce/GiftsTab'
+import { MetricsTab } from './commerce/MetricsTab'
 import { CupReviewList } from '@/features/cup'
 
-type Tab = 'overview' | 'orders' | 'plans' | 'grant' | 'passes' | 'policy' | 'gifts' | 'organizers' | 'items' | 'review' | 'clubs' | 'cups' | 'system'
+type Tab = 'overview' | 'metrics' | 'orders' | 'plans' | 'grant' | 'passes' | 'policy' | 'gifts' | 'organizers' | 'items' | 'review' | 'clubs' | 'cups' | 'system'
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
+  { id: 'metrics', label: 'Chỉ số', icon: BarChart3 },
   { id: 'orders', label: 'Đơn hàng', icon: Receipt },
   { id: 'plans', label: 'Gói & giá', icon: Tags },
   { id: 'grant', label: 'Cộng/Trừ Xu', icon: Coins },
@@ -58,6 +60,7 @@ export function AdminConsole() {
       </nav>
 
       {tab === 'system' ? <SystemTab />
+        : tab === 'metrics' ? <MetricsTab />
         : tab === 'orders' ? <OrdersTab />
         : tab === 'plans' ? <PlansTab />
         : tab === 'gifts' ? <GiftsTab />

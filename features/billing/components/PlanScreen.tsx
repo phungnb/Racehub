@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Check, Coins, Crown, Receipt, Ticket } from 'lucide-react'
+import Link from 'next/link'
+import { Check, ChevronRight, Coins, Crown, Receipt, Ticket } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, ErrorState, SectionTitle, SegmentedControl, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -105,6 +106,12 @@ export function PlanScreen() {
           </>
         )}
       </Card>
+
+      {plan?.plan_code.startsWith('VIP') && (
+        <Link href={routes.insights} className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-3 text-sm font-semibold">
+          Mở Phân tích của tôi (quyền lợi VIP)<ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+        </Link>
+      )}
 
       <SegmentedControl value={tab} onChange={setTab} options={[{ value: 'vip', label: 'Gói VIP' }, { value: 'xu', label: 'Nạp Xu' }]} />
 
