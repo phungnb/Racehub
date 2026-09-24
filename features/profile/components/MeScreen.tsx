@@ -1,0 +1,172 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
+import Link from 'next/link'
+import { ChevronRight, Coins, Copy, Gift, Pencil, Settings, Share2, Watch } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button, Card, LevelBadge, ProgressBar, SegmentedControl, Skeleton } from '@/shared/ui'
+import { formatCoin, formatKm, formatNumber } from '@/shared/lib/format'
+import { routes } from '@/shared/config/routes'
+import { levelProgress } from '@/features/progression'
+import { CharacterHub } from '@/features/character'
+import { BadgeGrid } from '@/features/game'
+import { getAthleteProfile } from '../api/athleteApi'
+import { AvatarPicker } from './AvatarPicker'
+import type { Profile } from '@/shared/types/profile'
+
+type Tab = 'character' | 'overview' | 'badges'
+const TABS: { value: Tab; label: string }[] = [
+  { value: 'character', label: 'Nhân vật' },
+  { value: 'overview', label: 'Tổng quan' },
+  { value: 'badges', label: 'Huy hiệu' },
+]
+const isTab = (v: string | null): v is Tab => TABS.some((t) => t.value === v)
+
+function StatCell({ label, km, runs }: { label: string; km: number; runs?: number }) {
+  return (
+    <div className="px-2 py-3 text-center">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-fg-subtle">{label}</p>
+      <p className="font-mono tabular text-xl font-bold">{formatKm(km)}</p>
+      <p className="text-xs text-fg-muted">km{runs !== undefined ? ` · ${runs} buổi` : ''}</p>
+    </div>
+  )
+}
+
+function Header({ profile }: { profile: Profile }) {
+  const p = levelProgress(profile.xp, profile.level)
+  const q = useQuery({ queryKey: ['athlete', profile.id], queryFn: () => getAthleteProfile(profile.id) })
+  const s = q.data?.stats
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="flex items-center gap-4 bg-gradient-to-br from-brand/15 via-transparent to-transparent p-4">
+        <AvatarPicker userId={profile.id} avatarUrl={profile.avatar_url} name={profile.display_name} size="md" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-2">
+            <h1 className="min-w-0 flex-1 truncate text-xl font-bold">{profile.display_name || 'Runner'}</h1>
+            <Link href={routes.settings} aria-label="Cài đặt"
+              className="-mr-2 -mt-2 grid size-11 shrink-0 place-items-center rounded-full text-fg-muted hover:bg-surface-2 hover:text-fg">
+              <Settings className="size-5" aria-hidden />
+            </Link>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-fg-muted">
+            <LevelBadge level={p.current.level} /> <span className="truncate">{p.current.name}</span>
+          </div>
+          <Link href={routes.wallet} aria-label="Mở ví Xu"
+            className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-coin/40 bg-coin/10 px-3 text-sm font-semibold text-coin hover:bg-coin/15">
+            <Coins className="size-4" aria-hidden /><span className="font-mono">{formatCoin(profile.xu)}</span> Xu
+            <ChevronRight className="size-4" aria-hidden />
+          </Link>
+          <div className="mt-2 space-y-1">
+            <ProgressBar value={p.value} max={p.span} tone="xp" />
+            <p className="text-xs text-fg-subtle">
+              {p.next ? <>Còn <span className="font-mono tabular text-fg">{formatNumber(p.remaining)}</span> XP lên {p.next.name}</> : 'Cấp cao nhất'}
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 divide-x divide-border border-t border-border">
+        {q.isPending ? (
+          <><Skeleton className="m-3 h-12" /><Skeleton className="m-3 h-12" /><Skeleton className="m-3 h-12" /></>
+        ) : (
+          <>
+            <StatCell label="Tuần này" km={s?.week.distance_m ?? 0} runs={s?.week.count ?? 0} />
+            <StatCell label="Tháng này" km={s?.month.distance_m ?? 0} runs={s?.month.count ?? 0} />
+            <StatCell label="Tổng" km={s?.all.distance_m ?? 0} runs={s?.all.count ?? 0} />
+          </>
+        )}
+      </div>
+    </Card>
+  )
+}
+
+function Devices({ profile }: { profile: Profile }) {
+  const [busy, setBusy] = useState(false)
+  const disconnect = async () => {
+    setBusy(true)
+    const res = await fetch('/api/connect/strava/disconnect', { method: 'POST' })
+    setBusy(false)
+    if (!res.ok) { toast.error('Không hủy được kết nối Strava. Thử lại sau.'); return }
+    toast.success('Đã hủy kết nối Strava')
+    window.location.reload()
+  }
+  return (
+    <ul className="divide-y divide-border">
+      <li className="flex items-center gap-3 py-3">
+        <span className="grid size-9 place-items-center rounded-lg bg-[#fc4c02]/15 font-black text-[#fc4c02]" aria-hidden>S</span>
+        <div className="flex-1">
+          <p className="font-semibold">Strava</p>
+          <p className="text-xs text-fg-muted">{profile.strava_connected ? 'Đã kết nối · bài chạy tự đồng bộ' : 'Nhận bài chạy từ Garmin, COROS, Apple Watch…'}</p>
+        </div>
+        {profile.strava_connected
+          ? <Button size="sm" variant="secondary" loading={busy} onClick={disconnect}>Ngắt</Button>
+          : <a href="/api/connect/strava"><Button size="sm">Kết nối</Button></a>}
+      </li>
+      {['Garmin Connect', 'COROS', 'Apple Health'].map((n) => (
+        <li key={n} className="flex items-center gap-3 py-3 opacity-60">
+          <span className="grid size-9 place-items-center rounded-lg bg-surface-2"><Watch className="size-4" aria-hidden /></span>
+          <p className="flex-1 font-semibold">{n}</p>
+          <span className="rounded-full bg-surface-2 px-2.5 py-1 text-xs text-fg-subtle">Sắp có</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function Invite({ profile }: { profile: Profile }) {
+  const link = typeof window !== 'undefined' ? `${window.location.origin}/join/${profile.id}` : ''
+  const share = async () => {
+    if (navigator.share) {
+      await navigator.share({ title: 'Chạy cùng mình trên RaceHub', url: link }).catch(() => undefined)
+    } else {
+      await navigator.clipboard.writeText(link)
+      toast.success('Đã sao chép link mời')
+    }
+  }
+  return (
+    <div className="flex items-center gap-3">
+      <span className="grid size-10 place-items-center rounded-xl bg-coin/15 text-coin"><Gift className="size-5" aria-hidden /></span>
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold">Mời bạn bè</p>
+        <p className="text-xs text-fg-muted">Bạn nhận thưởng Xu khi bạn bè chạy đủ 3 km đầu tiên.</p>
+      </div>
+      <Button size="sm" variant="secondary" onClick={share} aria-label="Chia sẻ link mời">
+        {typeof navigator !== 'undefined' && 'share' in navigator ? <Share2 className="size-4" /> : <Copy className="size-4" />}
+      </Button>
+    </div>
+  )
+}
+
+function Row({ icon: Icon, children }: { icon: typeof Pencil; children: React.ReactNode }) {
+  return <div className="flex items-center gap-2 text-sm font-semibold text-fg-muted"><Icon className="size-4" aria-hidden />{children}</div>
+}
+
+export function MeScreen({ profile }: { profile: Profile }) {
+  const params = useSearchParams()
+  const router = useRouter()
+  const fromUrl = params.get('tab')
+  const tab: Tab = isTab(fromUrl) ? fromUrl : 'character'
+  // Tab nằm trên URL để thông báo mở đúng chỗ (/me?tab=badges); mở trang Tôi là thấy nhân vật trước
+  const setTab = (t: Tab) => router.replace(t === 'character' ? routes.me : `${routes.me}?tab=${t}`, { scroll: false })
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <Header profile={profile} />
+      <SegmentedControl value={tab} onChange={setTab} options={TABS} />
+
+      {tab === 'badges' && <BadgeGrid />}
+
+      {tab === 'overview' && (
+        <div className="space-y-3">
+          <Card><Invite profile={profile} /></Card>
+          <Card className="space-y-1">
+            <Row icon={Watch}>Thiết bị & nguồn dữ liệu</Row>
+            <Devices profile={profile} />
+          </Card>
+        </div>
+      )}
+
+      {tab === 'character' && <CharacterHub />}
+    </div>
+  )
+}

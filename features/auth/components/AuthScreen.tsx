@@ -127,16 +127,16 @@ export default function AuthScreen({ onAuthSuccess }: { onAuthSuccess: () => voi
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6">
+    <div className="min-h-screen bg-bg flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-surface border border-border rounded-3xl p-8 shadow-2xl space-y-6">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-black text-orange-500 tracking-wider">
+          <h1 className="text-3xl font-black text-brand tracking-wider">
             RACEHUB{' '}
-            <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full align-middle">
+            <span className="text-xs bg-brand/20 text-brand px-2 py-0.5 rounded-full align-middle">
               v1.0
             </span>
           </h1>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-fg-muted">
             {mode === 'login' && 'Chào mừng trở lại đường đua!'}
             {mode === 'register' && 'Tạo tài khoản để bắt đầu chinh phục'}
             {mode === 'forgot' && 'Khôi phục mật khẩu của bạn'}
@@ -145,12 +145,12 @@ export default function AuthScreen({ onAuthSuccess }: { onAuthSuccess: () => voi
 
         {/* Tab chỉ hiện ở login/register, ẩn khi ở forgot */}
         {mode !== 'forgot' && (
-          <div className="grid grid-cols-2 bg-slate-950 border border-slate-800 rounded-xl p-1">
+          <div className="grid grid-cols-2 bg-bg border border-border rounded-xl p-1">
             <button
               type="button"
               onClick={() => switchMode('login')}
               className={`py-2.5 rounded-lg text-sm font-bold transition-all cursor-pointer ${
-                mode === 'login' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-slate-400 hover:text-slate-200'
+                mode === 'login' ? 'bg-brand text-brand-fg shadow-lg shadow-brand/20' : 'text-fg-muted hover:text-fg'
               }`}
             >
               Đăng nhập
@@ -159,7 +159,7 @@ export default function AuthScreen({ onAuthSuccess }: { onAuthSuccess: () => voi
               type="button"
               onClick={() => switchMode('register')}
               className={`py-2.5 rounded-lg text-sm font-bold transition-all cursor-pointer ${
-                mode === 'register' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-slate-400 hover:text-slate-200'
+                mode === 'register' ? 'bg-brand text-brand-fg shadow-lg shadow-brand/20' : 'text-fg-muted hover:text-fg'
               }`}
             >
               Đăng ký
@@ -182,14 +182,14 @@ export default function AuthScreen({ onAuthSuccess }: { onAuthSuccess: () => voi
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-bold text-white">Đã gửi email khôi phục!</p>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Kiểm tra hộp thư <span className="text-orange-400 font-semibold">{identifier}</span> và bấm vào liên kết để đặt lại mật khẩu.
+                <p className="text-xs text-fg-muted leading-relaxed">
+                  Kiểm tra hộp thư <span className="text-brand font-semibold">{identifier}</span> và bấm vào liên kết để đặt lại mật khẩu.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => switchMode('login')}
-                className="text-xs text-slate-400 hover:text-orange-400 transition-colors cursor-pointer flex items-center gap-1 justify-center mx-auto"
+                className="text-xs text-fg-muted hover:text-brand transition-colors cursor-pointer flex items-center gap-1 justify-center mx-auto"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 Quay lại đăng nhập
@@ -198,19 +198,19 @@ export default function AuthScreen({ onAuthSuccess }: { onAuthSuccess: () => voi
           ) : (
             <form onSubmit={handleForgotPassword} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">Email đã đăng ký</label>
+                <label className="block text-xs font-bold text-fg mb-1.5">Email đã đăng ký</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-subtle" />
                   <input
                     type="text"
                     required
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     placeholder="ban@gmail.com"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all"
+                    className="w-full bg-bg border border-border rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all"
                   />
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1.5">
+                <p className="text-[11px] text-fg-subtle mt-1.5">
                   Chúng tôi sẽ gửi một liên kết đặt lại mật khẩu đến email này.
                 </p>
               </div>
@@ -218,7 +218,7 @@ export default function AuthScreen({ onAuthSuccess }: { onAuthSuccess: () => voi
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl text-sm transition-all shadow-lg shadow-orange-500/20 cursor-pointer flex items-center justify-center gap-2"
+                className="w-full bg-brand hover:bg-brand-strong disabled:opacity-60 disabled:cursor-not-allowed text-brand-fg font-bold py-3.5 rounded-xl text-sm transition-all shadow-lg shadow-brand/20 cursor-pointer flex items-center justify-center gap-2"
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                 {loading ? 'Đang gửi...' : 'GỬI LIÊN KẾT KHÔI PHỤC'}
@@ -227,7 +227,7 @@ export default function AuthScreen({ onAuthSuccess }: { onAuthSuccess: () => voi
               <button
                 type="button"
                 onClick={() => switchMode('login')}
-                className="w-full text-xs text-slate-400 hover:text-orange-400 transition-colors cursor-pointer flex items-center gap-1 justify-center"
+                className="w-full text-xs text-fg-muted hover:text-brand transition-colors cursor-pointer flex items-center gap-1 justify-center"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 Quay lại đăng nhập
@@ -241,63 +241,63 @@ export default function AuthScreen({ onAuthSuccess }: { onAuthSuccess: () => voi
           <form onSubmit={handleAuth} className="space-y-4">
             {mode === 'register' && (
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">Tên hiển thị</label>
+                <label className="block text-xs font-bold text-fg mb-1.5">Tên hiển thị</label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-subtle" />
                   <input
                     type="text"
                     required
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Nguyễn Bá Phụng"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all"
+                    className="w-full bg-bg border border-border rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all"
                   />
                 </div>
               </div>
             )}
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">Email hoặc Số điện thoại</label>
+              <label className="block text-xs font-bold text-fg mb-1.5">Email hoặc Số điện thoại</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-subtle" />
                 <input
                   type="text"
                   required
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   placeholder="ban@gmail.com hoặc 0909123456"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all"
+                  className="w-full bg-bg border border-border rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all"
                 />
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold text-slate-300">Mật khẩu</label>
+                <label className="block text-xs font-bold text-fg">Mật khẩu</label>
                 {mode === 'login' && (
                   <button
                     type="button"
                     onClick={() => switchMode('forgot')}
-                    className="text-[11px] text-orange-400 hover:underline cursor-pointer font-semibold"
+                    className="text-[11px] text-brand hover:underline cursor-pointer font-semibold"
                   >
                     Quên mật khẩu?
                   </button>
                 )}
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-subtle" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-10 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all"
+                  className="w-full bg-bg border border-border rounded-xl pl-10 pr-10 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -307,7 +307,7 @@ export default function AuthScreen({ onAuthSuccess }: { onAuthSuccess: () => voi
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl text-sm transition-all shadow-lg shadow-orange-500/20 cursor-pointer flex items-center justify-center gap-2"
+              className="w-full bg-brand hover:bg-brand-strong disabled:opacity-60 disabled:cursor-not-allowed text-brand-fg font-bold py-3.5 rounded-xl text-sm transition-all shadow-lg shadow-brand/20 cursor-pointer flex items-center justify-center gap-2"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {loading ? 'Đang xử lý...' : mode === 'login' ? 'ĐĂNG NHẬP' : 'TẠO TÀI KHOẢN NGAY'}
@@ -316,7 +316,7 @@ export default function AuthScreen({ onAuthSuccess }: { onAuthSuccess: () => voi
         )}
 
         {mode !== 'forgot' && (
-          <p className="text-center text-[11px] text-slate-600">
+          <p className="text-center text-[11px] text-fg-subtle">
             Bằng việc tiếp tục, bạn đồng ý với Điều khoản sử dụng của RaceHub
           </p>
         )}

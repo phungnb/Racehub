@@ -1,11 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr'
+import { publicEnv } from '@/shared/config/env'
 
-const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
-const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim();
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
+// Client cho trình duyệt. Phiên đăng nhập lưu trong cookie (không phải localStorage)
+// để Route Handler / Server Component đọc được người dùng hiện tại.
+export const supabase = createBrowserClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey)

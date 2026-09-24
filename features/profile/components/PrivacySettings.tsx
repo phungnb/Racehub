@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Button, Card, Field, Input } from '@/shared/ui'
 import {
   DEFAULT_SETTINGS,
   getMySettings,
@@ -9,11 +10,7 @@ import {
   type Visibility,
 } from '../api/athleteApi'
 
-/* ────────────────────────────────────────────────────────────
- * PrivacySettings – vùng miền + ai được xem hồ sơ / hoạt động / bản đồ
- *  Đặt tại: features/profile/components/PrivacySettings.tsx
- *  Dùng trong ProfileTab:  <PrivacySettings userId={profile.id} />
- * ──────────────────────────────────────────────────────────── */
+// Quyền riêng tư: khu vực + ai được xem hồ sơ / hoạt động / đường chạy (dùng trong màn Cài đặt)
 
 const OPTIONS: [Visibility, string][] = [
   ['PUBLIC', 'Mọi người'],
@@ -36,20 +33,12 @@ function Row({
   onChange: (v: Visibility) => void
 }) {
   return (
-    <div>
-      <label htmlFor={id} className="block text-xs font-bold text-slate-300">{label}</label>
-      <p className="text-[11px] text-slate-500 mb-1.5">{hint}</p>
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value as Visibility)}
-        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-orange-500"
-      >
-        {OPTIONS.map(([v, l]) => (
-          <option key={v} value={v}>{l}</option>
-        ))}
+    <Field label={label} htmlFor={id} hint={hint}>
+      <select id={id} value={value} onChange={(e) => onChange(e.target.value as Visibility)}
+        className="h-11 w-full rounded-xl border border-border bg-bg px-3 text-[15px] text-fg outline-none focus:border-brand">
+        {OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
-    </div>
+    </Field>
   )
 }
 
@@ -98,30 +87,19 @@ export default function PrivacySettings({ userId }: { userId: string }) {
     }
   }
 
-  if (loading) return <div className="h-48 rounded-2xl bg-slate-900 animate-pulse" aria-hidden />
+  if (loading) return <div className="h-80 animate-pulse rounded-2xl bg-surface" aria-hidden />
 
   return (
-    <section aria-labelledby="privacy-title" className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 shadow-xl">
-      <h3 id="privacy-title" className="text-sm font-bold text-white">Quyền riêng tư</h3>
-
-      <div>
-        <label htmlFor="region" className="block text-xs font-bold text-slate-300">Khu vực</label>
-        <p className="text-[11px] text-slate-500 mb-1.5">Chỉ nên ghi tỉnh hoặc thành phố. Không ghi địa chỉ nhà.</p>
-        <input
-          id="region"
-          list="region-list"
-          value={s.region ?? ''}
-          maxLength={40}
-          onChange={(e) => set('region', e.target.value)}
-          placeholder="Ví dụ: Đà Nẵng"
-          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-slate-600 outline-none focus:border-orange-500"
-        />
+    <Card className="space-y-4">
+      <Field label="Khu vực" htmlFor="region" hint="Chỉ nên ghi tỉnh hoặc thành phố, không ghi địa chỉ nhà.">
+        <Input id="region" list="region-list" value={s.region ?? ''} maxLength={40} placeholder="Ví dụ: Đà Nẵng"
+          onChange={(e) => set('region', e.target.value)} />
         <datalist id="region-list">
           {REGION_SUGGESTIONS.map((r) => <option key={r} value={r} />)}
         </datalist>
-      </div>
+      </Field>
 
-      <Row id="pv-profile" label="Ai xem được hồ sơ" hint="Tên, level, khu vực, CLB. Tên và ảnh luôn hiển thị."
+      <Row id="pv-profile" label="Ai xem được hồ sơ" hint="Level, khu vực, CLB, giới thiệu. Tên và ảnh luôn hiển thị."
         value={s.profile_visibility} onChange={(v) => set('profile_visibility', v)} />
       <Row id="pv-acts" label="Ai xem được hoạt động" hint="Quãng đường, thời gian, pace của các bài chạy."
         value={s.activity_visibility} onChange={(v) => set('activity_visibility', v)} />
@@ -129,32 +107,17 @@ export default function PrivacySettings({ userId }: { userId: string }) {
         value={s.map_visibility} onChange={(v) => set('map_visibility', v)} />
 
       {mapShared && (
-        <label className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={understood}
-            onChange={(e) => setUnderstood(e.target.checked)}
-            className="accent-orange-500 mt-0.5"
-          />
-          <span className="text-[11px] text-amber-200">
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-coin/40 bg-coin/10 p-3">
+          <input type="checkbox" checked={understood} onChange={(e) => setUnderstood(e.target.checked)} className="mt-0.5 size-4 accent-[var(--color-brand)]" />
+          <span className="text-xs text-fg">
             Tôi hiểu đường chạy thường bắt đầu và kết thúc gần nơi ở hoặc nơi làm việc, và đồng ý chia sẻ với nhóm đã chọn.
           </span>
         </label>
       )}
 
-      {msg && (
-        <p role="status" className={`text-xs ${msg.tone === 'ok' ? 'text-emerald-300' : 'text-rose-300'}`}>
-          {msg.text}
-        </p>
-      )}
+      {msg && <p role="status" className={msg.tone === 'ok' ? 'text-sm text-brand' : 'text-sm text-danger'}>{msg.text}</p>}
 
-      <button
-        onClick={save}
-        disabled={!canSave}
-        className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-slate-950 font-black py-2.5 rounded-xl text-xs cursor-pointer"
-      >
-        {saving ? 'Đang lưu…' : 'Lưu cài đặt'}
-      </button>
-    </section>
+      <Button block onClick={save} disabled={!canSave} loading={saving}>Lưu quyền riêng tư</Button>
+    </Card>
   )
 }

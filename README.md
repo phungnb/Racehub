@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RaceHub
 
-## Getting Started
+Nền tảng chạy bộ xã hội: thử thách, giải chạy ảo, CLB, nhân vật và kinh tế RaceCoin.
+Next.js 16 (App Router) + Supabase (Postgres, Auth, Realtime, Storage).
 
-First, run the development server:
+## Chạy local
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local   # điền giá trị thật
+npm ci
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Lệnh | Việc |
+|---|---|
+| `npm run dev` / `build` / `start` | Phát triển / build / chạy bản production |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | Sinh type route (`next typegen`) + `tsc` |
+| `npm test` | Vitest: unit test + test migration DB trên Postgres nhúng (PGlite) |
+| `npm run check` | Cả ba lệnh trên (CI chạy lệnh này + build) |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Cấu trúc
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+app/                    Route: chỉ ghép màn hình
+features/<module>/      Nghiệp vụ. index.ts là cổng công khai duy nhất
+  api/ · model/ · hooks/ · components/
+shared/                 ui/ (design system) · lib/ · config/ · types/
+supabase/migrations/    Mọi thay đổi DB
+tests/db/               Test migration + RLS trên PGlite
+docs/                   Định hướng, kế hoạch, cấu trúc, triển khai, kiến trúc
+```
 
-## Learn More
+Chi tiết và luật ranh giới (ESLint kiểm tra): [docs/CAU_TRUC_THU_MUC.md](docs/CAU_TRUC_THU_MUC.md).
 
-To learn more about Next.js, take a look at the following resources:
+## Tài liệu chính
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| File | Nội dung |
+|---|---|
+| [DINH_HUONG_SAN_PHAM.md](docs/DINH_HUONG_SAN_PHAM.md) | Ba trụ cột: game hóa · thử thách cá nhân và đồng đội · CLB thay nhóm Zalo |
+| [KE_HOACH_HOAN_THIEN.md](docs/KE_HOACH_HOAN_THIEN.md) | Kế hoạch từng sprint, từng việc, mốc phát hành |
+| [HUONG_DAN_TRIEN_KHAI.md](docs/HUONG_DAN_TRIEN_KHAI.md) | Biến môi trường, migration, deploy |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Nguyên tắc
 
-## Deploy on Vercel
+- **Client không ghi tài sản** (Xu, XP, cấp độ, tiến độ). Mọi thay đổi có giá trị đi qua RPC dùng `auth.uid()`. Xem [ADR-003](docs/architecture/adr/003-commands-as-rpc.md).
+- **Secret chỉ ở server** (`shared/config/env.server.ts`), không dùng tiền tố `NEXT_PUBLIC_`.
+- **Component không gọi `supabase` trực tiếp.** Gọi qua `features/*/api` và TanStack Query.
+- **Ngoài module chỉ import qua `@/features/<module>`** (hoặc `@/features/<module>/server` cho code server).
+- **Chỉ dùng token màu** (`bg-surface`, `text-brand`…), không dùng mã màu cứng.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Tài liệu đầy đủ: [docs/architecture](docs/architecture/README.md).

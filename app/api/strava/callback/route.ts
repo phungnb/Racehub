@@ -1,116 +1,83 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { NextResponse, after } from 'next/server'
+import { cookies } from 'next/headers'
+import { createSupabaseAdminClient, createSupabaseServerClient } from '@/shared/lib/supabase-server'
+import { OAUTH_NONCE_COOKIE, OAUTH_RETURN_COOKIE, verifyOAuthState } from '@/shared/lib/oauth-state'
+import { safeNext } from '@/shared/config/routes'
+import { getPublicOrigin } from '@/shared/lib/request-url'
+import { serverEnv } from '@/shared/config/env.server'
+import { exchangeStravaCode, syncStravaActivities } from '@/features/integrations/server'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Lấy đúng domain public (quan trọng khi chạy trong Codespaces/proxy,
-// vì request.url bên trong container thường trả về localhost)
-function getBaseUrl(request: Request): string {
-  const forwardedHost = request.headers.get('x-forwarded-host');
-  const forwardedProto = request.headers.get('x-forwarded-proto') || 'https';
-  if (forwardedHost) {
-    return `${forwardedProto}://${forwardedHost}`;
-  }
-  return new URL(request.url).origin;
+function back(origin: string, to: string, params: Record<string, string>) {
+  const url = new URL(to, origin)
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
+  const res = NextResponse.redirect(url)
+  res.cookies.set(OAUTH_NONCE_COOKIE, '', { path: '/api/strava', maxAge: 0 })
+  res.cookies.set(OAUTH_RETURN_COOKIE, '', { path: '/api/strava', maxAge: 0 })
+  return res
 }
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const code = url.searchParams.get('code');
-  const state = url.searchParams.get('state'); // user_id
-  const error = url.searchParams.get('error');
-  const baseUrl = getBaseUrl(request);
+  const origin = getPublicOrigin(request)
+  const url = new URL(request.url)
+  const to = safeNext((await cookies()).get(OAUTH_RETURN_COOKIE)?.value, '/me')
+  const code = url.searchParams.get('code')
+  const state = url.searchParams.get('state')
 
-  console.log('📥 Strava Callback nhận được:', { code: !!code, state, error });
+  if (url.searchParams.get('error') || !code || !state) {
+    return back(origin, to, { strava_error: 'access_denied' })
+  }
 
-  if (error || !code || !state) {
-    console.error('❌ Lỗi callback từ Strava hoặc thiếu tham số:', error);
-    return NextResponse.redirect(new URL('/?tab=profile&strava_error=access_denied', baseUrl));
+  // 1. Kiểm tra state: chữ ký, hạn dùng, nonce khớp cookie của trình duyệt này
+  const cookieStore = await cookies()
+  const check = verifyOAuthState(state, cookieStore.get(OAUTH_NONCE_COOKIE)?.value, 'STRAVA', serverEnv.oauthStateSecret)
+  if (!check.ok) {
+    console.warn('[strava/callback] state không hợp lệ:', check.reason)
+    return back(origin, to, { strava_error: 'invalid_state' })
+  }
+
+  // 2. Người đang đăng nhập phải là người đã bắt đầu luồng
+  const supabase = await createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || user.id !== check.payload.uid) {
+    return back(origin, to, { strava_error: 'invalid_state' })
   }
 
   try {
-    const tokenRes = await fetch('https://www.strava.com/oauth/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: process.env.NEXT_PUBLIC_STRAVA_CLIENT_ID || '141757',
-        client_secret: process.env.STRAVA_CLIENT_SECRET || '',
-        code: code,
-        grant_type: 'authorization_code',
-      }),
-    });
+    // 3. Đổi code lấy token (secret chỉ nằm ở server)
+    const token = await exchangeStravaCode(code)
+    const athleteId = String(token.athlete?.id ?? '')
+    if (!athleteId) throw new Error('STRAVA_NO_ATHLETE')
 
-    const tokenData = await tokenRes.json();
-    console.log('🔄 Strava Token Response status:', tokenRes.status);
-
-    if (!tokenRes.ok || !tokenData.access_token) {
-      console.error('❌ Lỗi đổi Token Strava chi tiết:', tokenData);
-      return NextResponse.redirect(new URL('/?tab=profile&strava_error=server_error&step=token', baseUrl));
+    // 4. Lưu token vào schema private qua RPC chỉ service role gọi được
+    const admin = createSupabaseAdminClient()
+    const { error } = await admin.rpc('link_provider_connection', {
+      p_user_id: user.id,
+      p_provider: 'STRAVA',
+      p_external_user_id: athleteId,
+      p_access_token: token.access_token,
+      p_refresh_token: token.refresh_token,
+      p_expires_at: new Date(token.expires_at * 1000).toISOString(),
+      p_scopes: (token.scope ?? '').split(',').filter(Boolean),
+    })
+    if (error) {
+      if (error.message.includes('PROVIDER_ACCOUNT_CONFLICT')) {
+        return back(origin, to, { strava_error: 'account_conflict' })
+      }
+      console.error('[strava/callback] link_provider_connection:', error.message)
+      return back(origin, to, { strava_error: 'server_error' })
     }
-
-    const { access_token, refresh_token, expires_at, athlete } = tokenData;
-    const stravaAthleteId = String(athlete?.id || '');
-    const fullName = `${athlete?.firstname || ''} ${athlete?.lastname || ''}`.trim();
-
-    console.log('✅ Đã lấy được Strava Athlete ID:', stravaAthleteId);
-
-    // Kiểm tra xem ID Strava này đã liên kết với tài khoản khác chưa
-    const { data: existingProfiles, error: fetchError } = await supabase
-      .from('profiles')
-      .select('id, strava_athlete_id')
-      .eq('strava_athlete_id', stravaAthleteId)
-      .maybeSingle();
-
-    if (fetchError) {
-      console.error('❌ Lỗi kiểm tra trùng lặp Strava Athlete ID:', fetchError);
-      return NextResponse.redirect(new URL('/?tab=profile&strava_error=server_error&step=check', baseUrl));
-    }
-
-    if (existingProfiles && existingProfiles.id !== state) {
-      console.error('❌ Strava ID đã liên kết với tài khoản khác:', existingProfiles.id);
-      return NextResponse.redirect(new URL('/?tab=profile&strava_error=account_conflict', baseUrl));
-    }
-
-    const { data: updateData, error: dbError } = await supabase
-      .from('profiles')
-      .update({
-        strava_connected: true,
-        strava_access_token: access_token,
-        strava_refresh_token: refresh_token,
-        strava_token_expires_at: expires_at,
-        strava_athlete_id: stravaAthleteId,
-        ...(fullName ? { display_name: fullName } : {}),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', state)
-      .select();
-
-    if (dbError) {
-      console.error('❌ Lỗi Supabase Database Update:', {
-        message: dbError.message,
-        code: dbError.code,
-        details: dbError.details,
-        hint: dbError.hint,
-      });
-      return NextResponse.redirect(new URL('/?tab=profile&strava_error=server_error&step=db', baseUrl));
-    }
-
-    console.log('🎉 Cập nhật profile thành công vào Database:', updateData);
-
-    // Ghi log lịch sử kết nối
-    await supabase.from('activity_history').insert({
-      user_id: state,
-      name: 'Liên kết tài khoản Strava thành công',
-      description: `Đã kết nối với Strava ID: ${stravaAthleteId}`,
-      start_date: new Date().toISOString(),
-    }).select().maybeSingle();
-
-    return NextResponse.redirect(new URL('/?tab=profile&strava_success=true', baseUrl));
-
-  } catch (err: any) {
-    console.error('❌ Ngoại lệ nghiêm trọng tại Strava Callback:', err.message || err);
-    return NextResponse.redirect(new URL('/?tab=profile&strava_error=server_error&step=exception', baseUrl));
+    // Kéo luôn bài chạy 30 ngày gần nhất (chạy sau khi đã chuyển hướng người dùng)
+    after(async () => {
+      try {
+        const summary = await syncStravaActivities(admin, user.id)
+        console.info('[strava/callback] backfill', JSON.stringify(summary))
+      } catch (err) {
+        console.error('[strava/callback] backfill', err instanceof Error ? err.message : err)
+      }
+    })
+    return back(origin, to, { strava_success: 'true' })
+  } catch (err) {
+    console.error('[strava/callback]', err instanceof Error ? err.message : err)
+    return back(origin, to, { strava_error: 'server_error' })
   }
 }

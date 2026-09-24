@@ -1,14 +1,16 @@
-// features/club/index.ts
-// Cổng xuất công khai của tính năng Club.
-// Từ NGOÀI feature này (app/, hoặc feature khác), luôn import qua đây:
-//   import { ClubTab, getClub } from '@/features/club'
-// Bên TRONG feature này (giữa các file trong club/), dùng import tương đối.
-
-export { default as ClubTab } from './components/ClubTab'
-export { default as ClubMembersManager } from './components/ClubMembersManager'
-export { default as ClubSettings, ClubAvatar } from './components/ClubSettings'
-export { default as ClubAdminPanel } from './components/ClubAdminPanel'
-export { default as ClubActivities } from './components/ClubActivities'
-export { default as ClubDashboardWithLeaderboard } from './components/ClubDashboardWithLeaderboard'
-
-export * from './api'
+// Cổng công khai của module club. Code ngoài module chỉ import từ '@/features/club'.
+export { ClubsInboxScreen } from './components/hub/ClubsInboxScreen'
+export { ClubShell } from './components/hub/ClubShell'
+export { ClubFeedScreen } from './components/feed/ClubFeedScreen'
+export { ClubChatScreen } from './components/chat/ClubChatScreen'
+export { ClubLeaderboardScreen } from './components/leaderboard/ClubLeaderboardScreen'
+export { ClubMembersScreen } from './components/members/ClubMembersScreen'
+export { ClubTreasuryScreen } from './components/treasury/ClubTreasuryScreen'
+export { ClubEventsScreen } from './components/events/ClubEventsScreen'
+export { ClubEventScreen } from './components/events/ClubEventScreen'
+export { EventCheckinScreen } from './components/events/EventCheckinScreen'
+export { ClubSettingsScreen } from './components/settings/ClubSettingsScreen'
+export { joinClubByCode, joinClub, searchClubs, clubErrorMessage, getClub, type Club } from './api/clubApi'
+export { useClubInbox } from './hooks/useClub'
+export type { InboxClub } from './api/hubApi'
+export { ROLE_LABEL, isStaff, type ClubRole } from './model/roles'

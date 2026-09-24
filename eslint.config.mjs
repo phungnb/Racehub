@@ -6,12 +6,44 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   // Override default ignores of eslint-config-next.
+  // Nợ kỹ thuật tạm thời: code cũ dùng `any` và gọi dữ liệu trong useEffect.
+  // Hai luật này sẽ bật lại mức "error" khi các màn hình chuyển sang
+  // TanStack Query + type sinh từ DB (xem docs/architecture/frontend.md §5).
+  {
+    rules: {
+      "@typescript-eslint/no-explicit-any": "warn",
+      "react-hooks/set-state-in-effect": "warn",
+    },
+  },
+  // Ranh giới module (docs/CAU_TRUC_THU_MUC.md): ngoài một feature chỉ được
+  // import qua cổng công khai '@/features/<tên>' (hoặc '<tên>/server').
+  // Bên trong feature dùng import tương đối.
+  {
+    files: ["app/**/*.{ts,tsx}", "features/**/*.{ts,tsx}", "shared/**/*.{ts,tsx}", "proxy.ts"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [{
+          group: ["@/features/*/*", "!@/features/*/server"],
+          message: "Import qua cổng công khai '@/features/<module>' (xem docs/CAU_TRUC_THU_MUC.md).",
+        }],
+      }],
+    },
+  },
+  {
+    files: ["shared/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [{ group: ["@/features/**", "@/app/**"], message: "shared/ không được phụ thuộc features/ hoặc app/." }],
+      }],
+    },
+  },
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "docs/**",
   ]),
 ]);
 
