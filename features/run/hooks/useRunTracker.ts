@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/shared/lib/supabase'
-import { GPS, evaluatePoint, nextSplit, rollingPace, splitAnnouncement, type Split, type TrackPoint } from '../model/tracker'
+import { GPS, evaluatePoint, isStationary, nextSplit, rollingPace, smoothPoint, splitAnnouncement, type Split, type TrackPoint } from '../model/tracker'
 
 export type RunPhase = 'IDLE' | 'LOCATING' | 'RUNNING' | 'PAUSED' | 'FINISHED' | 'SAVING' | 'SAVED'
 export type GpsState = 'OFF' | 'SEARCHING' | 'GOOD' | 'WEAK' | 'DENIED' | 'UNSUPPORTED'
@@ -30,6 +30,10 @@ export function useRunTracker() {
   const [voiceOn, setVoiceOn] = useState(true)
   const [result, setResult] = useState<SaveResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  /** App bị ẩn (tắt màn hình / chuyển app) bao nhiêu giây trong lúc chạy — iPhone dừng GPS khi đó */
+  const [gapS, setGapS] = useState(0)
+  const raw = useRef<TrackPoint[]>([])
+  const hiddenAt = useRef<number | null>(null)
 
   const points = useRef<TrackPoint[]>([])
   const lastAccepted = useRef<TrackPoint | null>(null)
@@ -73,7 +77,7 @@ export function useRunTracker() {
   const onPosition = useCallback((pos: GeolocationPosition) => {
     const { latitude, longitude, accuracy, altitude, speed } = pos.coords
     const p: TrackPoint = {
-      latitude, longitude, accuracy, altitude: altitude ?? 0, speed: speed ?? 0,
+      latitude, longitude, accuracy, altitude: altitude ?? 0, speed: speed ?? null,
       recorded_at: new Date(pos.timestamp || Date.now()).toISOString(),
     }
     setGps(accuracy <= GPS.MAX_ACCURACY_M ? 'GOOD' : 'WEAK')
@@ -88,11 +92,17 @@ export function useRunTracker() {
       speak('Bắt đầu chạy')
     }
     if (phaseRef.current !== 'RUNNING') return
+    if (accuracy > GPS.MAX_ACCURACY_M) return
 
-    const v = evaluatePoint(lastAccepted.current, p)
+    // Đứng yên (vị trí đã làm mượt gần như không đổi trong 10 giây) → không cộng quãng đường
+    raw.current.push(p)
+    if (raw.current.length > 60) raw.current.splice(0, raw.current.length - 60)
+    if (isStationary(raw.current)) return
+    const sp = smoothPoint(raw.current)!
+    const v = evaluatePoint(lastAccepted.current, sp)
     if (!v.accept) return
-    lastAccepted.current = p
-    points.current.push(p)
+    lastAccepted.current = sp
+    points.current.push(sp)
     if (v.speed > GPS.AUTO_PAUSE_MPS || v.distance === 0) {
       lastMoveAt.current = Date.now()
       setAutoPaused(false)
@@ -146,6 +156,8 @@ export function useRunTracker() {
     distanceRef.current = 0
     movingRef.current = 0
     splitsRef.current = []
+    raw.current = []
+    setGapS(0)
     setDistanceM(0); setElapsedS(0); setMovingS(0); setCurrentPace(0); setSplits([]); setAutoPaused(false)
     setGps('SEARCHING')
     setPhase('LOCATING')
@@ -169,6 +181,7 @@ export function useRunTracker() {
     lastTick.current = Date.now()
     lastMoveAt.current = Date.now()
     lastAccepted.current = null           // không nối đoạn GPS qua quãng tạm dừng
+    raw.current = []
     setPhase('RUNNING')
     speak('Tiếp tục')
   }, [speak])
@@ -215,11 +228,34 @@ export function useRunTracker() {
     return data as SaveResult
   }, [elapsedS])
 
+  // Tắt màn hình / chuyển app: trình duyệt dừng GPS và nhả chế độ giữ sáng màn hình.
+  // Quay lại → xin lại cả hai; đoạn bị mất được nối bằng đường thẳng và báo cho người chạy.
+  useEffect(() => {
+    const onVis = () => {
+      const active = phaseRef.current === 'RUNNING' || phaseRef.current === 'PAUSED' || phaseRef.current === 'LOCATING'
+      if (!active) return
+      if (document.visibilityState === 'hidden') { hiddenAt.current = Date.now(); return }
+      void acquireWakeLock()
+      if (watchId.current !== null) {
+        navigator.geolocation.clearWatch(watchId.current)
+        watchId.current = navigator.geolocation.watchPosition(onPosition, onPositionError, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 })
+      }
+      raw.current = []
+      if (hiddenAt.current && phaseRef.current === 'RUNNING') {
+        const gone = (Date.now() - hiddenAt.current) / 1000
+        if (gone > 15) setGapS((g) => g + Math.round(gone))
+      }
+      hiddenAt.current = null
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [acquireWakeLock, onPosition, onPositionError])
+
   // Rời màn hình khi đang chạy: dọn GPS + wake lock
   useEffect(() => () => { stopWatch(); releaseWakeLock() }, [releaseWakeLock, stopWatch])
 
   return {
-    phase, gps, distanceM, elapsedS, movingS, currentPace, autoPaused, splits, voiceOn, result, error,
+    phase, gps, distanceM, elapsedS, movingS, currentPace, autoPaused, splits, voiceOn, result, error, gapS,
     setVoiceOn, start, startAnyway, pause, resume, finish, discard, save,
   }
 }

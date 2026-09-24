@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { ChevronRight, Shirt } from 'lucide-react'
 import { Button, Card, ErrorState, Skeleton } from '@/shared/ui'
-import { levelDef } from '@/features/progression'
 import { routes } from '@/shared/config/routes'
 import { characterErrorMessage } from '../api/characterApi'
 import { useCharacterState } from '../hooks/useCharacter'
@@ -25,9 +24,6 @@ export function CharacterHub() {
       <Card className="overflow-hidden p-0">
         <div className="relative h-96 bg-[#c4c4ce]">
           <PaperDoll gender={s.gender} items={resolveOutfit(s.items, s.equipped)} className="size-full" label="Nhân vật của bạn" />
-          <span className="absolute bottom-3 left-3 rounded-full bg-bg/85 px-3 py-1 text-xs font-semibold backdrop-blur">
-            Lv.{s.level} · {levelDef(s.level).name}
-          </span>
         </div>
         <div className="space-y-3 p-4">
           <p className="text-sm text-fg-muted">Tủ đồ có <b className="font-mono text-fg">{owned}</b>/{s.items.length} vật phẩm</p>
