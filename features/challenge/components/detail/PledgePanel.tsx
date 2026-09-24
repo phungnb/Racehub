@@ -12,6 +12,7 @@ import {
   type ChallengeDetail, type PledgeBoard, type PledgeMember,
 } from '../../api/challengeApi'
 import { challengeKeys } from '../../hooks/useChallenge'
+import { plannedTeams } from '../../model/challenge'
 
 const km = (v: number | null | undefined) => `${formatNumber(Math.round(Number(v ?? 0) * 10) / 10)} km`
 
@@ -29,9 +30,10 @@ export function PledgePanel({ d }: { d: ChallengeDetail }) {
       {d.me && d.me.status !== 'LEFT' && <MyPledge d={d} locked={locked} />}
       {q.isPending ? <Skeleton className="h-48" /> : q.data ? (
         <>
-          {team && q.data.teams && <TeamPledges board={q.data} capPct={c.pledge_cap_pct ?? null} />}
-          {team && q.data.can_manage && !started && <TeamTools id={c.id} board={q.data} />}
-          <PledgeRanking board={q.data} team={team} teamsById={Object.fromEntries((q.data.teams ?? []).map((t) => [t.team_id, t]))} />
+          {team && !c.teams_assigned_at && <TeamPlan board={q.data} teamSize={c.pledge_team_size ?? null} />}
+          {team && c.teams_assigned_at && q.data.teams && <TeamPledges board={q.data} capPct={c.pledge_cap_pct ?? null} />}
+          {team && q.data.can_manage && !started && <TeamTools id={c.id} board={q.data} teamSize={c.pledge_team_size ?? null} assigned={!!c.teams_assigned_at} />}
+          <PledgeRanking board={q.data} team={team} teamsById={c.teams_assigned_at ? Object.fromEntries((q.data.teams ?? []).map((t) => [t.team_id, t])) : {}} />
         </>
       ) : null}
     </div>
@@ -76,7 +78,7 @@ function MyPledge({ d, locked }: { d: ChallengeDetail; locked: boolean }) {
     <Card className="space-y-3 border-brand/40">
       <p className="flex items-center gap-2 font-semibold"><Flag className="size-4 text-brand" aria-hidden />{current === null ? 'Đăng ký mục tiêu của bạn' : 'Đổi mục tiêu'}</p>
       <p className="text-xs text-fg-muted">
-        {c.format === 'TEAM' ? 'Mục tiêu khóa khi ban quản trị chia đội hoặc khi xuất phát. Hãy chọn đúng sức mình — chạy vượt chỉ được tính thêm tối đa ' + (cap ?? 0) + '%.'
+        {c.format === 'TEAM' ? 'Chọn theo năng lực của bạn — đội được chia để tổng mục tiêu các đội bằng nhau. Mục tiêu khóa khi chia đội' + (cap !== null ? `; chạy vượt chỉ được tính thêm tối đa ${cap}%.` : '.')
           : 'Hoàn thành mốc bạn chọn là chiến thắng. Chọn trước giờ bắt đầu thì đổi được.'}
       </p>
       {options.length ? (
@@ -97,6 +99,36 @@ function MyPledge({ d, locked }: { d: ChallengeDetail; locked: boolean }) {
         </div>
       )}
     </Card>
+  )
+}
+
+/** Trước khi chia đội: bao nhiêu người đã đăng ký, tổng km, dự kiến bao nhiêu đội */
+function TeamPlan({ board, teamSize }: { board: PledgeBoard; teamSize: number | null }) {
+  const n = board.members.length
+  const total = board.members.reduce((a, m) => a + Number(m.pledge_km ?? 0), 0)
+  const teams = teamSize ? plannedTeams(n, teamSize) : (board.teams?.length ?? 2)
+  return (
+    <Card className="space-y-3">
+      <p className="flex items-center gap-2 font-semibold"><Scale className="size-4 text-xp" aria-hidden />Chưa chia đội</p>
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <Stat label="Đã tham gia" value={`${n}`} />
+        <Stat label="Tổng mục tiêu" value={km(total)} />
+        <Stat label="Dự kiến" value={`${teams} đội`} />
+      </div>
+      <p className="text-xs text-fg-subtle">
+        {teamSize ? `${teamSize} người/đội → ${n} người chia thành ${teams} đội, mỗi đội khoảng ${km(total / teams)} mục tiêu. ` : ''}
+        Ban quản trị chia đội trước giờ xuất phát; bạn sẽ nhận thông báo đội của mình.
+      </p>
+    </Card>
+  )
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-surface-2 p-2">
+      <p className="font-mono text-base font-bold">{value}</p>
+      <p className="text-[11px] text-fg-subtle">{label}</p>
+    </div>
   )
 }
 
@@ -132,7 +164,7 @@ function TeamPledges({ board, capPct }: { board: PledgeBoard; capPct: number | n
 }
 
 /** Ban quản trị: chia đội tự động (cân bằng / ngẫu nhiên có cân bằng) hoặc xếp tay từng người */
-function TeamTools({ id, board }: { id: string; board: PledgeBoard }) {
+function TeamTools({ id, board, teamSize, assigned }: { id: string; board: PledgeBoard; teamSize: number | null; assigned: boolean }) {
   const qc = useQueryClient()
   const [moving, setMoving] = useState<PledgeMember | null>(null)
   const done = (b: PledgeBoard) => { qc.setQueryData(challengeKeys.pledge(id), b); void qc.invalidateQueries({ queryKey: ['challenge', id] }) }
@@ -148,7 +180,13 @@ function TeamTools({ id, board }: { id: string; board: PledgeBoard }) {
   })
   return (
     <Card className="space-y-3 border-xp/40">
-      <p className="font-semibold">Chia đội (ban quản trị)</p>
+      <p className="font-semibold">{assigned ? 'Chia lại đội (ban quản trị)' : 'Chia đội (ban quản trị)'}</p>
+      {teamSize && (
+        <p className="text-xs text-fg-muted">
+          {board.members.length} người · {teamSize} người/đội → <b className="text-fg">{plannedTeams(board.members.length, teamSize)} đội</b>.
+          Hệ thống tự tạo đội và xếp người để tổng km đăng ký các đội bằng nhau.
+        </p>
+      )}
       {board.missing > 0 && (
         <p className="flex items-start gap-2 rounded-xl bg-warning/10 p-2.5 text-xs text-warning">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />{board.missing} người chưa đăng ký mục tiêu. Nhắc họ trước khi chia, hoặc chia luôn (tính 0 km).
@@ -160,10 +198,10 @@ function TeamTools({ id, board }: { id: string; board: PledgeBoard }) {
         <Button variant="secondary" loading={assign.isPending && assign.variables?.method === 'RANDOM'}
           onClick={() => assign.mutate({ method: 'RANDOM', includeMissing: board.missing > 0 })}><Shuffle className="size-4" aria-hidden />Ngẫu nhiên</Button>
       </div>
-      <p className="text-xs text-fg-subtle">Cả hai cách đều giữ tổng km đăng ký các đội gần bằng nhau và số người chênh tối đa 1. Bấm tên một người trong bảng dưới để xếp tay.</p>
+      <p className="text-xs text-fg-subtle">Cả hai cách đều giữ tổng km đăng ký các đội gần bằng nhau và số người chênh tối đa 1.{assigned ? ' Bấm tên một người trong bảng dưới để xếp tay.' : ''}</p>
       <MoveSheet member={moving} board={board} onClose={() => setMoving(null)} loading={move.isPending}
         onPick={(team) => moving && move.mutate({ pid: moving.participant_id, team })} />
-      <ManagerList board={board} onPick={setMoving} />
+      {assigned && <ManagerList board={board} onPick={setMoving} />}
     </Card>
   )
 }

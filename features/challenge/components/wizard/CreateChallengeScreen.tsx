@@ -16,7 +16,7 @@ import { routes } from '@/shared/config/routes'
 import { challengeErrorMessage, createChallenge, quoteChallenge, setChallengePledge, type ChallengeQuote } from '../../api/challengeApi'
 import {
   AUDIENCE_LABEL, defaultDraft, effectiveSlots, FORMAT_META, formatScore, OBJECTIVE_META, pledgePayload, pledgeSupported, rewardSummary,
-  TEAM_MODE_META, teamPledgePreset, validateDraft, weeklyPreset,
+  isTeamPledge, TEAM_MODE_META, validateDraft, weeklyPreset,
   type Audience, type ChallengeDraft, type ChallengeFormat, type DraftErrors, type Objective, type TeamMode,
 } from '../../model/challenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
@@ -87,7 +87,7 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
       const r = await createChallenge(d, key.current)
       if (d.pledge.enabled && pledgeSupported(d)) {
         // Bật mục tiêu tự đăng ký ngay sau khi tạo (cùng người tạo, trước khi ai tham gia)
-        await setChallengePledge(r.challenge_id, pledgePayload(d.pledge))
+        await setChallengePledge(r.challenge_id, pledgePayload(d.pledge, d.format === 'TEAM'))
           .catch((e) => toast.error(`Đã tạo thử thách nhưng chưa bật được mục tiêu tự đăng ký: ${challengeErrorMessage(e)}`))
       }
       toast.success(d.audience === 'CLUB_ONLY' ? 'Đã tạo và báo cho cả CLB!' : 'Đã tạo thử thách!')
@@ -144,18 +144,12 @@ function StepType({ d, set, errors, staffClubs }: StepProps & { staffClubs: { cl
       {templateClub && (
         <section>
           <p className="mb-2 text-sm font-medium text-fg-muted">Mẫu nhanh cho CLB</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid gap-2">
             <button type="button" onClick={() => set(weeklyPreset(new Date(), templateClub))}
               className={cn('rounded-xl border p-3 text-left', d.pledge.enabled && d.format === 'SOLO_GOAL' ? 'border-brand/60 bg-brand/10' : 'border-border bg-surface hover:border-fg-subtle')}>
               <CalendarRange className="mb-1.5 size-5 text-brand" aria-hidden />
               <span className="block text-sm font-semibold">Thử thách tuần</span>
               <span className="block text-xs text-fg-muted">Mỗi người tự chọn mốc 21 · 42 · 60 · 100 km</span>
-            </button>
-            <button type="button" onClick={() => set(teamPledgePreset(new Date(), templateClub))}
-              className={cn('rounded-xl border p-3 text-left', d.pledge.enabled && d.format === 'TEAM' ? 'border-brand/60 bg-brand/10' : 'border-border bg-surface hover:border-fg-subtle')}>
-              <Scale className="mb-1.5 size-5 text-xp" aria-hidden />
-              <span className="block text-sm font-semibold">Đua đội theo mục tiêu</span>
-              <span className="block text-xs text-fg-muted">Đăng ký km → chia đội cân bằng tổng mục tiêu</span>
             </button>
           </div>
         </section>
@@ -163,18 +157,27 @@ function StepType({ d, set, errors, staffClubs }: StepProps & { staffClubs: { cl
       <section>
         <p className="mb-2 text-sm font-medium text-fg-muted">Hình thức</p>
         <div role="radiogroup" aria-label="Hình thức" className="grid grid-cols-1 gap-2">
-          {formats.map((f) => {
-            const Icon = FORMAT_ICON[f]
-            const on = d.format === f
+          {formats.flatMap((f) => (f === 'TEAM' ? [f, 'TEAM_PLEDGE' as const] : [f])).map((f) => {
+            const teamPledge = f === 'TEAM_PLEDGE'
+            const fmt: ChallengeFormat = teamPledge ? 'TEAM' : f
+            const Icon = teamPledge ? Scale : FORMAT_ICON[fmt]
+            // "Đồng đội" (đặt tên đội, tự chọn đội) và "Đua đội theo mục tiêu" (đăng ký km → máy tự chia đội) là 2 lựa chọn riêng
+            const on = d.format === fmt && (fmt !== 'TEAM' || isTeamPledge(d) === teamPledge)
             return (
               <button key={f} role="radio" aria-checked={on}
-                onClick={() => set({ format: f, objective: f === 'TEAM' || f === 'COLLECTIVE' ? (d.objective === 'STREAK_DAYS' ? 'DISTANCE' : d.objective) : d.objective,
-                  audience: f === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience })}
+                onClick={() => set({ format: fmt, objective: fmt === 'TEAM' || fmt === 'COLLECTIVE' ? (teamPledge || d.objective === 'STREAK_DAYS' ? 'DISTANCE' : d.objective) : d.objective,
+                  audience: fmt === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience,
+                  pledge: { ...d.pledge, enabled: teamPledge || (fmt === 'SOLO_GOAL' && d.pledge.enabled),
+                    ...(teamPledge && d.format !== 'TEAM' ? { options: [], minKm: 10, maxKm: 300, capPct: 20 } : {}) } })}
                 className={cn('flex items-center gap-3 rounded-xl border p-3 text-left transition-colors',
                   on ? 'border-brand/60 bg-brand/10' : 'border-border bg-surface hover:border-fg-subtle')}>
-                <span className={cn('grid size-10 shrink-0 place-items-center rounded-xl', FORMAT_TONE[f])}><Icon className="size-5" aria-hidden /></span>
-                <span className="flex-1"><span className="block font-semibold">{FORMAT_META[f].label}</span>
-                  <span className="block text-sm text-fg-muted">{FORMAT_META[f].description}</span></span>
+                <span className={cn('grid size-10 shrink-0 place-items-center rounded-xl', teamPledge ? 'bg-xp/15 text-xp' : FORMAT_TONE[fmt])}><Icon className="size-5" aria-hidden /></span>
+                <span className="flex-1">
+                  <span className="block font-semibold">{teamPledge ? 'Đua đội theo mục tiêu' : FORMAT_META[fmt].label}</span>
+                  <span className="block text-sm text-fg-muted">{teamPledge
+                    ? 'Mỗi người đăng ký km theo sức mình, hệ thống chia đội sao cho tổng mục tiêu các đội bằng nhau'
+                    : FORMAT_META[fmt].description}</span>
+                </span>
                 {on && <Check className="size-5 text-brand" aria-hidden />}
               </button>
             )
@@ -264,7 +267,7 @@ function StepRules({ d, set, errors }: StepProps) {
   const pledge = d.pledge.enabled && pledgeSupported(d)
   return (
     <div className="space-y-5">
-      <section>
+      {!isTeamPledge(d) && <section>
         <p className="mb-2 text-sm font-medium text-fg-muted">Tính điểm theo</p>
         <div role="radiogroup" aria-label="Tính điểm theo" className="grid grid-cols-2 gap-2">
           {objectives.map((o) => (
@@ -276,21 +279,29 @@ function StepRules({ d, set, errors }: StepProps) {
             </button>
           ))}
         </div>
-      </section>
+      </section>}
 
-      {pledgeSupported(d) && <PledgeSection d={d} set={set} error={errors.pledge} />}
+      {pledgeSupported(d) && (d.format === 'SOLO_GOAL' || pledge) && <PledgeSection d={d} set={set} error={errors.pledge} />}
 
       {!pledge && <NumberField id="c-target" label={needTarget ? 'Mục tiêu' : 'Mục tiêu (không bắt buộc)'} unit={unit} value={d.targetValue}
         step={d.objective === 'DISTANCE' ? 5 : 1} onChange={(v) => set({ targetValue: v })} error={errors.targetValue}
         hint={needTarget ? (d.format === 'COLLECTIVE' ? 'Tổng của cả cộng đồng' : 'Mục tiêu của riêng bạn') : 'Để 0 nếu chỉ xếp hạng ai nhiều hơn'} />}
 
-      {d.format === 'TEAM' && (
+      {d.format === 'TEAM' && pledge && (
+        <section className="space-y-2">
+          <NumberField id="c-pteamsize" label="Số người mỗi đội" min={2} max={50} value={d.pledge.teamSize}
+            onChange={(v) => set({ pledge: { ...d.pledge, teamSize: v } })} error={errors.teamSize}
+            hint="Số đội = số người đăng ký ÷ số người mỗi đội (làm tròn). VD: 20 người, 5 người/đội → 4 đội" />
+          <p className="rounded-xl bg-surface-2 p-3 text-xs text-fg-muted">
+            Trước giờ xuất phát, bạn bấm <b className="text-fg">Chia đội</b>: hệ thống tạo đủ số đội và xếp người sao cho tổng km đăng ký
+            của các đội bằng nhau. Điểm đội = tổng km được tính của thành viên (mỗi người tối đa mục tiêu + % vượt).
+          </p>
+        </section>
+      )}
+
+      {d.format === 'TEAM' && !pledge && (
         <>
-          {pledge ? (
-            <p className="rounded-xl bg-surface-2 p-3 text-xs text-fg-muted">
-              Điểm đội = tổng km được tính của các thành viên (mỗi người tối đa mục tiêu + % vượt). Tổng mục tiêu các đội được chia cân bằng.
-            </p>
-          ) : <section>
+          <section>
             <p className="mb-2 text-sm font-medium text-fg-muted">Cách tính điểm đội</p>
             <div role="radiogroup" aria-label="Cách tính điểm đội" className="grid gap-2">
               {(Object.keys(TEAM_MODE_META) as TeamMode[]).map((m) => (
@@ -301,7 +312,7 @@ function StepRules({ d, set, errors }: StepProps) {
                 </button>
               ))}
             </div>
-          </section>}
+          </section>
           <section className="space-y-2">
             <p className="text-sm font-medium text-fg-muted">Các đội</p>
             {d.teamNames.map((n, i) => (
@@ -356,11 +367,11 @@ function PledgeSection({ d, set, error }: { d: ChallengeDraft; set: (p: Partial<
   return (
     <section className={cn('space-y-4 rounded-[var(--radius-card)] border p-4', p.enabled ? 'border-brand/50 bg-brand/5' : 'border-border bg-surface')}>
       <label className="flex items-start gap-3">
-        <input type="checkbox" checked={p.enabled} onChange={(e) => setP({ enabled: e.target.checked })} className="mt-1 size-5 accent-[var(--color-brand)]" />
+        {d.format !== 'TEAM' && <input type="checkbox" checked={p.enabled} onChange={(e) => setP({ enabled: e.target.checked })} className="mt-1 size-5 accent-[var(--color-brand)]" />}
         <span>
           <span className="flex items-center gap-1.5 font-semibold"><Flag className="size-4 text-brand" aria-hidden />Mỗi người tự đăng ký mục tiêu</span>
           <span className="block text-xs text-fg-muted">
-            {d.format === 'TEAM' ? 'Đăng ký km trước giờ xuất phát; bạn chia đội để tổng mục tiêu các đội bằng nhau'
+            {d.format === 'TEAM' ? 'Mỗi người chọn mục tiêu theo năng lực trước giờ xuất phát'
               : 'Hoàn thành = đạt mốc của chính mình; bảng xếp hạng theo % mục tiêu'}
           </span>
         </span>
@@ -510,7 +521,7 @@ function StepReview({ d, quote, bill, loading, failed, onRetry, clubName, onEdit
       <Card className="space-y-3">
         <div className="flex items-center gap-3">
           <span className={cn('grid size-11 place-items-center rounded-xl', FORMAT_TONE[d.format])}><Icon className="size-5" aria-hidden /></span>
-          <div className="min-w-0"><p className="text-xs font-semibold text-fg-muted">{FORMAT_META[d.format].label}{d.format === 'TEAM' ? ` · ${TEAM_MODE_META[d.gameMode].label}` : ''}</p>
+          <div className="min-w-0"><p className="text-xs font-semibold text-fg-muted">{isTeamPledge(d) ? 'Đua đội theo mục tiêu' : `${FORMAT_META[d.format].label}${d.format === 'TEAM' ? ` · ${TEAM_MODE_META[d.gameMode].label}` : ''}`}</p>
             <p className="truncate text-lg font-bold">{d.title}</p></div>
         </div>
         <ul className="space-y-1.5 text-sm">
@@ -524,7 +535,7 @@ function StepReview({ d, quote, bill, loading, failed, onRetry, clubName, onEdit
           <li><span className="text-fg-subtle">Thời gian: </span>{fmtWhen(d.start)} → {fmtWhen(d.end)} ({days} ngày)</li>
           {perDay > 0 && <li><span className="text-fg-subtle">Trung bình cần: </span>{formatScore(d.objective, perDay)}/ngày</li>}
           <li><span className="text-fg-subtle">Phạm vi: </span>{d.audience === 'CLUB_ONLY' ? `Nội bộ ${clubName ?? 'CLB'}` : AUDIENCE_LABEL[d.format === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience]}</li>
-          {d.format === 'TEAM' && <li><span className="text-fg-subtle">Đội: </span>{d.teamNames.filter((n) => n.trim()).join(' · ')}</li>}
+          {d.format === 'TEAM' && <li><span className="text-fg-subtle">Đội: </span>{isTeamPledge(d) ? `Tự chia theo số người đăng ký · ${d.pledge.teamSize} người/đội` : d.teamNames.filter((n) => n.trim()).join(' · ')}</li>}
           <li><span className="text-fg-subtle">Luật: </span>≥ {formatNumber(d.minKm)} km/{d.objective === 'STREAK_DAYS' ? 'ngày' : 'bài'} · pace {d.minPace}–{d.maxPace} ph/km{d.dailyCapKm > 0 ? ` · tối đa ${d.dailyCapKm} km/ngày` : ''}</li>
           {summary && <li><span className="text-fg-subtle">Thưởng: </span>{summary}</li>}
         </ul>

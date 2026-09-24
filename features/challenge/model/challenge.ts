@@ -136,9 +136,18 @@ export interface PledgeDraft {
   maxKm: number
   /** Được tính vượt mục tiêu tối đa bao nhiêu % (null = không giới hạn) */
   capPct: number | null
+  /** Đua đội theo mục tiêu: số người mỗi đội. Số đội = số người đăng ký ÷ số này (máy chủ tự tạo đội khi chia) */
+  teamSize: number
 }
 
-export const DEFAULT_PLEDGE: PledgeDraft = { enabled: false, options: [21, 42, 60, 100], minKm: 10, maxKm: 300, capPct: 20 }
+export const DEFAULT_PLEDGE: PledgeDraft = { enabled: false, options: [21, 42, 60, 100], minKm: 10, maxKm: 300, capPct: 20, teamSize: 5 }
+
+/** Đua đội theo mục tiêu: đồng đội + mỗi người tự đăng ký km, đội được chia tự động theo số người đăng ký */
+export const isTeamPledge = (d: Pick<ChallengeDraft, 'format' | 'pledge'>) => d.format === 'TEAM' && d.pledge.enabled
+
+/** Số đội dự kiến khi chia: làm tròn (số người ÷ số người mỗi đội), ít nhất 2 */
+export const plannedTeams = (members: number, teamSize: number) =>
+  teamSize > 0 ? Math.max(2, Math.round(members / teamSize)) : 2
 
 /** Thử thách này có hỗ trợ mục tiêu tự đăng ký không (chỉ tính quãng đường, cá nhân hoặc đồng đội) */
 export const pledgeSupported = (d: Pick<ChallengeDraft, 'format' | 'objective'>) =>
@@ -183,9 +192,9 @@ export function teamPledgePreset(now: Date, clubId: string): Partial<ChallengeDr
   return {
     format: 'TEAM', objective: 'DISTANCE', gameMode: 'TEAM_SUM', title: 'Đua đội 10 ngày',
     description: 'Đăng ký mục tiêu km của bạn trước ngày xuất phát. Ban quản trị chia đội để tổng mục tiêu các đội bằng nhau.',
-    audience: 'CLUB_ONLY', clubId, rewardSource: 'CLUB', teamNames: ['Đội Xanh', 'Đội Đỏ'], teamSize: 0, maxSlots: 50,
+    audience: 'CLUB_ONLY', clubId, rewardSource: 'CLUB', teamSize: 0, maxSlots: 50,
     start: s.toISOString(), end: new Date(s.getTime() + 10 * DAY).toISOString(),
-    pledge: { ...DEFAULT_PLEDGE, enabled: true, options: [], minKm: 10, maxKm: 300, capPct: 20 },
+    pledge: { ...DEFAULT_PLEDGE, enabled: true, options: [], minKm: 10, maxKm: 300, capPct: 20, teamSize: 5 },
   }
 }
 
@@ -200,12 +209,16 @@ export function validatePledge(p: PledgeDraft): string | null {
   return null
 }
 
-/** Dữ liệu gửi RPC set_challenge_pledge */
-export const pledgePayload = (p: PledgeDraft) => ({
+/** Kiểm tra số người mỗi đội của đua đội theo mục tiêu */
+export const validateTeamSize = (n: number) => (Number.isInteger(n) && n >= 2 && n <= 50 ? null : 'Mỗi đội từ 2 đến 50 người')
+
+/** Dữ liệu gửi RPC set_challenge_pledge (team_size chỉ có ở đua đội) */
+export const pledgePayload = (p: PledgeDraft, team = false) => ({
   options: p.options.length ? [...new Set(p.options)].sort((a, b) => a - b) : null,
   min_km: p.options.length ? null : p.minKm,
   max_km: p.options.length ? null : p.maxKm,
   cap_pct: p.capPct,
+  team_size: team ? p.teamSize : null,
 })
 
 /** Km thật sự được tính cho một người: tối đa mục tiêu × (1 + % vượt) */
@@ -244,7 +257,8 @@ export function validateDraft(d: ChallengeDraft, step: 1 | 2 | 3, now = new Date
     if (d.objective === 'STREAK_DAYS' && !(d.minKm > 0)) e.minKm = 'Chuỗi ngày cần cự ly tối thiểu mỗi ngày'
     if (!(d.minPace > 0) || d.maxPace < d.minPace || d.maxPace > 30) e.minPace = 'Khoảng pace không hợp lệ'
     if (d.dailyCapKm < 0) e.dailyCapKm = 'Không hợp lệ'
-    if (d.format === 'TEAM') {
+    if (isTeamPledge(d)) { const te = validateTeamSize(d.pledge.teamSize); if (te) e.teamSize = te }
+    else if (d.format === 'TEAM') {
       const names = d.teamNames.map((n) => n.trim()).filter(Boolean)
       if (names.length < 2 || names.length > 8) e.teamNames = 'Cần từ 2 đến 8 đội'
       else if (new Set(names.map((n) => n.toLocaleLowerCase('vi'))).size !== names.length) e.teamNames = 'Tên đội bị trùng'
@@ -269,6 +283,7 @@ export function validateDraft(d: ChallengeDraft, step: 1 | 2 | 3, now = new Date
 export function effectiveSlots(d: Pick<ChallengeDraft, 'format' | 'maxSlots' | 'teamSize' | 'teamNames'> & { pledge?: PledgeDraft }): number {
   if (d.format === 'DUEL') return 2
   if (d.format === 'SOLO_GOAL') return d.pledge?.enabled ? d.maxSlots : 1
+  if (d.format === 'TEAM' && d.pledge?.enabled) return d.maxSlots
   if (d.format === 'TEAM' && d.teamSize > 0) {
     const teams = d.teamNames.filter((t) => t.trim()).length
     return Math.min(d.maxSlots, d.teamSize * Math.max(teams, 1))
@@ -296,8 +311,9 @@ export function draftToPayload(d: ChallengeDraft) {
     max_slots: effectiveSlots(d),
     audience: d.format === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience,
     club_id: d.audience === 'CLUB_ONLY' ? d.clubId : null,
-    team_names: d.format === 'TEAM' ? d.teamNames.map((n) => n.trim()).filter(Boolean) : [],
-    team_size: d.format === 'TEAM' ? d.teamSize : 0,
+    // Đua đội theo mục tiêu: 2 đội tạm, máy chủ tạo lại đúng số đội khi ban quản trị chia đội
+    team_names: d.format === 'TEAM' ? (pledge ? ['Đội 1', 'Đội 2'] : d.teamNames.map((n) => n.trim()).filter(Boolean)) : [],
+    team_size: d.format === 'TEAM' && !pledge ? d.teamSize : 0,
     reward_xu: d.rewardXu || 0,
     reward_source: d.rewardXu > 0 ? d.rewardSource : 'NONE',
     reward_split: d.format === 'RANKED' ? d.rewardSplit : 'WINNER',

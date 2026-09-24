@@ -53,7 +53,7 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
           <span className={cn('flex items-center gap-1.5 rounded-full px-2.5 py-1', FORMAT_TONE[c.format])}>
-            <Icon className="size-3.5" aria-hidden />{FORMAT_META[c.format]?.label}
+            <Icon className="size-3.5" aria-hidden />{c.format === 'TEAM' && c.pledge_enabled ? 'Đua đội theo mục tiêu' : FORMAT_META[c.format]?.label}
           </span>
           <span className="flex items-center gap-1 rounded-full bg-surface-2 px-2.5 py-1 text-fg-muted">
             {c.target_audience === 'INVITE_ONLY' ? <Lock className="size-3.5" aria-hidden /> : c.target_audience === 'CLUB_ONLY' ? <Shield className="size-3.5" aria-hidden /> : <Users className="size-3.5" aria-hidden />}
@@ -120,7 +120,8 @@ function StatusBanner({ d, phase }: { d: ChallengeDetail; phase: ReturnType<type
   }
   if (phase === 'UPCOMING') {
     return <Banner icon={Clock} tone="warning" title={`Bắt đầu lúc ${fmtDateTime(c.start_date)}`}
-      text={c.format === 'TEAM' ? 'Chọn đội trước giờ bắt đầu — sau đó danh sách đội sẽ được khóa.' : 'Bài chạy chỉ được tính từ giờ bắt đầu.'} />
+      text={c.format === 'TEAM' && c.pledge_enabled ? 'Đăng ký mục tiêu km trước giờ bắt đầu. Ban quản trị sẽ chia đội sao cho tổng mục tiêu các đội bằng nhau.'
+        : c.format === 'TEAM' ? 'Chọn đội trước giờ bắt đầu — sau đó danh sách đội sẽ được khóa.' : 'Bài chạy chỉ được tính từ giờ bắt đầu.'} />
   }
   return null
 }
@@ -142,7 +143,8 @@ function ProgressHero({ d, phase, standings }: { d: ChallengeDetail; phase: Retu
   const target = c.pledge_enabled ? Number(d.me?.pledge_km ?? 0) : c.target_value
   const unit = OBJECTIVE_META[c.objective]?.unit
 
-  if (c.format === 'TEAM') return <TeamVersus d={d} standings={standings} />
+  // Đua đội theo mục tiêu: trước khi chia đội chỉ có đội tạm → chưa hiện bảng đối đầu
+  if (c.format === 'TEAM') return c.pledge_enabled && !c.teams_assigned_at ? null : <TeamVersus d={d} standings={standings} />
 
   if (c.format === 'COLLECTIVE') {
     const total = d.stats.total_score
@@ -244,7 +246,7 @@ function Leaderboard({ d, rows, loading, error, standings }: {
   const teamOf = new Map(standings.map((t) => [t.team_id, t]))
   return (
     <div className="space-y-2">
-      {c.format === 'TEAM' && standings.length > 0 && (
+      {c.format === 'TEAM' && standings.length > 0 && (!c.pledge_enabled || !!c.teams_assigned_at) && (
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
           {[{ team_id: 'ALL', name: 'Tất cả', color: 'var(--color-fg-muted)' }, ...standings].map((t) => (
             <button key={t.team_id} onClick={() => setTeam(t.team_id)} aria-pressed={team === t.team_id}
@@ -325,6 +327,7 @@ function ActionBar({ d, phase, code }: { d: ChallengeDetail; phase: ReturnType<t
   const joined = !!d.me && d.me.status !== 'LEFT'
   const open = phase === 'UPCOMING' || phase === 'LIVE'
   const teamLocked = c.format === 'TEAM' && phase !== 'UPCOMING'
+  const pickTeam = c.format === 'TEAM' && !c.pledge_enabled       // đua đội theo mục tiêu: ban quản trị chia đội, không tự chọn
   const canJoin = open && !joined && !teamLocked
   const canLeave = joined && open && (phase === 'UPCOMING' || (c.format !== 'TEAM' && c.format !== 'DUEL'))
   const canCancel = d.can_manage && open && (phase === 'UPCOMING' || d.stats.participants <= 1)
@@ -339,15 +342,15 @@ function ActionBar({ d, phase, code }: { d: ChallengeDetail; phase: ReturnType<t
       <div className="fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-md gap-2 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur-md">
         {canJoin ? (
           <Button block size="lg" loading={a.join.isPending}
-            onClick={() => c.format === 'TEAM' ? setSheet('team') : run(a.join.mutateAsync({ code }), c.format === 'DUEL' ? 'Đã nhận lời thách đấu!' : 'Đã tham gia. Chạy thôi!')}>
-            {c.format === 'TEAM' ? 'Chọn đội và tham gia' : c.format === 'DUEL' ? 'Nhận lời thách đấu' : 'Tham gia'}
+            onClick={() => pickTeam ? setSheet('team') : run(a.join.mutateAsync({ code }), c.format === 'DUEL' ? 'Đã nhận lời thách đấu!' : c.pledge_enabled ? 'Đã tham gia. Hãy đăng ký mục tiêu của bạn!' : 'Đã tham gia. Chạy thôi!')}>
+            {pickTeam ? 'Chọn đội và tham gia' : c.format === 'TEAM' ? 'Tham gia và đăng ký mục tiêu' : c.format === 'DUEL' ? 'Nhận lời thách đấu' : 'Tham gia'}
           </Button>
         ) : joined && open ? (
           <Button block size="lg" variant="secondary" onClick={() => setSheet('invite')}><Share2 className="size-4" aria-hidden />Mời bạn cùng tham gia</Button>
         ) : (
           <p className="flex flex-1 items-center text-sm text-fg-muted">{teamLocked && !joined ? 'Danh sách đội đã khóa.' : ''}</p>
         )}
-        {(canLeave || canCancel || (joined && c.format === 'TEAM' && phase === 'UPCOMING') || (!joined && inviteCode)) && (
+        {(canLeave || canCancel || (joined && pickTeam && phase === 'UPCOMING') || (!joined && inviteCode)) && (
           <Button variant="secondary" size="lg" aria-label="Tùy chọn khác" className="w-13 shrink-0 px-0" onClick={() => setSheet('menu')}>
             <MoreHorizontal className="size-5" aria-hidden />
           </Button>
@@ -357,7 +360,7 @@ function ActionBar({ d, phase, code }: { d: ChallengeDetail; phase: ReturnType<t
       <Sheet open={sheet === 'menu'} onClose={() => setSheet(null)} title="Tùy chọn">
         <div className="space-y-1">
           {inviteCode && <MenuButton icon={Share2} label="Mời bạn (link có mã)" onClick={() => setSheet('invite')} />}
-          {joined && c.format === 'TEAM' && phase === 'UPCOMING' && <MenuButton icon={UsersRound} label="Đổi đội" onClick={() => setSheet('team')} />}
+          {joined && pickTeam && phase === 'UPCOMING' && <MenuButton icon={UsersRound} label="Đổi đội" onClick={() => setSheet('team')} />}
           {canLeave && <MenuButton icon={LogOut} label="Rời thử thách" danger onClick={() => setSheet('leave')} />}
           {canCancel && <MenuButton icon={CircleSlash} label="Hủy thử thách" danger onClick={() => setSheet('cancel')} />}
         </div>

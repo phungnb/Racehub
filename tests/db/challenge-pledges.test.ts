@@ -114,6 +114,24 @@ describe('Thử thách theo mục tiêu tự đăng ký (002000)', () => {
     expect((await me(db, cid, F)).status).toBe('COMPLETED')
   })
 
+  it('đua đội tự tạo đội (002200): số đội = số người đăng ký ÷ số người mỗi đội, tổng mục tiêu gần bằng nhau', async () => {
+    const cid = await create(db, { title: 'Đua đội tự chia', format: 'TEAM', objective: 'DISTANCE', game_mode: 'TEAM_SUM',
+      team_names: ['Đội 1', 'Đội 2'], start_date: iso(2), end_date: iso(24 * 10), max_slots: 20 })
+    expect(await fails(db, A, `select public.set_challenge_pledge($1, '{"min_km":10,"max_km":300,"team_size":1}'::jsonb)`, [cid])).toContain('INVALID_TEAM_SIZE')
+    await rpc(db, A, `select public.set_challenge_pledge($1, '{"min_km":10,"max_km":300,"cap_pct":20,"team_size":2}'::jsonb)`, [cid])
+    for (const [u, km] of [[A, 100], [B, 80], [C, 60], [D, 50], [E, 40], [F, 30]] as [string, number][]) {
+      await rpc(db, u, `select public.join_challenge($1)`, [cid])
+      await rpc(db, u, `select public.set_my_pledge($1, $2)`, [cid, km])
+    }
+    const r = (await rpc<{ r: Board }>(db, A, `select public.assign_pledge_teams($1, 'BALANCE') as r`, [cid]))[0].r
+    expect(r.teams!.map((x) => x.members)).toEqual([2, 2, 2])       // 6 người ÷ 2 = 3 đội
+    const t = r.teams!.map((x) => Number(x.pledge_total))
+    expect(Math.max(...t) - Math.min(...t)).toBeLessThanOrEqual(20)   // 130 / 120 / 110 là tốt nhất có thể
+    // Chia lại vẫn giữ 3 đội, không tạo thừa
+    await rpc(db, A, `select public.assign_pledge_teams($1, 'RANDOM')`, [cid])
+    expect((await db.query(`select 1 from public.challenge_teams where challenge_id = $1`, [cid])).rows).toHaveLength(3)
+  })
+
   it('người ngoài không xem được bảng mục tiêu của thử thách riêng', async () => {
     const cid = await create(db, { title: 'Nội bộ', format: 'SOLO_GOAL', objective: 'DISTANCE', target_value: 21, audience: 'INVITE_ONLY',
       start_date: iso(-1), end_date: iso(48), max_slots: 5 })
