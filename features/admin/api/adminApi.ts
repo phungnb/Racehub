@@ -55,6 +55,13 @@ export interface PendingActivity {
   distance_m: number
   started_at: string | null
   created_at: string
+  source: string | null
+  moving_time_s: number | null
+  validation_reason: string | null
+  /** Chống gian lận (migration 002300) */
+  risk_score: number | null
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | null
+  risk_flags: { code: string; severity: string; message?: string; durationS?: number | null }[] | null
   profiles: { display_name: string | null } | null
 }
 
@@ -116,7 +123,7 @@ export async function publishPolicy(current: Record<string, unknown>, next: Econ
 
 export async function listPendingActivities(): Promise<PendingActivity[]> {
   const { data, error } = await supabase.from('activities')
-    .select('id, title, distance_m, started_at, created_at, profiles!activities_user_id_fkey(display_name)')
+    .select('id, title, distance_m, started_at, created_at, source, moving_time_s, validation_reason, risk_score, risk_level, risk_flags, profiles!activities_user_id_fkey(display_name)')
     .eq('validation_status', 'PENDING').order('created_at', { ascending: false }).limit(100)
   if (error) throw error
   return (data ?? []) as unknown as PendingActivity[]

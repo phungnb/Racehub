@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { serverEnv } from '@/shared/config/env.server'
+import { analyzeRun, stravaStreams, type FraudResult } from '@/features/activity/server'
 import { mapStravaActivity, mapStravaDetail, summarize, syncWindowStart, tokenNeedsRefresh, type StravaSummaryActivity, type SyncSummary } from './mapping'
 
 export const STRAVA_SCOPES = 'read,activity:read_all'
@@ -108,9 +109,45 @@ async function stravaGet<T>(token: string, path: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
-async function ingest(admin: SupabaseClient, userId: string, a: StravaSummaryActivity, detailed = false) {
+const RUN_SPORTS = new Set(['Run', 'TrailRun', 'VirtualRun'])
+/** Chỉ phân tích sâu bài mới (tránh tốn hạn mức API Strava khi đồng bộ lại lịch sử) */
+const FRAUD_RECENT_MS = 3 * 86_400_000
+const STREAM_KEYS = 'time,distance,latlng,heartrate,cadence'
+
+/**
+ * Chấm điểm gian lận một bài chạy trước khi nhập (migration 002300): tải streams + pace các bài gần đây của người chạy.
+ * Lỗi mạng / hết hạn mức → trả null, máy chủ CSDL vẫn áp luật cơ bản (không chặn việc nhập bài).
+ */
+async function assessRisk(admin: SupabaseClient, userId: string, token: string, a: StravaSummaryActivity): Promise<FraudResult | null> {
+  const n = mapStravaActivity(a)
+  if (!RUN_SPORTS.has(n.sport_type) || n.distance_m < 200) return null
+  const summary = { sportType: n.sport_type, manual: n.manual, trainer: a.trainer === true, deviceName: n.device_name,
+    distanceM: n.distance_m, movingS: n.moving_s, maxSpeedMps: n.max_speed_mps }
+  if (n.manual || Date.now() - Date.parse(n.started_at) > FRAUD_RECENT_MS) return analyzeRun(summary, null)
+  try {
+    // Bài đã nhập (đồng bộ lại / webhook đổi tên) → không tải streams lần nữa
+    const { data: existing } = await admin.from('activities').select('id').eq('source', 'STRAVA').eq('source_activity_id', String(a.id)).limit(1)
+    if (existing?.length) return null
+    const [raw, hist] = await Promise.all([
+      stravaGet<Record<string, { data?: unknown[] }>>(token, `/activities/${a.id}/streams?keys=${STREAM_KEYS}&key_by_type=true`),
+      admin.from('activities').select('moving_time_s, distance_m').eq('user_id', userId).eq('validation_status', 'APPROVED')
+        .gte('distance_m', 2000).order('started_at', { ascending: false }).limit(30),
+    ])
+    const history = ((hist.data ?? []) as { moving_time_s: number; distance_m: number }[])
+      .map((h) => h.moving_time_s / (h.distance_m / 1000))
+    return analyzeRun(summary, stravaStreams(raw), history)
+  } catch (e) {
+    console.warn('[strava] fraud streams', (e as Error).message)
+    return analyzeRun(summary, null)
+  }
+}
+
+async function ingest(admin: SupabaseClient, userId: string, a: StravaSummaryActivity, detailed = false, token?: string) {
+  const risk = token ? await assessRisk(admin, userId, token, a) : null
   const { data, error } = await admin.rpc('ingest_provider_activity', {
-    p_user_id: userId, p_source: 'STRAVA', p_external_id: String(a.id), p_activity: mapStravaActivity(a),
+    p_user_id: userId, p_source: 'STRAVA', p_external_id: String(a.id),
+    p_activity: { ...mapStravaActivity(a), ...(risk ? { risk: { verdict: risk.verdict, score: risk.score, level: risk.level, reason: risk.reason,
+      flags: risk.flags.map((f) => ({ code: f.code, severity: f.severity, message: f.message, atS: f.atS ?? null, durationS: f.durationS ?? null })) } } : {}) },
   })
   if (error) throw new Error(`INGEST_FAILED:${error.message}`)
   const r = data as Record<string, unknown>
@@ -149,7 +186,7 @@ export async function syncStravaActivities(admin: SupabaseClient, userId: string
   for (let page = 1; page <= 3; page++) {
     const list = await stravaGet<StravaSummaryActivity[]>(token, `/athlete/activities?after=${after}&per_page=100&page=${page}`)
     // Xử lý từ cũ đến mới để trần thưởng/ngày và thứ tự thử thách đúng thời gian
-    for (const a of [...list].reverse()) results.push(await ingest(admin, userId, a))
+    for (const a of [...list].reverse()) results.push(await ingest(admin, userId, a, false, token))
     if (list.length < 100) break
   }
   await admin.from('connected_accounts').update({ last_synced_at: new Date().toISOString() })
@@ -176,5 +213,5 @@ export async function handleStravaWebhookEvent(admin: SupabaseClient, event: {
   }
   const { token } = await getValidStravaToken(admin, conn.user_id)
   const activity = await stravaGet<StravaSummaryActivity>(token, `/activities/${event.object_id}`)
-  return ingest(admin, conn.user_id, activity, true)
+  return ingest(admin, conn.user_id, activity, true, token)
 }
