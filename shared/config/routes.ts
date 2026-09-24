@@ -18,6 +18,7 @@ export const routes = {
   character: '/character',
   admin: '/admin',
   welcome: '/welcome',
+  activity: (id: string) => `/activities/${encodeURIComponent(id)}`,
 } as const
 
 /** Chỉ chấp nhận đường dẫn nội bộ cho tham số ?next= (chống open redirect) */

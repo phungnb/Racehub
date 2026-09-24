@@ -101,8 +101,8 @@ const PORTRAIT: Record<Gender, { cx: number; cy: number; side: number }> = {
   female: { cx: 450, cy: 215, side: 330 },
 }
 
-/** Ảnh chân dung vuông của nhân vật đang mặc bộ đồ (JPEG), dùng làm ảnh đại diện */
-export async function renderPortrait(gender: Gender, items: CharacterItem[], size = 512): Promise<Blob> {
+/** Nhân vật đầy đủ (khung chuẩn 900×1350) mặc bộ đồ `items` — dùng cho ảnh chia sẻ, ảnh đại diện */
+export async function renderCharacter(gender: Gender, items: CharacterItem[]): Promise<HTMLCanvasElement> {
   const tints = items.filter((i) => i.render_kind === 'TINT' && i.color && isTintSlot(i.slot)).map((i) => [i.slot, i.color!] as [TintSlot, string])
   const urls = items.map((i) => layerUrl(i, gender)).filter((u): u is string => !!u)
   const [p, imgs] = await Promise.all([prepare(gender), Promise.all(urls.map(loadLayer))])
@@ -112,6 +112,12 @@ export async function renderPortrait(gender: Gender, items: CharacterItem[], siz
   const fctx = full.getContext('2d')!
   fctx.putImageData(paint(p, tints), 0, 0)
   for (const img of imgs) fctx.drawImage(img, 0, 0, FRAME.width, FRAME.height)
+  return full
+}
+
+/** Ảnh chân dung vuông của nhân vật đang mặc bộ đồ (JPEG), dùng làm ảnh đại diện */
+export async function renderPortrait(gender: Gender, items: CharacterItem[], size = 512): Promise<Blob> {
+  const full = await renderCharacter(gender, items)
   const { cx, cy, side } = PORTRAIT[gender]
   const out = document.createElement('canvas')
   out.width = size

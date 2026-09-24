@@ -1,7 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { serverEnv } from '@/shared/config/env.server'
-import { mapStravaActivity, summarize, syncWindowStart, tokenNeedsRefresh, type StravaSummaryActivity, type SyncSummary } from './mapping'
+import { mapStravaActivity, mapStravaDetail, summarize, syncWindowStart, tokenNeedsRefresh, type StravaSummaryActivity, type SyncSummary } from './mapping'
 
 export const STRAVA_SCOPES = 'read,activity:read_all'
 export const STRAVA_CALLBACK_PATH = '/api/strava/callback'
@@ -108,12 +108,37 @@ async function stravaGet<T>(token: string, path: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
-async function ingest(admin: SupabaseClient, userId: string, a: StravaSummaryActivity) {
+async function ingest(admin: SupabaseClient, userId: string, a: StravaSummaryActivity, detailed = false) {
   const { data, error } = await admin.rpc('ingest_provider_activity', {
     p_user_id: userId, p_source: 'STRAVA', p_external_id: String(a.id), p_activity: mapStravaActivity(a),
   })
   if (error) throw new Error(`INGEST_FAILED:${error.message}`)
-  return data as Record<string, unknown>
+  const r = data as Record<string, unknown>
+  if (r.result === 'IMPORTED' || r.result === 'UPDATED' || r.result === 'DUPLICATE') await saveDetail(admin, a, detailed)
+  return r
+}
+
+/** Lưu tuyến chạy / từng km (migration 001900). Lỗi ở đây không được làm hỏng việc nhập bài. */
+async function saveDetail(admin: SupabaseClient, a: StravaSummaryActivity, detailed: boolean) {
+  const detail = mapStravaDetail(a, detailed)
+  if (!detail) return
+  const { error } = await admin.rpc('save_activity_detail', { p_source: 'STRAVA', p_external_id: String(a.id), p_detail: detail })
+  if (error) console.warn('[strava] save_activity_detail', error.message)
+}
+
+/**
+ * Lấy bản chi tiết một bài (polyline đầy đủ + từng km) khi chủ bài mở màn chi tiết lần đầu.
+ * Đã có bản chi tiết thì không gọi lại Strava (giữ hạn mức API).
+ */
+export async function enrichStravaActivity(admin: SupabaseClient, userId: string, activityId: string): Promise<'OK' | 'SKIPPED' | 'NOT_FOUND'> {
+  const { data } = await admin.rpc('activity_source_ref', { p_activity_id: activityId })
+  const ref = data as { user_id: string; source: string; external_id: string | null; detailed: boolean; fetched_at: string | null } | null
+  if (!ref || ref.user_id !== userId || ref.source !== 'STRAVA' || !ref.external_id) return 'NOT_FOUND'
+  if (ref.detailed) return 'SKIPPED'
+  const { token } = await getValidStravaToken(admin, userId)
+  const a = await stravaGet<StravaSummaryActivity>(token, `/activities/${ref.external_id}`)
+  await saveDetail(admin, a, true)
+  return 'OK'
 }
 
 /** Đồng bộ các bài chạy mới của một người (tối đa 30 ngày, 3 trang × 100 bài). */
@@ -151,5 +176,5 @@ export async function handleStravaWebhookEvent(admin: SupabaseClient, event: {
   }
   const { token } = await getValidStravaToken(admin, conn.user_id)
   const activity = await stravaGet<StravaSummaryActivity>(token, `/activities/${event.object_id}`)
-  return ingest(admin, conn.user_id, activity)
+  return ingest(admin, conn.user_id, activity, true)
 }

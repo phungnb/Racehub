@@ -42,3 +42,27 @@ describe('tiện ích đồng bộ', () => {
     ])).toEqual({ imported: 2, pending: 1, skipped: 1, duplicates: 2, earned_xu: 5 })
   })
 })
+
+describe('mapStravaDetail', () => {
+  it('bản chi tiết: polyline đầy đủ, từng km, cadence nhân đôi, bỏ đoạn lẻ quá ngắn', async () => {
+    const { mapStravaDetail } = await import('./mapping')
+    const d = mapStravaDetail({
+      id: 1, map: { polyline: 'FULL', summary_polyline: 'SUM' }, start_latlng: [21.03, 105.85], average_cadence: 86.4, max_heartrate: 181,
+      splits_metric: [
+        { distance: 1000.4, moving_time: 330, elevation_difference: 3.2, average_heartrate: 148.6 },
+        { distance: 1000, moving_time: 325 },
+        { distance: 20, moving_time: 7 },
+      ],
+    }, true)
+    expect(d).toMatchObject({ polyline: 'FULL', avg_cadence: 173, max_heartrate: 181, start_lat: 21.03, start_lng: 105.85, detailed: true })
+    expect(d!.splits).toEqual([
+      { distance_m: 1000, moving_s: 330, elev_m: 3.2, hr: 149 },
+      { distance_m: 1000, moving_s: 325, elev_m: null, hr: null },
+    ])
+  })
+  it('bản tóm tắt: chỉ polyline rút gọn; không có gì thì bỏ qua', async () => {
+    const { mapStravaDetail } = await import('./mapping')
+    expect(mapStravaDetail({ id: 1, map: { polyline: 'FULL', summary_polyline: 'SUM' } }, false)).toMatchObject({ polyline: 'SUM', splits: null, detailed: false })
+    expect(mapStravaDetail({ id: 1, map: { summary_polyline: '' } }, false)).toBeNull()
+  })
+})

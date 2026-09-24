@@ -52,6 +52,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001001600_club_bank_qr.sql` | Ban quản trị CLB tự tải **ảnh mã QR nhận tiền** (app ngân hàng / MoMo / ZaloPay); có ảnh thì thành viên quét ảnh này, không có thì app tự tạo VietQR từ số tài khoản | Cần file 1500 |
 | `20261001001700_web_push.sql` | **Thông báo đẩy:** thiết bị nhận push, cài đặt loại thông báo + giờ yên lặng (mặc định 22h–6h), hàng đợi gửi. Sau khi chạy cần bước "Bật gửi push" bên dưới | Cần file 1600 |
 | `20261001001800_onboarding.sql` | **Màn chào mừng người mới** (hồ sơ → Strava → CLB → thông báo). Tài khoản đang có được coi là đã xong, chỉ người đăng ký mới thấy | Cần file 1700 |
+| `20261001001900_activity_detail.sql` | **Chi tiết bài chạy:** lưu tuyến chạy + từng km (từ Strava), trang `/activities/<id>` có bản đồ, nhịp tim, so sánh với bài trước; ảnh chia sẻ. Bản đồ của người khác vẫn theo cài đặt quyền riêng tư (mặc định riêng tư) | Cần file 1800 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 
