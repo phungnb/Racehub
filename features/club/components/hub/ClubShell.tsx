@@ -59,8 +59,8 @@ export function ClubShell({ clubId, children }: { clubId: string; children: Reac
         <div className="flex items-end gap-4 px-4 pb-4">
           <ClubAvatar club={club} size="lg" className="shadow-lg" />
           <div className="min-w-0 pb-1">
-            <h1 className="flex items-center gap-2 text-2xl font-bold leading-tight">
-              <span className="truncate">{club.name}</span>
+            <h1 className="flex items-center gap-2 text-xl font-bold leading-tight sm:text-2xl">
+              <span className="line-clamp-2 break-words">{club.name}</span>
               {club.plan === 'PRO' && <span className="shrink-0 rounded-full bg-coin/20 px-2 py-0.5 text-[11px] font-bold text-coin">PRO</span>}
             </h1>
             <p className="mt-1 flex items-center gap-1.5 text-sm text-fg-muted">

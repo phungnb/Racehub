@@ -51,7 +51,7 @@ export function ClubFinance({ clubId, openDue }: { clubId: string; openDue?: str
         {f.can_manage && (
           <div className="flex gap-2">
             <Button block onClick={() => setSheet('due')}><HandCoins className="size-4" aria-hidden />Thu phí</Button>
-            <Button block variant="secondary" onClick={() => setSheet('entry')}><Plus className="size-4" aria-hidden />Ghi thu / chi</Button>
+            <Button block variant="secondary" onClick={() => setSheet('entry')}><Plus className="size-4" aria-hidden /><span className="whitespace-nowrap">Thu / chi</span></Button>
           </div>
         )}
       </Card>
