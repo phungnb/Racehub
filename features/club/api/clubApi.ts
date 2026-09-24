@@ -1,6 +1,7 @@
 // Dữ liệu CLB: thông tin, thành viên, quỹ, cài đặt. Mọi thao tác ghi đi qua RPC.
 import { supabase } from '@/shared/lib/supabase'
 import type { ClubRole, JoinPolicy, MemberStatus } from '../model/roles'
+import type { PendingRun } from '@/features/activity'
 
 export interface Club {
   id: string
@@ -176,6 +177,18 @@ export async function updateClubPolicy(clubId: string, fields: { joinPolicy?: Jo
   return data as Club
 }
 
+/** Bài chạy chờ duyệt của thành viên CLB (migration 002400) — chỉ ban quản trị */
+export async function listClubPendingRuns(clubId: string): Promise<PendingRun[]> {
+  const { data, error } = await supabase.rpc('club_pending_activities', { p_club_id: clubId })
+  if (error) throw error
+  return (data ?? []) as PendingRun[]
+}
+
+export async function reviewRun(activityId: string, status: 'APPROVED' | 'REJECTED') {
+  const { error } = await supabase.rpc('review_activity', { p_activity_id: activityId, p_status: status })
+  if (error) throw error
+}
+
 export async function rotateInviteCode(clubId: string): Promise<string> {
   const { data, error } = await supabase.rpc('rotate_invite_code', { p_club_id: clubId })
   if (error) throw error
@@ -212,6 +225,7 @@ const MESSAGES: Record<string, string> = {
   INVITE_ONLY: 'CLB này chỉ nhận thành viên qua link mời.',
   INVALID_INVITE: 'Mã mời không đúng hoặc đã hết hiệu lực.',
   FORBIDDEN: 'Bạn không có quyền làm việc này.',
+  ACTIVITY_NOT_PENDING: 'Bài chạy này đã được người khác duyệt.',
   NOT_AUTHORIZED: 'Bạn không có quyền làm việc này.',
   MEMBER_NOT_FOUND: 'Không tìm thấy thành viên này.',
   TARGET_NOT_APPROVED: 'Chỉ áp dụng được với thành viên đã được duyệt.',

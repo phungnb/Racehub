@@ -95,7 +95,7 @@ describe('mục tiêu tự đăng ký', () => {
     expect(m.draftToPayload(d)).toMatchObject({ target_value: 21, max_slots: 50 })
     const t = { ...d, ...m.teamPledgePreset(new Date('2026-09-24T03:00:00Z'), 'c') } as m.ChallengeDraft
     expect(m.draftToPayload({ ...t, gameMode: 'TEAM_AVG' })).toMatchObject({ game_mode: 'TEAM_SUM', target_value: 0, team_names: ['Đội 1', 'Đội 2'], team_size: 0 })
-    expect(m.pledgePayload(t.pledge, true)).toMatchObject({ team_size: 5 })
+    expect(m.pledgePayload({ ...t.pledge, options: [21, 42] }, true)).toMatchObject({ team_size: 5, options: null, min_km: 1, max_km: 1000 })   // đua đội: thành viên tự nhập km
     expect(m.validateDraft({ ...t, pledge: { ...t.pledge, teamSize: 1 } }, 2)).toHaveProperty('teamSize')
     expect(m.validateDraft({ ...t, teamNames: [] }, 2)).not.toHaveProperty('teamNames')
   })

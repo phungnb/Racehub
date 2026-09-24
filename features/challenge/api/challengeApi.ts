@@ -64,6 +64,8 @@ export interface Challenge {
   teams_assigned_at?: string | null
   /** Đua đội theo mục tiêu: số người mỗi đội (đội được tạo tự động khi chia) */
   pledge_team_size?: number | null
+  /** Bài không có nhịp tim không được tính */
+  require_hr?: boolean
 }
 
 export interface ChallengeParticipant {
@@ -245,6 +247,11 @@ export const movePledgeMember = (id: string, participantId: string, teamId: stri
 
 export async function setMyPledge(id: string, km: number) {
   const { error } = await supabase.rpc('set_my_pledge', { p_challenge_id: id, p_km: km })
+  if (error) throw error
+}
+
+export async function setChallengeOptions(id: string, p: { require_hr: boolean }) {
+  const { error } = await supabase.rpc('set_challenge_options', { p_challenge_id: id, p })
   if (error) throw error
 }
 

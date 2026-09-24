@@ -116,6 +116,8 @@ export interface ChallengeDraft {
   minPace: number
   maxPace: number
   dailyCapKm: number
+  /** Bắt buộc có nhịp tim: bài không có dữ liệu nhịp tim không được tính (migration 002400) */
+  requireHr: boolean
   teamNames: string[]
   teamSize: number
   maxSlots: number
@@ -194,7 +196,7 @@ export function teamPledgePreset(now: Date, clubId: string): Partial<ChallengeDr
     description: 'Đăng ký mục tiêu km của bạn trước ngày xuất phát. Ban quản trị chia đội để tổng mục tiêu các đội bằng nhau.',
     audience: 'CLUB_ONLY', clubId, rewardSource: 'CLUB', teamSize: 0, maxSlots: 50,
     start: s.toISOString(), end: new Date(s.getTime() + 10 * DAY).toISOString(),
-    pledge: { ...DEFAULT_PLEDGE, enabled: true, options: [], minKm: 10, maxKm: 300, capPct: 20, teamSize: 5 },
+    pledge: { ...DEFAULT_PLEDGE, enabled: true, options: [], minKm: 1, maxKm: 1000, capPct: 20, teamSize: 5 },
   }
 }
 
@@ -214,9 +216,10 @@ export const validateTeamSize = (n: number) => (Number.isInteger(n) && n >= 2 &&
 
 /** Dữ liệu gửi RPC set_challenge_pledge (team_size chỉ có ở đua đội) */
 export const pledgePayload = (p: PledgeDraft, team = false) => ({
-  options: p.options.length ? [...new Set(p.options)].sort((a, b) => a - b) : null,
-  min_km: p.options.length ? null : p.minKm,
-  max_km: p.options.length ? null : p.maxKm,
+  // Đua đội: thành viên tự nhập km bất kỳ (1–1000), không có mốc do người tạo đặt
+  options: team ? null : p.options.length ? [...new Set(p.options)].sort((a, b) => a - b) : null,
+  min_km: team ? 1 : p.options.length ? null : p.minKm,
+  max_km: team ? 1000 : p.options.length ? null : p.maxKm,
   cap_pct: p.capPct,
   team_size: team ? p.teamSize : null,
 })
@@ -230,7 +233,7 @@ export function defaultDraft(now = new Date(), clubId: string | null = null): Ch
   start.setMinutes(0, 0, 0)
   return {
     format: 'RANKED', title: '', description: '', audience: clubId ? 'CLUB_ONLY' : 'PUBLIC', clubId,
-    objective: 'DISTANCE', gameMode: 'TEAM_AVG', targetValue: 0, minKm: 1, minPace: 3, maxPace: 15, dailyCapKm: 0,
+    objective: 'DISTANCE', gameMode: 'TEAM_AVG', targetValue: 0, minKm: 1, minPace: 3, maxPace: 15, dailyCapKm: 0, requireHr: false,
     teamNames: ['Đội Xanh', 'Đội Đỏ'], teamSize: 0, maxSlots: 5,      // ≤ 5 người: miễn phí tạo
     start: start.toISOString(), end: new Date(start.getTime() + 7 * DAY).toISOString(),
     rewardXu: 0, rewardSource: clubId ? 'CLUB' : 'CREATOR', rewardSplit: 'WINNER',
