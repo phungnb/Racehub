@@ -43,7 +43,7 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
   const t = useRunTracker()
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [locked, setLocked] = useState(false)
-  const avgPace = t.distanceM > 0 ? t.movingS / (t.distanceM / 1000) : 0
+  const avgPace = t.avgPace
   const live = t.phase === 'RUNNING' || t.phase === 'PAUSED' || t.phase === 'LOCATING'
 
   // ---------------- Chờ bắt đầu ----------------

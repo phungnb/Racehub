@@ -1,7 +1,7 @@
 /* RaceHub service worker — khung offline + Web Push.
  * Không cache trang/HTML hay dữ liệu API (luôn lấy mới); chỉ cache tệp tĩnh có hash của Next
  * và trang offline để khi mất mạng vẫn mở được app và thấy thông báo rõ ràng. */
-const VERSION = 'rh-v1'
+const VERSION = 'rh-v2'   // tăng khi đổi icon / trang offline để máy người dùng lấy bản mới
 const STATIC = `${VERSION}-static`
 const OFFLINE_URL = '/offline.html'
 const PRECACHE = [OFFLINE_URL, '/icons/icon-192.png', '/icons/badge-96.png']

@@ -23,6 +23,7 @@ export const GPS = {
   STILL_MIN_M: 10,         // …vị trí (đã làm mượt) dời chưa tới 10 m (< 1 m/s) → đang đứng yên
   STILL_DEVICE_MPS: 0.5,   // máy báo vận tốc < 0,5 m/s mà điểm vẫn "nhảy" → coi là đứng yên
   MAX_SPEED_MPS: 12,       // > 43 km/h: nhảy điểm
+  SEGMENT_MAX_S: 15,       // đoạn giữa 2 điểm dài hơn thế = có lúc đứng chờ → chỉ tính phần thời gian di chuyển
   AUTO_PAUSE_MPS: 0.6,     // < 2,2 km/h trong AUTO_PAUSE_AFTER_S → tự tạm dừng
   AUTO_PAUSE_AFTER_S: 10,
 } as const
@@ -91,11 +92,26 @@ export function isStationary(raw: TrackPoint[]): boolean {
   return haversineM(then.latitude, then.longitude, now.latitude, now.longitude) < GPS.STILL_MIN_M
 }
 
-/** Pace hiện tại (giây/km) từ các điểm trong 30 giây gần nhất — mượt hơn pace tức thời. */
-export function rollingPace(points: TrackPoint[], windowS = 30): number {
+/**
+ * Thời gian di chuyển (giây) của một đoạn giữa hai điểm được nhận — dùng để tính pace trung bình
+ * khớp với chính quãng đường GPS (như Strava: "moving time").
+ * Đoạn dài (đứng chờ đèn rồi chạy tiếp) chỉ tính phần di chuyển ước lượng theo tốc độ gần đây.
+ */
+export function segmentMovingS(dt: number, d: number, recentSpeed: number): number {
+  if (dt <= 0 || d <= 0) return 0
+  if (dt <= GPS.SEGMENT_MAX_S) return dt
+  return Math.min(dt, d / Math.max(recentSpeed, 1.5))
+}
+
+/**
+ * Pace hiện tại (giây/km) từ các điểm trong 30 giây gần nhất — mượt hơn pace tức thời.
+ * Điểm cuối cũ hơn 10 giây (đang đứng) hoặc quãng quá ngắn → 0 (hiện "--:--").
+ */
+export function rollingPace(points: TrackPoint[], windowS = 30, now?: number): number {
   if (points.length < 2) return 0
   const last = points[points.length - 1]
   const tEnd = Date.parse(last.recorded_at)
+  if (now !== undefined && now - tEnd > 10_000) return 0
   let dist = 0
   let tStart = tEnd
   for (let i = points.length - 1; i > 0; i--) {
@@ -105,7 +121,7 @@ export function rollingPace(points: TrackPoint[], windowS = 30): number {
     tStart = t
   }
   const dt = (tEnd - tStart) / 1000
-  return dist > 5 && dt > 0 ? dt / (dist / 1000) : 0
+  return dist >= 20 && dt > 0 ? dt / (dist / 1000) : 0
 }
 
 /** Khi vượt qua mốc km mới, trả về split của km vừa hoàn thành. */

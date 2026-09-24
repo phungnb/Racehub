@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { evaluatePoint, haversineM, isStationary, nextSplit, rollingPace, smoothPoint, splitAnnouncement, type TrackPoint } from './tracker'
+import { evaluatePoint, haversineM, isStationary, nextSplit, rollingPace, segmentMovingS, smoothPoint, splitAnnouncement, type TrackPoint } from './tracker'
 
 const pt = (lat: number, t: number, accuracy = 5, speed: number | null = null): TrackPoint =>
   ({ latitude: lat, longitude: 105.85, accuracy, altitude: 0, speed, recorded_at: new Date(t * 1000).toISOString() })
@@ -68,6 +68,36 @@ describe('pace & split', () => {
     const pts = Array.from({ length: 10 }, (_, i) => pt(21 + dLat(i * 25), i * 5))   // 5 m/s
     expect(rollingPace(pts)).toBeCloseTo(200, -1)                                    // 3:20/km
     expect(rollingPace([pt(21, 0)])).toBe(0)
+    // đứng yên quá 10 giây → không hiện pace cũ
+    expect(rollingPace(pts, 30, Date.parse(pts[9].recorded_at) + 15_000)).toBe(0)
+  })
+  it('thời gian di chuyển: đoạn ngắn tính đủ, đoạn có đứng chờ chỉ tính phần di chuyển', () => {
+    expect(segmentMovingS(4, 12, 3)).toBe(4)
+    expect(segmentMovingS(60, 30, 3)).toBe(10)            // đứng 50 s rồi chạy 30 m
+    expect(segmentMovingS(20, 0, 3)).toBe(0)
+  })
+  it('pace trung bình khớp thực tế: chạy 5:00/km, dừng đèn đỏ 60 giây giữa chừng', () => {
+    let anchor: TrackPoint | null = null
+    let dist = 0, moving = 0, speed = 3.33
+    const raw: TrackPoint[] = []
+    for (let t = 0; t <= 420; t++) {
+      const m = t < 180 ? t * 3.333 : t < 240 ? 600 : 600 + (t - 240) * 3.333   // 180 s chạy, 60 s đứng, 180 s chạy
+      raw.push(pt(21 + dLat(m), t, 6))
+      if (isStationary(raw)) continue
+      const p = smoothPoint(raw)!
+      const v = evaluatePoint(anchor, p)
+      if (!v.accept) continue
+      if (anchor) {
+        const dt = (Date.parse(p.recorded_at) - Date.parse(anchor.recorded_at)) / 1000
+        moving += segmentMovingS(dt, v.distance, speed)
+        if (dt <= 15) speed = 0.7 * speed + 0.3 * v.speed
+      }
+      anchor = p
+      dist += v.distance
+    }
+    const pace = moving / (dist / 1000)
+    expect(pace).toBeGreaterThan(290)
+    expect(pace).toBeLessThan(310)
   })
   it('split mỗi km, không lặp lại', () => {
     const s1 = nextSplit(990, 1005, 330, [])

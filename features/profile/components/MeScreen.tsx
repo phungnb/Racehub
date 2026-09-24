@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
-import { ChevronRight, Coins, Copy, Gift, Pencil, Settings, Share2, Watch } from 'lucide-react'
+import { Copy, Gift, Pencil, Settings, Share2, Watch } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, LevelBadge, ProgressBar, SegmentedControl, Skeleton } from '@/shared/ui'
-import { formatCoin, formatKm, formatNumber } from '@/shared/lib/format'
+import { formatKm, formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import { levelProgress } from '@/features/progression'
 import { CharacterHub } from '@/features/character'
@@ -53,11 +53,6 @@ function Header({ profile }: { profile: Profile }) {
           <div className="flex flex-wrap items-center gap-2 text-sm text-fg-muted">
             <LevelBadge level={p.current.level} /> <span className="truncate">{p.current.name}</span>
           </div>
-          <Link href={routes.wallet} aria-label="Mở ví Xu"
-            className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-full border border-coin/40 bg-coin/10 px-3 text-sm font-semibold text-coin hover:bg-coin/15">
-            <Coins className="size-4" aria-hidden /><span className="font-mono">{formatCoin(profile.xu)}</span> Xu
-            <ChevronRight className="size-4" aria-hidden />
-          </Link>
           <div className="mt-2 space-y-1">
             <ProgressBar value={p.value} max={p.span} tone="xp" />
             <p className="text-xs text-fg-subtle">
