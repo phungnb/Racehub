@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Crown, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, EmptyState, ErrorState, Field, Input, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
+import { useDebounced } from '@/shared/lib/search'
 import { formatNumber } from '@/shared/lib/format'
 import { adminErrorMessage, adminListClubs, adminSetClubPlan, type AdminClub } from '../api/adminApi'
 
@@ -15,7 +16,8 @@ const TERMS = [{ months: 1, label: '1 tháng' }, { months: 3, label: '3 tháng' 
 export function ClubsProTab() {
   const [q, setQ] = useState('')
   const [editing, setEditing] = useState<AdminClub | null>(null)
-  const list = useQuery({ queryKey: ['admin', 'clubs', q], queryFn: () => adminListClubs(q) })
+  const term = useDebounced(q.trim())
+  const list = useQuery({ queryKey: ['admin', 'clubs', term], queryFn: () => adminListClubs(term), placeholderData: keepPreviousData })
   return (
     <div className="space-y-3">
       <div className="relative">

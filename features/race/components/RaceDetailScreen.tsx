@@ -304,7 +304,7 @@ function CertificateSheet({ r, onClose }: { r: Race; onClose: () => void }) {
 
 function bibData(r: Race, bib: string, name: string | null, km: number) {
   return {
-    race: r.title, bib, name, distanceKm: km, dates: `${fmtDate(r.start_at)} – ${fmtDate(r.end_at)}`,
+    race: r.title, bib, name, org: r.club?.name ?? r.organizer?.display_name ?? null, distanceKm: km, dates: `${fmtDate(r.start_at)} – ${fmtDate(r.end_at)}`,
     qrUrl: typeof window === 'undefined' ? null : `${window.location.origin}/races/${r.id}?bib=${encodeURIComponent(bib)}`,
   }
 }

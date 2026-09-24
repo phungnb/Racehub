@@ -115,17 +115,26 @@ describe('BIB điện tử do BTC thiết kế (002900)', () => {
     expect(d.bib_design.template).toBe('stripe')
   })
 
-  it('003000: ảnh BIB có sẵn làm khung + bố cục số / tên, giới hạn giá trị, sai lựa chọn bị từ chối', async () => {
+  it('003000 + 003200: ảnh BIB có sẵn làm khung + 3 khung chữ tự do, giới hạn giá trị, sai lựa chọn bị từ chối', async () => {
     const q = `select public.set_race_bib_design($1, $2::jsonb) as r`
     const base = { template: 'classic', colors: {}, sponsors: [] }
     const saved = await rpc<Record<string, unknown>>(db, ORG, q, [race, JSON.stringify({ ...base, art_url: url(race, 'bib.png'), use_art: true,
-      art_fit: { zoom: 9, x: -0.25, y: 'lạ' }, show_header: false, text: { layout: 'inline', align: 'left', font: 'outline', y: 0.9, scale: 0.2 }, qr_pos: 'corner' })])
-    expect(saved).toMatchObject({ use_art: true, show_header: false, show_sponsors: true, qr_pos: 'corner',
-      art_fit: { zoom: 3, x: -0.25, y: 0 }, text: { layout: 'inline', align: 'left', font: 'outline', y: 0.85, scale: 0.5, name_scale: 1 } })
+      art_fit: { zoom: 9, x: -0.25, y: 'lạ' }, show_header: false, qr_pos: 'corner', org_text: '  BTC Hồ Tây  ',
+      boxes: { number: { x: 2, y: 0.4, align: 'left', font: 'impact', outline: true, size: 9, color: 'accent', hack: 1 }, name: { show: false } } })])
+    expect(saved).toMatchObject({ use_art: true, show_header: false, show_sponsors: true, qr_pos: 'corner', art_fit: { zoom: 3, x: -0.25, y: 0 },
+      org_text: 'BTC Hồ Tây', show_name: false,
+      boxes: {
+        number: { show: true, x: 1, y: 0.4, align: 'left', font: 'impact', italic: false, outline: true, size: 2.5, color: 'accent' },
+        name: { show: false, font: 'sans', color: 'text' },
+        org: { show: true, x: 0.42, y: 0.3, align: 'center', font: 'sans', size: 1 },
+      } })
+    expect((saved.boxes as Record<string, object>).number).not.toHaveProperty('hack')
+    expect(saved).not.toHaveProperty('text')
     const noArt = await rpc<Record<string, unknown>>(db, ORG, q, [race, JSON.stringify({ ...base, use_art: true })])
-    expect(noArt).toMatchObject({ use_art: false, text: { layout: 'below', align: 'center', font: 'mono' }, qr_pos: 'right' })
+    expect(noArt).toMatchObject({ use_art: false, qr_pos: 'right', boxes: { number: { font: 'mono', color: 'number' } } })
     expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, art_url: 'https://evil.com/bib.png' })]))).toContain('INVALID_BIB_IMAGE')
-    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, text: { layout: 'diagonal' } })]))).toContain('INVALID_BIB_DESIGN')
+    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, boxes: { number: { font: 'comic' } } })]))).toContain('INVALID_BIB_DESIGN')
+    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, boxes: { org: 'x' } })]))).toContain('INVALID_BIB_DESIGN')
     expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, qr_pos: 'top' })]))).toContain('INVALID_BIB_DESIGN')
   })
 

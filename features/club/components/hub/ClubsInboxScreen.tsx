@@ -2,13 +2,15 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useDeferredValue, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, Clock, KeyRound, MessagesSquare, Pin, Plus, Search, Shield, Users } from 'lucide-react'
+import { useState } from 'react'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Clock, KeyRound, Lock, MessagesSquare, Pin, Plus, Search, Shield, Users } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Card, EmptyState, ErrorState, Field, Input, SectionTitle, Sheet, Skeleton, Textarea } from '@/shared/ui'
+import { Button, EmptyState, ErrorState, Field, Input, SectionTitle, Sheet, Skeleton, Textarea } from '@/shared/ui'
 import { formatNumber, formatRelative } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
+import { cn } from '@/shared/lib/cn'
+import { useDebounced } from '@/shared/lib/search'
 import { clubErrorMessage, createClub, joinClubByCode, searchClubs } from '../../api/clubApi'
 import type { InboxClub } from '../../api/hubApi'
 import { JOIN_POLICY_LABEL } from '../../model/roles'
@@ -89,8 +91,8 @@ function InboxRow({ c }: { c: InboxClub }) {
 
 function Discover({ exclude }: { exclude: Set<string> }) {
   const [q, setQ] = useState('')
-  const term = useDeferredValue(q)
-  const res = useQuery({ queryKey: clubKeys.search(term), queryFn: () => searchClubs(term), staleTime: 60_000 })
+  const term = useDebounced(q.trim())
+  const res = useQuery({ queryKey: clubKeys.search(term), queryFn: () => searchClubs(term, 30), staleTime: 60_000, placeholderData: keepPreviousData })
   const list = (res.data ?? []).filter((c) => !exclude.has(c.id))
   return (
     <section>
@@ -100,26 +102,29 @@ function Discover({ exclude }: { exclude: Set<string> }) {
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm theo tên CLB" aria-label="Tìm CLB" className="pl-9" />
       </div>
       {res.isLoading ? (
-        <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-16" />)}</div>
+        <div className="grid grid-cols-4 gap-x-2 gap-y-4">{Array.from({ length: 8 }, (_, i) => (
+          <div key={i} className="flex flex-col items-center gap-1.5"><Skeleton className="size-14 rounded-2xl" /><Skeleton className="h-3 w-12" /></div>))}</div>
       ) : res.isError ? (
         <ErrorState onRetry={() => res.refetch()} />
       ) : list.length === 0 ? (
-        <p className="py-6 text-center text-sm text-fg-muted">{term ? `Không tìm thấy CLB nào tên "${term}".` : 'Chưa có CLB công khai nào.'}</p>
+        <p className="py-6 text-center text-sm text-fg-muted">{term ? `Không tìm thấy CLB nào khớp "${term}". Thử gõ không dấu hoặc vài chữ trong tên.` : 'Chưa có CLB công khai nào.'}</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className={cn('grid grid-cols-4 gap-x-2 gap-y-4 transition-opacity', res.isPlaceholderData && 'opacity-60')}>
           {list.map((c) => (
             <li key={c.id}>
-              <Link href={routes.club(c.id)}>
-                <Card className="flex items-center gap-3 p-3 transition-colors hover:border-fg-subtle">
-                  <ClubAvatar club={c} size="sm" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold">{c.name}</span>
-                    <span className="flex items-center gap-1 text-xs text-fg-muted">
-                      <Users className="size-3.5" aria-hidden />{formatNumber(c.member_count)} thành viên · {JOIN_POLICY_LABEL[c.join_policy].title}
+              <Link href={routes.club(c.id)} className="group flex flex-col items-center gap-1.5 text-center"
+                title={`${c.name} · ${formatNumber(c.member_count)} thành viên · ${JOIN_POLICY_LABEL[c.join_policy].title}`}>
+                <span className="relative">
+                  <ClubAvatar club={c} className="size-14 rounded-2xl transition-transform group-hover:scale-105 group-active:scale-95" />
+                  {c.join_policy !== 'OPEN' && (
+                    <span className="absolute -bottom-1 -right-1 grid size-5 place-items-center rounded-full border-2 border-bg bg-surface-2 text-fg-muted"
+                      aria-label={JOIN_POLICY_LABEL[c.join_policy].title}>
+                      {c.join_policy === 'INVITE_ONLY' ? <Lock className="size-2.5" aria-hidden /> : <Clock className="size-2.5" aria-hidden />}
                     </span>
-                  </span>
-                  <ChevronRight className="size-5 text-fg-subtle" aria-hidden />
-                </Card>
+                  )}
+                </span>
+                <span className="line-clamp-2 w-full break-words text-[11px] font-semibold leading-tight">{c.name}</span>
+                <span className="-mt-1 flex items-center gap-0.5 text-[10px] text-fg-muted"><Users className="size-3" aria-hidden />{formatCompact(c.member_count)}</span>
               </Link>
             </li>
           ))}
@@ -127,6 +132,11 @@ function Discover({ exclude }: { exclude: Set<string> }) {
       )}
     </section>
   )
+}
+
+/** 1234 → "1,2k" */
+function formatCompact(n: number) {
+  return n >= 1000 ? `${(n / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}k` : String(n)
 }
 
 function CreateClubSheet({ open, onClose }: { open: boolean; onClose: () => void }) {

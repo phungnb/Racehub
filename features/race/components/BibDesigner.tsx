@@ -2,19 +2,25 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ImagePlus, Move, Plus, RotateCcw, Trash2, X } from 'lucide-react'
+import { Eye, EyeOff, ImagePlus, Move, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Field, Input, Sheet } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { raceErrorMessage, setBibDesign, uploadRaceImage, type Race } from '../api/raceApi'
 import {
-  ALIGNS, BIB_SIZE, bibPayload, DEFAULT_FIT, editableBib, FONTS, LAYOUTS, panArt, QR_POS, resolveBib, TEMPLATES,
-  type BibColors, type BibDesign, type BibTemplate, type BibText,
+  ALIGNS, applyPreset, BIB_SIZE, bibPayload, BOX_LABEL, COLOR_LABEL, DEFAULT_FIT, editableBib, FONTS, hitBox, moveBox, panArt, PRESETS, QR_POS,
+  resolveBib, TEMPLATES, type BibColors, type BibDesign, type BibFont, type BibLayout, type BibTemplate, type BoxKey, type TextBox,
 } from '../model/bib'
+import { BIB_FONT_FAMILIES } from './bibFonts'
 import { EBib } from './EBib'
 import { fmtDate } from './RaceCard'
 
-const COLOR_LABEL: Record<keyof BibColors, string> = { bg: 'Nền', band: 'Dải chính', number: 'Số BIB', text: 'Chữ', accent: 'Điểm nhấn' }
+/** Font xem trước trên nút chọn font */
+function previewFamily(f: BibFont) {
+  if (f === 'sans') return 'var(--font-be-vietnam)'
+  if (f === 'mono') return 'var(--font-jetbrains)'
+  return BIB_FONT_FAMILIES[f] ?? 'inherit'
+}
 
 /** Ban tổ chức thiết kế e-BIB: ảnh BIB có sẵn làm khung, mẫu, màu, bố cục số / tên, logo, nhà tài trợ, QR — xem trước trực tiếp */
 export function BibDesigner({ r, onClose }: { r: Race; onClose: () => void }) {
@@ -22,7 +28,9 @@ export function BibDesigner({ r, onClose }: { r: Race; onClose: () => void }) {
   const [d, setD] = useState<BibDesign>(() => editableBib(r.bib_design))
   const palette = resolveBib(d).palette
   const set = (p: Partial<BibDesign>) => setD((x) => ({ ...x, ...p }))
-  const setText = (p: Partial<BibText>) => setD((x) => ({ ...x, text: { ...x.text, ...p } }))
+  const [active, setActive] = useState<BoxKey>('number')
+  const setBox = (k: BoxKey, p: Partial<TextBox>) => setD((x) => ({ ...x, boxes: { ...x.boxes, [k]: { ...x.boxes[k], ...p } } }))
+  const [layout, setLayout] = useState<BibLayout | null>(null)
   const artDim = useImageSize(d.art_url)
   const framed = d.use_art && !!d.art_url
   const [uploading, setUploading] = useState<string | null>(null)
@@ -36,7 +44,8 @@ export function BibDesigner({ r, onClose }: { r: Race; onClose: () => void }) {
     onSuccess: () => { toast.success('Đã lưu thiết kế BIB — VĐV thấy ngay'); void qc.invalidateQueries({ queryKey: ['race', r.id] }); onClose() },
     onError: (e) => toast.error(raceErrorMessage(e)),
   })
-  const sample = { race: r.title, bib: `${r.bib_prefix}-0001`, name: 'Nguyễn Văn An', distanceKm: Number(r.distances[r.distances.length - 1]),
+  const defaultOrg = r.club?.name ?? r.organizer?.display_name ?? null
+  const sample = { race: r.title, bib: `${r.bib_prefix}-0001`, name: 'Nguyễn Văn An', org: defaultOrg, distanceKm: Number(r.distances[r.distances.length - 1]),
     dates: `${fmtDate(r.start_at)} – ${fmtDate(r.end_at)}`, qrUrl: typeof window === 'undefined' ? null : `${window.location.origin}/races/${r.id}?bib=${r.bib_prefix}-0001` }
 
   return (
@@ -44,11 +53,36 @@ export function BibDesigner({ r, onClose }: { r: Race; onClose: () => void }) {
       footer={<Button block onClick={() => save.mutate()} loading={save.isPending} disabled={!!uploading}>Lưu thiết kế</Button>}>
       <div className="space-y-5">
         <div className="sticky top-0 z-10 -mx-1 bg-surface px-1 pb-2">
-          <ArtDrag enabled={framed && !!artDim} onPan={(dx, dy) => artDim && setD((x) => ({ ...x, art_fit: panArt(x.art_fit, dx, dy, artDim.w, artDim.h) }))}>
-            <EBib design={d} data={sample} />
-          </ArtDrag>
-          {framed && <p className="mt-1 flex items-center justify-center gap-1 text-[11px] text-fg-muted"><Move className="size-3" aria-hidden />Kéo trên ảnh để căn khung</p>}
+          <CanvasEditor layout={layout} active={active}
+            onGrab={(x, y) => {
+              const k = hitBox(layout, x, y)
+              if (k) { setActive(k); return k }
+              return framed && artDim ? 'art' : null
+            }}
+            onDrag={(target, dx, dy) => setD((x) => target === 'art'
+              ? (artDim ? { ...x, art_fit: panArt(x.art_fit, dx, dy, artDim.w, artDim.h) } : x)
+              : { ...x, boxes: { ...x.boxes, [target]: moveBox(x.boxes[target], dx, dy) } })}>
+            <EBib design={d} data={sample} onLayout={setLayout} />
+          </CanvasEditor>
+          <p className="mt-1 flex items-center justify-center gap-1 text-[11px] text-fg-muted">
+            <Move className="size-3" aria-hidden />Chạm vào chữ trên BIB để chọn, kéo để di chuyển{framed ? ' · kéo chỗ trống để căn ảnh khung' : ''}
+          </p>
         </div>
+
+        <Section title="Chữ trên BIB" hint="3 khung: Đơn vị tổ chức, Số BIB, Tên VĐV. Chọn một khung để đổi font, cỡ, màu, căn lề và vị trí.">
+          <Chips label="Bố cục nhanh" value={null} options={PRESETS} onChange={(p) => set({ boxes: applyPreset(d.boxes, p, d.show_qr ? d.qr_pos : null) })} />
+          <div className="grid grid-cols-3 gap-1.5" role="tablist" aria-label="Khung chữ">
+            {(Object.keys(BOX_LABEL) as BoxKey[]).map((k) => (
+              <button key={k} type="button" role="tab" aria-selected={active === k} onClick={() => setActive(k)}
+                className={cn('flex items-center justify-center gap-1 rounded-xl border px-2 py-2 text-xs font-semibold',
+                  active === k ? 'border-brand bg-brand/15 text-fg' : 'border-border text-fg-muted', !d.boxes[k].show && 'line-through opacity-60')}>
+                {BOX_LABEL[k]}
+              </button>
+            ))}
+          </div>
+          <BoxEditor k={active} b={d.boxes[active]} palette={palette} onChange={(p) => setBox(active, p)}
+            orgText={d.org_text} defaultOrg={defaultOrg} onOrgText={(v) => set({ org_text: v })} />
+        </Section>
 
         <Section title="Ảnh BIB có sẵn" hint="Đã thiết kế BIB trên Canva / Photoshop? Tải lên (khổ ngang 7:5, ví dụ 1400×1000), tick dùng làm khung rồi căn cho khớp. App sẽ in số BIB, tên, QR lên trên.">
           <ImagePick label="Ảnh BIB" url={d.art_url} busy={uploading === 'art'}
@@ -68,16 +102,6 @@ export function BibDesigner({ r, onClose }: { r: Race; onClose: () => void }) {
           )}
           <Toggle checked={d.show_header} onChange={(v) => set({ show_header: v })} label="Hiện đầu BIB (logo, tên giải, cự ly)" />
           <Toggle checked={d.show_sponsors} onChange={(v) => set({ show_sponsors: v })} label="Hiện dải nhà tài trợ" />
-        </Section>
-
-        <Section title="Số BIB & tên VĐV">
-          <Chips label="Bố cục" value={d.text.layout} options={LAYOUTS} onChange={(v) => setText({ layout: v })} />
-          <Chips label="Căn chỉnh" value={d.text.align} options={ALIGNS} onChange={(v) => setText({ align: v })} />
-          <Chips label="Kiểu chữ" value={d.text.font} options={FONTS} onChange={(v) => setText({ font: v })} />
-          <Slider label="Vị trí dọc" value={Math.round(d.text.y * 100)} min={15} max={85} unit="%" onChange={(v) => setText({ y: v / 100 })} />
-          <Slider label="Cỡ số BIB" value={Math.round(d.text.scale * 100)} min={50} max={150} unit="%" onChange={(v) => setText({ scale: v / 100 })} />
-          {d.show_name && <Slider label="Cỡ tên" value={Math.round(d.text.name_scale * 100)} min={50} max={150} unit="%" onChange={(v) => setText({ name_scale: v / 100 })} />}
-          <Toggle checked={d.show_name} onChange={(v) => set({ show_name: v })} label="In tên VĐV" />
         </Section>
 
         <Section title="Mã QR xác thực">
@@ -173,7 +197,7 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
   )
 }
 
-function Chips<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: Record<T, string>; onChange: (v: T) => void }) {
+function Chips<T extends string>({ label, value, options, onChange }: { label: string; value: T | null; options: Record<T, string>; onChange: (v: T) => void }) {
   return (
     <div className="space-y-1.5">
       <p className="text-xs font-medium text-fg-muted">{label}</p>
@@ -198,22 +222,100 @@ function Slider({ label, value, min, max, unit = '', onChange }: { label: string
   )
 }
 
-/** Kéo trên ảnh xem trước để dịch ảnh khung (đổi px màn hình → px BIB) */
-function ArtDrag({ enabled, onPan, children }: { enabled: boolean; onPan: (dx: number, dy: number) => void; children: ReactNode }) {
-  const last = useRef<{ x: number; y: number } | null>(null)
-  if (!enabled) return <>{children}</>
+/** Trình sửa trên ảnh xem trước: chạm chọn khung chữ, kéo để di chuyển (hoặc kéo ảnh khung). Đổi px màn hình → px BIB. */
+function CanvasEditor({ layout, active, onGrab, onDrag, children }: {
+  layout: BibLayout | null; active: BoxKey
+  onGrab: (x: number, y: number) => BoxKey | 'art' | null
+  onDrag: (target: BoxKey | 'art', dx: number, dy: number) => void
+  children: ReactNode
+}) {
+  const drag = useRef<{ target: BoxKey | 'art'; x: number; y: number } | null>(null)
+  const sel = layout?.boxes[active]
+  const pct = (v: number, of: number) => `${(v / of) * 100}%`
   return (
-    <div className="cursor-grab touch-none active:cursor-grabbing"
-      onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); last.current = { x: e.clientX, y: e.clientY } }}
-      onPointerMove={(e) => {
-        if (!last.current) return
-        const k = BIB_SIZE.w / e.currentTarget.clientWidth
-        onPan((e.clientX - last.current.x) * k, (e.clientY - last.current.y) * k)
-        last.current = { x: e.clientX, y: e.clientY }
+    <div className="relative touch-none select-none"
+      onPointerDown={(e) => {
+        const box = e.currentTarget.getBoundingClientRect()
+        const k = BIB_SIZE.w / box.width
+        const target = onGrab((e.clientX - box.left) * k, (e.clientY - box.top) * k)
+        if (!target) return
+        e.currentTarget.setPointerCapture(e.pointerId)
+        drag.current = { target, x: e.clientX, y: e.clientY }
       }}
-      onPointerUp={() => { last.current = null }} onPointerCancel={() => { last.current = null }}>
+      onPointerMove={(e) => {
+        if (!drag.current) return
+        const k = BIB_SIZE.w / e.currentTarget.clientWidth
+        onDrag(drag.current.target, (e.clientX - drag.current.x) * k, (e.clientY - drag.current.y) * k)
+        drag.current = { ...drag.current, x: e.clientX, y: e.clientY }
+      }}
+      onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }}>
       {children}
+      {sel && (
+        <span aria-hidden className="pointer-events-none absolute rounded-md border-2 border-dashed border-brand shadow-[0_0_0_1px_rgba(0,0,0,0.4)]"
+          style={{ left: pct(sel.x - 10, BIB_SIZE.w), top: pct(sel.y - 10, BIB_SIZE.h), width: pct(sel.w + 20, BIB_SIZE.w), height: pct(sel.h + 20, BIB_SIZE.h) }} />
+      )}
     </div>
+  )
+}
+
+function BoxEditor({ k, b, palette, onChange, orgText, defaultOrg, onOrgText }: {
+  k: BoxKey; b: TextBox; palette: BibColors; onChange: (p: Partial<TextBox>) => void
+  orgText: string | null; defaultOrg: string | null; onOrgText: (v: string) => void
+}) {
+  const sample = k === 'number' ? '0421' : k === 'name' ? 'AN' : 'Aa'
+  return (
+    <div className="space-y-3 rounded-xl border border-border p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold">{BOX_LABEL[k]}</p>
+        <Button size="sm" variant="ghost" onClick={() => onChange({ show: !b.show })}>
+          {b.show ? <><Eye className="size-4" aria-hidden />Đang hiện</> : <><EyeOff className="size-4" aria-hidden />Đang ẩn</>}
+        </Button>
+      </div>
+      {k === 'org' && (
+        <Field label="Nội dung" htmlFor="bib-org" hint={`${(orgText ?? '').length}/60`}>
+          <Input id="bib-org" value={orgText ?? ''} maxLength={60} onChange={(e) => onOrgText(e.target.value)} placeholder={defaultOrg ?? 'VD: BTC Hồ Tây Runners'} />
+        </Field>
+      )}
+      {k === 'name' && <p className="text-[11px] text-fg-muted">Mỗi VĐV thấy tên của mình (in hoa). Xem trước dùng tên mẫu.</p>}
+      <div className="space-y-1.5">
+        <p className="text-xs font-medium text-fg-muted">Font chữ</p>
+        <div className="grid grid-cols-5 gap-1.5" role="group" aria-label="Font chữ">
+          {(Object.keys(FONTS) as BibFont[]).map((f) => (
+            <button key={f} type="button" aria-pressed={b.font === f} onClick={() => onChange({ font: f })} title={FONTS[f].label}
+              className={cn('flex flex-col items-center rounded-lg border px-1 py-1.5', b.font === f ? 'border-brand bg-brand/15' : 'border-border')}>
+              <span className="text-base leading-none" style={{ fontFamily: previewFamily(f), fontWeight: FONTS[f].weight, fontStyle: b.italic ? 'italic' : 'normal' }}>{sample}</span>
+              <span className="mt-1 truncate text-[9px] text-fg-muted">{FONTS[f].label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        <Pill on={b.italic} onClick={() => onChange({ italic: !b.italic })}><i>Nghiêng</i></Pill>
+        <Pill on={b.outline} onClick={() => onChange({ outline: !b.outline })}>Viền rỗng</Pill>
+      </div>
+      <Chips label="Căn lề" value={b.align} options={ALIGNS} onChange={(v) => onChange({ align: v })} />
+      <div className="space-y-1.5">
+        <p className="text-xs font-medium text-fg-muted">Màu</p>
+        <div className="flex gap-2" role="group" aria-label="Màu chữ">
+          {(Object.keys(COLOR_LABEL) as (keyof BibColors)[]).map((c) => (
+            <button key={c} type="button" aria-pressed={b.color === c} onClick={() => onChange({ color: c })} title={COLOR_LABEL[c]} aria-label={`Màu ${COLOR_LABEL[c]}`}
+              className={cn('size-8 rounded-full border-2', b.color === c ? 'border-brand ring-2 ring-brand/40' : 'border-border')} style={{ background: palette[c] }} />
+          ))}
+        </div>
+      </div>
+      <Slider label="Cỡ chữ" value={Math.round(b.size * 100)} min={30} max={250} unit="%" onChange={(v) => onChange({ size: v / 100 })} />
+      <Slider label="Ngang" value={Math.round(b.x * 100)} min={0} max={100} unit="%" onChange={(v) => onChange({ x: v / 100 })} />
+      <Slider label="Dọc" value={Math.round(b.y * 100)} min={0} max={100} unit="%" onChange={(v) => onChange({ y: v / 100 })} />
+    </div>
+  )
+}
+
+function Pill({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" aria-pressed={on} onClick={onClick}
+      className={cn('rounded-full border px-3 py-1.5 text-xs font-semibold', on ? 'border-brand bg-brand/15 text-fg' : 'border-border text-fg-muted')}>
+      {children}
+    </button>
   )
 }
 

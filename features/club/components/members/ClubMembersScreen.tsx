@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Ban, Check, Crown, Search, Share2, ShieldCheck, UserMinus, UserX } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Input, LevelBadge, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
+import { matchesSearch } from '@/shared/lib/search'
 import { cn } from '@/shared/lib/cn'
 import { formatRelative } from '@/shared/lib/format'
 import { clubErrorMessage, removeMember, setMemberRole, setMemberStatus, type ClubMember } from '../../api/clubApi'
@@ -55,9 +56,8 @@ export function ClubMembersScreen({ clubId }: { clubId: string }) {
   const all = members.data ?? []
   const pending = all.filter((m) => m.status === 'PENDING')
   const banned = all.filter((m) => m.status === 'BANNED')
-  const term = q.trim().toLocaleLowerCase('vi')
   const approved = all.filter((m) => m.status === 'APPROVED')
-    .filter((m) => !term || (m.profile?.display_name ?? '').toLocaleLowerCase('vi').includes(term))
+    .filter((m) => matchesSearch(q, m.profile?.display_name))
     .sort((a, b) => ({ OWNER: 0, CAPTAIN: 1, MEMBER: 2 }[a.role] - { OWNER: 0, CAPTAIN: 1, MEMBER: 2 }[b.role]))
 
   return (

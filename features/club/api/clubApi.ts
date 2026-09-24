@@ -79,12 +79,9 @@ export async function listMembers(clubId: string): Promise<ClubMember[]> {
   return ((data ?? []) as unknown as MemberRow[]).map(normalizeMember)
 }
 
-/** Tìm CLB để tham gia (theo tên), CLB đông người trước */
+/** Tìm CLB (migration 003100): không dấu, nhiều từ, viết tắt, link riêng; khớp nhất rồi đông người trước */
 export async function searchClubs(search: string, limit = 20): Promise<Club[]> {
-  let q = supabase.from('clubs').select('*').neq('join_policy', 'INVITE_ONLY')
-    .order('member_count', { ascending: false }).limit(limit)
-  if (search.trim()) q = q.ilike('name', `%${search.trim().replace(/[%_]/g, '')}%`)
-  const { data, error } = await q
+  const { data, error } = await supabase.rpc('search_clubs', { p_query: search.trim(), p_limit: limit })
   if (error) throw error
   return (data ?? []) as Club[]
 }

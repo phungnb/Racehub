@@ -5,6 +5,7 @@ import { Copy, CornerUpLeft, Loader2, MessagesSquare, RotateCcw, SendHorizontal,
 import { toast } from 'sonner'
 import { Avatar, Button, EmptyState, ErrorState, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
+import { matchesSearch } from '@/shared/lib/search'
 import { clubErrorMessage } from '../../api/clubApi'
 import type { ChatMessage } from '../../api/chatApi'
 import { applyMention, findMentions, groupMessages, mentionQuery } from '../../model/chat'
@@ -213,7 +214,7 @@ function ChatComposer({ members, replyTo, replyName, onCancelReply, onSend }: {
 
   const mq = mentionQuery(text, caret)
   const suggestions = mq
-    ? members.filter((m) => m.name && m.name.toLocaleLowerCase('vi').includes(mq.query.toLocaleLowerCase('vi'))).slice(0, 5)
+    ? members.filter((m) => m.name && matchesSearch(mq.query, m.name)).slice(0, 5)
     : []
 
   const submit = () => {

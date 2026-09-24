@@ -1,6 +1,6 @@
 // Giải chạy ảo (migration 002700)
 import { supabase } from '@/shared/lib/supabase'
-import type { BibDesign } from '../model/bib'
+import type { BibDesign, StoredDesign } from '../model/bib'
 
 export type RaceScope = 'UPCOMING' | 'MINE' | 'PAST'
 
@@ -33,7 +33,7 @@ export interface Race {
   max_participants: number | null
   bib_prefix: string
   /** Thiết kế e-BIB của BTC (migration 002900), null = mẫu mặc định */
-  bib_design: Partial<BibDesign> | null
+  bib_design: StoredDesign | null
   club: { id: string; name: string; avatar_url: string | null; accent_color: string | null } | null
   organizer: { id: string; display_name: string | null; avatar_url: string | null } | null
   registered: number

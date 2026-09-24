@@ -1,11 +1,33 @@
-// BIB điện tử do ban tổ chức thiết kế (migration 002900). Phần kiểu dữ liệu + mặc định là hàm thuần;
+// BIB điện tử do ban tổ chức thiết kế (migration 002900 → 003200). Phần kiểu dữ liệu + mặc định là hàm thuần;
 // drawBib vẽ lên canvas ở trình duyệt (khổ 1400×1000 ≈ BIB giấy A5 ngang).
+// Chữ trên BIB gồm 3 khung: Đơn vị tổ chức, Số BIB, Tên VĐV — mỗi khung tự đặt vị trí, căn lề, font, cỡ, màu.
 import QRCode from 'qrcode'
 import { distanceLabel } from './race'
 
 export type BibTemplate = 'classic' | 'stripe' | 'neon' | 'minimal'
 export interface BibColors { bg: string; band: string; number: string; text: string; accent: string }
+export type ColorKey = keyof BibColors
 export interface BibSponsor { name: string; logo_url: string | null }
+export interface ArtFit { zoom: number; x: number; y: number }
+export type TextAlign = 'left' | 'center' | 'right'
+export type QrPos = 'right' | 'left' | 'corner'
+export type BoxKey = 'org' | 'number' | 'name'
+export type BibFont = 'sans' | 'mono' | 'condensed' | 'impact' | 'athletic' | 'tech' | 'slab' | 'stencil' | 'script' | 'serif'
+export interface TextBox {
+  show: boolean
+  /** Tâm khung theo tỉ lệ khổ BIB (0..1) */
+  x: number
+  y: number
+  align: TextAlign
+  font: BibFont
+  italic: boolean
+  outline: boolean
+  /** Hệ số cỡ chữ (0.3..2.5) so với cỡ chuẩn của khung */
+  size: number
+  color: ColorKey
+}
+export type BibBoxes = Record<BoxKey, TextBox>
+
 export interface BibDesign {
   template: BibTemplate
   colors: Partial<BibColors>
@@ -22,15 +44,11 @@ export interface BibDesign {
   art_fit: ArtFit
   show_header: boolean
   show_sponsors: boolean
-  text: BibText
   qr_pos: QrPos
+  /** Chữ Đơn vị tổ chức (trống = tên CLB / người tổ chức) */
+  org_text: string | null
+  boxes: BibBoxes
 }
-export interface ArtFit { zoom: number; x: number; y: number }
-export type TextLayout = 'below' | 'above' | 'inline'
-export type TextAlign = 'left' | 'center' | 'right'
-export type BibFont = 'mono' | 'sans' | 'italic' | 'outline'
-export type QrPos = 'right' | 'left' | 'corner'
-export interface BibText { layout: TextLayout; align: TextAlign; font: BibFont; y: number; scale: number; name_scale: number }
 
 export const BIB_SIZE = { w: 1400, h: 1000 }
 
@@ -41,42 +59,116 @@ export const TEMPLATES: Record<BibTemplate, { label: string; hint: string; color
   minimal: { label: 'Tối giản', hint: 'Một màu nền, chữ sạch', colors: { bg: '#f4f6f8', band: '#0a0d12', number: '#0a0d12', text: '#5b6472', accent: '#e11d48' } },
 }
 
-export const LAYOUTS: Record<TextLayout, string> = { below: 'Tên dưới số', above: 'Tên trên số', inline: 'Cùng hàng' }
+export const BOX_LABEL: Record<BoxKey, string> = { org: 'Đơn vị tổ chức', number: 'Số BIB', name: 'Tên VĐV' }
+/** Cỡ chữ chuẩn (px trên BIB 1400×1000) khi size = 1 */
+export const BOX_BASE_PX: Record<BoxKey, number> = { org: 44, number: 300, name: 64 }
 export const ALIGNS: Record<TextAlign, string> = { left: 'Trái', center: 'Giữa', right: 'Phải' }
-export const FONTS: Record<BibFont, string> = { mono: 'Số đều', sans: 'Đậm', italic: 'Nghiêng thể thao', outline: 'Viền rỗng' }
 export const QR_POS: Record<QrPos, string> = { right: 'Bên phải', left: 'Bên trái', corner: 'Góc dưới' }
+export const COLOR_LABEL: Record<ColorKey, string> = { bg: 'Nền', band: 'Dải chính', number: 'Số BIB', text: 'Chữ', accent: 'Điểm nhấn' }
+export const FONTS: Record<BibFont, { label: string; weight: number }> = {
+  sans: { label: 'Đậm', weight: 900 },
+  mono: { label: 'Số đều', weight: 800 },
+  condensed: { label: 'Hẹp', weight: 700 },
+  impact: { label: 'Khối', weight: 400 },
+  athletic: { label: 'Thể thao', weight: 800 },
+  tech: { label: 'Kỹ thuật số', weight: 700 },
+  slab: { label: 'Chân vuông', weight: 800 },
+  stencil: { label: 'Quân đội', weight: 400 },
+  script: { label: 'Viết tay', weight: 700 },
+  serif: { label: 'Cổ điển', weight: 800 },
+}
 
-export const DEFAULT_TEXT: BibText = { layout: 'below', align: 'center', font: 'mono', y: 0.5, scale: 1, name_scale: 1 }
+export type BibPreset = 'below' | 'above' | 'inline' | 'left'
+export const PRESETS: Record<BibPreset, string> = { below: 'Tên dưới số', above: 'Tên trên số', inline: 'Cùng hàng', left: 'Căn trái' }
+
+const BASE_BOXES: BibBoxes = {
+  org: { show: true, x: 0.42, y: 0.3, align: 'center', font: 'sans', italic: false, outline: false, size: 1, color: 'text' },
+  number: { show: true, x: 0.42, y: 0.54, align: 'center', font: 'mono', italic: false, outline: false, size: 1, color: 'number' },
+  name: { show: true, x: 0.42, y: 0.72, align: 'center', font: 'sans', italic: false, outline: false, size: 1, color: 'text' },
+}
+
+/** Bố cục nhanh: đặt lại vị trí / căn lề / cỡ 3 khung, giữ font + màu đã chọn. Chừa chỗ cho QR. */
+export function applyPreset(boxes: BibBoxes, preset: BibPreset, qr: QrPos | null): BibBoxes {
+  const cx = qr === 'right' ? 0.42 : qr === 'left' ? 0.58 : 0.5
+  const lx = qr === 'left' ? 0.26 : 0.06
+  type Spot = [number, number, TextAlign, number]
+  const all: Record<BibPreset, Record<BoxKey, Spot>> = {
+    below: { org: [cx, 0.3, 'center', 1], number: [cx, 0.54, 'center', 1], name: [cx, 0.72, 'center', 1] },
+    above: { org: [cx, 0.3, 'center', 1], name: [cx, 0.44, 'center', 1], number: [cx, 0.64, 'center', 1] },
+    inline: { org: [cx, 0.32, 'center', 1], number: [cx + 0.04, 0.56, 'right', 0.8], name: [cx + 0.07, 0.56, 'left', 0.9] },
+    left: { org: [lx, 0.3, 'left', 1], number: [lx, 0.54, 'left', 1], name: [lx, 0.72, 'left', 1] },
+  }
+  const pos = all[preset]
+  const out = { ...boxes }
+  for (const k of Object.keys(pos) as BoxKey[]) {
+    const [x, y, align, size] = pos[k]
+    out[k] = { ...boxes[k], x, y, align, size }
+  }
+  return out
+}
+
 export const DEFAULT_FIT: ArtFit = { zoom: 1, x: 0, y: 0 }
+export const DEFAULT_BOXES: BibBoxes = applyPreset(BASE_BOXES, 'below', 'right')
 
 export const DEFAULT_BIB: BibDesign = {
   template: 'classic', colors: {}, logo_url: null, bg_url: null, bg_opacity: 0.35, tagline: null, sponsors: [], show_name: true, show_qr: true,
-  art_url: null, use_art: false, art_fit: DEFAULT_FIT, show_header: true, show_sponsors: true, text: DEFAULT_TEXT, qr_pos: 'right',
+  art_url: null, use_art: false, art_fit: DEFAULT_FIT, show_header: true, show_sponsors: true, qr_pos: 'right',
+  org_text: null, boxes: DEFAULT_BOXES,
 }
 
 const clamp = (v: unknown, lo: number, hi: number, def: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def)
-const pick = <T extends string>(v: unknown, all: Record<T, string>, def: T): T => (typeof v === 'string' && v in all ? (v as T) : def)
+const pick = <T extends string>(v: unknown, all: Record<T, unknown>, def: T): T => (typeof v === 'string' && v in all ? (v as T) : def)
+const bool = (v: unknown, def: boolean) => (typeof v === 'boolean' ? v : def)
+
+function cleanBox(b: Partial<TextBox> | undefined, def: TextBox): TextBox {
+  return {
+    show: bool(b?.show, def.show), x: clamp(b?.x, 0, 1, def.x), y: clamp(b?.y, 0, 1, def.y),
+    align: pick(b?.align, ALIGNS, def.align), font: pick(b?.font, FONTS, def.font),
+    italic: bool(b?.italic, def.italic), outline: bool(b?.outline, def.outline),
+    size: clamp(b?.size, 0.3, 2.5, def.size), color: pick(b?.color, COLOR_LABEL, def.color),
+  }
+}
+
+/** Thiết kế lưu bởi bản 003000 (text.layout …) → 3 khung */
+interface LegacyText { layout?: string; align?: string; font?: string; y?: number; scale?: number; name_scale?: number }
+function legacyBoxes(t: LegacyText, qr: QrPos): BibBoxes {
+  const preset: BibPreset = t.align === 'left' ? 'left' : t.layout === 'above' ? 'above' : t.layout === 'inline' ? 'inline' : 'below'
+  const b = applyPreset(DEFAULT_BOXES, preset, qr)
+  const style = { italic: t.font === 'italic', outline: t.font === 'outline' }
+  const dy = (clamp(t.y, 0.15, 0.85, 0.5) - 0.5) * 0.5
+  return {
+    org: { ...b.org, y: b.org.y + dy },
+    number: { ...b.number, ...style, font: t.font === 'mono' || !t.font ? 'mono' : 'sans', y: b.number.y + dy, size: b.number.size * clamp(t.scale, 0.5, 1.5, 1) },
+    name: { ...b.name, italic: style.italic, y: b.name.y + dy, size: b.name.size * clamp(t.name_scale, 0.5, 1.5, 1) },
+  }
+}
+
+export type StoredDesign = Partial<Omit<BibDesign, 'boxes'>> & { boxes?: Partial<Record<BoxKey, Partial<TextBox>>>; text?: LegacyText }
 
 /** Thiết kế đã lưu (có thể null / thiếu trường) → đủ trường, màu = màu mẫu + màu BTC chọn */
-export function resolveBib(d: Partial<BibDesign> | null | undefined): BibDesign & { palette: BibColors } {
+export function resolveBib(d: StoredDesign | null | undefined): BibDesign & { palette: BibColors } {
   const template = d?.template && d.template in TEMPLATES ? d.template : 'classic'
-  const t: Partial<BibText> = d?.text ?? {}
   const f: Partial<ArtFit> = d?.art_fit ?? {}
+  const qr_pos = pick(d?.qr_pos, QR_POS, 'right')
+  const boxes: BibBoxes = d?.boxes
+    ? { org: cleanBox(d.boxes.org, DEFAULT_BOXES.org), number: cleanBox(d.boxes.number, DEFAULT_BOXES.number), name: cleanBox(d.boxes.name, DEFAULT_BOXES.name) }
+    : d?.text ? legacyBoxes(d.text, qr_pos) : { ...DEFAULT_BOXES }
+  if (!d?.boxes && d?.show_name === false) boxes.name = { ...boxes.name, show: false }
   const design: BibDesign = {
-    ...DEFAULT_BIB, ...(d ?? {}), template, colors: { ...(d?.colors ?? {}) }, sponsors: (d?.sponsors ?? []).slice(0, 4),
+    template, colors: { ...(d?.colors ?? {}) },
+    logo_url: d?.logo_url ?? null, bg_url: d?.bg_url ?? null, bg_opacity: clamp(d?.bg_opacity, 0, 1, 0.35),
+    tagline: d?.tagline ?? null, sponsors: (d?.sponsors ?? []).slice(0, 4),
+    show_name: boxes.name.show, show_qr: bool(d?.show_qr, true),
     art_url: d?.art_url ?? null, use_art: !!(d?.use_art && d?.art_url),
     art_fit: { zoom: clamp(f.zoom, 0.5, 3, 1), x: clamp(f.x, -1, 1, 0), y: clamp(f.y, -1, 1, 0) },
-    text: {
-      layout: pick(t.layout, LAYOUTS, 'below'), align: pick(t.align, ALIGNS, 'center'), font: pick(t.font, FONTS, 'mono'),
-      y: clamp(t.y, 0.15, 0.85, 0.5), scale: clamp(t.scale, 0.5, 1.5, 1), name_scale: clamp(t.name_scale, 0.5, 1.5, 1),
-    },
-    qr_pos: pick(d?.qr_pos, QR_POS, 'right'),
+    show_header: bool(d?.show_header, true), show_sponsors: bool(d?.show_sponsors, true),
+    qr_pos, org_text: d?.org_text?.trim() || null, boxes,
   }
   return { ...design, palette: { ...TEMPLATES[template].colors, ...design.colors } }
 }
 
 /** Bản nháp cho trình thiết kế (bỏ bảng màu tính sẵn) */
-export function editableBib(d: Partial<BibDesign> | null | undefined): BibDesign {
+export function editableBib(d: StoredDesign | null | undefined): BibDesign {
   const { palette, ...rest } = resolveBib(d)
   void palette
   return rest
@@ -86,7 +178,8 @@ export function editableBib(d: Partial<BibDesign> | null | undefined): BibDesign
 export function bibPayload(d: BibDesign) {
   const base = TEMPLATES[d.template].colors
   const colors = Object.fromEntries(Object.entries(d.colors).filter(([k, v]) => v && v.toLowerCase() !== base[k as keyof BibColors]))
-  return { ...d, colors, tagline: d.tagline?.trim() || null, use_art: d.use_art && !!d.art_url,
+  return { ...d, colors, tagline: d.tagline?.trim() || null, org_text: d.org_text?.trim() || null, use_art: d.use_art && !!d.art_url,
+    show_name: d.boxes.name.show,
     sponsors: d.sponsors.filter((s) => s.name.trim() || s.logo_url).map((s) => ({ ...s, name: s.name.trim() })) }
 }
 
@@ -105,16 +198,30 @@ export function panArt(fit: ArtFit, dxc: number, dyc: number, iw: number, ih: nu
   return { ...fit, x: move(fit.x, dxc, r.w - BIB_SIZE.w), y: move(fit.y, dyc, r.h - BIB_SIZE.h) }
 }
 
-/** Tên chia 2 dòng cho bố cục cùng hàng: họ + tên đệm / tên */
-export function splitName(name: string): string[] {
-  const words = name.trim().split(/\s+/).filter(Boolean)
-  return words.length < 2 ? words : [words.slice(0, -1).join(' '), words[words.length - 1]]
+/** Kéo một khung chữ dxc / dyc (px trên BIB) */
+export function moveBox(b: TextBox, dxc: number, dyc: number): TextBox {
+  return { ...b, x: Math.min(1, Math.max(0, b.x + dxc / BIB_SIZE.w)), y: Math.min(1, Math.max(0, b.y + dyc / BIB_SIZE.h)) }
+}
+
+export interface Rect { x: number; y: number; w: number; h: number }
+export interface BibLayout { boxes: Partial<Record<BoxKey, Rect>> }
+
+/** Khung chữ dưới điểm (px trên BIB); ưu tiên khung nhỏ (tên, đơn vị) khi chồng nhau */
+export function hitBox(layout: BibLayout | null, x: number, y: number, pad = 16): BoxKey | null {
+  if (!layout) return null
+  for (const k of ['name', 'org', 'number'] as BoxKey[]) {
+    const r = layout.boxes[k]
+    if (r && x >= r.x - pad && x <= r.x + r.w + pad && y >= r.y - pad && y <= r.y + r.h + pad) return k
+  }
+  return null
 }
 
 export interface BibData {
   race: string
   bib: string
   name: string | null
+  /** Tên CLB / người tổ chức (khi BTC chưa nhập chữ riêng) */
+  org: string | null
   distanceKm: number
   dates: string
   qrUrl: string | null
@@ -123,6 +230,13 @@ export interface BibData {
 // ---------------------------------------------------------------------
 // Vẽ (trình duyệt)
 // ---------------------------------------------------------------------
+const families: Partial<Record<BibFont, string>> = {}
+/** bibFonts.ts (next/font) đăng ký tên font thật */
+export function registerBibFonts(map: Partial<Record<BibFont, string>>) {
+  Object.assign(families, map)
+  return map
+}
+
 const images = new Map<string, Promise<HTMLImageElement | null>>()
 function loadImage(src: string | null | undefined): Promise<HTMLImageElement | null> {
   if (!src) return Promise.resolve(null)
@@ -138,7 +252,13 @@ function loadImage(src: string | null | undefined): Promise<HTMLImageElement | n
   return images.get(src)!
 }
 
-function fonts() {
+const qrs = new Map<string, Promise<HTMLImageElement | null>>()
+function loadQr(url: string) {
+  if (!qrs.has(url)) qrs.set(url, QRCode.toDataURL(url, { margin: 1, width: 360, errorCorrectionLevel: 'M' }).then(loadImage))
+  return qrs.get(url)!
+}
+
+function baseFonts() {
   const root = getComputedStyle(document.documentElement)
   return {
     sans: root.getPropertyValue('--font-be-vietnam').trim() || 'system-ui, sans-serif',
@@ -149,7 +269,7 @@ function fonts() {
 function fitFont(ctx: CanvasRenderingContext2D, text: string, font: (px: number) => string, start: number, maxW: number) {
   let px = start
   ctx.font = font(px)
-  while (ctx.measureText(text).width > maxW && px > 16) { px -= 4; ctx.font = font(px) }
+  while (ctx.measureText(text).width > maxW && px > 16) { px -= Math.max(2, Math.round(px / 40)); ctx.font = font(px) }
   return px
 }
 
@@ -171,23 +291,32 @@ function onColor(hex: string) {
   return l > 0.6 ? '#0a0d12' : '#ffffff'
 }
 
-export async function drawBib(canvas: HTMLCanvasElement, design: Partial<BibDesign> | null | undefined, data: BibData) {
+export async function drawBib(canvas: HTMLCanvasElement, design: StoredDesign | null | undefined, data: BibData): Promise<BibLayout> {
   const d = resolveBib(design)
   const c = d.palette
-  const t = d.text
   const { w, h } = BIB_SIZE
-  canvas.width = w
-  canvas.height = h
   const ctx = canvas.getContext('2d')!
-  const { sans, mono } = fonts()
+  const { sans, mono } = baseFonts()
+  const family = (f: BibFont) => (f === 'mono' ? mono : f === 'sans' ? sans : families[f] ? `${families[f]}, ${sans}` : sans)
+  const fontCss = (b: TextBox, px: number) => `${b.italic ? 'italic ' : ''}${FONTS[b.font].weight} ${px}px ${family(b.font)}`
+  const texts: Record<BoxKey, string | null> = {
+    org: d.org_text ?? data.org,
+    number: data.bib,
+    name: data.name ? data.name.toUpperCase() : null,
+  }
+  const shown = (Object.keys(texts) as BoxKey[]).filter((k) => d.boxes[k].show && texts[k])
   const sponsors = d.show_sponsors ? d.sponsors : []
   const [logo, bg, artIm, qr, ...sponsorLogos] = await Promise.all([
     d.show_header ? loadImage(d.logo_url) : Promise.resolve(null),
     d.use_art ? Promise.resolve(null) : loadImage(d.bg_url),
     d.use_art ? loadImage(d.art_url) : Promise.resolve(null),
-    d.show_qr && data.qrUrl ? QRCode.toDataURL(data.qrUrl, { margin: 1, width: 360, errorCorrectionLevel: 'M' }).then(loadImage) : Promise.resolve(null),
+    d.show_qr && data.qrUrl ? loadQr(data.qrUrl) : Promise.resolve(null),
     ...sponsors.map((s) => loadImage(s.logo_url)),
+    // Font Google chỉ tải khi cần: chờ tải xong mới vẽ để chữ đúng font ngay lần đầu
+    ...shown.map((k) => Promise.resolve(document.fonts?.load(fontCss(d.boxes[k], 100), texts[k]!)).catch(() => null).then(() => null)),
   ])
+  canvas.width = w
+  canvas.height = h
   const framed = !!artIm                              // dùng ảnh BIB có sẵn làm khung → bỏ trang trí của mẫu
 
   // Nền: ảnh khung (phủ kín × zoom, dịch theo art_fit) hoặc màu nền + ảnh nền mờ
@@ -253,23 +382,57 @@ export async function drawBib(canvas: HTMLCanvasElement, design: Partial<BibDesi
     }
   }
 
-  // Vùng số BIB + tên (trừ cột QR nếu QR đặt bên trái / phải)
-  const top = headerH ? headerH + 40 : 60
-  const bottom = h - sponsorH - footH - (sponsorH ? 24 : 50)
+  // Mã QR: vị trí tính trước để khung chữ tự thu nhỏ, không đè lên QR
+  const top = headerH ? headerH + 30 : 50
+  const bottom = h - sponsorH - footH - 20
   const qrSize = qr ? (d.qr_pos === 'corner' ? 180 : 230) : 0
-  const qrCol = qr && d.qr_pos !== 'corner' ? qrSize + 70 : 0
-  const x0 = 70 + (d.qr_pos === 'left' ? qrCol : 0)
-  const x1 = w - 70 - (d.qr_pos === 'right' ? qrCol : 0)
-  const maxW = x1 - x0
-  const cy = top + (bottom - top) * t.y
-  drawNumberAndName(ctx, d, { bib: data.bib, name: d.show_name && data.name ? data.name.toUpperCase() : null }, { x0, x1, top, bottom, cy, maxW, sans, mono })
-
-  // Mã QR xác thực (nền trắng + chú thích trong khung → quét được trên mọi nền)
+  let qrRect: Rect | null = null
   if (qr) {
     const qx = d.qr_pos === 'left' ? 60 : d.qr_pos === 'right' ? w - 60 - qrSize : w - 50 - qrSize
-    const qy = d.qr_pos === 'corner' ? bottom - qrSize - 30 : Math.max(top, Math.min(bottom - qrSize - 40, cy - qrSize / 2 - 16))
+    const qy = d.qr_pos === 'corner' ? bottom - qrSize - 40
+      : Math.max(top, Math.min(bottom - qrSize - 44, d.boxes.number.y * h - qrSize / 2 - 16))
+    qrRect = { x: qx - 12, y: qy - 12, w: qrSize + 24, h: qrSize + 56 }
+  }
+
+  // 3 khung chữ
+  const layout: BibLayout = { boxes: {} }
+  const CAP = 0.74                                     // chiều cao chữ hoa ≈ 0.74 × cỡ chữ
+  for (const k of ['org', 'number', 'name'] as BoxKey[]) {
+    const b = d.boxes[k]
+    const text = texts[k]
+    if (!b.show || !text) continue
+    const X = b.x * w, Y = b.y * h
+    const start = Math.round(BOX_BASE_PX[k] * b.size)
+    let L = 40, R = w - 40
+    if (qrRect && Y + start * 0.4 > qrRect.y && Y - start * 0.4 < qrRect.y + qrRect.h) {
+      if (qrRect.x + qrRect.w / 2 > X) R = Math.min(R, qrRect.x - 24)
+      else L = Math.max(L, qrRect.x + qrRect.w + 24)
+    }
+    const maxW = Math.max(80, b.align === 'left' ? R - X : b.align === 'right' ? X - L : 2 * Math.min(X - L, R - X))
+    const px = fitFont(ctx, text, (p) => fontCss(b, p), start, maxW)
+    ctx.textAlign = b.align
+    const base = Y + (px * CAP) / 2
+    const color = c[b.color]
+    if (b.outline) {
+      ctx.lineJoin = 'round'
+      ctx.lineWidth = Math.max(2, px / 16)
+      ctx.strokeStyle = color
+      ctx.strokeText(text, X, base)
+    } else {
+      ctx.fillStyle = color
+      if (k === 'number' && d.template === 'neon' && !framed) { ctx.shadowColor = color; ctx.shadowBlur = 40 }
+      ctx.fillText(text, X, base)
+      ctx.shadowBlur = 0
+    }
+    const tw = ctx.measureText(text).width
+    layout.boxes[k] = { x: b.align === 'left' ? X : b.align === 'right' ? X - tw : X - tw / 2, y: Y - (px * CAP) / 2, w: tw, h: px * CAP }
+  }
+
+  // Mã QR xác thực (nền trắng + chú thích trong khung → quét được trên mọi nền)
+  if (qr && qrRect) {
+    const qx = qrRect.x + 12, qy = qrRect.y + 12
     ctx.fillStyle = '#ffffff'
-    ctx.beginPath(); ctx.roundRect(qx - 12, qy - 12, qrSize + 24, qrSize + 56, 18); ctx.fill()
+    ctx.beginPath(); ctx.roundRect(qrRect.x, qrRect.y, qrRect.w, qrRect.h, 18); ctx.fill()
     ctx.drawImage(qr, qx, qy, qrSize, qrSize)
     ctx.fillStyle = '#0a0d12'
     ctx.textAlign = 'center'
@@ -296,7 +459,7 @@ export async function drawBib(canvas: HTMLCanvasElement, design: Partial<BibDesi
     })
   }
 
-  if (framed) return                                   // ảnh có sẵn đã có chân / lỗ ghim riêng
+  if (framed) return layout                            // ảnh có sẵn đã có chân / lỗ ghim riêng
 
   // Chân: ngày giải + nhãn e-BIB
   ctx.textAlign = 'left'
@@ -312,81 +475,5 @@ export async function drawBib(canvas: HTMLCanvasElement, design: Partial<BibDesi
     ctx.fillStyle = d.template === 'neon' ? '#1d2330' : '#d9dde3'
     ctx.fill()
   }
-}
-
-interface TextBox { x0: number; x1: number; top: number; bottom: number; cy: number; maxW: number; sans: string; mono: string }
-
-/** Số BIB + tên theo bố cục: tên dưới / trên số, hoặc cùng hàng (tên 2 dòng bên cạnh số); căn trái / giữa / phải */
-function drawNumberAndName(ctx: CanvasRenderingContext2D, d: BibDesign & { palette: BibColors }, v: { bib: string; name: string | null }, b: TextBox) {
-  const t = d.text
-  const c = d.palette
-  const numFont = (px: number) => (t.font === 'mono' ? `900 ${px}px ${b.mono}` : `${t.font === 'italic' ? 'italic ' : ''}900 ${px}px ${b.sans}`)
-  const nameFont = (px: number) => `${t.font === 'italic' ? 'italic ' : ''}800 ${px}px ${b.sans}`
-  const avail = b.bottom - b.top
-  const CAP = 0.74                                     // chiều cao chữ hoa ≈ 0.74 × cỡ chữ
-
-  const paintNumber = (x: number, y: number, align: CanvasTextAlign, px: number) => {
-    ctx.font = numFont(px)
-    ctx.textAlign = align
-    if (t.font === 'outline') {
-      ctx.lineJoin = 'round'
-      ctx.lineWidth = Math.max(4, px / 16)
-      ctx.strokeStyle = c.number
-      ctx.strokeText(v.bib, x, y)
-      return
-    }
-    ctx.fillStyle = c.number
-    if (d.template === 'neon' && !d.use_art) { ctx.shadowColor = c.number; ctx.shadowBlur = 40 }
-    ctx.fillText(v.bib, x, y)
-    ctx.shadowBlur = 0
-  }
-  const paintName = (line: string, x: number, y: number, align: CanvasTextAlign, px: number) => {
-    ctx.font = nameFont(px)
-    ctx.textAlign = align
-    ctx.fillStyle = c.text
-    ctx.fillText(line, x, y)
-  }
-
-  if (t.layout === 'inline') {
-    const lines = v.name ? splitName(v.name) : []
-    const gap = 44
-    let numPx = fitFont(ctx, v.bib, numFont, Math.round(300 * t.scale), lines.length ? b.maxW * 0.62 : b.maxW)
-    numPx = Math.min(numPx, Math.floor(avail / CAP))
-    ctx.font = numFont(numPx)
-    const numW = ctx.measureText(v.bib).width
-    const nameAvail = Math.max(120, b.maxW - numW - gap)
-    const namePx = lines.length ? Math.min(...lines.map((l) => fitFont(ctx, l, nameFont, Math.round(62 * t.name_scale), nameAvail)), Math.floor(numPx * 0.6)) : 0
-    ctx.font = nameFont(namePx)
-    const nameW = lines.length ? Math.max(...lines.map((l) => ctx.measureText(l).width)) : 0
-    const groupW = numW + (lines.length ? gap + nameW : 0)
-    const gx = t.align === 'left' ? b.x0 : t.align === 'right' ? b.x1 - groupW : (b.x0 + b.x1) / 2 - groupW / 2
-    const cy = Math.max(b.top + (numPx * CAP) / 2, Math.min(b.bottom - (numPx * CAP) / 2, b.cy))
-    const nameFirst = t.align === 'right'               // căn phải: tên bên trái số
-    const numX = nameFirst ? gx + groupW - numW : gx
-    paintNumber(numX, cy + (numPx * CAP) / 2, 'left', numPx)
-    const lh = namePx * 1.12
-    lines.forEach((l, i) => {
-      const y = cy + (namePx * CAP) / 2 + (i - (lines.length - 1) / 2) * lh
-      if (nameFirst) paintName(l, gx + nameW, y, 'right', namePx)
-      else paintName(l, gx + numW + gap, y, 'left', namePx)
-    })
-    return
-  }
-
-  // Xếp chồng: tên dưới hoặc trên số
-  const gap = 34
-  const namePx = v.name ? fitFont(ctx, v.name, nameFont, Math.round(64 * t.name_scale), b.maxW) : 0
-  const nameBlock = v.name ? gap + namePx * CAP : 0
-  let numPx = fitFont(ctx, v.bib, numFont, Math.round(330 * t.scale), b.maxW)
-  numPx = Math.min(numPx, Math.floor((avail - nameBlock) / CAP))
-  const blockH = numPx * CAP + nameBlock
-  const blockTop = Math.max(b.top, Math.min(b.bottom - blockH, b.cy - blockH / 2))
-  const x = t.align === 'left' ? b.x0 : t.align === 'right' ? b.x1 : (b.x0 + b.x1) / 2
-  if (t.layout === 'above' && v.name) {
-    paintName(v.name, x, blockTop + namePx * CAP, t.align, namePx)
-    paintNumber(x, blockTop + nameBlock + numPx * CAP, t.align, numPx)
-  } else {
-    paintNumber(x, blockTop + numPx * CAP, t.align, numPx)
-    if (v.name) paintName(v.name, x, blockTop + numPx * CAP + gap + namePx * CAP, t.align, namePx)
-  }
+  return layout
 }
