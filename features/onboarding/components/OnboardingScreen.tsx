@@ -7,6 +7,7 @@ import { ArrowLeft, BellRing, Check, CheckCircle2, ChevronRight, KeyRound, Loade
 import { toast } from 'sonner'
 import { Avatar, Button, Card, Field, Input, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
+import { ICONS } from '@/shared/config/brand'
 import { routes } from '@/shared/config/routes'
 import { useInvalidateProfile, useMyProfile, useSession } from '@/features/auth'
 import { AvatarPicker, getMyProfile, myProfileKey, profileErrorMessage, updateMyProfile, type Gender } from '@/features/profile'
@@ -297,7 +298,7 @@ function NotifyStep({ onDone }: { onDone: () => void }) {
         {examples.map((t, i) => (
           <div key={i} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3" style={{ opacity: 1 - i * 0.2 }}>
             {/* eslint-disable-next-line @next/next/no-img-element -- icon tĩnh của app */}
-            <img src="/icons/icon-192.png" alt="" className="size-9 rounded-xl" />
+            <img src={ICONS.any192} alt="" className="size-9 rounded-xl" />
             <span className="min-w-0 text-sm"><span className="block text-xs text-fg-subtle">RaceHub · vừa xong</span>{t}</span>
           </div>
         ))}

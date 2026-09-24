@@ -11,6 +11,9 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'public' / 'icons'
+# Đổi tiền tố mỗi khi đổi thiết kế: điện thoại/trình duyệt nhớ icon theo đường dẫn, trùng tên sẽ không cập nhật.
+# Nhớ sửa cùng tiền tố trong shared/config/brand.ts và public/sw.js.
+V = 'rh2'
 BRAND = (182, 255, 59)
 BRAND_HI = (214, 255, 140)
 BG_TOP = (24, 31, 43)
@@ -103,13 +106,13 @@ def main():
     full = render(scaled(base, 0.66))          # "any": iOS/Android tự bo góc
     safe = render(scaled(base, 0.52))          # maskable: nằm trọn trong vùng an toàn 80%
     for s in (192, 512):
-        save(full, s, f'icon-{s}.png')
-        save(safe, s, f'maskable-{s}.png')
-    save(render(scaled(base, 0.6)), 180, 'apple-touch-icon.png')
+        save(full, s, f'{V}-icon-{s}.png')
+        save(safe, s, f'{V}-maskable-{s}.png')
+    save(render(scaled(base, 0.6)), 180, f'{V}-apple-180.png')
     # Huy hiệu thanh trạng thái Android: một màu trắng, nền trong suốt
-    save(render(scaled(base, 0.9), bg=False, glow=False, mono=(255, 255, 255)), 96, 'badge-96.png', rgb=False)
+    save(render(scaled(base, 0.9), bg=False, glow=False, mono=(255, 255, 255)), 96, f'{V}-badge-96.png', rgb=False)
     # Biểu tượng trong suốt để đặt trong giao diện (thanh trên, màn chào)
-    save(render(scaled(base, 0.96), bg=False, glow=False), 256, 'mark-256.png', rgb=False)
+    save(render(scaled(base, 0.96), bg=False, glow=False), 256, f'{V}-mark-256.png', rgb=False)
     # favicon.ico (16/32/48)
     fav = render(scaled(base, 0.78)).convert('RGB')
     fav.resize((48, 48), Image.LANCZOS).save(ROOT / 'app' / 'favicon.ico', sizes=[(16, 16), (32, 32), (48, 48)])
