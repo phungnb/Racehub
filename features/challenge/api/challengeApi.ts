@@ -1,7 +1,7 @@
 // Thử thách: mọi thao tác ghi đi qua RPC (migration 000600). Client chỉ đọc và hiển thị.
 import { supabase } from '@/shared/lib/supabase'
 import type { Audience, ChallengeDraft, ChallengeFormat, Objective, RewardSource, RewardSplit, TeamMode } from '../model/challenge'
-import { draftToPayload, effectiveSlots } from '../model/challenge'
+import { draftToPayload, effectiveSlots, type pledgePayload } from '../model/challenge'
 import { toPolicy, type EconomyPolicy } from '@/shared/lib/economy'
 
 export type ChallengeTab = 'MINE' | 'DISCOVER' | 'CLUB' | 'ENDED'
@@ -56,6 +56,12 @@ export interface Challenge {
   created_by: string | null
   settled_at: string | null
   cancelled_reason: string | null
+  pledge_enabled?: boolean
+  pledge_options?: number[] | null
+  pledge_min_km?: number | null
+  pledge_max_km?: number | null
+  pledge_cap_pct?: number | null
+  teams_assigned_at?: string | null
 }
 
 export interface ChallengeParticipant {
@@ -67,6 +73,7 @@ export interface ChallengeParticipant {
   completed_at: string | null
   final_rank: number | null
   reward_xu: number
+  pledge_km?: number | null
 }
 
 export interface TeamStanding {
@@ -198,7 +205,61 @@ export async function settleIfDue(id: string): Promise<boolean> {
   return Boolean(data)
 }
 
+/* ---------------------- Mục tiêu tự đăng ký (migration 002000) ---------------------- */
+
+export interface PledgeMember {
+  participant_id: string
+  user_id: string
+  display_name: string | null
+  avatar_url: string | null
+  team_id: string | null
+  pledge_km: number | null
+  km: number
+  counted_km: number
+  pct: number | null
+  completed: boolean
+}
+export interface PledgeTeam { team_id: string; name: string; color: string; members: number; pledge_total: number; counted_total: number }
+export interface PledgeBoard { can_manage: boolean; missing: number; members: PledgeMember[]; teams: PledgeTeam[] | null }
+
+const toBoard = (b: PledgeBoard): PledgeBoard => ({
+  ...b,
+  members: b.members.map((m) => ({ ...m, pledge_km: m.pledge_km == null ? null : Number(m.pledge_km), km: Number(m.km),
+    counted_km: Number(m.counted_km), pct: m.pct == null ? null : Number(m.pct) })),
+  teams: b.teams?.map((t) => ({ ...t, pledge_total: Number(t.pledge_total), counted_total: Number(t.counted_total) })) ?? null,
+})
+
+async function rpcBoard(fn: string, args: Record<string, unknown>) {
+  const { data, error } = await supabase.rpc(fn, args)
+  if (error) throw error
+  return toBoard(data as PledgeBoard)
+}
+
+export const getPledgeBoard = (id: string) => rpcBoard('challenge_pledge_board', { p_challenge_id: id })
+export const assignPledgeTeams = (id: string, method: 'BALANCE' | 'RANDOM', includeMissing = false) =>
+  rpcBoard('assign_pledge_teams', { p_challenge_id: id, p_method: method, p_include_missing: includeMissing })
+export const movePledgeMember = (id: string, participantId: string, teamId: string) =>
+  rpcBoard('move_pledge_member', { p_challenge_id: id, p_participant_id: participantId, p_team_id: teamId })
+
+export async function setMyPledge(id: string, km: number) {
+  const { error } = await supabase.rpc('set_my_pledge', { p_challenge_id: id, p_km: km })
+  if (error) throw error
+}
+
+export async function setChallengePledge(id: string, p: ReturnType<typeof pledgePayload>) {
+  const { error } = await supabase.rpc('set_challenge_pledge', { p_challenge_id: id, p })
+  if (error) throw error
+}
+
 const MESSAGES: Record<string, string> = {
+  PLEDGES_MISSING: 'Còn thành viên chưa đăng ký mục tiêu. Nhắc họ, hoặc chia đội luôn (người chưa đăng ký tính 0 km).',
+  PLEDGE_LOCKED: 'Mục tiêu đã khóa (đã xuất phát hoặc đã chia đội).',
+  PLEDGE_RULES_LOCKED: 'Đã có người đăng ký mục tiêu và thử thách đã bắt đầu — không đổi luật được nữa.',
+  INVALID_PLEDGE: 'Mục tiêu không nằm trong các mốc cho phép.',
+  INVALID_PLEDGE_OPTIONS: 'Các mốc mục tiêu không hợp lệ.',
+  INVALID_PLEDGE_CAP: '% vượt mục tiêu không hợp lệ.',
+  PLEDGE_NOT_SUPPORTED: 'Thử thách này không dùng mục tiêu tự đăng ký.',
+  NOT_ENOUGH_MEMBERS: 'Chưa đủ người để chia đội.',
   CHALLENGE_NOT_FOUND: 'Không tìm thấy thử thách, hoặc bạn cần mã mời để xem.',
   CHALLENGE_CLOSED: 'Thử thách đã kết thúc hoặc đã bị hủy.',
   CHALLENGE_FULL: 'Thử thách đã đủ người.',

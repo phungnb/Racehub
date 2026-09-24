@@ -18,6 +18,7 @@ import {
 } from '../../model/challenge'
 import { useChallenge, useChallengeActions } from '../../hooks/useChallenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
+import { PledgePanel } from './PledgePanel'
 
 const fmtDateTime = (iso: string) => new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
 
@@ -84,7 +85,9 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
 
       <SegmentedControl value={tab} onChange={setTab} options={[{ value: 'RANK', label: 'Bảng xếp hạng' }, { value: 'RULES', label: 'Luật chơi' }]} />
       {tab === 'RANK'
-        ? <Leaderboard d={d} rows={leaderboard.data} loading={leaderboard.isLoading} error={leaderboard.isError} standings={standings} />
+        ? c.pledge_enabled
+          ? <PledgePanel d={d} />
+          : <Leaderboard d={d} rows={leaderboard.data} loading={leaderboard.isLoading} error={leaderboard.isError} standings={standings} />
         : <Rules d={d} />}
 
       <ActionBar d={d} phase={phase} code={code ?? null} />
@@ -135,7 +138,8 @@ function Banner({ icon: Icon, tone, title, text }: { icon: typeof Clock; tone: '
 
 function ProgressHero({ d, phase, standings }: { d: ChallengeDetail; phase: ReturnType<typeof challengePhase>; standings: TeamStanding[] }) {
   const c = d.challenge
-  const target = c.target_value
+  // Mục tiêu tự đăng ký: mục tiêu là mốc của chính người xem
+  const target = c.pledge_enabled ? Number(d.me?.pledge_km ?? 0) : c.target_value
   const unit = OBJECTIVE_META[c.objective]?.unit
 
   if (c.format === 'TEAM') return <TeamVersus d={d} standings={standings} />
@@ -159,7 +163,8 @@ function ProgressHero({ d, phase, standings }: { d: ChallengeDetail; phase: Retu
 
   if (!d.me) return null
   const score = d.me.current_progress
-  const plan = phase === 'LIVE' ? planStatus(c, score) : null
+  if (c.pledge_enabled && !target) return null        // chưa chọn mục tiêu → thẻ chọn mục tiêu ở dưới
+  const plan = phase === 'LIVE' ? planStatus({ ...c, target_value: target }, score) : null
   return (
     <Card className="flex items-center gap-4">
       <ProgressRing value={target > 0 ? score / target : 0} size={112} label="Tiến độ của bạn" color={d.me.completed_at ? 'var(--color-coin)' : undefined}>

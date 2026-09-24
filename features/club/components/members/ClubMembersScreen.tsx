@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Ban, Check, Copy, Crown, Link2, QrCode, Search, Share2, ShieldCheck, UserMinus, UserX } from 'lucide-react'
+import { Ban, Check, Crown, Search, Share2, ShieldCheck, UserMinus, UserX } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Input, LevelBadge, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -12,6 +12,7 @@ import { canManage, ROLE_LABEL } from '../../model/roles'
 import { useClub, useClubMembers } from '../../hooks/useClub'
 import { clubKeys } from '../../hooks/keys'
 import { MenuItem } from '../feed/PostCard'
+import { InviteSheet } from './InvitePanel'
 
 type Pending = { kind: 'remove' | 'ban'; m: ClubMember } | null
 
@@ -183,38 +184,5 @@ function RoleChip({ role }: { role: ClubMember['role'] }) {
       {role === 'OWNER' ? <Crown className="size-3.5" aria-hidden /> : <ShieldCheck className="size-3.5" aria-hidden />}
       {ROLE_LABEL[role]}
     </span>
-  )
-}
-
-function InviteSheet({ open, onClose, code, name }: { open: boolean; onClose: () => void; code: string; name: string }) {
-  const link = typeof window === 'undefined' ? '' : `${window.location.origin}/club/join/${code}`
-  const copy = async (text: string, what: string) => {
-    try { await navigator.clipboard.writeText(text); toast.success(`Đã sao chép ${what}`) } catch { toast.error('Không sao chép được, hãy chọn và sao chép thủ công.') }
-  }
-  const share = async () => {
-    if (navigator.share) {
-      try { await navigator.share({ title: `Vào CLB ${name} trên RaceHub`, text: `Tham gia CLB ${name} cùng mình trên RaceHub nhé!`, url: link }) } catch { /* người dùng hủy */ }
-    } else void copy(link, 'link mời')
-  }
-  return (
-    <Sheet open={open} onClose={onClose} title="Mời bạn vào CLB" description="Gửi link vào nhóm Zalo hoặc Messenger để mọi người chuyển sang RaceHub.">
-      <div className="space-y-4">
-        <div className="rounded-xl border border-border bg-bg p-3">
-          <p className="flex items-center gap-2 text-xs text-fg-subtle"><Link2 className="size-3.5" aria-hidden />Link mời</p>
-          <p className="mt-1 break-all font-mono text-sm">{link}</p>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="secondary" onClick={() => copy(link, 'link mời')}><Copy className="size-4" aria-hidden />Sao chép link</Button>
-          <Button onClick={share}><Share2 className="size-4" aria-hidden />Chia sẻ</Button>
-        </div>
-        <button onClick={() => copy(code, 'mã mời')} className="flex w-full items-center justify-between rounded-xl border border-dashed border-border px-4 py-3 text-left">
-          <span>
-            <span className="flex items-center gap-2 text-xs text-fg-subtle"><QrCode className="size-3.5" aria-hidden />Mã mời</span>
-            <span className="font-mono text-lg font-bold tracking-widest">{code}</span>
-          </span>
-          <Copy className="size-4 text-fg-subtle" aria-hidden />
-        </button>
-      </div>
-    </Sheet>
   )
 }

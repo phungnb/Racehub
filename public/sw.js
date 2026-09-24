@@ -1,10 +1,10 @@
 /* RaceHub service worker — khung offline + Web Push.
  * Không cache trang/HTML hay dữ liệu API (luôn lấy mới); chỉ cache tệp tĩnh có hash của Next
  * và trang offline để khi mất mạng vẫn mở được app và thấy thông báo rõ ràng. */
-const VERSION = 'rh-v3'   // tăng khi đổi icon / trang offline để máy người dùng lấy bản mới
+const VERSION = 'rh-v4'   // tăng khi đổi icon / trang offline để máy người dùng lấy bản mới
 const STATIC = `${VERSION}-static`
 const OFFLINE_URL = '/offline.html'
-const PRECACHE = [OFFLINE_URL, '/icons/rh2-icon-192.png', '/icons/rh2-badge-96.png']
+const PRECACHE = [OFFLINE_URL, '/icons/rh3-icon-192.png', '/icons/rh3-badge-96.png']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(STATIC).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()))
@@ -49,8 +49,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(Promise.all([
     self.registration.showNotification(title, {
       body: data.body || '',
-      icon: '/icons/rh2-icon-192.png',
-      badge: '/icons/rh2-badge-96.png',
+      icon: '/icons/rh3-icon-192.png',
+      badge: '/icons/rh3-badge-96.png',
       tag: data.tag || undefined,
       renotify: !!data.tag,
       data: { url: data.url || '/notifications' },
