@@ -3,7 +3,7 @@
 import { Coins, History, ScrollText, Settings2, Shield, Ticket, type LucideIcon } from 'lucide-react'
 import { Card, EmptyState, StatTile } from '@/shared/ui'
 import { formatCoin, formatNumber, formatRelative } from '@/shared/lib/format'
-import { feePolicyText, xuToVnd } from '@/shared/lib/economy'
+import { feePolicyText, runPolicyText, xuToVnd } from '@/shared/lib/economy'
 import type { AuditEntry, EconomyOverview } from '../../api/adminApi'
 
 const ACTIONS: Record<string, { label: string; icon: LucideIcon; tone: string }> = {
@@ -53,8 +53,9 @@ export function OverviewTab({ o }: { o: EconomyOverview }) {
       </Card>
       <Card className="space-y-1.5 text-sm">
         <p className="flex items-center gap-2 font-semibold"><ScrollText className="size-4 text-fg-muted" aria-hidden />Chính sách đang áp dụng</p>
-        <p className="text-fg-muted">1 Xu ≈ {formatNumber(p.xuVnd)}đ · chạy: km đầu {formatNumber(p.firstKmXu)} Xu, mỗi km tiếp {formatNumber(p.extraKmXu)} Xu, tối đa {formatNumber(p.maxDailyReward)} Xu/ngày</p>
-        <p className="text-fg-muted">Thử thách: {feePolicyText(p.challengeFee)}</p>
+        <p className="text-fg-muted">1 Xu ≈ {formatNumber(p.xuVnd)}đ · {formatNumber(p.xpPerKm)} XP/km · điểm danh +{formatNumber(p.checkinXu)} Xu khi chạy ≥ {formatNumber(p.checkinMinKm)} km</p>
+        <p className="text-fg-muted">Chạy (cộng dồn trong ngày): {runPolicyText(p.run)}</p>
+        <p className="text-fg-muted">Phí tạo thử thách / giải: {feePolicyText(p.capacityTiers)}</p>
       </Card>
 
       <h2 className="flex items-center gap-2 text-lg font-semibold"><History className="size-5 text-fg-muted" aria-hidden />Nhật ký điều phối</h2>

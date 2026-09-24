@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Activity, CheckCircle2, Swords, Coins, Crown, LayoutDashboard, ScrollText, Shirt, Ticket, type LucideIcon } from 'lucide-react'
+import { Activity, CheckCircle2, Flag, Gift, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Tags, Ticket, type LucideIcon } from 'lucide-react'
 import { ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { adminErrorMessage } from '../api/adminApi'
@@ -14,14 +14,21 @@ import { ItemsTab } from './items/ItemsTab'
 import { ReviewTab } from './ReviewTab'
 import { ClubsProTab } from './ClubsProTab'
 import { SystemTab } from './SystemTab'
+import { OrdersTab } from './commerce/OrdersTab'
+import { PlansTab } from './commerce/PlansTab'
+import { GiftsTab, OrganizersTab } from './commerce/GiftsTab'
 import { CupReviewList } from '@/features/cup'
 
-type Tab = 'overview' | 'grant' | 'passes' | 'policy' | 'items' | 'review' | 'clubs' | 'cups' | 'system'
+type Tab = 'overview' | 'orders' | 'plans' | 'grant' | 'passes' | 'policy' | 'gifts' | 'organizers' | 'items' | 'review' | 'clubs' | 'cups' | 'system'
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
+  { id: 'orders', label: 'Đơn hàng', icon: Receipt },
+  { id: 'plans', label: 'Gói & giá', icon: Tags },
   { id: 'grant', label: 'Cộng/Trừ Xu', icon: Coins },
-  { id: 'passes', label: 'Vé miễn phí', icon: Ticket },
+  { id: 'passes', label: 'Lượt tạo', icon: Ticket },
   { id: 'policy', label: 'Chính sách', icon: ScrollText },
+  { id: 'gifts', label: 'Quà tặng', icon: Gift },
+  { id: 'organizers', label: 'Tổ chức giải', icon: Flag },
   { id: 'items', label: 'Vật phẩm', icon: Shirt },
   { id: 'review', label: 'Duyệt bài', icon: CheckCircle2 },
   { id: 'clubs', label: 'CLB Pro', icon: Crown },
@@ -38,7 +45,7 @@ export function AdminConsole() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold">Quản trị RaceHub</h1>
-        <p className="text-sm text-fg-muted">Điều phối Xu, vé tạo thử thách, chính sách kinh tế và vật phẩm</p>
+        <p className="text-sm text-fg-muted">Đơn hàng, bảng giá, điều phối Xu, lượt tạo, chính sách kinh tế, quà tặng và vật phẩm</p>
       </div>
       <nav className="flex flex-wrap gap-2" role="tablist" aria-label="Khu vực quản trị">
         {TABS.map((t) => (
@@ -51,6 +58,10 @@ export function AdminConsole() {
       </nav>
 
       {tab === 'system' ? <SystemTab />
+        : tab === 'orders' ? <OrdersTab />
+        : tab === 'plans' ? <PlansTab />
+        : tab === 'gifts' ? <GiftsTab />
+        : tab === 'organizers' ? <OrganizersTab />
         : tab === 'cups' ? <CupReviewList />
         : tab === 'review' ? <ReviewTab />
         : tab === 'clubs' ? <ClubsProTab />

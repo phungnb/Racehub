@@ -9,6 +9,7 @@ import {
   paceOf,
   type AthleteProfileData,
 } from '../api/athleteApi'
+import { GiftWall } from '@/features/game'
 import ActivityHistory from './ActivityHistory'
 
 /* ────────────────────────────────────────────────────────────
@@ -213,6 +214,7 @@ export default function AthleteProfile({ userId, onClose }: Props) {
                       </dl>
                     </section>
 
+                    <GiftWall userId={userId} />
                     <ActivityHistory userId={userId} />
                   </>
                 ) : (

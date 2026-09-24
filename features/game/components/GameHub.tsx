@@ -2,14 +2,13 @@
 
 import { useState } from 'react'
 import { CalendarCheck, Check, ChevronRight, ChevronUp, Flame, Gift, ShieldCheck, Trophy } from 'lucide-react'
-import { toast } from 'sonner'
-import { Avatar, Button, Card, ErrorState, LevelBadge, ProgressBar, ProgressRing, Skeleton } from '@/shared/ui'
+import { Avatar, Card, ErrorState, LevelBadge, ProgressBar, ProgressRing, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { levelProgress } from '@/features/progression'
 import type { Profile } from '@/shared/types/profile'
 import { gameErrorMessage } from '../api/gameApi'
-import { useCheckIn, useGameState, useMarkSeen } from '../hooks/useGame'
+import { useGameState, useMarkSeen } from '../hooks/useGame'
 import { leagueTier, timeLeft, type GameState } from '../model/game'
 import { LeagueSheet } from './LeagueSheet'
 import { QuestList } from './QuestList'
@@ -62,16 +61,11 @@ function Hub({ profile, s }: { profile: Profile; s: GameState }) {
 
 function TodayCard({ profile, s, onStreak }: { profile: Profile; s: GameState; onStreak: () => void }) {
   const lv = levelProgress(profile.xp, profile.level)
-  const checkIn = useCheckIn()
   const st = s.streak
   const left = Math.max(0, st.goal - st.week_days)
   const status = st.done_this_week ? 'Tuần này đã đạt mục tiêu'
     : st.alive || st.current === 0 ? `Chạy thêm ${left} ngày để ${st.current > 0 ? 'giữ' : 'bắt đầu'} chuỗi`
     : 'Chuỗi đã đứt — bắt đầu lại tuần này'
-  const doCheckIn = () => checkIn.mutate(undefined, {
-    onSuccess: () => toast.success('Đã điểm danh hôm nay'),
-    onError: (e) => toast.error(gameErrorMessage(e)),
-  })
 
   return (
     <Card className="space-y-4 overflow-hidden bg-gradient-to-br from-brand/10 via-surface to-surface">
@@ -114,13 +108,12 @@ function TodayCard({ profile, s, onStreak }: { profile: Profile; s: GameState; o
 
       {s.checked_in ? (
         <p className="flex h-11 items-center justify-center gap-2 rounded-xl bg-surface-2 text-sm font-semibold text-fg-muted">
-          <Check className="size-4 text-brand" aria-hidden />Đã điểm danh hôm nay
+          <Check className="size-4 text-brand" aria-hidden />Đã điểm danh hôm nay bằng bài chạy
         </p>
       ) : (
-        <Button block onClick={doCheckIn} loading={checkIn.isPending}>
-          <CalendarCheck className="size-4" aria-hidden />Điểm danh
-          {(() => { const c = s.quests.find((x) => x.metric === 'CHECKIN'); return c?.reward_xu ? <span className="font-mono">+{formatCoin(c.reward_xu)} Xu</span> : null })()}
-        </Button>
+        <p className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-dashed border-border px-3 text-center text-sm text-fg-muted">
+          <CalendarCheck className="size-4 shrink-0 text-brand" aria-hidden />Chạy từ 1 km hôm nay để tự điểm danh, nhận thêm Xu
+        </p>
       )}
     </Card>
   )

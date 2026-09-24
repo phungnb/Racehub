@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 
 export type QuestPeriod = 'DAILY' | 'WEEKLY'
-export type GameEventKind = 'RUN' | 'QUEST' | 'BADGE' | 'STREAK' | 'LEVEL_UP' | 'LEAGUE' | 'CHEER_IN'
+export type GameEventKind = 'RUN' | 'QUEST' | 'BADGE' | 'STREAK' | 'LEVEL_UP' | 'LEAGUE' | 'CHEER_IN' | 'CHECKIN' | 'REFERRAL' | 'GIFT_IN'
 export type BadgeTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'LEGEND'
 export type LeagueZone = 'UP' | 'STAY' | 'DOWN'
 
@@ -154,7 +154,7 @@ export function questProgressLabel(q: Pick<Quest, 'metric' | 'progress' | 'targe
 }
 
 /** Thứ tự thẻ trong màn tổng kết: bài chạy → nhiệm vụ → streak → huy hiệu → league → cổ vũ → lên cấp (đỉnh điểm) */
-const ORDER: Record<GameEventKind, number> = { RUN: 0, QUEST: 1, STREAK: 2, BADGE: 3, LEAGUE: 4, CHEER_IN: 5, LEVEL_UP: 6 }
+const ORDER: Record<GameEventKind, number> = { RUN: 0, CHECKIN: 1, QUEST: 2, STREAK: 3, BADGE: 4, LEAGUE: 5, REFERRAL: 6, CHEER_IN: 7, GIFT_IN: 8, LEVEL_UP: 9 }
 export const MAX_CASCADE = 6
 
 /** Tối đa 6 thẻ; quá nhiều nhiệm vụ thì gộp thành một thẻ */
@@ -185,6 +185,8 @@ export const WALLET_LABEL: Record<string, string> = {
   CHALLENGE_REFUND: 'Hoàn tiền thử thách', CLUB_CONTRIBUTION: 'Góp quỹ CLB', ADMIN_GRANT: 'RaceHub tặng', ADMIN_DEDUCT: 'RaceHub điều chỉnh', ADMIN_ADJUST: 'RaceHub điều chỉnh',
   CLUB_FUND_TOPUP: 'Nạp quỹ CLB', IAP_TOPUP_VND: 'Nạp Xu',
   REFERRAL_INVITER: 'Thưởng giới thiệu', REFERRAL_REFEREE: 'Thưởng được mời', OPENING_BALANCE: 'Số dư đầu kỳ',
+  GIFT: 'Tặng quà', XU_PURCHASE: 'Nạp Xu', XU_PURCHASE_BONUS: 'Tặng thêm khi nạp', RATE_CONVERSION: 'Đổi quy ước 1 Xu = 100đ',
+  RACE_FEE: 'Phí tạo giải chạy ảo', LEVEL_UP_XU: 'Thưởng lên cấp', CHECKIN: 'Điểm danh',
 }
 export const walletLabel = (type: string) => WALLET_LABEL[type] ?? 'Giao dịch'
 

@@ -11,7 +11,7 @@ import { formatKm, formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import { levelProgress } from '@/features/progression'
 import { CharacterHub } from '@/features/character'
-import { BadgeGrid } from '@/features/game'
+import { BadgeGrid, GiftWall } from '@/features/game'
 import { getAthleteProfile } from '../api/athleteApi'
 import { AvatarPicker } from './AvatarPicker'
 import type { Profile } from '@/shared/types/profile'
@@ -149,7 +149,7 @@ export function MeScreen({ profile }: { profile: Profile }) {
       <Header profile={profile} />
       <SegmentedControl value={tab} onChange={setTab} options={TABS} />
 
-      {tab === 'badges' && <BadgeGrid />}
+      {tab === 'badges' && <div className="space-y-4"><GiftWall userId={profile.id} /><BadgeGrid /></div>}
 
       {tab === 'overview' && (
         <div className="space-y-3">

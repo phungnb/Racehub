@@ -1,40 +1,75 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import { Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, ConfirmSheet, Field, Input } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
-import { creationFee, DEFAULT_POLICY, feePolicyText, runReward, validatePolicy, xuToVnd, type EconomyPolicy } from '@/shared/lib/economy'
+import {
+  creationFee, DEFAULT_POLICY, feePolicyText, LEVELS, runPolicyText, runReward, validatePolicy, xuToVnd, type EconomyPolicy,
+} from '@/shared/lib/economy'
 import { adminErrorMessage } from '../../api/adminApi'
 import { usePublishPolicy } from '../../hooks/useAdmin'
 
-const SIM_SLOTS = [2, 5, 6, 10, 11, 20, 50, 100, 500]
-const SIM_KM = [3, 5, 10, 21.1, 42.2]
+const SIM_SLOTS = [5, 6, 20, 50, 100, 200, 500, 1000, 1001]
+const SIM_KM = [2, 3, 5, 10, 21.1]
 
 function Num({ id, label, value, onChange, unit, hint }: {
-  id: string; label: string; value: number; onChange: (v: number) => void; unit: string; hint?: string
+  id: string; label?: string; value: number; onChange: (v: number) => void; unit: string; hint?: string
 }) {
   const [text, setText] = useState(String(value).replace('.', ','))
+  const input = (
+    <div className="relative">
+      <Input id={id} inputMode="decimal" aria-label={label ? undefined : unit} className="pr-16 font-mono" value={text}
+        onChange={(e) => { setText(e.target.value); const v = Number(e.target.value.replace(',', '.')); if (!Number.isNaN(v)) onChange(v) }} />
+      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-fg-subtle">{unit}</span>
+    </div>
+  )
+  return label ? <Field label={label} htmlFor={id} hint={hint}>{input}</Field> : input
+}
+
+function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
-    <Field label={label} htmlFor={id} hint={hint}>
-      <div className="relative">
-        <Input id={id} inputMode="decimal" className="pr-20 font-mono" value={text}
-          onChange={(e) => { setText(e.target.value); const v = Number(e.target.value.replace(',', '.')); if (!Number.isNaN(v)) onChange(v) }} />
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-fg-subtle">{unit}</span>
+    <Card className="space-y-3">
+      <div>
+        <h2 className="font-semibold">{title}</h2>
+        {hint && <p className="text-xs text-fg-subtle">{hint}</p>}
       </div>
-    </Field>
+      {children}
+    </Card>
   )
 }
 
-/** Chính sách Xu: giá trị tham chiếu, mức thưởng chạy, biểu phí thử thách — có mô phỏng trước khi lưu */
+/** Danh sách hàng (bậc km, mức quy mô, mốc chuỗi) có thêm / xóa */
+function Rows<T>({ items, onChange, make, render, addLabel }: {
+  items: T[]; onChange: (v: T[]) => void; make: (last: T | undefined) => T; addLabel: string
+  render: (item: T, set: (patch: Partial<T>) => void, i: number) => ReactNode
+}) {
+  return (
+    <div className="space-y-2">
+      {items.map((it, i) => (
+        <div key={`${items.length}-${i}`} className="flex items-center gap-2">
+          <div className="grid flex-1 grid-cols-2 gap-2">{render(it, (patch) => onChange(items.map((x, j) => (j === i ? { ...x, ...patch } : x))), i)}</div>
+          <Button size="sm" variant="ghost" aria-label="Xóa dòng" onClick={() => onChange(items.filter((_, j) => j !== i))}>
+            <Trash2 className="size-4" aria-hidden />
+          </Button>
+        </div>
+      ))}
+      <Button size="sm" variant="secondary" onClick={() => onChange([...items, make(items.at(-1))])}>
+        <Plus className="size-4" aria-hidden />{addLabel}
+      </Button>
+    </div>
+  )
+}
+
+/** Chính sách kinh tế v2 (Baseline v1.1): mọi con số do admin chỉnh — có mô phỏng trước khi lưu */
 export function PolicyTab({ policy, raw }: { policy: EconomyPolicy; raw: Record<string, unknown> }) {
   const [p, setP] = useState<EconomyPolicy>(policy)
   const [confirm, setConfirm] = useState(false)
   const [formKey, setFormKey] = useState(0)
   const publish = usePublishPolicy()
-  const f = p.challengeFee
-  const setFee = (patch: Partial<EconomyPolicy['challengeFee']>) => setP({ ...p, challengeFee: { ...f, ...patch } })
+  const set = (patch: Partial<EconomyPolicy>) => setP({ ...p, ...patch })
   const error = validatePolicy(p)
   const dirty = JSON.stringify(p) !== JSON.stringify(policy)
 
@@ -42,30 +77,37 @@ export function PolicyTab({ policy, raw }: { policy: EconomyPolicy; raw: Record<
     try {
       const v = await publish.mutateAsync({ current: raw, next: p })
       toast.success(`Đã áp dụng chính sách phiên bản ${v}`)
-      setConfirm(false)
     } catch (e) {
       toast.error(adminErrorMessage(e))
-      setConfirm(false)
     }
+    setConfirm(false)
   }
   const reset = (to: EconomyPolicy) => { setP(to); setFormKey((k) => k + 1) }
+  const monthly = runReward(5, p) * 30 + p.checkinXu * 30
 
   return (
     <div className="space-y-4" key={formKey}>
-      <Card className="space-y-3">
-        <h2 className="font-semibold">Giá trị Xu</h2>
-        <Num id="pol-vnd" label="1 Xu tương đương" unit="đồng" value={p.xuVnd} onChange={(v) => setP({ ...p, xuVnd: v })}
-          hint="Chỉ để quy đổi tham chiếu khi bán gói Xu, tài trợ, hiển thị — Xu không rút ra tiền" />
-      </Card>
-
-      <Card className="space-y-3">
-        <h2 className="font-semibold">Xu kiếm từ chạy bộ</h2>
+      <Section title="Giá trị Xu & XP" hint="Xu không đổi ra tiền mặt, không chuyển cho người khác — chỉ dùng trong RaceHub">
         <div className="grid grid-cols-2 gap-3">
-          <Num id="pol-first" label="Km đầu tiên" unit="Xu" value={p.firstKmXu} onChange={(v) => setP({ ...p, firstKmXu: v })} />
-          <Num id="pol-extra" label="Mỗi km tiếp theo" unit="Xu/km" value={p.extraKmXu} onChange={(v) => setP({ ...p, extraKmXu: v })} />
+          <Num id="pol-vnd" label="1 Xu tương đương" unit="đồng" value={p.xuVnd} onChange={(v) => set({ xuVnd: v })} />
+          <Num id="pol-xp" label="XP mỗi km" unit="XP/km" value={p.xpPerKm} onChange={(v) => set({ xpPerKm: v })}
+            hint="XP chỉ phát sinh từ km chạy" />
         </div>
-        <Num id="pol-cap" label="Trần mỗi ngày" unit="Xu/ngày" value={p.maxDailyReward} onChange={(v) => setP({ ...p, maxDailyReward: v })}
-          hint="Chặn cày Xu: chạy bao nhiêu cũng không vượt mức này trong một ngày" />
+      </Section>
+
+      <Section title="Xu kiếm từ chạy bộ" hint="Tính trên tổng km trong ngày (giờ Việt Nam), nhiều bài chạy được cộng dồn">
+        <div className="grid grid-cols-2 gap-3">
+          <Num id="pol-free" label="Không tính Xu tới" unit="km" value={p.run.freeKm} onChange={(v) => set({ run: { ...p.run, freeKm: v } })} />
+          <Num id="pol-cap" label="Trần mỗi ngày" unit="Xu" value={p.run.dailyCap} onChange={(v) => set({ run: { ...p.run, dailyCap: v } })} />
+        </div>
+        <p className="text-xs font-medium text-fg-muted">Bậc thưởng (đến km — Xu mỗi km)</p>
+        <Rows items={p.run.tiers} addLabel="Thêm bậc" onChange={(tiers) => set({ run: { ...p.run, tiers } })}
+          make={(last) => ({ upToKm: (last?.upToKm ?? p.run.freeKm) + 10, rate: 1 })}
+          render={(t, s, i) => (<>
+            <Num id={`pol-tier-km-${i}`} unit="km" value={t.upToKm} onChange={(v) => s({ upToKm: v })} />
+            <Num id={`pol-tier-rate-${i}`} unit="Xu/km" value={t.rate} onChange={(v) => s({ rate: v })} />
+          </>)} />
+        <p className="text-sm text-fg-muted">{runPolicyText(p.run)}</p>
         <div className="grid grid-cols-5 gap-1.5 text-center">
           {SIM_KM.map((km) => (
             <div key={km} className="rounded-lg bg-bg/60 px-1 py-2">
@@ -75,19 +117,52 @@ export function PolicyTab({ policy, raw }: { policy: EconomyPolicy; raw: Record<
           ))}
         </div>
         <p className="text-xs text-fg-subtle">
-          Chạy 5 km mỗi ngày ≈ {formatCoin(runReward(5, p) * 30)} Xu/tháng ({xuToVnd(runReward(5, p) * 30, p)}).
+          Chạy 5 km mỗi ngày + điểm danh ≈ {formatCoin(monthly)} Xu/tháng ({xuToVnd(monthly, p)}).
         </p>
-      </Card>
+      </Section>
 
-      <Card className="space-y-3">
-        <h2 className="font-semibold">Phí tạo thử thách (theo số người tối đa)</h2>
+      <Section title="Điểm danh & chuỗi tuần" hint="Điểm danh tự động khi có bài chạy hợp lệ trong ngày; chuỗi tính theo tuần đạt mục tiêu">
         <div className="grid grid-cols-2 gap-3">
-          <Num id="pol-free" label="Miễn phí tới" unit="người" value={f.freeMaxSlots} onChange={(v) => setFee({ freeMaxSlots: v })} />
-          <Num id="pol-mid" label="Mức giữa tới" unit="người" value={f.midMaxSlots} onChange={(v) => setFee({ midMaxSlots: v })} />
-          <Num id="pol-midrate" label="Đơn giá mức giữa" unit="Xu/người" value={f.midRatePerSlot} onChange={(v) => setFee({ midRatePerSlot: v })} />
-          <Num id="pol-rate" label="Đơn giá trên mức giữa" unit="Xu/người" value={f.ratePerSlot} onChange={(v) => setFee({ ratePerSlot: v })} />
+          <Num id="pol-checkin" label="Thưởng điểm danh" unit="Xu" value={p.checkinXu} onChange={(v) => set({ checkinXu: v })} />
+          <Num id="pol-checkin-km" label="Cần chạy tối thiểu" unit="km" value={p.checkinMinKm} onChange={(v) => set({ checkinMinKm: v })} />
         </div>
-        <p className="text-sm text-fg-muted">{feePolicyText(f)}. Thử thách CLB trừ vào quỹ CLB.</p>
+        <p className="text-xs font-medium text-fg-muted">Mốc chuỗi (số tuần liên tiếp — Xu thưởng)</p>
+        <Rows items={p.streakRewards} addLabel="Thêm mốc" onChange={(streakRewards) => set({ streakRewards })}
+          make={(last) => ({ weeks: (last?.weeks ?? 1) * 2, xu: (last?.xu ?? 10) * 2 })}
+          render={(t, s, i) => (<>
+            <Num id={`pol-streak-w-${i}`} unit="tuần" value={t.weeks} onChange={(v) => s({ weeks: v })} />
+            <Num id={`pol-streak-x-${i}`} unit="Xu" value={t.xu} onChange={(v) => s({ xu: v })} />
+          </>)} />
+      </Section>
+
+      <Section title="Giới thiệu bạn bè" hint="Chỉ trả khi người được mời đã xác thực email/SĐT và có bài chạy đủ km">
+        <div className="grid grid-cols-2 gap-3">
+          <Num id="pol-ref-in" label="Người mời nhận" unit="Xu" value={p.referral.inviterXu} onChange={(v) => set({ referral: { ...p.referral, inviterXu: v } })} />
+          <Num id="pol-ref-ee" label="Người được mời nhận" unit="Xu" value={p.referral.refereeXu} onChange={(v) => set({ referral: { ...p.referral, refereeXu: v } })} />
+          <Num id="pol-ref-cap" label="Tối đa mỗi tháng" unit="lượt" value={p.referral.monthlyCap} onChange={(v) => set({ referral: { ...p.referral, monthlyCap: v } })} />
+          <Num id="pol-ref-km" label="Bài chạy đầu tối thiểu" unit="km" value={p.referral.minKm} onChange={(v) => set({ referral: { ...p.referral, minKm: v } })} />
+        </div>
+      </Section>
+
+      <Section title="Thưởng lên cấp" hint="Trả một lần khi đạt cấp">
+        <div className="grid grid-cols-2 gap-3">
+          {LEVELS.slice(1).map((l) => (
+            <Num key={l.level} id={`pol-lv-${l.level}`} label={`Cấp ${l.level} · ${l.name}`} unit="Xu" value={p.levelUpXu[l.level] ?? 0}
+              onChange={(v) => set({ levelUpXu: { ...p.levelUpXu, [l.level]: v } })} />
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Phí tạo thử thách / giải chạy ảo theo quy mô"
+        hint="Thu một lần theo số người tối đa, không phụ thuộc thời gian. Thử thách CLB trừ quỹ CLB; thách đấu CLB luôn miễn phí.">
+        <p className="text-xs font-medium text-fg-muted">Mức (tối đa số người — phí)</p>
+        <Rows items={p.capacityTiers} addLabel="Thêm mức" onChange={(capacityTiers) => set({ capacityTiers })}
+          make={(last) => ({ max: (last?.max ?? 0) * 2 || 5, xu: (last?.xu ?? 0) * 2 })}
+          render={(t, s, i) => (<>
+            <Num id={`pol-cap-max-${i}`} unit="người" value={t.max} onChange={(v) => s({ max: v })} />
+            <Num id={`pol-cap-xu-${i}`} unit="Xu" value={t.xu} onChange={(v) => s({ xu: v })} />
+          </>)} />
+        <p className="text-sm text-fg-muted">{feePolicyText(p.capacityTiers)} · lớn hơn: admin cấp riêng</p>
         <div className="overflow-hidden rounded-xl border border-border">
           <table className="w-full text-sm">
             <thead className="bg-surface-2 text-xs text-fg-subtle">
@@ -95,14 +170,14 @@ export function PolicyTab({ policy, raw }: { policy: EconomyPolicy; raw: Record<
             </thead>
             <tbody>
               {SIM_SLOTS.map((s) => {
-                const fee = creationFee(s, f)
-                const before = creationFee(s, policy.challengeFee)
+                const fee = creationFee(s, p.capacityTiers)
+                const before = creationFee(s, policy.capacityTiers)
                 return (
                   <tr key={s} className="border-t border-border">
                     <td className="px-3 py-2 font-mono">{formatNumber(s)}</td>
                     <td className={cn('px-3 py-2 text-right font-mono font-semibold', fee ? 'text-coin' : 'text-brand')}>
-                      {fee ? `${formatCoin(fee)} Xu` : 'Miễn phí'}
-                      {fee !== before && <span className="ml-1 text-xs font-normal text-fg-subtle line-through">{formatCoin(before)}</span>}
+                      {fee === null ? 'Liên hệ admin' : fee ? `${formatCoin(fee)} Xu` : 'Miễn phí'}
+                      {fee !== before && before !== null && <span className="ml-1 text-xs font-normal text-fg-subtle line-through">{formatCoin(before)}</span>}
                     </td>
                     <td className="px-3 py-2 text-right text-xs text-fg-muted">{fee ? xuToVnd(fee, p) : '—'}</td>
                   </tr>
@@ -111,7 +186,15 @@ export function PolicyTab({ policy, raw }: { policy: EconomyPolicy; raw: Record<
             </tbody>
           </table>
         </div>
-      </Card>
+      </Section>
+
+      <Section title="Tiêu Xu khác">
+        <div className="grid grid-cols-2 gap-3">
+          <Num id="pol-gift" label="Trần tặng quà mỗi ngày" unit="Xu" value={p.giftDailyCapXu} onChange={(v) => set({ giftDailyCapXu: v })}
+            hint="Chống lạm dụng / rửa Xu" />
+          <Num id="pol-shield" label="Giá khiên chuỗi" unit="Xu" value={p.game.shieldPrice} onChange={(v) => set({ game: { ...p.game, shieldPrice: v } })} />
+        </div>
+      </Section>
 
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       <div className="flex gap-2">
@@ -124,9 +207,10 @@ export function PolicyTab({ policy, raw }: { policy: EconomyPolicy; raw: Record<
         title="Áp dụng chính sách mới?" confirmLabel="Áp dụng ngay"
         description="Áp dụng cho bài chạy và thử thách tạo từ bây giờ. Không ảnh hưởng Xu đã phát hay thử thách đã tạo. Mỗi lần lưu là một phiên bản trong nhật ký.">
         <ul className="space-y-1 text-sm">
-          <li>1 Xu ≈ {formatNumber(p.xuVnd)}đ</li>
-          <li>Chạy: km đầu {formatNumber(p.firstKmXu)} Xu, mỗi km tiếp {formatNumber(p.extraKmXu)} Xu, tối đa {formatNumber(p.maxDailyReward)} Xu/ngày</li>
-          <li>Thử thách: {feePolicyText(f)}</li>
+          <li>1 Xu ≈ {formatNumber(p.xuVnd)}đ · {formatNumber(p.xpPerKm)} XP/km</li>
+          <li>Chạy: {runPolicyText(p.run)}</li>
+          <li>Điểm danh +{formatNumber(p.checkinXu)} Xu (chạy ≥ {formatNumber(p.checkinMinKm)} km)</li>
+          <li>Phí quy mô: {feePolicyText(p.capacityTiers)}</li>
         </ul>
       </ConfirmSheet>
     </div>

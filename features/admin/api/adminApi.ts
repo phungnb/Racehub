@@ -101,8 +101,8 @@ export async function revokePass(id: string, reason: string) {
 
 /** Lưu chính sách: giữ nguyên các khóa khác (pace hợp lệ, giới thiệu bạn bè...) đang có */
 export async function publishPolicy(current: Record<string, unknown>, next: EconomyPolicy) {
-  const value = { ...current, ...next, challengeFee: { ...next.challengeFee } }
-  delete (value as Record<string, unknown>).tiers
+  // Máy chủ ghép với mặc định v2 và kiểm tra lại; giữ các khóa khác admin đã đặt (nếu có)
+  const value = { ...current, ...next, econVersion: 2 }
   const { data, error } = await supabase.rpc('admin_publish_config', { p_config_key: 'economy_global_config', p_config_value: value })
   if (error) throw error
   return Number(data)
@@ -199,6 +199,16 @@ const MESSAGES: Record<string, string> = {
   SLOT_LOCKED: 'Đã có người sở hữu món này, không đổi sang ô khác được. Hãy tạo mã mới.',
   ITEM_REQUIRED: 'Không ngừng bán được bản nguyên bản (bộ mặc định của mọi người).',
   ITEM_NOT_FOUND: 'Không tìm thấy vật phẩm.',
+  ORDER_NOT_FOUND: 'Không tìm thấy đơn hàng.',
+  ORDER_NOT_PENDING: 'Đơn đã được xử lý hoặc đã hủy.',
+  INVALID_PLAN: 'Gói không hợp lệ cho loại tài khoản này (VIP cho cá nhân, CLB Pro cho CLB).',
+  INVALID_MONTHS: 'Kỳ hạn chỉ 1, 3, 6 hoặc 12 tháng.',
+  INVALID_BANK: 'Tài khoản nhận tiền không hợp lệ: mã BIN 6 số, số tài khoản 4–30 ký tự, tên chủ tài khoản ≥ 3 ký tự.',
+  INVALID_OWNER: 'Loại tài khoản không hợp lệ.',
+  gift_catalog: 'Quà không hợp lệ: mã 2–40 ký tự (a-z, 0-9, _), tên 2–40 ký tự, giá 1–1.000.000 Xu.',
+  xu_packages: 'Gói Xu không hợp lệ: giá ≥ 1.000đ, số Xu ≥ 1.',
+  plan_prices: 'Giá gói không hợp lệ.',
+  plan_credits: 'Lượt tạo không hợp lệ (quy mô 1–10.000, 1–100 lượt/tháng).',
   'Payload too large': 'File quá lớn (tối đa 1 MB).',
   'mime type': 'Chỉ nhận file PNG.',
 }

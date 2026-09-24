@@ -15,6 +15,7 @@ export const routes = {
   me: '/me',
   settings: '/me/settings',
   wallet: '/wallet',
+  plan: '/me/plan',
   character: '/character',
   admin: '/admin',
   welcome: '/welcome',

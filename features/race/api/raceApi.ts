@@ -93,6 +93,19 @@ export const getRace = (id: string) => call<Race>('race_detail', { p_race_id: id
 export const getRaceResults = (id: string, km: number) => call<RaceResult[]>('race_results', { p_race_id: id, p_distance_km: km })
 export const getRaceDashboard = (id: string) => call<DashboardRow[]>('race_dashboard', { p_race_id: id })
 export const createRace = (p: NewRace) => call<string>('create_virtual_race', { p })
+export interface OrganizerRights { admin: boolean; personal: boolean; clubs: string[] }
+export const getOrganizerRights = () => call<OrganizerRights>('can_organize_race')
+
+/** Báo phí theo quy mô (như thử thách): lượt tạo miễn phí dùng trước, rồi trừ Xu ví cá nhân / quỹ CLB */
+export interface CapacityQuote {
+  slots: number; fee: number; custom: boolean; tier: { max: number; xu: number } | null
+  payer: 'USER' | 'CLUB'; payer_balance: number; pass: { id: string; max_slots: number; remaining: number; note: string | null } | null
+}
+export async function quoteCapacity(slots: number, clubId: string | null): Promise<CapacityQuote> {
+  const q = await call<CapacityQuote>('quote_capacity', { p_slots: slots, p_club_id: clubId })
+  return { ...q, fee: Number(q.fee ?? 0), payer_balance: Number(q.payer_balance ?? 0), custom: Boolean(q.custom) }
+}
+
 export const registerRace = (id: string, km: number) => call<Race>('register_race', { p_race_id: id, p_distance_km: km })
 export const withdrawRace = (id: string) => call<Race>('withdraw_race', { p_race_id: id })
 export const cancelRace = (id: string, reason: string) => call<void>('cancel_virtual_race', { p_race_id: id, p_reason: reason })
@@ -116,6 +129,10 @@ export async function uploadRaceImage(raceId: string, file: File): Promise<strin
 
 const MESSAGES: Record<string, string> = {
   FORBIDDEN: 'Bạn không có quyền làm việc này.',
+  RACE_ORGANIZER_REQUIRED: 'Chỉ CLB hoặc cá nhân được RaceHub cấp quyền mới tạo được giải chạy ảo. Liên hệ admin để đăng ký.',
+  CAPACITY_REQUIRED: 'Chọn quy mô (số VĐV tối đa) — phí tạo giải tính theo quy mô.',
+  INSUFFICIENT_BALANCE: 'Ví của bạn không đủ Xu trả phí tạo giải.',
+  INSUFFICIENT_TREASURY: 'Quỹ CLB không đủ Xu trả phí tạo giải.',
   RACE_NOT_FOUND: 'Không tìm thấy giải (hoặc giải chỉ dành cho thành viên CLB).',
   RACE_CANCELLED: 'Giải đã bị hủy.',
   REGISTRATION_CLOSED: 'Đã hết hạn đăng ký.',

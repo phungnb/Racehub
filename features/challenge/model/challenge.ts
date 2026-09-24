@@ -236,7 +236,7 @@ export function defaultDraft(now = new Date(), clubId: string | null = null): Ch
     objective: 'DISTANCE', gameMode: 'TEAM_AVG', targetValue: 0, minKm: 1, minPace: 3, maxPace: 15, dailyCapKm: 0, requireHr: false,
     teamNames: ['Đội Xanh', 'Đội Đỏ'], teamSize: 0, maxSlots: 5,      // ≤ 5 người: miễn phí tạo
     start: start.toISOString(), end: new Date(start.getTime() + 7 * DAY).toISOString(),
-    rewardXu: 0, rewardSource: clubId ? 'CLUB' : 'CREATOR', rewardSplit: 'WINNER',
+    rewardXu: 0, rewardSource: clubId ? 'CLUB' : 'NONE', rewardSplit: 'WINNER',
     pledge: { ...DEFAULT_PLEDGE },
   }
 }

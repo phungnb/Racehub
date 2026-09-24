@@ -166,7 +166,9 @@ export interface ChallengeQuote {
   payer: 'USER' | 'CLUB'            // thử thách CLB trả bằng quỹ CLB
   payerBalance: number              // số dư của bên trả phí
   walletBalance: number             // ví cá nhân người tạo
-  pass: { id: string; remaining: number; max_slots: number; expires_at: string | null } | null
+  pass: { id: string; remaining: number; max_slots: number; expires_at: string | null; note?: string | null } | null
+  tier: { max: number; xu: number } | null   // mức quy mô áp dụng; null = vượt mức lớn nhất
+  custom: boolean                   // > mức lớn nhất: admin cấp riêng
   policy: EconomyPolicy
 }
 
@@ -176,10 +178,15 @@ export async function quoteChallenge(d: ChallengeDraft): Promise<ChallengeQuote>
     p_max_slots: effectiveSlots(d), p_format: d.format, p_club_id: d.audience === 'CLUB_ONLY' ? d.clubId : null,
   })
   if (error) throw error
-  const q = data as { fee: number; payer: 'USER' | 'CLUB'; payer_balance: number; wallet_balance: number; pass: ChallengeQuote['pass']; xu_vnd: number; policy: unknown }
+  const q = data as {
+    fee: number; payer: 'USER' | 'CLUB'; payer_balance: number; wallet_balance: number; pass: ChallengeQuote['pass']
+    tier: ChallengeQuote['tier']; custom: boolean; xu_vnd: number; policy: unknown
+  }
+  const policy = toPolicy(q.policy)
   return {
     fee: Number(q.fee ?? 0), payer: q.payer, payerBalance: Number(q.payer_balance ?? 0), walletBalance: Number(q.wallet_balance ?? 0),
-    pass: q.pass, policy: toPolicy({ xuVnd: q.xu_vnd, challengeFee: q.policy }),
+    pass: q.pass, tier: q.tier ? { max: Number(q.tier.max), xu: Number(q.tier.xu) } : null, custom: Boolean(q.custom),
+    policy: q.xu_vnd ? { ...policy, xuVnd: Number(q.xu_vnd) } : policy,
   }
 }
 
@@ -261,6 +268,7 @@ export async function setChallengePledge(id: string, p: ReturnType<typeof pledge
 }
 
 const MESSAGES: Record<string, string> = {
+  REWARD_NOT_ALLOWED: 'Chỉ thử thách CLB mới treo thưởng được (trích quỹ CLB). Thử thách cá nhân không treo thưởng Xu.',
   PLEDGES_MISSING: 'Còn thành viên chưa đăng ký mục tiêu. Nhắc họ, hoặc chia đội luôn (người chưa đăng ký tính 0 km).',
   PLEDGE_LOCKED: 'Mục tiêu đã khóa (đã xuất phát hoặc đã chia đội).',
   PLEDGE_RULES_LOCKED: 'Đã có người đăng ký mục tiêu và thử thách đã bắt đầu — không đổi luật được nữa.',

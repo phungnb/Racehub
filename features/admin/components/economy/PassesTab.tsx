@@ -28,7 +28,7 @@ export function PassesTab({ policy }: { policy: EconomyPolicy }) {
   const grant = useGrantPass()
   const revoke = useRevokePass()
   const passes = usePasses()
-  const worth = creationFee(slots, policy.challengeFee) * qty
+  const worth = (creationFee(slots, policy.capacityTiers) ?? 0) * qty
 
   const submit = async () => {
     if (!target) return

@@ -2,18 +2,20 @@
 
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BarChart3, Check, Crown, Download, Link2, Users } from 'lucide-react'
+import { BarChart3, Check, Crown, Download, Link2, Ticket, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, ErrorState, Input, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatNumber } from '@/shared/lib/format'
 import { clubErrorMessage, getAttendanceReport, getClubPlan, setClubSlug, type AttendanceRow, type Club } from '../../api/clubApi'
 import { clubKeys } from '../../hooks/keys'
+import { ClubProPurchase } from '@/features/billing'
 
 const BENEFITS = [
   { icon: Users, text: 'Không giới hạn Quản trị viên (gói miễn phí: 2)' },
   { icon: Link2, text: 'Link mời riêng dễ nhớ: racehub…/c/ten-clb' },
   { icon: BarChart3, text: 'Báo cáo chuyên cần: buổi chạy, km, điểm danh sự kiện, đóng quỹ — xuất CSV' },
+  { icon: Ticket, text: '2 lượt tạo thử thách CLB ≤100 người mỗi tháng (trừ quỹ CLB 0 Xu)' },
 ]
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('vi-VN')
 
@@ -53,11 +55,8 @@ export function ProSection({ club }: { club: Club }) {
             <SlugEditor clubId={club.id} current={p.slug} />
             <Button block variant="secondary" onClick={() => setReport(true)}><BarChart3 className="size-4" aria-hidden />Báo cáo chuyên cần</Button>
           </>
-        ) : (
-          <p className="rounded-xl bg-surface-2 p-3 text-xs text-fg-muted">
-            Thanh toán trong app sắp ra mắt. Hiện tại, liên hệ đội ngũ RaceHub để nâng cấp — CLB được bật Pro ngay, dữ liệu giữ nguyên.
-          </p>
-        )}
+        ) : null}
+        <ClubProPurchase clubId={club.id} active={p.active} />
       </Card>
       {report && <ReportSheet club={club} onClose={() => setReport(false)} />}
     </section>
