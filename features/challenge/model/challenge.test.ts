@@ -91,10 +91,18 @@ describe('mục tiêu tự đăng ký', () => {
     const d = { ...m.defaultDraft(new Date('2026-09-24T03:00:00Z')), ...m.weeklyPreset(new Date('2026-09-24T03:00:00Z'), 'c') } as m.ChallengeDraft
     expect(m.validatePledge({ ...d.pledge, options: [0] })).toBe('Mốc từ 1 đến 5.000 km')
     expect(m.validatePledge({ ...d.pledge, options: [], minKm: 50, maxKm: 10 })).toBe('Khoảng mục tiêu không hợp lệ')
-    expect(m.pledgePayload({ ...d.pledge, options: [60, 21, 42, 21] })).toEqual({ options: [21, 42, 60], min_km: null, max_km: null, cap_pct: null })
+    expect(m.pledgePayload({ ...d.pledge, options: [60, 21, 42, 21] })).toEqual({ options: [21, 42, 60], min_km: null, max_km: null, cap_pct: null, team_size: null })
     expect(m.draftToPayload(d)).toMatchObject({ target_value: 21, max_slots: 50 })
     const t = { ...d, ...m.teamPledgePreset(new Date('2026-09-24T03:00:00Z'), 'c') } as m.ChallengeDraft
-    expect(m.draftToPayload({ ...t, gameMode: 'TEAM_AVG' })).toMatchObject({ game_mode: 'TEAM_SUM', target_value: 0 })
+    expect(m.draftToPayload({ ...t, gameMode: 'TEAM_AVG' })).toMatchObject({ game_mode: 'TEAM_SUM', target_value: 0, team_names: ['Đội 1', 'Đội 2'], team_size: 0 })
+    expect(m.pledgePayload(t.pledge, true)).toMatchObject({ team_size: 5 })
+    expect(m.validateDraft({ ...t, pledge: { ...t.pledge, teamSize: 1 } }, 2)).toHaveProperty('teamSize')
+    expect(m.validateDraft({ ...t, teamNames: [] }, 2)).not.toHaveProperty('teamNames')
+  })
+  it('số đội = số người đăng ký ÷ số người mỗi đội (làm tròn, ít nhất 2)', () => {
+    expect(m.plannedTeams(20, 5)).toBe(4)
+    expect(m.plannedTeams(17, 5)).toBe(3)
+    expect(m.plannedTeams(6, 5)).toBe(2)
   })
   it('km được tính tối đa mục tiêu × (1 + % vượt)', () => {
     expect(m.cappedKm(50, 30, 20)).toBe(36)

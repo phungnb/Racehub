@@ -62,6 +62,8 @@ export interface Challenge {
   pledge_max_km?: number | null
   pledge_cap_pct?: number | null
   teams_assigned_at?: string | null
+  /** Đua đội theo mục tiêu: số người mỗi đội (đội được tạo tự động khi chia) */
+  pledge_team_size?: number | null
 }
 
 export interface ChallengeParticipant {
@@ -258,6 +260,7 @@ const MESSAGES: Record<string, string> = {
   INVALID_PLEDGE: 'Mục tiêu không nằm trong các mốc cho phép.',
   INVALID_PLEDGE_OPTIONS: 'Các mốc mục tiêu không hợp lệ.',
   INVALID_PLEDGE_CAP: '% vượt mục tiêu không hợp lệ.',
+  INVALID_TEAM_SIZE: 'Mỗi đội từ 2 đến 50 người.',
   PLEDGE_NOT_SUPPORTED: 'Thử thách này không dùng mục tiêu tự đăng ký.',
   NOT_ENOUGH_MEMBERS: 'Chưa đủ người để chia đội.',
   CHALLENGE_NOT_FOUND: 'Không tìm thấy thử thách, hoặc bạn cần mã mời để xem.',
