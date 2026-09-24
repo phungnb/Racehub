@@ -6,6 +6,7 @@ import { isSystemAdmin } from '@/features/admin'
 import { NotificationBell } from '@/features/notification'
 import { CoinAmount } from '@/shared/ui'
 import { routes } from '@/shared/config/routes'
+import { ICONS } from '@/shared/config/brand'
 import type { Profile } from '@/shared/types/profile'
 
 // Chiều cao cố định (h-16) để các thanh dính bên dưới (vd. tab CLB) đặt đúng vị trí: top-[var(--topbar-h)]
@@ -15,7 +16,7 @@ export function TopBar({ profile }: { profile: Profile | null }) {
       <div className="flex h-16 items-center justify-between gap-2 px-4">
         <Link href={routes.home} className="flex items-center gap-2 text-lg font-extrabold tracking-wide">
           {/* eslint-disable-next-line @next/next/no-img-element -- biểu tượng tĩnh nhỏ */}
-          <img src="/icons/mark-256.png" alt="" width={28} height={28} className="size-7" />
+          <img src={ICONS.mark} alt="" width={28} height={28} className="size-7" />
           <span>RACE<span className="text-brand">HUB</span></span>
         </Link>
         {profile && (

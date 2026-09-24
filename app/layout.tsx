@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Be_Vietnam_Pro, JetBrains_Mono } from 'next/font/google'
 import { Providers } from './providers'
+import { ICONS } from '@/shared/config/brand'
 import './globals.css'
 
 const sans = Be_Vietnam_Pro({
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
   description: 'Nền tảng chạy bộ xã hội: thử thách, giải chạy ảo, CLB và phần thưởng RaceCoin.',
   applicationName: 'RaceHub',
   appleWebApp: { capable: true, title: 'RaceHub', statusBarStyle: 'black-translucent' },
-  icons: { icon: [{ url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }], apple: '/icons/apple-touch-icon.png' },
+  icons: { icon: [{ url: ICONS.any192, sizes: '192x192', type: 'image/png' }], apple: ICONS.apple },
   formatDetection: { telephone: false },
 }
 

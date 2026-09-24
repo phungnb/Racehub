@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore } from 'react'
 import { Download, MoreVertical, Share, SquarePlus, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { ICONS } from '@/shared/config/brand'
 import { Button, Card, Sheet } from '@/shared/ui'
 import {
   canPromptInstall, detectPlatform, dismissInstall, installDismissed, isIosSafari, isStandalone, promptInstall, subscribeInstall,
@@ -76,7 +77,7 @@ export function InstallCard() {
   return (
     <Card className="relative flex items-center gap-3 border-brand/30 bg-gradient-to-br from-brand/10 to-transparent">
       {/* eslint-disable-next-line @next/next/no-img-element -- icon tĩnh của app */}
-      <img src="/icons/icon-192.png" alt="" className="size-12 shrink-0 rounded-2xl" />
+      <img src={ICONS.any192} alt="" className="size-12 shrink-0 rounded-2xl" />
       <div className="min-w-0 flex-1">
         <p className="font-semibold">Cài RaceHub như một app</p>
         <p className="text-xs text-fg-muted">Mở nhanh từ màn hình chính và nhận thông báo buổi chạy, thu quỹ</p>
