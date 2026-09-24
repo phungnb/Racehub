@@ -135,7 +135,7 @@ Bảy tính năng **chỉ RaceHub có**. Đây là thứ để quảng bá, nên
 
 ### Sprint 4: Lớp game (02/11 → 13/11) · Trụ cột ① · Mốc M3 Beta kín
 
-> **Trạng thái:** code xong GM-01 → GM-09, GM-11 (migration 000800, ADR-015, 8 test DB + 3 test logic). **Còn:** GM-10 chi tiết bài chạy có bản đồ; admin sửa nhiệm vụ/huy hiệu trên giao diện (hiện sửa trong bảng `quests`, `achievements`).
+> **Trạng thái:** code xong GM-01 → GM-09, GM-11 (migration 000800, ADR-015, 8 test DB + 3 test logic). **Còn:** ~~GM-10 chi tiết bài chạy có bản đồ~~ (xong: migration 001900, `/activities/[id]`, ảnh chia sẻ SS-05); admin sửa nhiệm vụ/huy hiệu trên giao diện (hiện sửa trong bảng `quests`, `achievements`).
 
 | Mã | Việc | Loại | Nghiệm thu |
 |---|---|---|---|

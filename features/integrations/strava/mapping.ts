@@ -17,7 +17,25 @@ export interface StravaSummaryActivity {
   manual?: boolean
   trainer?: boolean
   device_name?: string
-  map?: { summary_polyline?: string | null } | null
+  map?: { summary_polyline?: string | null; polyline?: string | null } | null
+  // Chỉ có ở bản chi tiết (GET /activities/:id)
+  start_latlng?: [number, number] | [] | null
+  max_heartrate?: number
+  average_cadence?: number
+  calories?: number
+  splits_metric?: { distance?: number; moving_time?: number; elevation_difference?: number; average_heartrate?: number }[]
+}
+
+/** Dữ liệu chi tiết lưu vào activity_details (migration 001900) */
+export interface ActivityDetailPayload {
+  polyline: string | null
+  splits: { distance_m: number; moving_s: number; elev_m: number | null; hr: number | null }[] | null
+  max_heartrate: number | null
+  avg_cadence: number | null
+  calories: number | null
+  start_lat: number | null
+  start_lng: number | null
+  detailed: boolean
 }
 
 export interface NormalizedActivity {
@@ -55,6 +73,36 @@ export function mapStravaActivity(a: StravaSummaryActivity): NormalizedActivity 
     manual: a.manual === true,
     has_gps: !!a.map?.summary_polyline,
     device_name: a.device_name ?? null,
+  }
+}
+
+/**
+ * Tuyến chạy + từng km. `detailed` = dữ liệu lấy từ GET /activities/:id (có polyline đầy đủ + splits_metric);
+ * bản trong danh sách chỉ có summary_polyline rút gọn.
+ */
+export function mapStravaDetail(a: StravaSummaryActivity, detailed: boolean): ActivityDetailPayload | null {
+  const polyline = (detailed ? a.map?.polyline : null) || a.map?.summary_polyline || null
+  const splits = (a.splits_metric ?? [])
+    .filter((s) => (num(s.distance) ?? 0) > 50 && (num(s.moving_time) ?? 0) > 0)
+    .map((s) => ({
+      distance_m: Math.round(num(s.distance)!),
+      moving_s: Math.round(num(s.moving_time)!),
+      elev_m: num(s.elevation_difference),
+      hr: num(s.average_heartrate) === null ? null : Math.round(num(s.average_heartrate)!),
+    }))
+  const ll = Array.isArray(a.start_latlng) && a.start_latlng.length === 2 ? a.start_latlng : null
+  // Strava tính cadence chạy theo một chân → nhân đôi thành bước/phút
+  const cadence = num(a.average_cadence)
+  if (!polyline && !splits.length && !detailed) return null
+  return {
+    polyline,
+    splits: splits.length ? splits : null,
+    max_heartrate: num(a.max_heartrate),
+    avg_cadence: cadence === null ? null : Math.round(cadence * 2),
+    calories: num(a.calories),
+    start_lat: ll ? ll[0] : null,
+    start_lng: ll ? ll[1] : null,
+    detailed,
   }
 }
 

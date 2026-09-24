@@ -1,6 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
+import { routes } from '@/shared/config/routes'
 import { Footprints, Clock3 } from 'lucide-react'
 import { listMyRecentActivities } from '../api/activities'
 import { Card, EmptyState, ErrorState, Skeleton } from '@/shared/ui'
@@ -22,7 +24,8 @@ export function ActivityList({ userId }: { userId: string }) {
     <ul className="space-y-2">
       {q.data.map((a) => (
         <li key={a.id}>
-          <Card className="flex items-center justify-between gap-3 py-3">
+          <Link href={routes.activity(a.id)} className="block rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-brand">
+          <Card className="flex items-center justify-between gap-3 py-3 transition-colors hover:border-fg-subtle">
             <div className="min-w-0">
               <p className="truncate font-semibold">{a.title}</p>
               <p className="text-xs text-fg-subtle">
@@ -42,6 +45,7 @@ export function ActivityList({ userId }: { userId: string }) {
               </p>
             </div>
           </Card>
+          </Link>
         </li>
       ))}
     </ul>

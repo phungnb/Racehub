@@ -41,7 +41,11 @@ describe('syncStravaActivities', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('https://www.strava.com/oauth/token')
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ grant_type: 'refresh_token', refresh_token: 'r1' })
     expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Bearer new')
-    expect(calls.rpc.map(([, a]) => a.p_external_id)).toEqual(['1', '2'])          // cũ trước
+    const ingests = calls.rpc.filter(([fn]) => fn === 'ingest_provider_activity')
+    expect(ingests.map(([, a]) => a.p_external_id)).toEqual(['1', '2'])          // cũ trước
+    // Tuyến chạy rút gọn trong danh sách được lưu kèm (migration 001900)
+    const details = calls.rpc.filter(([fn]) => fn === 'save_activity_detail')
+    expect(details.map(([, a]) => a.p_detail)).toEqual([expect.objectContaining({ polyline: 'x', detailed: false }), expect.objectContaining({ polyline: 'x' })])
     expect(calls.updates[0]).toMatchObject({ access_token: 'new', refresh_token: 'r2' })
     expect(calls.updates.at(-1)).toHaveProperty('last_synced_at')
     expect(s).toEqual({ imported: 2, pending: 0, skipped: 0, duplicates: 0, earned_xu: 10 })
