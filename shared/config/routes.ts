@@ -17,6 +17,7 @@ export const routes = {
   wallet: '/wallet',
   character: '/character',
   admin: '/admin',
+  welcome: '/welcome',
 } as const
 
 /** Chỉ chấp nhận đường dẫn nội bộ cho tham số ?next= (chống open redirect) */

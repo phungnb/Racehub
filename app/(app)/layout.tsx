@@ -9,6 +9,8 @@ import { ErrorState } from '@/shared/ui'
 import { TopBar } from './_components/TopBar'
 import { BottomTabBar } from './_components/BottomTabBar'
 import { FullScreenMessage } from './_components/FullScreenMessage'
+import { OfflineBanner } from '@/features/pwa'
+import { usePushSync } from '@/features/notification'
 
 // Khung chung cho mọi màn hình cần đăng nhập
 export default function AppLayout({ children }: LayoutProps<'/'>) {
@@ -16,6 +18,7 @@ export default function AppLayout({ children }: LayoutProps<'/'>) {
   const pathname = usePathname()
   const { session, loading } = useSession()
   const { profile, isError, refetch } = useMyProfile()
+  usePushSync(session?.user.id ?? null)
 
   useEffect(() => {
     if (loading) return
@@ -24,8 +27,10 @@ export default function AppLayout({ children }: LayoutProps<'/'>) {
       return
     }
     const pending = takePendingRedirect()
-    if (pending) router.replace(pending)
-  }, [loading, session, pathname, router])
+    if (pending) { router.replace(pending); return }
+    // Người mới chưa qua màn chào mừng (cột chỉ có sau migration 001800; chưa chạy thì là undefined → bỏ qua)
+    if (profile && profile.onboarded_at === null) router.replace(routes.welcome)
+  }, [loading, session, pathname, router, profile])
 
   if (loading || !session) {
     return <FullScreenMessage><Loader2 className="size-6 animate-spin text-brand" aria-label="Đang tải" /></FullScreenMessage>
@@ -33,6 +38,7 @@ export default function AppLayout({ children }: LayoutProps<'/'>) {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col border-x border-border/60">
+      <OfflineBanner />
       <TopBar profile={profile} />
       <main className="flex-1 px-4 pb-32 pt-4">
         {isError ? <ErrorState message="Không tải được hồ sơ của bạn." onRetry={() => refetch()} /> : children}

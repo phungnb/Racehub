@@ -6,6 +6,7 @@ import { ConnectDeviceCard } from '@/features/home'
 import { GameHub } from '@/features/game'
 import { ActivityList } from '@/features/activity'
 import { StravaSyncCard } from '@/features/integrations'
+import { InstallCard } from '@/features/pwa'
 import { EmptyState, SectionTitle, Skeleton } from '@/shared/ui'
 
 export default function FeedPage() {
@@ -22,6 +23,7 @@ export default function FeedPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <InstallCard />
       <GameHub profile={profile} />
       {profile.strava_connected ? <StravaSyncCard /> : <ConnectDeviceCard />}
 

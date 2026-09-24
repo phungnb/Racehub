@@ -163,10 +163,12 @@ Bảy tính năng **chỉ RaceHub có**. Đây là thứ để quảng bá, nên
 | ✅ CLB-22 | **Điểm danh**: QR ký HMAC có hạn 15 phút + **tự điểm danh** từ bài chạy (±30 phút, ≤ 500 m) | DB·UI | Thử 3 trường hợp: đúng giờ đúng chỗ, đúng giờ sai chỗ, QR hết hạn |
 | ✅ CLB-23 | Tab **Quỹ**: kỳ thu phí, ai đã đóng / chưa đóng, nhắc đóng phí, mã **VietQR** theo tài khoản CLB, khoản chi có ảnh hóa đơn, xuất CSV | UI | Số dư = tổng thu − tổng chi; mọi thay đổi có nhật ký |
 | ◐ CLB-24 | **Bình chọn** ✅ và **album ảnh** sự kiện (album: dùng ảnh bài đăng CLB, chưa gom theo sự kiện) | UI | Bình chọn có hạn chót; kết quả ẩn / hiện theo cài đặt |
-| PWA-01 | Manifest, icon, splash, service worker (cache khung app), nút "Cài lên màn hình chính" | OPS·UI | Lighthouse PWA đạt; mở offline thấy khung app và thông báo "mất mạng" |
-| PWA-02 | **Web Push**: tin nhắc tên, thông báo CLB, sự kiện sắp tới, thử thách sắp hết, bị vượt hạng | OPS | Nhận push trên Android Chrome và iOS (bản PWA đã cài) |
-| ONB-01 | **Onboarding 3 bước** (MH1–MH4): đăng nhập Google/Apple → kết nối Strava → chọn / nhập mã CLB → tạo nhân vật | UI | Người mới tới được trang chủ trong ≤ 90 giây |
+| ✅ PWA-01 | Manifest, icon, splash, service worker (cache khung app), nút "Cài lên màn hình chính" | OPS·UI | Lighthouse PWA đạt; mở offline thấy khung app và thông báo "mất mạng" |
+| ✅ PWA-02 | **Web Push**: tin nhắc tên, thông báo CLB, sự kiện sắp tới, thử thách sắp hết, bị vượt hạng | OPS | Nhận push trên Android Chrome và iOS (bản PWA đã cài) |
+| ✅ ONB-01 | **Onboarding 3 bước** (MH1–MH4): đăng nhập Google/Apple → kết nối Strava → chọn / nhập mã CLB → tạo nhân vật | UI | Người mới tới được trang chủ trong ≤ 90 giây |
 | ONB-02 | Làm lại **Đăng nhập** (MH1) theo chuẩn mới | UI | Đủ 4 trạng thái, không còn emoji và màu cứng |
+
+> **Trạng thái PWA/Push/Onboarding:** xong PWA-01 (manifest, icon, service worker, trang offline, thẻ "Cài app", dải báo mất mạng), PWA-02 (migration 001700: thiết bị, 4 nhóm thông báo, giờ yên lặng, hàng đợi + pg_net → `/api/push/dispatch`, số trên biểu tượng app; 5 test DB), ONB-01 (migration 001800, `/welcome` 4 bước: hồ sơ + giới tính → Strava → CLB → thông báo → nhân vật; Strava quay lại đúng bước). Đăng nhập Google/Apple thuộc ONB-02 (chưa làm).
 | REL-5 | Kiểm tra trước ra mắt: bảo mật (RLS toàn bộ bảng mới), tải (200 người chat cùng lúc), điều khoản, chính sách riêng tư | QA | Không lỗi P0 / P1 |
 
 ### Sprint 6: Mùa giải và CLB đấu CLB (30/11 → 11/12) · ① ③ · Mốc M5

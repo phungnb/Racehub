@@ -40,6 +40,9 @@ Racehub/
 │   ├── home/                     Trang chủ (trung tâm game)
 │   ├── profile/                  Hồ sơ, quyền riêng tư, tìm vận động viên
 │   ├── referral/                 Giới thiệu bạn bè
+│   ├── notification/             Chuông thông báo, Web Push (bật/tắt, loại thông báo, giờ yên lặng)
+│   ├── pwa/                      Cài app lên màn hình chính, service worker, báo mất mạng
+│   ├── onboarding/               Màn chào mừng người mới (/welcome)
 │   └── admin/                    Quản trị hệ thống, cấu hình phí
 │
 ├── shared/                       DÙNG CHUNG, không biết gì về nghiệp vụ

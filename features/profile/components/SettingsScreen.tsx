@@ -10,6 +10,7 @@ import { Button, Card, ErrorState, Field, Input, Skeleton, Textarea } from '@/sh
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import { useSession } from '@/features/auth'
+import { PushSettingsCard, unsubscribeThisDevice } from '@/features/notification'
 import { getMyProfile, profileErrorMessage, updateMyProfile } from '../api/profileApi'
 import {
   ageInfo, diffDraft, maxBirthDate, toDraft, validateDraft,
@@ -37,6 +38,9 @@ export function SettingsScreen() {
       {q.isPending ? <Skeleton className="h-[34rem]" />
         : q.isError ? <ErrorState message={profileErrorMessage(q.error)} onRetry={() => void q.refetch()} />
         : <ProfileCard key={JSON.stringify(q.data)} profile={q.data} />}
+
+      <SectionTitle>Thông báo & ứng dụng</SectionTitle>
+      <PushSettingsCard />
 
       <SectionTitle>Quyền riêng tư</SectionTitle>
       {q.data && <PrivacySettings userId={q.data.id} />}
@@ -149,6 +153,7 @@ function Unit({ icon: Icon, unit, children }: { icon: typeof Ruler; unit: string
 function AccountCard() {
   const { session } = useSession()
   const [confirm, setConfirm] = useState(false)
+  const [leaving, setLeaving] = useState(false)
   return (
     <Card className="space-y-3">
       <div className="flex items-center gap-3">
@@ -161,7 +166,7 @@ function AccountCard() {
       {confirm ? (
         <div className="flex gap-2">
           <Button variant="secondary" block onClick={() => setConfirm(false)}>Hủy</Button>
-          <Button variant="danger" block onClick={() => void supabase.auth.signOut()}><LogOut className="size-4" aria-hidden />Đăng xuất</Button>
+          <Button variant="danger" block loading={leaving} onClick={() => { setLeaving(true); void unsubscribeThisDevice().finally(() => supabase.auth.signOut()) }}><LogOut className="size-4" aria-hidden />Đăng xuất</Button>
         </div>
       ) : (
         <Button variant="secondary" block onClick={() => setConfirm(true)}><LogOut className="size-4" aria-hidden />Đăng xuất</Button>

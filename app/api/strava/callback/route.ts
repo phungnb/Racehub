@@ -1,27 +1,30 @@
 import { NextResponse, after } from 'next/server'
 import { cookies } from 'next/headers'
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/shared/lib/supabase-server'
-import { OAUTH_NONCE_COOKIE, verifyOAuthState } from '@/shared/lib/oauth-state'
+import { OAUTH_NONCE_COOKIE, OAUTH_RETURN_COOKIE, verifyOAuthState } from '@/shared/lib/oauth-state'
+import { safeNext } from '@/shared/config/routes'
 import { getPublicOrigin } from '@/shared/lib/request-url'
 import { serverEnv } from '@/shared/config/env.server'
 import { exchangeStravaCode, syncStravaActivities } from '@/features/integrations/server'
 
-function back(origin: string, params: Record<string, string>) {
-  const url = new URL('/me', origin)
+function back(origin: string, to: string, params: Record<string, string>) {
+  const url = new URL(to, origin)
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
   const res = NextResponse.redirect(url)
   res.cookies.set(OAUTH_NONCE_COOKIE, '', { path: '/api/strava', maxAge: 0 })
+  res.cookies.set(OAUTH_RETURN_COOKIE, '', { path: '/api/strava', maxAge: 0 })
   return res
 }
 
 export async function GET(request: Request) {
   const origin = getPublicOrigin(request)
   const url = new URL(request.url)
+  const to = safeNext((await cookies()).get(OAUTH_RETURN_COOKIE)?.value, '/me')
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')
 
   if (url.searchParams.get('error') || !code || !state) {
-    return back(origin, { strava_error: 'access_denied' })
+    return back(origin, to, { strava_error: 'access_denied' })
   }
 
   // 1. Kiểm tra state: chữ ký, hạn dùng, nonce khớp cookie của trình duyệt này
@@ -29,14 +32,14 @@ export async function GET(request: Request) {
   const check = verifyOAuthState(state, cookieStore.get(OAUTH_NONCE_COOKIE)?.value, 'STRAVA', serverEnv.oauthStateSecret)
   if (!check.ok) {
     console.warn('[strava/callback] state không hợp lệ:', check.reason)
-    return back(origin, { strava_error: 'invalid_state' })
+    return back(origin, to, { strava_error: 'invalid_state' })
   }
 
   // 2. Người đang đăng nhập phải là người đã bắt đầu luồng
   const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || user.id !== check.payload.uid) {
-    return back(origin, { strava_error: 'invalid_state' })
+    return back(origin, to, { strava_error: 'invalid_state' })
   }
 
   try {
@@ -58,10 +61,10 @@ export async function GET(request: Request) {
     })
     if (error) {
       if (error.message.includes('PROVIDER_ACCOUNT_CONFLICT')) {
-        return back(origin, { strava_error: 'account_conflict' })
+        return back(origin, to, { strava_error: 'account_conflict' })
       }
       console.error('[strava/callback] link_provider_connection:', error.message)
-      return back(origin, { strava_error: 'server_error' })
+      return back(origin, to, { strava_error: 'server_error' })
     }
     // Kéo luôn bài chạy 30 ngày gần nhất (chạy sau khi đã chuyển hướng người dùng)
     after(async () => {
@@ -72,9 +75,9 @@ export async function GET(request: Request) {
         console.error('[strava/callback] backfill', err instanceof Error ? err.message : err)
       }
     })
-    return back(origin, { strava_success: 'true' })
+    return back(origin, to, { strava_success: 'true' })
   } catch (err) {
     console.error('[strava/callback]', err instanceof Error ? err.message : err)
-    return back(origin, { strava_error: 'server_error' })
+    return back(origin, to, { strava_error: 'server_error' })
   }
 }

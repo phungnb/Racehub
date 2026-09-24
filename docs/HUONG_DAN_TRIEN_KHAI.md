@@ -21,6 +21,8 @@ Sao chép `.env.example` thành `.env.local` (máy local / Codespaces), hoặc �
 | `NEXT_PUBLIC_STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET` | strava.com/settings/api | Trước đây Client ID bị hard-code, nay đọc từ biến môi trường |
 | `OAUTH_STATE_SECRET` | Tự tạo bằng `openssl rand -hex 32` | **Mới**, bắt buộc |
 | `CRON_SECRET` | Tự tạo bằng `openssl rand -hex 24` | **Mới (Sprint 2)**. Vercel dùng để gọi `/api/cron/club-recap` (bài Tổng kết tuần, 07:00 sáng thứ Hai), `/api/cron/challenges` (tất toán thử thách) và `/api/cron/leagues` (chốt league 00:10 thứ Hai). Lịch nằm trong `vercel.json` |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Tự tạo một lần: `npx web-push generate-vapid-keys` | **Mới (PWA-02)**. Bật thông báo đẩy. Khóa riêng chỉ đặt ở server. Đổi khóa thì mọi thiết bị phải bật lại thông báo |
+| `VAPID_SUBJECT` | `mailto:<email của bạn>` hoặc `https://<tên-miền>` | Không bắt buộc (mặc định dùng tên miền app) |
 
 Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo lỗi rõ tên biến bị thiếu, thay vì âm thầm dùng key sai như trước.
 
@@ -48,6 +50,8 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001001400_profile_details.sql` | **Hồ sơ cá nhân:** giới tính (nhân vật đi theo), giới thiệu, ngày sinh / chiều cao / cân nặng (bảng riêng, chỉ chủ tài khoản đọc được), kho ảnh `avatars`, lệnh `update_my_profile` | Cần file 1300 |
 | `20261001001500_club_events_finance.sql` | **CLB hoàn chỉnh:** sự kiện chạy nhóm + báo tham gia + nhắc trước 12 giờ; điểm danh bằng QR (hết hạn 15 phút), tự điểm danh từ bài chạy, ban quản trị điểm danh tay; thu chi tiền VND (tài khoản VietQR, kỳ thu phí, xác nhận đóng, khoản chi có hóa đơn, xuất CSV); bình chọn; huy hiệu chạy nhóm 1/5/20 | Cần file 1400 |
 | `20261001001600_club_bank_qr.sql` | Ban quản trị CLB tự tải **ảnh mã QR nhận tiền** (app ngân hàng / MoMo / ZaloPay); có ảnh thì thành viên quét ảnh này, không có thì app tự tạo VietQR từ số tài khoản | Cần file 1500 |
+| `20261001001700_web_push.sql` | **Thông báo đẩy:** thiết bị nhận push, cài đặt loại thông báo + giờ yên lặng (mặc định 22h–6h), hàng đợi gửi. Sau khi chạy cần bước "Bật gửi push" bên dưới | Cần file 1600 |
+| `20261001001800_onboarding.sql` | **Màn chào mừng người mới** (hồ sơ → Strava → CLB → thông báo). Tài khoản đang có được coi là đã xong, chỉ người đăng ký mới thấy | Cần file 1700 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 
@@ -127,6 +131,19 @@ notify pgrst, 'reload schema';
    - **Cộng/Trừ Xu:** tìm người (tên, email, ID) hoặc CLB → nhập số Xu → chọn *Xu thưởng* hay *Xu nạp* → ghi lý do → xác nhận. Có nhật ký, người nhận (hoặc ban quản trị CLB) được báo.
    - **Vé miễn phí:** tặng N vé cho cá nhân/CLB, mỗi vé dùng cho một thử thách tối đa M người, có hạn dùng; thu hồi được.
    - **Chính sách:** sửa giá trị 1 Xu, mức thưởng chạy, biểu phí; bảng mô phỏng cho thấy phí trước/sau khi lưu.
+
+### Sau khi chạy file 1700: bật gửi push (làm một lần)
+
+1. Đặt `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` trên Vercel (Bước 2) rồi **deploy lại**.
+2. Trong **SQL Editor** chạy (thay tên miền thật, phải là https):
+   ```sql
+   select private.configure_push('https://<tên-miền>/api/push/dispatch');
+   ```
+   Lệnh tự bật extension `pg_net` và tự sinh khóa bí mật giữa Supabase ↔ Vercel (không cần thêm biến môi trường). Nếu kết quả có chữ *"pg_net chưa bật"*: vào **Database → Extensions**, bật `pg_net`, rồi chạy lại lệnh trên.
+3. Kiểm tra: mở app **bản đã deploy** → Tôi → Cài đặt → *Thông báo & ứng dụng* → bật *Thông báo trên thiết bị này* → **Gửi thử**. iPhone: phải **cài app lên màn hình chính** (Safari → Chia sẻ → Thêm vào MH chính, iOS 16.4+) và mở từ biểu tượng đó mới bật được.
+4. Tắt gửi push: `select private.configure_push(null);` (thông báo vẫn vào chuông như cũ).
+
+Thông báo trong giờ yên lặng của người nhận vẫn vào chuông, chỉ không rung máy. Thiết bị hết hạn (gỡ app, xóa dữ liệu) tự bị xóa khi gửi lỗi 404/410.
 
 ### Sau khi chạy file 500: bật Realtime cho chat
 

@@ -26,6 +26,13 @@ export const serverEnv = {
     if (secret.length < 16) throw new Error('[RaceHub] CRON_SECRET phải dài ít nhất 16 ký tự')
     return secret
   },
+  get vapidPrivateKey() {
+    return required('VAPID_PRIVATE_KEY')
+  },
+  /** "mailto:..." hoặc URL trang của bạn — dịch vụ push dùng để liên hệ khi có sự cố */
+  get vapidSubject() {
+    return process.env.VAPID_SUBJECT?.trim() || null
+  },
   get oauthStateSecret() {
     const secret = required('OAUTH_STATE_SECRET')
     if (secret.length < 32) throw new Error('[RaceHub] OAUTH_STATE_SECRET phải dài ít nhất 32 ký tự')

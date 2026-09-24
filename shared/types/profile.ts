@@ -9,5 +9,7 @@ export interface Profile {
   level: number | null
   role?: string | null
   strava_connected?: boolean | null
+  /** null = chưa qua màn chào mừng (migration 001800) */
+  onboarded_at?: string | null
   [key: string]: unknown
 }

@@ -4,6 +4,8 @@ export const publicEnv = {
   supabaseUrl: (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
   supabaseAnonKey: (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').trim(),
   stravaClientId: (process.env.NEXT_PUBLIC_STRAVA_CLIENT_ID ?? '').trim(),
+  /** Khóa công khai VAPID cho Web Push; trống = tắt tính năng thông báo đẩy */
+  vapidPublicKey: (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? '').trim(),
 }
 
 if (!publicEnv.supabaseUrl || !publicEnv.supabaseAnonKey) {

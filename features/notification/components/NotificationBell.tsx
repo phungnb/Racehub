@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect } from 'react'
 import { Bell } from 'lucide-react'
 import { routes } from '@/shared/config/routes'
 import { useNotificationStream, useUnreadCount } from '../hooks/useNotifications'
@@ -8,6 +9,12 @@ import { useNotificationStream, useUnreadCount } from '../hooks/useNotifications
 export function NotificationBell({ userId }: { userId: string | undefined }) {
   useNotificationStream(userId)
   const { data: unread = 0 } = useUnreadCount(!!userId)
+  // Số trên biểu tượng app đã cài (Android, máy tính; iOS 16.4+)
+  useEffect(() => {
+    const nav = navigator as Navigator & { setAppBadge?: (n: number) => Promise<void>; clearAppBadge?: () => Promise<void> }
+    if (unread > 0) void nav.setAppBadge?.(unread).catch(() => {})
+    else void nav.clearAppBadge?.().catch(() => {})
+  }, [unread])
   const label = unread > 0 ? `Thông báo, ${unread} chưa đọc` : 'Thông báo'
   return (
     <Link href={routes.notifications} aria-label={label}

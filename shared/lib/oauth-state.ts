@@ -6,6 +6,8 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 // Chống CSRF gắn tài khoản: nonce trong state phải khớp cookie httpOnly của chính trình duyệt đã bắt đầu luồng.
 
 export const OAUTH_NONCE_COOKIE = 'rh_oauth_nonce'
+/** Trang quay về sau khi kết nối (mặc định /me) — chỉ đường dẫn nội bộ đã lọc bằng safeNext */
+export const OAUTH_RETURN_COOKIE = 'rh_oauth_return'
 const TTL_SECONDS = 10 * 60
 
 interface StatePayload {
