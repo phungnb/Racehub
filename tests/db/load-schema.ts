@@ -53,3 +53,6 @@ export async function asUser<T>(db: PGlite, uid: string | null, reqPath: string,
     await db.query(`select set_config('request.path', '', false), set_config('request.jwt.claims', '', false)`)
   }
 }
+
+/** Kinh tế v1 (1 Xu = 1.000đ) — migration cuối trước economy v2 (003700). Test lịch sử của v1 dừng ở đây; v2 có test riêng. */
+export const ECON_V1 = '20261001003600'

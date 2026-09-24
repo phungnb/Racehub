@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
-import { createDb, asUser } from './load-schema'
+import { createDb, asUser, ECON_V1 } from './load-schema'
 
 // Migration 000700: chính sách Xu, phí thử thách theo số người, vé miễn phí, admin điều phối Xu
 const ADMIN = '00000000-0000-0000-0000-0000000000e0'
@@ -37,7 +37,7 @@ describe('Kinh tế Xu & điều phối admin (000700)', () => {
   let club: string
 
   beforeAll(async () => {
-    db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed })
+    db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed, until: ECON_V1 })
     club = (await rpc<{ c: { id: string } }>(db, U, `select public.create_club('Sông Hồng Runners') as c`))[0].c.id
     await db.query(`update public.clubs set join_policy = 'OPEN' where id = $1`, [club])
     await rpc(db, V, `select public.join_club($1)`, [club])

@@ -28,7 +28,7 @@ insert into public.avatar_items (code, name, description, category, rarity, asse
   ('hat_band_thin_pink', 'Băng đô mảnh Hồng', 'Thun co giãn, không trượt', 'hat', 'common', 'layer', 'LAYER', '{"male": "/character/layers/hat_band_thin_pink_male.png?v=1", "female": "/character/layers/hat_band_thin_pink_female.png?v=1"}', 15, 1, 215)
 on conflict (code) where code is not null do update set
   name = excluded.name, description = excluded.description, rarity = excluded.rarity,
-  layer_urls = excluded.layer_urls, price_xu = excluded.price_xu, unlock_level = excluded.unlock_level, sort = excluded.sort
+  layer_urls = excluded.layer_urls, unlock_level = excluded.unlock_level, sort = excluded.sort
   where public.avatar_items.render_kind = 'LAYER' and public.avatar_items.layer_urls->>'male' like '/character/layers/%';
 
 notify pgrst, 'reload schema';

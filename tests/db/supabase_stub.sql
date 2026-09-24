@@ -10,7 +10,8 @@ create schema if not exists vault;
 grant usage on schema public, auth, extensions to anon, authenticated, service_role;
 
 create table auth.users (
-  id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb
+  id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb,
+  email_confirmed_at timestamptz default now(), phone_confirmed_at timestamptz
 );
 create function auth.uid() returns uuid language sql stable as
   $$ select nullif(current_setting('request.jwt.claims', true)::json->>'sub', '')::uuid $$;

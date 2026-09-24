@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
-import { createDb, asUser } from './load-schema'
+import { createDb, asUser, ECON_V1 } from './load-schema'
 
 // Kiểm tra trên ĐÚNG schema production (supabase/remote_schema.sql).
 // Mỗi lỗ hổng: trước migration phải khai thác được (chứng minh lỗ hổng có thật),
@@ -57,7 +57,7 @@ describe('TRƯỚC migration — lỗ hổng tồn tại trên production', () =
 
 describe('SAU migration', () => {
   let db: PGlite
-  beforeAll(async () => { db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed }) }, 120_000)
+  beforeAll(async () => { db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed, until: ECON_V1 }) }, 120_000)
 
   describe('lỗ hổng đã bị chặn', () => {
     it('không ai tự nạp / điều chỉnh Xu, kể cả khi truyền UUID của admin', async () => {

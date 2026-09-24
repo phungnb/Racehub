@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
-import { createDb, asUser } from './load-schema'
+import { createDb, asUser, ECON_V1 } from './load-schema'
 
 // Migration 000900 (tủ đồ, shop) + 001000 (nhân vật 2D: bộ màu áo/quần/tất/giày, hoàn Xu đồ 3D ngừng bán)
 const U = '00000000-0000-0000-0000-0000000000d1'
@@ -35,7 +35,7 @@ const give = (db: PGlite, uid: string, amount: number, key: string, kind = 'BONU
 
 describe('Nhân vật 2D: tủ đồ & shop (000900 + 001000)', () => {
   let db: PGlite
-  beforeAll(async () => { db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed }) }, 240_000)
+  beforeAll(async () => { db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed, until: ECON_V1 }) }, 240_000)
 
   it('lần đầu mở: mặc bản nguyên bản của ảnh, chỉ còn đồ đổi màu áo/quần/tất/giày', async () => {
     const m = await state(db, U)

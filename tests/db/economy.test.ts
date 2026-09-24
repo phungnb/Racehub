@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
-import { createDb, asUser } from './load-schema'
+import { createDb, asUser, ECON_V1 } from './load-schema'
 
 // Nghiệp vụ sau migration, trên schema production có sẵn dữ liệu.
 const RUNNER = '00000000-0000-0000-0000-0000000000c1'
@@ -63,7 +63,7 @@ const ledgerBalance = (db: PGlite, id: string) => num(db, `select coalesce(sum(a
 
 describe('kinh tế & bài chạy (sau migration)', () => {
   let db: PGlite
-  beforeAll(async () => { db = await createDb({ seed }) }, 120_000)
+  beforeAll(async () => { db = await createDb({ seed, until: ECON_V1 }) }, 120_000)
 
   it('đối soát: sổ cái khớp số Xu cũ của user và quỹ CLB', async () => {
     expect(await ledgerBalance(db, RUNNER)).toBe(10)

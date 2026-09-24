@@ -20,5 +20,8 @@ export async function GET(req: NextRequest) {
   // Thách đấu nhiều CLB (migration 003600)
   const cups = await admin.rpc('settle_due_club_cups')
   if (cups.error) console.error('[cron/challenges] cups', cups.error.message)
-  return NextResponse.json({ settled: data, battles: battles.data ?? null, cups: cups.data ?? null })
+  // Lượt tạo thử thách tháng mới cho gói VIP / CLB Pro (migration 003800)
+  const credits = await admin.rpc('issue_due_credits')
+  if (credits.error) console.error('[cron/challenges] credits', credits.error.message)
+  return NextResponse.json({ settled: data, battles: battles.data ?? null, cups: cups.data ?? null, credits: credits.data ?? null })
 }

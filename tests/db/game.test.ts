@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
-import { createDb, asUser } from './load-schema'
+import { createDb, asUser, ECON_V1 } from './load-schema'
 
 // Migration 000800: nhiệm vụ, streak tuần + khiên, huy hiệu, league tuần, cổ vũ bằng Xu, ví, chuỗi phần thưởng
 const A = '00000000-0000-0000-0000-0000000000a1'
@@ -43,7 +43,7 @@ const state = async (db: PGlite, uid: string) =>
 describe('Lớp game (000800)', () => {
   let db: PGlite
   beforeAll(async () => {
-    db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed })
+    db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed, until: ECON_V1 })
   }, 240_000)
 
   it('một bài chạy 5 km trả về chuỗi phần thưởng: thẻ bài chạy, nhiệm vụ, huy hiệu — Xu qua sổ cái', async () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
-import { createDb, asUser } from './load-schema'
+import { createDb, asUser, ECON_V1 } from './load-schema'
 
 const U = '00000000-0000-0000-0000-0000000000e1'
 const OTHER = '00000000-0000-0000-0000-0000000000e2'
@@ -32,7 +32,7 @@ describe('ingest_provider_activity', () => {
   const xu = async (id: string) => Number((await db.query<{ xu: string }>(`select xu from public.profiles where id = $1`, [id])).rows[0].xu)
 
   beforeAll(async () => {
-    db = await createDb({ seed })
+    db = await createDb({ seed, until: ECON_V1 })
     // Kết nối Strava cách đây 1 ngày
     await db.exec('set role service_role')
     await db.query(`select public.link_provider_connection($1, 'STRAVA', 'ath-1', 't', 'r', now() + interval '6 hours')`, [U])
