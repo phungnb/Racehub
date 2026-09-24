@@ -5,7 +5,8 @@ export interface TrackPoint {
   longitude: number
   accuracy: number
   altitude: number
-  speed: number
+  /** Vận tốc máy báo (m/s); null = máy không báo */
+  speed: number | null
   recorded_at: string
 }
 
@@ -15,8 +16,12 @@ export interface Split {
 }
 
 export const GPS = {
-  MAX_ACCURACY_M: 35,      // bỏ điểm sai số lớn hơn
-  MIN_STEP_M: 2,           // bỏ rung GPS khi đứng yên
+  MAX_ACCURACY_M: 25,      // bỏ điểm sai số lớn hơn (trong nhà, dưới mái che thường 30–100 m)
+  MIN_STEP_M: 6,           // quãng dịch chuyển tối thiểu so với điểm neo
+  ACCURACY_FACTOR: 1,      // …và tối thiểu bằng sai số trung bình của 2 điểm: rung GPS khi ngồi yên không cộng km
+  STILL_WINDOW_S: 10,      // trong 10 giây gần nhất…
+  STILL_MIN_M: 10,         // …vị trí (đã làm mượt) dời chưa tới 10 m (< 1 m/s) → đang đứng yên
+  STILL_DEVICE_MPS: 0.5,   // máy báo vận tốc < 0,5 m/s mà điểm vẫn "nhảy" → coi là đứng yên
   MAX_SPEED_MPS: 12,       // > 43 km/h: nhảy điểm
   AUTO_PAUSE_MPS: 0.6,     // < 2,2 km/h trong AUTO_PAUSE_AFTER_S → tự tạm dừng
   AUTO_PAUSE_AFTER_S: 10,
@@ -33,19 +38,57 @@ export function haversineM(lat1: number, lon1: number, lat2: number, lon2: numbe
 
 export type PointVerdict =
   | { accept: true; distance: number; speed: number }
-  | { accept: false; reason: 'INACCURATE' | 'JITTER' | 'TELEPORT' | 'NO_TIME' }
+  | { accept: false; reason: 'INACCURATE' | 'JITTER' | 'STILL' | 'TELEPORT' | 'NO_TIME' }
 
-/** Có nhận điểm GPS mới không, và cộng thêm bao nhiêu mét. */
+/**
+ * Có nhận điểm GPS mới không, và cộng thêm bao nhiêu mét.
+ * `prev` là điểm NEO (điểm được nhận gần nhất): điểm rung quanh chỗ đứng không dời neo,
+ * nên khi thật sự di chuyển, quãng đường vẫn được cộng đủ từ neo tới vị trí mới.
+ */
 export function evaluatePoint(prev: TrackPoint | null, next: TrackPoint): PointVerdict {
   if (next.accuracy > GPS.MAX_ACCURACY_M) return { accept: false, reason: 'INACCURATE' }
   if (!prev) return { accept: true, distance: 0, speed: 0 }
   const dt = (Date.parse(next.recorded_at) - Date.parse(prev.recorded_at)) / 1000
   if (dt <= 0) return { accept: false, reason: 'NO_TIME' }
   const d = haversineM(prev.latitude, prev.longitude, next.latitude, next.longitude)
-  if (d < GPS.MIN_STEP_M) return { accept: false, reason: 'JITTER' }
+  const minStep = Math.max(GPS.MIN_STEP_M, GPS.ACCURACY_FACTOR * ((prev.accuracy + next.accuracy) / 2))
+  if (d < minStep) return { accept: false, reason: 'JITTER' }
   const speed = d / dt
+  // Máy báo gần như đứng yên nhưng điểm lệch vừa phải → rung GPS (điểm lệch rất xa thì vẫn xét tiếp)
+  if (next.speed !== null && next.speed >= 0 && next.speed < GPS.STILL_DEVICE_MPS && d < 3 * minStep) {
+    return { accept: false, reason: 'STILL' }
+  }
   if (speed > GPS.MAX_SPEED_MPS) return { accept: false, reason: 'TELEPORT' }
   return { accept: true, distance: d, speed }
+}
+
+const SMOOTH_N = 5
+
+/**
+ * Làm mượt: trung vị của 5 điểm thô gần nhất (kết thúc ở vị trí `end`), loại điểm "văng" đơn lẻ.
+ * Sai số lấy trung vị của 5 điểm.
+ */
+export function smoothPoint(raw: TrackPoint[], end = raw.length): TrackPoint | null {
+  if (end <= 0) return null
+  const last = raw[end - 1]
+  const w = raw.slice(Math.max(0, end - SMOOTH_N), end)
+  if (w.length < 3) return last
+  const med = (xs: number[]) => { const a = [...xs].sort((x, y) => x - y); return a[Math.floor(a.length / 2)] }
+  return { ...last, latitude: med(w.map((p) => p.latitude)), longitude: med(w.map((p) => p.longitude)), accuracy: med(w.map((p) => p.accuracy)) }
+}
+
+/**
+ * Đang đứng yên? So vị trí đã làm mượt hiện tại với ~10 giây trước.
+ * Chưa đủ 10 giây dữ liệu → chưa kết luận (trả về false).
+ */
+export function isStationary(raw: TrackPoint[]): boolean {
+  if (raw.length < 3) return false
+  const tEnd = Date.parse(raw[raw.length - 1].recorded_at)
+  let i = raw.length - 1
+  while (i > 0 && tEnd - Date.parse(raw[i].recorded_at) < GPS.STILL_WINDOW_S * 1000) i--
+  if (tEnd - Date.parse(raw[i].recorded_at) < GPS.STILL_WINDOW_S * 1000) return false
+  const now = smoothPoint(raw)!, then = smoothPoint(raw, i + 1)!
+  return haversineM(then.latitude, then.longitude, now.latitude, now.longitude) < GPS.STILL_MIN_M
 }
 
 /** Pace hiện tại (giây/km) từ các điểm trong 30 giây gần nhất — mượt hơn pace tức thời. */

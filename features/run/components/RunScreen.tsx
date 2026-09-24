@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { AlertTriangle, CheckCircle2, Clock3, Gift, Gauge, Loader2, MapPin, Pause, Play, Satellite, Square, Timer, Volume2, VolumeX, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock3, Gift, Gauge, Loader2, Lock, MapPin, Pause, Play, Satellite, Smartphone, Square, Timer, Unlock, Volume2, VolumeX, Watch, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, CoinAmount, HoldButton, XpAmount } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -42,6 +42,7 @@ function Metric({ label, value, unit, icon: Icon }: { label: string; value: stri
 export function RunScreen({ onSaved }: { onSaved?: () => void }) {
   const t = useRunTracker()
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  const [locked, setLocked] = useState(false)
   const avgPace = t.distanceM > 0 ? t.movingS / (t.distanceM / 1000) : 0
   const live = t.phase === 'RUNNING' || t.phase === 'PAUSED' || t.phase === 'LOCATING'
 
@@ -71,8 +72,9 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
 
         {t.error && <p role="alert" className="mb-3 rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">{t.error}</p>}
         <Card className="space-y-2 text-sm text-fg-muted">
-          <p className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-brand" /> Chạy ngoài trời, giữ màn hình mở trong lúc chạy.</p>
-          <p className="flex gap-2"><Gauge className="mt-0.5 size-4 shrink-0 text-brand" /> Có đồng hồ Garmin / COROS? Kết nối Strava để bài chạy tự về, chính xác hơn.</p>
+          <p className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-brand" /> Chạy ngoài trời. Đứng yên thì app tự dừng tính km.</p>
+          <p className="flex gap-2"><Smartphone className="mt-0.5 size-4 shrink-0 text-brand" /> Trình duyệt chỉ ghi GPS khi app đang mở: bấm <b className="text-fg">Khóa màn hình</b> rồi bỏ túi, màn hình tối lại và không bấm nhầm.</p>
+          <p className="flex gap-2"><Watch className="mt-0.5 size-4 shrink-0 text-brand" /> Chạy dài hoặc muốn tắt hẳn màn hình? Dùng đồng hồ Garmin / COROS / Apple Watch hoặc app Strava — bài chạy tự về RaceHub.</p>
         </Card>
       </div>
     )
@@ -81,6 +83,9 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
   // ---------------- Đang chạy / tạm dừng ----------------
   if (live) {
     const status = t.phase === 'LOCATING' ? 'ĐANG TÌM GPS' : t.phase === 'PAUSED' ? 'TẠM DỪNG' : t.autoPaused ? 'TỰ TẠM DỪNG' : 'ĐANG CHẠY'
+    if (locked && t.phase !== 'LOCATING') {
+      return <PocketMode distanceM={t.distanceM} movingS={t.movingS} pace={avgPace} status={status} onUnlock={() => setLocked(false)} />
+    }
     return (
       <div className="flex min-h-[75dvh] flex-col">
         <div className="flex items-center justify-between">
@@ -112,6 +117,14 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
           </ol>
         )}
 
+        {t.gapS > 0 && (
+          <p role="status" className="mt-3 flex gap-2 rounded-xl bg-warning/10 px-3 py-2 text-xs text-warning">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+            App bị ẩn {Math.round(t.gapS / 60) || 1} phút (tắt màn hình / chuyển app) nên điện thoại dừng GPS; đoạn đó được nối thẳng.
+            Lần sau hãy dùng nút Khóa màn hình.
+          </p>
+        )}
+
         {t.phase === 'LOCATING' ? (
           <div className="mt-8 flex flex-col items-center gap-3">
             <p className="flex items-center gap-2 text-sm text-fg-muted"><Loader2 className="size-4 animate-spin" /> Đang chờ tín hiệu GPS ổn định…</p>
@@ -121,23 +134,28 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
             </div>
           </div>
         ) : (
-          <div className="mt-8 flex items-center justify-center gap-10">
-            {t.phase === 'RUNNING' ? (
-              <button onClick={t.pause} aria-label="Tạm dừng" className="grid size-20 place-items-center rounded-full bg-surface-2 text-fg active:scale-95">
-                <Pause className="size-8 fill-current" />
+          t.phase === 'RUNNING' ? (
+            <div className="mt-8 grid grid-cols-3 items-center justify-items-center">
+              <RoundAction label="Khóa màn hình" onClick={() => setLocked(true)}><Lock className="size-6" aria-hidden /></RoundAction>
+              <button onClick={t.pause} aria-label="Tạm dừng"
+                className="grid size-24 place-items-center rounded-full bg-fg text-bg shadow-lg active:scale-95">
+                <Pause className="size-10 fill-current" aria-hidden />
               </button>
-            ) : (
-              <button onClick={t.resume} aria-label="Tiếp tục" className="grid size-20 place-items-center rounded-full bg-brand text-brand-fg active:scale-95">
-                <Play className="size-8 fill-current" />
-              </button>
-            )}
-            <div className="flex flex-col items-center gap-1">
-              <HoldButton onComplete={t.finish} label="Giữ để kết thúc" className="bg-danger/15 text-danger">
-                <Square className="size-7 fill-current" />
-              </HoldButton>
-              <span className="text-[11px] font-semibold text-fg-subtle">Giữ để kết thúc</span>
+              <RoundAction label={t.voiceOn ? 'Tắt giọng HLV' : 'Bật giọng HLV'} onClick={() => t.setVoiceOn(!t.voiceOn)}>
+                {t.voiceOn ? <Volume2 className="size-6" aria-hidden /> : <VolumeX className="size-6" aria-hidden />}
+              </RoundAction>
             </div>
-          </div>
+          ) : (
+            // Đã tạm dừng: bấm một lần là kết thúc (tạm dừng đã là bước xác nhận, như Strava / Garmin)
+            <div className="mt-8 grid grid-cols-2 gap-3">
+              <button onClick={t.resume} className="flex h-16 items-center justify-center gap-2 rounded-2xl bg-brand text-lg font-bold text-brand-fg active:scale-[0.98]">
+                <Play className="size-6 fill-current" aria-hidden />Tiếp tục
+              </button>
+              <button onClick={t.finish} className="flex h-16 items-center justify-center gap-2 rounded-2xl bg-danger text-lg font-bold text-white active:scale-[0.98]">
+                <Square className="size-5 fill-current" aria-hidden />Kết thúc
+              </button>
+            </div>
+          )
         )}
       </div>
     )
@@ -214,6 +232,41 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
       <div className="flex gap-2">
         <Button block variant="secondary" onClick={t.discard}>Chạy tiếp</Button>
         <Link href="/feed" className="flex-1"><Button block>Về trang chủ</Button></Link>
+      </div>
+    </div>
+  )
+}
+
+function RoundAction({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} className="flex flex-col items-center gap-1.5 text-fg-muted active:scale-95">
+      <span className="grid size-14 place-items-center rounded-full bg-surface-2">{children}</span>
+      <span className="text-[11px] font-semibold">{label}</span>
+    </button>
+  )
+}
+
+/**
+ * Chế độ bỏ túi: màn hình đen (tiết kiệm pin màn OLED), chữ lớn, chạm nhầm không có tác dụng.
+ * Mở khóa bằng cách giữ nút 1,5 giây — chỉ ở đây mới cần giữ, để tránh bấm nhầm trong túi.
+ */
+function PocketMode({ distanceM, movingS, pace, status, onUnlock }: { distanceM: number; movingS: number; pace: number; status: string; onUnlock: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[80] flex flex-col items-center justify-between bg-black px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] text-white">
+      <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-black tracking-wider text-white/70">{status}</span>
+      <div className="text-center">
+        <p className="font-mono tabular text-[6.5rem] font-black leading-none text-brand">{formatKm(distanceM)}</p>
+        <p className="mt-1 text-sm font-semibold uppercase tracking-widest text-white/50">Kilômét</p>
+        <div className="mt-10 grid grid-cols-2 gap-10">
+          <div><p className="text-xs uppercase tracking-wider text-white/50">Thời gian</p><p className="font-mono tabular text-4xl font-bold">{formatDuration(movingS)}</p></div>
+          <div><p className="text-xs uppercase tracking-wider text-white/50">Pace TB</p><p className="font-mono tabular text-4xl font-bold">{formatPace(pace)}</p></div>
+        </div>
+      </div>
+      <div className="flex flex-col items-center gap-2">
+        <HoldButton onComplete={onUnlock} label="Giữ để mở khóa" className="bg-white/10 text-white">
+          <Unlock className="size-7" aria-hidden />
+        </HoldButton>
+        <span className="text-xs font-semibold text-white/50">Giữ để mở khóa</span>
       </div>
     </div>
   )
