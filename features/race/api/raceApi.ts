@@ -1,5 +1,6 @@
 // Giải chạy ảo (migration 002700)
 import { supabase } from '@/shared/lib/supabase'
+import type { BibDesign } from '../model/bib'
 
 export type RaceScope = 'UPCOMING' | 'MINE' | 'PAST'
 
@@ -31,6 +32,8 @@ export interface Race {
   cancelled_reason: string | null
   max_participants: number | null
   bib_prefix: string
+  /** Thiết kế e-BIB của BTC (migration 002900), null = mẫu mặc định */
+  bib_design: Partial<BibDesign> | null
   club: { id: string; name: string; avatar_url: string | null; accent_color: string | null } | null
   organizer: { id: string; display_name: string | null; avatar_url: string | null } | null
   registered: number
@@ -93,6 +96,24 @@ export const registerRace = (id: string, km: number) => call<Race>('register_rac
 export const withdrawRace = (id: string) => call<Race>('withdraw_race', { p_race_id: id })
 export const cancelRace = (id: string, reason: string) => call<void>('cancel_virtual_race', { p_race_id: id, p_reason: reason })
 
+export const setBibDesign = (id: string, p: unknown) => call<BibDesign>('set_race_bib_design', { p_race_id: id, p })
+
+export interface BibCheck { bib: string; display_name: string | null; avatar_url: string | null; distance_km: number; status: MyRegistration['status']; finish_time_s: number | null; finished_at: string | null }
+export const lookupBib = (id: string, bib: string) => call<BibCheck | null>('race_bib_lookup', { p_race_id: id, p_bib: bib })
+
+/** Ảnh cho BIB (logo, nền, nhà tài trợ): kho race-media/<race_id>/<user_id>/… — chỉ BTC giải đó tải lên được */
+export async function uploadRaceImage(raceId: string, file: File): Promise<string> {
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('INVALID_IMAGE_TYPE')
+  if (file.size > 3 * 1024 * 1024) throw new Error('IMAGE_TOO_LARGE')
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('AUTH_REQUIRED')
+  const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
+  const path = `${raceId}/${user.id}/${Date.now()}.${ext}`
+  const { error } = await supabase.storage.from('race-media').upload(path, file, { contentType: file.type, upsert: false })
+  if (error) throw error
+  return supabase.storage.from('race-media').getPublicUrl(path).data.publicUrl
+}
+
 const MESSAGES: Record<string, string> = {
   FORBIDDEN: 'Bạn không có quyền làm việc này.',
   RACE_NOT_FOUND: 'Không tìm thấy giải (hoặc giải chỉ dành cho thành viên CLB).',
@@ -110,6 +131,10 @@ const MESSAGES: Record<string, string> = {
   INVALID_MAX: 'Số VĐV tối đa từ 2 đến 100.000.',
   INVALID_BIB_PREFIX: 'Tiền tố BIB chỉ gồm chữ và số, tối đa 6 ký tự.',
   INVALID_DISTANCES: 'Chọn 1–6 cự ly, mỗi cự ly từ 1 đến 250 km.',
+  INVALID_BIB_DESIGN: 'Thiết kế BIB không hợp lệ.',
+  INVALID_BIB_IMAGE: 'Ảnh phải được tải lên từ trình thiết kế BIB của giải này.',
+  INVALID_IMAGE_TYPE: 'Chỉ nhận ảnh PNG, JPG hoặc WebP.',
+  IMAGE_TOO_LARGE: 'Ảnh tối đa 3 MB.',
 }
 
 export function raceErrorMessage(e: unknown): string {

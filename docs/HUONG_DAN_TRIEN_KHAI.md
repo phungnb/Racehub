@@ -62,6 +62,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001002600_club_battles.sql` | **CLB đấu CLB + Xếp hạng CLB:** ban quản trị gửi lời thách đấu (tổng km hoặc km trung bình / thành viên), CLB kia nhận lời; bảng hai phía; tất toán + báo kết quả (cron hằng ngày `/api/cron/challenges`). Xếp hạng CLB tuần / tháng theo km trung bình, hạng Đồng → Kim cương | Chạy độc lập |
 | `20261001002700_virtual_races.sql` | **Giải chạy ảo:** BTC (admin hoặc ban quản trị CLB) tạo giải nhiều cự ly; VĐV đăng ký nhận BIB; bài hợp lệ ≥ cự ly tự ghi thành tích (quy đổi theo pace); kết quả, dashboard BTC, xuất CSV, giấy chứng nhận | Chạy độc lập |
 | `20261001002800_club_pro.sql` | **Gói CLB Pro:** gói miễn phí tối đa 2 Quản trị viên; Pro: không giới hạn, link mời riêng `/c/<slug>`, báo cáo chuyên cần CSV. Admin bật Pro ở Quản trị → CLB Pro (chưa có thanh toán trong app) | Cần file 2600 (dùng hàm báo tin CLB) |
+| `20261001002900_race_bib_design.sql` | **e-BIB tự thiết kế:** BTC chọn mẫu (cổ điển / sọc chéo / neon / tối giản), màu, logo, ảnh nền, khẩu hiệu, tối đa 4 nhà tài trợ, QR xác thực; kho ảnh `race-media`; quét QR mở trang giải xác thực VĐV | Cần file 2700 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

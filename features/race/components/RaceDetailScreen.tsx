@@ -2,19 +2,22 @@
 
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Award, CalendarDays, Clock, Download, Flag, Medal, Timer, Users, XCircle } from 'lucide-react'
+import { ArrowLeft, Award, BadgeCheck, CalendarDays, Clock, Download, Flag, Maximize2, Medal, Palette, Timer, Users, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Input, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatNumber } from '@/shared/lib/format'
 import {
-  cancelRace, getRace, getRaceDashboard, getRaceResults, raceErrorMessage, registerRace, withdrawRace,
+  cancelRace, getRace, getRaceDashboard, getRaceResults, lookupBib, raceErrorMessage, registerRace, withdrawRace,
   type Race,
 } from '../api/raceApi'
 import { CERT_SIZE, drawCertificate } from '../model/certificate'
 import { canRegister, dashboardCsv, distanceLabel, racePace, racePhase, raceTime } from '../model/race'
 import { fmtDate, PHASE } from './RaceCard'
+import { BibDesigner } from './BibDesigner'
+import { downloadCanvas, EBib } from './EBib'
 
 const fmtDateTime = (iso: string) => new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
 
@@ -45,6 +48,7 @@ export function RaceDetailScreen({ id }: { id: string }) {
       </div>
       {r.description && <p className="whitespace-pre-line text-sm text-fg-muted">{r.description}</p>}
 
+      <BibCheck r={r} />
       <MyEntry r={r} now={now} />
       <Rules />
       <Results r={r} />
@@ -107,18 +111,8 @@ function MyEntry({ r, now }: { r: Race; now: number }) {
 
   return (
     <section className="space-y-3">
-      {/* Thẻ BIB */}
-      <div className="relative overflow-hidden rounded-[var(--radius-card)] border-2 border-dashed border-fg/30 bg-[#f4f6f8] p-4 text-[#0a0d12]">
-        <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-[#5b6472]">
-          <span className="truncate">{r.title}</span>
-          <span>{distanceLabel(me.distance_km)}</span>
-        </div>
-        <p className="my-2 text-center font-mono text-5xl font-black tracking-tight">{me.bib}</p>
-        <div className="flex items-center justify-between text-xs font-semibold text-[#5b6472]">
-          <span>{fmtDate(r.start_at)} – {fmtDate(r.end_at)}</span>
-          <span className={me.status === 'FINISHED' ? 'text-[#16a34a]' : ''}>{me.status === 'FINISHED' ? '✓ HOÀN THÀNH' : 'RACEHUB'}</span>
-        </div>
-      </div>
+      {/* e-BIB theo thiết kế của BTC */}
+      <EBibCard r={r} />
 
       {me.status === 'FINISHED' ? (
         <Card className="space-y-3 border-coin/40">
@@ -223,6 +217,7 @@ function Organizer({ r }: { r: Race }) {
   const refresh = useRefresh(r.id)
   const dash = useQuery({ queryKey: ['race', r.id, 'dashboard'], queryFn: () => getRaceDashboard(r.id) })
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [design, setDesign] = useState(false)
   const [reason, setReason] = useState('')
   const cancel = useMutation({
     mutationFn: () => cancelRace(r.id, reason),
@@ -266,6 +261,7 @@ function Organizer({ r }: { r: Race }) {
             ))}
           </ul>
         )}
+        <Button block onClick={() => setDesign(true)}><Palette className="size-4" aria-hidden />Thiết kế BIB</Button>
         <div className="grid grid-cols-2 gap-2">
           <Button variant="secondary" onClick={exportCsv} disabled={!dash.data?.length}><Download className="size-4" aria-hidden />Xuất CSV</Button>
           {r.status === 'PUBLISHED' && <Button variant="danger" onClick={() => setCancelOpen(true)}><XCircle className="size-4" aria-hidden />Hủy giải</Button>}
@@ -275,6 +271,7 @@ function Organizer({ r }: { r: Race }) {
         title="Hủy giải?" description="Mọi VĐV đã đăng ký sẽ nhận thông báo. Không thể hoàn tác." confirmLabel="Hủy giải">
         <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Lý do (không bắt buộc)" aria-label="Lý do hủy" />
       </ConfirmSheet>
+      {design && <BibDesigner r={r} onClose={() => setDesign(false)} />}
     </section>
   )
 }
@@ -302,5 +299,63 @@ function CertificateSheet({ r, onClose }: { r: Race; onClose: () => void }) {
     <Sheet open onClose={onClose} title="Giấy chứng nhận hoàn thành" footer={<Button block onClick={download}><Download className="size-4" aria-hidden />Tải ảnh</Button>}>
       <canvas ref={ref} width={CERT_SIZE.w} height={CERT_SIZE.h} className="mx-auto w-full max-w-xs rounded-xl" aria-label="Giấy chứng nhận" />
     </Sheet>
+  )
+}
+
+function bibData(r: Race, bib: string, name: string | null, km: number) {
+  return {
+    race: r.title, bib, name, distanceKm: km, dates: `${fmtDate(r.start_at)} – ${fmtDate(r.end_at)}`,
+    qrUrl: typeof window === 'undefined' ? null : `${window.location.origin}/races/${r.id}?bib=${encodeURIComponent(bib)}`,
+  }
+}
+
+/** e-BIB của tôi: tải PNG (in ra giấy A5 ngang) hoặc mở toàn màn hình để khoe / check-in */
+function EBibCard({ r }: { r: Race }) {
+  const me = r.me!
+  const ref = useRef<HTMLCanvasElement | null>(null)
+  const [full, setFull] = useState(false)
+  const data = bibData(r, me.bib, me.display_name, Number(me.distance_km))
+  return (
+    <div className="space-y-2">
+      <button type="button" onClick={() => setFull(true)} className="block w-full" aria-label="Xem BIB toàn màn hình">
+        <EBib ref={ref} design={r.bib_design} data={data} />
+      </button>
+      <div className="grid grid-cols-2 gap-2">
+        <Button variant="secondary" onClick={() => downloadCanvas(ref.current, `bib-${me.bib.toLowerCase()}.png`)}><Download className="size-4" aria-hidden />Tải BIB</Button>
+        <Button variant="secondary" onClick={() => setFull(true)}><Maximize2 className="size-4" aria-hidden />Toàn màn hình</Button>
+      </div>
+      {full && (
+        <div role="dialog" aria-label="BIB toàn màn hình" onClick={() => setFull(false)}
+          className="fixed inset-0 z-50 grid place-items-center bg-black/90 p-3">
+          <div className="w-full max-w-[min(100vw,140vh)] rotate-0 landscape:max-w-[90vw]">
+            <EBib design={r.bib_design} data={data} />
+            <p className="mt-3 text-center text-xs text-white/60">Chạm để đóng · Xoay ngang điện thoại để BIB to hơn</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Quét QR trên BIB → trang giải kèm ?bib=… → xác thực VĐV */
+function BibCheck({ r }: { r: Race }) {
+  const bib = useSearchParams().get('bib')
+  const q = useQuery({ queryKey: ['race', r.id, 'bib', bib], queryFn: () => lookupBib(r.id, bib!), enabled: !!bib })
+  if (!bib) return null
+  if (q.isPending) return <Skeleton className="h-20" />
+  const v = q.data
+  return (
+    <Card className={cn('flex items-center gap-3', v ? 'border-brand/50 bg-brand/10' : 'border-danger/40 bg-danger/10')}>
+      {v ? <Avatar src={v.avatar_url} name={v.display_name ?? 'VĐV'} size="md" /> : <XCircle className="size-8 text-danger" aria-hidden />}
+      <div className="min-w-0 flex-1">
+        {v ? (
+          <>
+            <p className="flex items-center gap-1.5 font-semibold"><BadgeCheck className="size-4 text-brand" aria-hidden />BIB {v.bib} hợp lệ</p>
+            <p className="truncate text-sm">{v.display_name} · {distanceLabel(v.distance_km)}</p>
+            <p className="text-xs text-fg-muted">{v.status === 'FINISHED' ? `Đã hoàn thành · ${raceTime(v.finish_time_s)}` : 'Đã đăng ký, chưa hoàn thành'}</p>
+          </>
+        ) : <p className="font-semibold text-danger">Không tìm thấy BIB {bib} trong giải này</p>}
+      </div>
+    </Card>
   )
 }
