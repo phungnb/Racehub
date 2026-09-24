@@ -13,6 +13,7 @@ import { levelProgress } from '@/features/progression'
 import { CharacterHub } from '@/features/character'
 import { BadgeGrid } from '@/features/game'
 import { getAthleteProfile } from '../api/athleteApi'
+import { AvatarPicker } from './AvatarPicker'
 import type { Profile } from '@/shared/types/profile'
 
 type Tab = 'character' | 'overview' | 'badges'
@@ -37,14 +38,10 @@ function Header({ profile }: { profile: Profile }) {
   const p = levelProgress(profile.xp, profile.level)
   const q = useQuery({ queryKey: ['athlete', profile.id], queryFn: () => getAthleteProfile(profile.id) })
   const s = q.data?.stats
-  const initial = (profile.display_name ?? 'R').trim().charAt(0).toUpperCase()
   return (
     <Card className="overflow-hidden p-0">
       <div className="flex items-center gap-4 bg-gradient-to-br from-brand/15 via-transparent to-transparent p-4">
-        <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full bg-brand text-2xl font-black text-brand-fg ring-4 ring-bg">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {profile.avatar_url ? <img src={profile.avatar_url} alt="" className="size-full object-cover" /> : initial}
-        </div>
+        <AvatarPicker userId={profile.id} avatarUrl={profile.avatar_url} name={profile.display_name} size="md" />
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">
             <h1 className="min-w-0 flex-1 truncate text-xl font-bold">{profile.display_name || 'Runner'}</h1>

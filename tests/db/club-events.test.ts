@@ -148,6 +148,17 @@ describe('CLB: thu chi VND + bình chọn (001500)', () => {
     expect(f.bank).toEqual({ bin: '970436', account_no: '0123456789', account_name: 'NGUYEN VAN A' })
   })
 
+  it('ảnh QR nhận tiền (001600): chỉ ban quản trị, chỉ ảnh trong thư mục CLB trên club-media', async () => {
+    const url = `https://x.supabase.co/storage/v1/object/public/club-media/${CLUB}/${OWNER}/bankqr-1.png`
+    expect(await fails(db, MEM, `select public.set_club_bank_qr($1, $2)`, [CLUB, url])).toContain('FORBIDDEN')
+    expect(await fails(db, OWNER, `select public.set_club_bank_qr($1, $2)`, [CLUB, 'https://evil.vn/qr.png'])).toContain('INVALID_QR')
+    expect(await fails(db, OWNER, `select public.set_club_bank_qr($1, $2)`, [CLUB, url.replace(CLUB, OUT)])).toContain('INVALID_QR')
+    await rpc(db, OWNER, `select public.set_club_bank_qr($1, $2)`, [CLUB, url])
+    expect((await one<Fin & { bank_qr_url: string | null }>(db, MEM, `select public.club_finance($1) as r`, [CLUB])).bank_qr_url).toBe(url)
+    await rpc(db, OWNER, `select public.set_club_bank_qr($1, null)`, [CLUB])
+    expect((await one<Fin & { bank_qr_url: string | null }>(db, MEM, `select public.club_finance($1) as r`, [CLUB])).bank_qr_url).toBeNull()
+  })
+
   it('kỳ thu phí: báo đã chuyển → xác nhận → vào sổ; bỏ xác nhận thì hủy bút toán', async () => {
     due = (await rpc<{ id: string }>(db, OWNER, `select public.create_club_due($1, 'Phí tháng 10', 100000, '2026-10-10', null) as id`, [CLUB]))[0].id
     await rpc(db, MEM, `select public.claim_due_paid($1)`, [due])

@@ -122,6 +122,8 @@ export interface ClubDue {
 export interface ClubFinance {
   can_manage: boolean
   bank: { bin: string; account_no: string; account_name: string } | null
+  /** Ảnh QR nhận tiền ban quản trị tự tải lên (ưu tiên hơn VietQR tự tạo) */
+  bank_qr_url: string | null
   balance: number
   income_30d: number
   expense_30d: number
@@ -150,6 +152,7 @@ export async function getFinance(clubId: string): Promise<ClubFinance> {
 export const getDue = (dueId: string) => rpc<DueDetail>('club_due_detail', { p_due_id: dueId })
 export const setBank = (clubId: string, bank: { bin: string; account: string; name: string } | null) =>
   rpc<void>('set_club_bank', { p_club_id: clubId, p_bin: bank?.bin ?? null, p_account: bank?.account ?? null, p_name: bank?.name ?? null })
+export const setBankQr = (clubId: string, url: string | null) => rpc<void>('set_club_bank_qr', { p_club_id: clubId, p_url: url })
 export const createDue = (clubId: string, d: { title: string; amount: number; dueDate: string | null; note: string | null }) =>
   rpc<string>('create_club_due', { p_club_id: clubId, p_title: d.title, p_amount: d.amount, p_due_date: d.dueDate, p_note: d.note })
 export const claimDue = (dueId: string) => rpc<void>('claim_due_paid', { p_due_id: dueId })
@@ -161,10 +164,10 @@ export const addCashEntry = (clubId: string, e: { kind: 'INCOME' | 'EXPENSE'; am
   rpc<string>('add_cash_entry', { p_club_id: clubId, p_kind: e.kind, p_amount: e.amount, p_title: e.title, p_note: e.note, p_receipt_url: e.receiptUrl })
 export const voidCashEntry = (entryId: string, reason: string) => rpc<void>('void_cash_entry', { p_entry_id: entryId, p_reason: reason })
 
-/** Ảnh hóa đơn: bucket club-media, thư mục <club_id>/<user_id>/ (quy tắc sẵn có của ảnh bài đăng) */
-export async function uploadReceipt(clubId: string, userId: string, file: File): Promise<string> {
+/** Ảnh hóa đơn / ảnh QR nhận tiền: bucket club-media, thư mục <club_id>/<user_id>/ (quy tắc sẵn có của ảnh bài đăng) */
+export async function uploadReceipt(clubId: string, userId: string, file: File, prefix: 'receipt' | 'bankqr' = 'receipt'): Promise<string> {
   const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
-  const path = `${clubId}/${userId}/receipt-${Date.now()}.${ext}`
+  const path = `${clubId}/${userId}/${prefix}-${Date.now()}.${ext}`
   const { error } = await supabase.storage.from('club-media').upload(path, file, { contentType: file.type, upsert: false })
   if (error) throw error
   return supabase.storage.from('club-media').getPublicUrl(path).data.publicUrl
@@ -186,6 +189,7 @@ const MESSAGES: Record<string, string> = {
   TOKEN_EXPIRED: 'Mã QR đã hết hạn. Nhờ ban tổ chức mở mã mới.',
   CHECKIN_CLOSED: 'Chưa tới hoặc đã quá giờ điểm danh.',
   INVALID_BANK: 'Thông tin tài khoản ngân hàng chưa đúng.',
+  INVALID_QR: 'Ảnh QR không hợp lệ. Hãy tải lại ảnh.',
   INVALID_AMOUNT: 'Số tiền không hợp lệ.',
   DUE_NOT_FOUND: 'Không tìm thấy kỳ thu phí.',
   DUE_CLOSED: 'Kỳ thu phí đã đóng.',

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import {
   AlertCircle, Banknote, BellRing, Building2, CheckCircle2, Clock, Copy, Download, FileImage, HandCoins, Lock, Pencil, Plus,
-  ReceiptText, Undo2, Wallet,
+  QrCode, ReceiptText, Trash2, Undo2, Wallet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useMyProfile, useSession } from '@/features/auth'
@@ -11,7 +11,7 @@ import { Avatar, Button, Card, EmptyState, ErrorState, Field, Input, SectionTitl
 import { cn } from '@/shared/lib/cn'
 import { formatRelative } from '@/shared/lib/format'
 import {
-  addCashEntry, claimDue, closeDue, createDue, eventsErrorMessage, remindDue, setBank, setDuePayment, uploadReceipt, voidCashEntry,
+  addCashEntry, claimDue, closeDue, createDue, eventsErrorMessage, remindDue, setBank, setBankQr, setDuePayment, uploadReceipt, voidCashEntry,
   type ClubDue, type ClubFinance as Finance, type DueStatus,
 } from '../../api/eventsApi'
 import { useClub } from '../../hooks/useClub'
@@ -71,31 +71,51 @@ export function ClubFinance({ clubId, openDue }: { clubId: string; openDue?: str
 
       {sheet === 'due' && <CreateDueSheet clubId={clubId} onClose={() => setSheet(null)} />}
       {sheet === 'entry' && <EntrySheet clubId={clubId} onClose={() => setSheet(null)} />}
-      {sheet === 'bank' && <BankSheet clubId={clubId} bank={f.bank} onClose={() => setSheet(null)} />}
+      {sheet === 'bank' && <BankSheet clubId={clubId} bank={f.bank} qrUrl={f.bank_qr_url} onClose={() => setSheet(null)} />}
       {dueId && <DueSheet clubId={clubId} dueId={dueId} finance={f} onClose={() => setDueId(null)} />}
     </div>
   )
 }
 
 function BankCard({ finance: f, onEdit }: { finance: Finance; onEdit: () => void }) {
-  if (!f.bank) {
+  const [zoom, setZoom] = useState(false)
+  if (!f.bank && !f.bank_qr_url) {
     return f.can_manage ? (
       <button type="button" onClick={onEdit} className="flex w-full items-center gap-3 rounded-[var(--radius-card)] border-2 border-dashed border-border p-4 text-left hover:border-fg-subtle">
         <Building2 className="size-6 text-fg-subtle" aria-hidden />
-        <span><span className="block font-semibold">Thêm tài khoản nhận tiền</span><span className="block text-xs text-fg-muted">Để thành viên chuyển khoản bằng mã VietQR</span></span>
+        <span><span className="block font-semibold">Thêm tài khoản nhận tiền</span><span className="block text-xs text-fg-muted">Số tài khoản hoặc ảnh mã QR để thành viên chuyển khoản</span></span>
       </button>
     ) : null
   }
   return (
     <Card className="flex items-center gap-3">
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2"><Building2 className="size-5 text-fg-muted" aria-hidden /></span>
+      {f.bank_qr_url ? (
+        <button type="button" onClick={() => setZoom(true)} aria-label="Xem mã QR nhận tiền" className="shrink-0 overflow-hidden rounded-xl border border-border bg-white">
+          {/* eslint-disable-next-line @next/next/no-img-element -- ảnh QR CLB trên Supabase Storage */}
+          <img src={f.bank_qr_url} alt="" className="size-14 object-contain" />
+        </button>
+      ) : (
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2"><Building2 className="size-5 text-fg-muted" aria-hidden /></span>
+      )}
       <div className="min-w-0 flex-1">
-        <p className="text-xs text-fg-subtle">{bankName(f.bank.bin)}</p>
-        <p className="font-mono font-bold">{f.bank.account_no}</p>
-        <p className="truncate text-xs text-fg-muted">{f.bank.account_name}</p>
+        {f.bank ? (
+          <>
+            <p className="text-xs text-fg-subtle">{bankName(f.bank.bin)}</p>
+            <p className="font-mono font-bold">{f.bank.account_no}</p>
+            <p className="truncate text-xs text-fg-muted">{f.bank.account_name}</p>
+          </>
+        ) : (
+          <><p className="font-semibold">Mã QR nhận tiền</p><p className="text-xs text-fg-muted">Bấm vào ảnh để xem lớn và quét</p></>
+        )}
       </div>
-      <Button size="sm" variant="secondary" aria-label="Sao chép số tài khoản" onClick={() => void copy(f.bank!.account_no, 'số tài khoản')}><Copy className="size-4" aria-hidden /></Button>
+      {f.bank && <Button size="sm" variant="secondary" aria-label="Sao chép số tài khoản" onClick={() => void copy(f.bank!.account_no, 'số tài khoản')}><Copy className="size-4" aria-hidden /></Button>}
       {f.can_manage && <Button size="sm" variant="secondary" aria-label="Sửa tài khoản" onClick={onEdit}><Pencil className="size-4" aria-hidden /></Button>}
+      {zoom && f.bank_qr_url && (
+        <Sheet open onClose={() => setZoom(false)} title="Mã QR nhận tiền của CLB" description="Mở app ngân hàng / ví → Quét mã">
+          {/* eslint-disable-next-line @next/next/no-img-element -- ảnh QR CLB trên Supabase Storage */}
+          <img src={f.bank_qr_url} alt="Mã QR nhận tiền" className="mx-auto w-full max-w-xs rounded-xl bg-white p-2" />
+        </Sheet>
+      )}
     </Card>
   )
 }
@@ -126,7 +146,8 @@ function DueSheet({ clubId, dueId, finance, onClose }: { clubId: string; dueId: 
   const close = useClubMutation(clubId, (v: boolean) => closeDue(dueId, v))
   const d = q.data
   const note = d && club ? transferNote(club.name, d.title, profile?.display_name ?? '') : ''
-  const qr = d && finance.bank ? vietQrUrl(finance.bank, d.amount_vnd, note) : null
+  // Ảnh QR ban quản trị tải lên được ưu tiên; không có thì tự tạo VietQR (điền sẵn số tiền + nội dung)
+  const qr = d && !finance.bank_qr_url && finance.bank ? vietQrUrl(finance.bank, d.amount_vnd, note) : null
   const pay = d?.my_status === 'UNPAID' || d?.my_status === 'CLAIMED'
 
   return (
@@ -140,7 +161,19 @@ function DueSheet({ clubId, dueId, finance, onClose }: { clubId: string; dueId: 
                 <p className="text-sm font-semibold">Của bạn</p>
                 <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', STATUS[d.my_status].tone)}>{STATUS[d.my_status].label}</span>
               </div>
-              {pay && !d.closed && (qr ? (
+              {pay && !d.closed && (finance.bank_qr_url ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- ảnh QR CLB trên Supabase Storage */}
+                  <img src={finance.bank_qr_url} alt="Mã QR nhận tiền của CLB" className="mx-auto w-60 rounded-xl bg-white p-2" />
+                  <p className="text-center text-xs text-fg-muted">
+                    Mở app ngân hàng → Quét QR → nhập <b className="text-fg">{formatVnd(d.amount_vnd)}</b> và dán nội dung chuyển khoản.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="secondary" block onClick={() => void copy(note, 'nội dung')}><Copy className="size-4" aria-hidden />Nội dung CK</Button>
+                    <Button size="sm" variant="secondary" block onClick={() => void copy(String(d.amount_vnd), 'số tiền')}><Copy className="size-4" aria-hidden />Số tiền</Button>
+                  </div>
+                </>
+              ) : qr ? (
                 <>
                   <QrImage src={qr} bank={finance.bank!} />
                   <p className="text-center text-xs text-fg-muted">Mở app ngân hàng → Quét QR. Số tiền và nội dung đã điền sẵn.</p>
@@ -365,14 +398,25 @@ function EntrySheet({ clubId, onClose }: { clubId: string; onClose: () => void }
   )
 }
 
-function BankSheet({ clubId, bank, onClose }: { clubId: string; bank: Finance['bank']; onClose: () => void }) {
+function BankSheet({ clubId, bank, qrUrl, onClose }: { clubId: string; bank: Finance['bank']; qrUrl: string | null; onClose: () => void }) {
+  const { session } = useSession()
+  const saveQr = useClubMutation(clubId, async (file: File | null) => {
+    const url = file && session ? await uploadReceipt(clubId, session.user.id, file, 'bankqr') : null
+    await setBankQr(clubId, url)
+  })
+  const pickQr = (f: File | undefined) => {
+    if (!f) return
+    if (!f.type.startsWith('image/')) { toast.error('Hãy chọn một file ảnh.'); return }
+    if (f.size > 5 * 1024 * 1024) { toast.error('Ảnh tối đa 5 MB'); return }
+    saveQr.mutate(f, { onSuccess: () => toast.success('Đã lưu ảnh QR'), onError: (e) => toast.error(eventsErrorMessage(e)) })
+  }
   const [bin, setBin] = useState(bank?.bin ?? BANKS[0].bin)
   const [account, setAccount] = useState(bank?.account_no ?? '')
   const [name, setName] = useState(bank?.account_name ?? '')
   const m = useClubMutation(clubId, (b: { bin: string; account: string; name: string } | null) => setBank(clubId, b))
   const valid = /^\d{6}$/.test(bin) && /^[0-9A-Za-z]{4,20}$/.test(account) && name.trim().length >= 2
   return (
-    <Sheet open onClose={onClose} title="Tài khoản nhận tiền của CLB" description="Hiện cho thành viên kèm mã VietQR khi đóng phí"
+    <Sheet open onClose={onClose} title="Tài khoản nhận tiền của CLB" description="Thành viên thấy khi đóng phí"
       footer={<div className="flex gap-2">
         {bank && <Button variant="secondary" className="shrink-0" loading={m.isPending}
           onClick={() => m.mutate(null, { onSuccess: () => { toast.success('Đã gỡ tài khoản'); onClose() }, onError: (e) => toast.error(eventsErrorMessage(e)) })}>Gỡ</Button>}
@@ -380,6 +424,26 @@ function BankSheet({ clubId, bank, onClose }: { clubId: string; bank: Finance['b
           onClick={() => m.mutate({ bin, account, name }, { onSuccess: () => { toast.success('Đã lưu tài khoản'); onClose() }, onError: (e) => toast.error(eventsErrorMessage(e)) })}>Lưu</Button>
       </div>}>
       <div className="space-y-4">
+        <Field label="Ảnh mã QR nhận tiền" hint="Chụp màn hình mã QR trong app ngân hàng / MoMo / ZaloPay. Có ảnh thì thành viên quét ảnh này.">
+          <div className="flex items-center gap-3">
+            <label className={cn('flex flex-1 cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-border p-3 hover:border-fg-subtle', saveQr.isPending && 'pointer-events-none opacity-60')}>
+              {qrUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- ảnh QR CLB trên Supabase Storage
+                <img src={qrUrl} alt="" className="size-16 rounded-lg bg-white object-contain" />
+              ) : <QrCode className="size-8 text-fg-subtle" aria-hidden />}
+              <span className="text-sm font-semibold text-fg-muted">{saveQr.isPending ? 'Đang tải lên…' : qrUrl ? 'Đổi ảnh QR' : 'Tải ảnh QR lên'}</span>
+              <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                onChange={(e) => { pickQr(e.target.files?.[0]); e.target.value = '' }} />
+            </label>
+            {qrUrl && (
+              <Button variant="secondary" className="shrink-0" aria-label="Gỡ ảnh QR" disabled={saveQr.isPending}
+                onClick={() => saveQr.mutate(null, { onSuccess: () => toast.success('Đã gỡ ảnh QR'), onError: (e) => toast.error(eventsErrorMessage(e)) })}>
+                <Trash2 className="size-4" aria-hidden />
+              </Button>
+            )}
+          </div>
+        </Field>
+        <p className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">Hoặc / và số tài khoản (app tự tạo mã VietQR có sẵn số tiền)</p>
         <Field label="Ngân hàng" htmlFor="bank-bin">
           <select id="bank-bin" value={bin} onChange={(e) => setBin(e.target.value)} className="h-11 w-full rounded-xl border border-border bg-bg px-3 text-[15px]">
             {BANKS.map((b) => <option key={b.bin} value={b.bin}>{b.name}</option>)}
