@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { ChevronRight, Compass, Flag, Plus, Shield, Trophy } from 'lucide-react'
+import { ChevronRight, Compass, Flag, Plus, Shield, Swords, Trophy } from 'lucide-react'
 import { Button, EmptyState, ErrorState, SegmentedControl, Skeleton } from '@/shared/ui'
 import type { ChallengeTab } from '../api/challengeApi'
 import { useChallengeList } from '../hooks/useChallenge'
@@ -40,6 +40,12 @@ export function ChallengesScreen() {
         <span className="grid size-10 place-items-center rounded-xl bg-brand/20 text-brand"><Flag className="size-5" aria-hidden /></span>
         <span className="flex-1"><span className="block font-semibold">Giải chạy ảo</span>
           <span className="block text-xs text-fg-muted">Đăng ký nhận BIB · 5K · 10K · Half · Full · giấy chứng nhận</span></span>
+        <ChevronRight className="size-5 text-fg-subtle" aria-hidden />
+      </Link>
+      <Link href="/cups" className="flex items-center gap-3 rounded-[var(--radius-card)] border border-live/30 bg-gradient-to-r from-live/15 to-surface p-3 hover:border-live/60">
+        <span className="grid size-10 place-items-center rounded-xl bg-live/20 text-live"><Swords className="size-5" aria-hidden /></span>
+        <span className="flex-1"><span className="block font-semibold">Thách đấu CLB</span>
+          <span className="block text-xs text-fg-muted">Nhiều CLB tranh tài · ban quản trị CLB đăng ký cho cả đội</span></span>
         <ChevronRight className="size-5 text-fg-subtle" aria-hidden />
       </Link>
 

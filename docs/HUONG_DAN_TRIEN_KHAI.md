@@ -69,6 +69,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001003300_search_suggest_media_fix.sql` | **Gợi ý tìm kiếm admin + sửa kho ảnh BIB:** ô chọn người nhận Xu / vé có sổ xuống gợi ý ngay khi bấm (người mới + CLB đông nhất), gõ 1 ký tự đã lọc; kho `race-media` kiểm tra đường dẫn an toàn và nâng giới hạn lên 10 MB (app tự nén ảnh) | Cần file 3100 |
 | `20261001003400_club_secrets.sql` | **Bảo mật CLB:** bảng `clubs` chỉ cho đọc cột công khai — mã mời và tài khoản ngân hàng không còn lộ qua API; mã mời lấy qua `club_invite_code`. **Sửa lỗi:** CLB "chỉ qua mã mời" trước đây không ai vào được, nay có mã là vào | Cần file 3300. **Gộp nhánh cùng lúc** (app mới không đọc `invite_code` trực tiếp) |
 | `20261001003500_system_check.sql` | **Quản trị → Hệ thống:** tự kiểm migration đã chạy, biến môi trường Vercel, Strava secret + webhook, cặp khóa VAPID, kho ảnh, push, cron | Cần file 3400 |
+| `20261001003600_club_cups.sql` | **Thách đấu CLB (nhiều CLB):** BQT CLB tạo dưới tên CLB → mở ngay; admin tạo → mở ngay; người dùng thường tạo → chờ admin duyệt (Quản trị → Thách đấu). Chỉ Chủ nhiệm / Quản trị viên của CLB mới đăng ký CLB. Tính tổng km hoặc km TB / thành viên; người ở nhiều CLB chỉ tính cho CLB vào trước; tự tất toán + báo hạng | Cần file 2600; chạy lại 3500 để trang Hệ thống nhận file này |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

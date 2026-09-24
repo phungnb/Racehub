@@ -246,6 +246,7 @@ export interface SystemCheck {
   stats: {
     pg_net: boolean; push_url: string | null; admins: number; users: number; clubs: number
     push_stuck?: number; challenges_overdue?: number; battles_overdue?: number; pending_reviews?: number
+    cups_overdue?: number; cups_pending?: number
   }
   checked_at: string
 }

@@ -48,6 +48,9 @@ export function SystemTab() {
       detail: s.challenges_overdue > 0 ? `${s.challenges_overdue} thử thách quá 1 ngày chưa chia thưởng — việc tự chạy (cron) có thể chưa hoạt động: kiểm tra CRON_SECRET và Vercel → Cron Jobs.` : 'Ổn.' }] : []),
     ...(s.battles_overdue !== undefined ? [{ key: 'bt_over', label: 'Trận CLB đấu CLB quá hạn', status: (s.battles_overdue > 0 ? 'warn' : 'ok') as Status,
       detail: s.battles_overdue > 0 ? `${s.battles_overdue} trận quá 1 ngày chưa chốt kết quả — kiểm tra cron.` : 'Ổn.' }] : []),
+    ...(s.cups_overdue !== undefined ? [{ key: 'cup_over', label: 'Thách đấu CLB quá hạn', status: (s.cups_overdue > 0 ? 'warn' : 'ok') as Status,
+      detail: s.cups_overdue > 0 ? `${s.cups_overdue} thách đấu quá 1 ngày chưa chốt — kiểm tra cron.` : 'Ổn.' }] : []),
+    ...(s.cups_pending ? [{ key: 'cup_pending', label: 'Thách đấu CLB chờ duyệt', status: 'warn' as Status, detail: `${s.cups_pending} thách đấu — xem tab Thách đấu.` }] : []),
     ...(s.pending_reviews !== undefined ? [{ key: 'reviews', label: 'Bài chạy chờ duyệt', status: (s.pending_reviews > 20 ? 'warn' : 'ok') as Status,
       detail: s.pending_reviews ? `${s.pending_reviews} bài — xem tab Duyệt bài.` : 'Không có bài nào.' }] : []),
   ] : []

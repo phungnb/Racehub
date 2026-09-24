@@ -14,3 +14,4 @@ export { joinClubByCode, joinClub, searchClubs, clubErrorMessage, getClub, resol
 export { useClubInbox } from './hooks/useClub'
 export type { InboxClub } from './api/hubApi'
 export { ROLE_LABEL, isStaff, type ClubRole } from './model/roles'
+export { ClubAvatar } from './components/hub/ClubAvatar'

@@ -29,6 +29,7 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   CLUB_POLL: { icon: Vote, tone: 'text-xp' },
   PUSH_TEST: { icon: BellRing, tone: 'text-brand' },
   CLUB_BATTLE: { icon: Swords, tone: 'text-live' },
+  CLUB_CUP: { icon: Swords, tone: 'text-coin' },
   RACE_FINISHED: { icon: Medal, tone: 'text-coin' },
   RACE_CANCELLED: { icon: Flag, tone: 'text-danger' },
   RUN_REVIEW: { icon: ShieldAlert, tone: 'text-warning' },

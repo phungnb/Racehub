@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Activity, CheckCircle2, Coins, Crown, LayoutDashboard, ScrollText, Shirt, Ticket, type LucideIcon } from 'lucide-react'
+import { Activity, CheckCircle2, Swords, Coins, Crown, LayoutDashboard, ScrollText, Shirt, Ticket, type LucideIcon } from 'lucide-react'
 import { ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { adminErrorMessage } from '../api/adminApi'
@@ -14,8 +14,9 @@ import { ItemsTab } from './items/ItemsTab'
 import { ReviewTab } from './ReviewTab'
 import { ClubsProTab } from './ClubsProTab'
 import { SystemTab } from './SystemTab'
+import { CupReviewList } from '@/features/cup'
 
-type Tab = 'overview' | 'grant' | 'passes' | 'policy' | 'items' | 'review' | 'clubs' | 'system'
+type Tab = 'overview' | 'grant' | 'passes' | 'policy' | 'items' | 'review' | 'clubs' | 'cups' | 'system'
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
   { id: 'grant', label: 'Cộng/Trừ Xu', icon: Coins },
@@ -24,6 +25,7 @@ const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'items', label: 'Vật phẩm', icon: Shirt },
   { id: 'review', label: 'Duyệt bài', icon: CheckCircle2 },
   { id: 'clubs', label: 'CLB Pro', icon: Crown },
+  { id: 'cups', label: 'Thách đấu', icon: Swords },
   { id: 'system', label: 'Hệ thống', icon: Activity },
 ]
 
@@ -49,6 +51,7 @@ export function AdminConsole() {
       </nav>
 
       {tab === 'system' ? <SystemTab />
+        : tab === 'cups' ? <CupReviewList />
         : tab === 'review' ? <ReviewTab />
         : tab === 'clubs' ? <ClubsProTab />
         : tab === 'items' ? <ItemsTab />

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { ArrowLeft, CalendarRange, Check, Coins, Flag, Lock, Minus, Plus, Scale, Shield, Ticket, Users, X } from 'lucide-react'
+import { ArrowLeft, CalendarRange, Check, ChevronRight, Coins, Flag, Lock, Minus, Plus, Scale, Shield, Swords, Ticket, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useMyProfile } from '@/features/auth'
 import { isStaff, useClubInbox } from '@/features/club'
@@ -183,6 +183,15 @@ function StepType({ d, set, errors, staffClubs }: StepProps & { staffClubs: { cl
               </button>
             )
           })}
+          {/* Nhiều CLB tranh tài: màn riêng (BQT CLB đăng ký cho cả CLB, người thường tạo thì chờ admin duyệt) */}
+          <Link href="/cups/new" className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 text-left transition-colors hover:border-fg-subtle">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-live/15 text-live"><Swords className="size-5" aria-hidden /></span>
+            <span className="flex-1">
+              <span className="block font-semibold">Thách đấu CLB</span>
+              <span className="block text-sm text-fg-muted">Nhiều CLB cùng tranh tài theo tổng km hoặc km trung bình. Chỉ ban quản trị CLB đăng ký cho CLB mình</span>
+            </span>
+            <ChevronRight className="size-5 text-fg-subtle" aria-hidden />
+          </Link>
         </div>
       </section>
 

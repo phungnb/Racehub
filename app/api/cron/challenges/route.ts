@@ -17,5 +17,8 @@ export async function GET(req: NextRequest) {
   // Trận CLB đấu CLB (migration 002600); lỗi ở đây không chặn phần thử thách
   const battles = await admin.rpc('settle_due_club_battles')
   if (battles.error) console.error('[cron/challenges] battles', battles.error.message)
-  return NextResponse.json({ settled: data, battles: battles.data ?? null })
+  // Thách đấu nhiều CLB (migration 003600)
+  const cups = await admin.rpc('settle_due_club_cups')
+  if (cups.error) console.error('[cron/challenges] cups', cups.error.message)
+  return NextResponse.json({ settled: data, battles: battles.data ?? null, cups: cups.data ?? null })
 }
