@@ -93,7 +93,7 @@ function MyPledge({ d, locked }: { d: ChallengeDetail; locked: boolean }) {
       ) : (
         <div className="flex gap-2">
           <Input inputMode="decimal" value={custom} onChange={(e) => setCustom(e.target.value)} aria-label="Mục tiêu (km)"
-            placeholder={`${c.pledge_min_km ?? 10}–${c.pledge_max_km ?? 300} km${current !== null ? ` (hiện ${current})` : ''}`} />
+            placeholder={c.format === 'TEAM' ? `Nhập số km bạn cam kết${current !== null ? ` (hiện ${current})` : ''}` : `${c.pledge_min_km ?? 10}–${c.pledge_max_km ?? 300} km${current !== null ? ` (hiện ${current})` : ''}`} />
           <Button className="shrink-0" loading={save.isPending} disabled={!(Number(custom.replace(',', '.')) > 0)}
             onClick={() => save.mutate(Number(custom.replace(',', '.')))}>Lưu</Button>
         </div>

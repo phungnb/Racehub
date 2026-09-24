@@ -13,6 +13,7 @@ import { useClub, useClubMembers } from '../../hooks/useClub'
 import { clubKeys } from '../../hooks/keys'
 import { MenuItem } from '../feed/PostCard'
 import { InviteSheet } from './InvitePanel'
+import { ClubRunReview } from './ClubRunReview'
 
 type Pending = { kind: 'remove' | 'ban'; m: ClubMember } | null
 
@@ -68,6 +69,7 @@ export function ClubMembersScreen({ clubId }: { clubId: string }) {
         <ErrorState onRetry={() => members.refetch()} />
       ) : (
         <>
+          {isStaff && <ClubRunReview clubId={clubId} />}
           {isStaff && pending.length > 0 && (
             <section>
               <SectionTitle>Xin gia nhập <span className="ml-1 rounded-full bg-live px-2 text-sm text-white">{pending.length}</span></SectionTitle>

@@ -72,9 +72,17 @@ export function ActivityDetailScreen({ id }: { id: string }) {
       )}
 
       {a.is_mine && a.validation_status === 'PENDING' && (
-        <p className="rounded-2xl border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
-          Bài đang chờ xác minh{a.validation_reason ? `: ${a.validation_reason}` : ''}. Chưa được tính thưởng và thử thách.
-        </p>
+        <div className="rounded-2xl border border-warning/40 bg-warning/10 p-3 text-sm">
+          <p className="font-semibold text-warning">Bài đang chờ xác minh</p>
+          {a.validation_reason && <p className="mt-1 text-fg">{a.validation_reason}</p>}
+          <p className="mt-1 text-xs text-fg-muted">Chưa cộng Xu và chưa tính vào thử thách. Bạn sẽ nhận thông báo khi ban quản trị CLB hoặc admin xác minh xong.</p>
+        </div>
+      )}
+      {a.is_mine && a.validation_status === 'REJECTED' && (
+        <div className="rounded-2xl border border-danger/40 bg-danger/10 p-3 text-sm">
+          <p className="font-semibold text-danger">Bài không được ghi nhận</p>
+          {a.validation_reason && <p className="mt-1 text-fg">{a.validation_reason}</p>}
+        </div>
       )}
 
       {/* Bản đồ */}

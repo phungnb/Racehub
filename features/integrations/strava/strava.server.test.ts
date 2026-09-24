@@ -9,7 +9,8 @@ const { syncStravaActivities, handleStravaWebhookEvent } = await import('./strav
 function fakeAdmin(conn: Record<string, unknown> | null) {
   const calls = { rpc: [] as Array<[string, Record<string, unknown>]>, updates: [] as Record<string, unknown>[] }
   const chain = {
-    select: () => chain, eq: () => chain,
+    select: () => chain, eq: () => chain, gte: () => chain, order: () => chain,
+    limit: async () => ({ data: [], error: null }),
     maybeSingle: async () => ({ data: conn, error: null }),
     update: (v: Record<string, unknown>) => { calls.updates.push(v); return { eq: () => ({ eq: async () => ({ error: null }) }) } },
   }
@@ -71,6 +72,19 @@ describe('handleStravaWebhookEvent', () => {
     await handleStravaWebhookEvent(admin, { object_type: 'activity', aspect_type: 'create', object_id: 77, owner_id: 9 })
     expect(fetchMock.mock.calls[0][0]).toBe('https://www.strava.com/api/v3/activities/77')
     expect(calls.rpc[0][0]).toBe('ingest_provider_activity')
+  })
+
+  it('bài mới: tải streams, phát hiện giữ 20 km/h suốt 4 phút → gửi kèm kết luận REVIEW', async () => {
+    const { admin, calls } = fakeAdmin(conn)
+    const time = Array.from({ length: 1201 }, (_, i) => i)
+    const distance = time.map((t) => (t <= 400 ? t * 3 : t <= 640 ? 1200 + (t - 400) * 6 : 2640 + (t - 640) * 3))
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify(run(78, new Date(Date.now() - 3600_000).toISOString()))))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ time: { data: time }, distance: { data: distance } })))
+    await handleStravaWebhookEvent(admin, { object_type: 'activity', aspect_type: 'create', object_id: 78, owner_id: 9 })
+    expect(fetchMock.mock.calls[1][0]).toContain('/activities/78/streams?keys=')
+    const [, args] = calls.rpc.find(([fn]) => fn === 'ingest_provider_activity')!
+    expect((args.p_activity as { risk: unknown }).risk).toMatchObject({ verdict: 'REVIEW', flags: [expect.objectContaining({ code: 'SUSTAINED_SPEED' })] })
   })
 
   it('delete → thu hồi; thu hồi quyền → hủy kết nối; không gọi API Strava', async () => {

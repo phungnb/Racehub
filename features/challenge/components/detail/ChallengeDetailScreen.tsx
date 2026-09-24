@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import {
   ArrowLeft, CalendarDays, Check, CircleSlash, Clock, Coins, Copy, Crown, Gauge, Hourglass, Info, Lock, LogOut, MoreHorizontal,
-  Route, Share2, Shield, Timer, Trophy, Users, UsersRound,
-} from 'lucide-react'
+  Route, Share2, Shield, Timer, Trophy, Users, UsersRound, HeartPulse } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, LevelBadge, ProgressRing, SegmentedControl, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -296,6 +295,7 @@ function Rules({ d }: { d: ChallengeDetail }) {
     ...(c.target_value > 0 ? [{ icon: Crown, label: 'Mục tiêu', value: formatScore(c.objective, c.target_value) }] : []),
     { icon: Route, label: c.objective === 'STREAK_DAYS' ? 'Tối thiểu mỗi ngày' : 'Tối thiểu mỗi bài', value: `${formatNumber(c.min_km)} km` },
     { icon: Gauge, label: 'Pace hợp lệ', value: `${formatPace(c.min_pace * 60)} – ${formatPace(c.max_pace * 60)} /km` },
+    ...(c.require_hr ? [{ icon: HeartPulse, label: 'Nhịp tim', value: 'Bắt buộc — bài không có dữ liệu nhịp tim không được tính' }] : []),
     ...(c.daily_cap_km ? [{ icon: Timer, label: 'Trần mỗi người mỗi ngày', value: `${formatNumber(c.daily_cap_km)} km` }] : []),
     { icon: CalendarDays, label: 'Thời gian', value: `${fmtDateTime(c.start_date)} → ${fmtDateTime(c.end_date)}` },
     ...(c.format === 'TEAM' ? [{ icon: UsersRound, label: 'Cách tính đội', value: TEAM_MODE_META[(c.game_mode ?? 'TEAM_SUM') as TeamMode]?.description ?? '' }] : []),

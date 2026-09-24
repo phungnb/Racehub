@@ -56,6 +56,8 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001002000_challenge_pledges.sql` | **Mục tiêu tự đăng ký:** thử thách tuần của CLB (mỗi người chọn mốc 21/42/60/100 km…, xếp hạng theo % mục tiêu) và đua đội theo mục tiêu (đăng ký km → quản trị chia đội cân bằng hoặc ngẫu nhiên, giới hạn % chạy vượt được tính) | Cần file 1900 |
 | `20261001002100_club_no_member_limit.sql` | **Bỏ giới hạn thành viên CLB:** CLB không còn số thành viên tối đa (cài đặt CLB đã bỏ ô này) | Chạy độc lập |
 | `20261001002200_pledge_auto_teams.sql` | **Đua đội theo mục tiêu — tự tạo đội:** ban quản trị chỉ đặt số người mỗi đội; khi chia đội, số đội = số người đăng ký ÷ số người mỗi đội, hệ thống tạo đội và chia cho tổng mục tiêu các đội bằng nhau. Thử thách Đồng đội cũ giữ nguyên | Cần file 2000 |
+| `20261001002300_anti_cheat.sql` | **Chống gian lận:** bài Strava mới được máy chủ tải dữ liệu chi tiết và chấm điểm (tốc độ duy trì, đoạn đi xe, GPS nhảy, sải chân, nhịp tim so với pace, so với lịch sử); bài chạy GPS trong app kiểm tra tốc độ duy trì / đoạn đi xe. Nghi vấn → chờ duyệt (chưa cộng Xu, chưa tính thử thách), tab Duyệt bài hiện lý do + mức rủi ro | Chạy độc lập |
+| `20261001002400_review_flow_hr.sql` | **Duyệt bài chuyên nghiệp + nhịp tim:** bài bình thường ghi nhận ngay, chỉ bài nghi gian lận chờ duyệt kèm mức nghi vấn và lý do; báo người chạy + ban quản trị CLB; chủ nhiệm / quản trị viên CLB duyệt trong tab Thành viên. Thử thách có tùy chọn Bắt buộc có nhịp tim | Cần file 2300 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

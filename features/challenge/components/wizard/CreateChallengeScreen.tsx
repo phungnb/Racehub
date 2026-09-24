@@ -13,7 +13,7 @@ import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { creationFee, DEFAULT_POLICY, xuToVnd } from '@/shared/lib/economy'
 import { routes } from '@/shared/config/routes'
-import { challengeErrorMessage, createChallenge, quoteChallenge, setChallengePledge, type ChallengeQuote } from '../../api/challengeApi'
+import { challengeErrorMessage, createChallenge, quoteChallenge, setChallengeOptions, setChallengePledge, type ChallengeQuote } from '../../api/challengeApi'
 import {
   AUDIENCE_LABEL, defaultDraft, effectiveSlots, FORMAT_META, formatScore, OBJECTIVE_META, pledgePayload, pledgeSupported, rewardSummary,
   isTeamPledge, TEAM_MODE_META, validateDraft, weeklyPreset,
@@ -85,6 +85,7 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
     setBusy(true)
     try {
       const r = await createChallenge(d, key.current)
+      if (d.requireHr) await setChallengeOptions(r.challenge_id, { require_hr: true })
       if (d.pledge.enabled && pledgeSupported(d)) {
         // Bật mục tiêu tự đăng ký ngay sau khi tạo (cùng người tạo, trước khi ai tham gia)
         await setChallengePledge(r.challenge_id, pledgePayload(d.pledge, d.format === 'TEAM'))
@@ -168,7 +169,7 @@ function StepType({ d, set, errors, staffClubs }: StepProps & { staffClubs: { cl
                 onClick={() => set({ format: fmt, objective: fmt === 'TEAM' || fmt === 'COLLECTIVE' ? (teamPledge || d.objective === 'STREAK_DAYS' ? 'DISTANCE' : d.objective) : d.objective,
                   audience: fmt === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience,
                   pledge: { ...d.pledge, enabled: teamPledge || (fmt === 'SOLO_GOAL' && d.pledge.enabled),
-                    ...(teamPledge && d.format !== 'TEAM' ? { options: [], minKm: 10, maxKm: 300, capPct: 20 } : {}) } })}
+                    ...(teamPledge ? { options: [], minKm: 1, maxKm: 1000, capPct: d.pledge.capPct ?? 20 } : {}) } })}
                 className={cn('flex items-center gap-3 rounded-xl border p-3 text-left transition-colors',
                   on ? 'border-brand/60 bg-brand/10' : 'border-border bg-surface hover:border-fg-subtle')}>
                 <span className={cn('grid size-10 shrink-0 place-items-center rounded-xl', teamPledge ? 'bg-xp/15 text-xp' : FORMAT_TONE[fmt])}><Icon className="size-5" aria-hidden /></span>
@@ -337,12 +338,23 @@ function StepRules({ d, set, errors }: StepProps) {
         </>
       )}
 
+      <label className="flex items-start gap-3 rounded-xl border border-border bg-surface p-3">
+        <input type="checkbox" checked={d.requireHr} onChange={(e) => set({ requireHr: e.target.checked })} className="mt-0.5 size-5 accent-[var(--color-brand)]" />
+        <span>
+          <span className="block text-sm font-semibold">Bắt buộc có nhịp tim</span>
+          <span className="block text-xs text-fg-muted">
+            Chỉ tính bài có dữ liệu nhịp tim (đồng hồ / dây đo tim đồng bộ qua Strava). Chống nhờ người chạy hộ, đi xe.
+            Bài ghi bằng GPS trong app (không có nhịp tim) sẽ không được tính.
+          </span>
+        </span>
+      </label>
+
       <details className="rounded-[var(--radius-card)] border border-border bg-surface p-4" open={!!(errors.minKm || errors.minPace)}>
         <summary className="cursor-pointer text-sm font-semibold">Luật hợp lệ (chống gian lận)</summary>
         <div className="mt-4 space-y-4">
           <NumberField id="c-minkm" label={d.objective === 'STREAK_DAYS' ? 'Tối thiểu mỗi ngày' : 'Tối thiểu mỗi bài'} unit="km" step={0.5}
             value={d.minKm} onChange={(v) => set({ minKm: v })} error={errors.minKm} />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3">
             <NumberField id="c-pmin" label="Pace nhanh nhất" unit="ph/km" step={0.5} min={1} value={d.minPace} onChange={(v) => set({ minPace: v })} error={errors.minPace} />
             <NumberField id="c-pmax" label="Pace chậm nhất" unit="ph/km" step={0.5} min={1} value={d.maxPace} onChange={(v) => set({ maxPace: v })} />
           </div>
@@ -371,13 +383,19 @@ function PledgeSection({ d, set, error }: { d: ChallengeDraft; set: (p: Partial<
         <span>
           <span className="flex items-center gap-1.5 font-semibold"><Flag className="size-4 text-brand" aria-hidden />Mỗi người tự đăng ký mục tiêu</span>
           <span className="block text-xs text-fg-muted">
-            {d.format === 'TEAM' ? 'Mỗi người chọn mục tiêu theo năng lực trước giờ xuất phát'
+            {d.format === 'TEAM' ? 'Thành viên tự nhập km cam kết trước giờ xuất phát'
               : 'Hoàn thành = đạt mốc của chính mình; bảng xếp hạng theo % mục tiêu'}
           </span>
         </span>
       </label>
       {p.enabled && (
         <>
+          {/* Đua đội: mỗi người tự nhập số km theo năng lực — người tạo không đặt mốc */}
+          {d.format === 'TEAM' ? (
+            <p className="rounded-xl bg-surface-2 p-3 text-xs text-fg-muted">
+              Mỗi thành viên tự nhập số km cam kết theo năng lực của mình (VD: 30, 60, 120 km) khi tham gia.
+            </p>
+          ) : (<>
           <div className="grid grid-cols-2 gap-2">
             {(['OPTIONS', 'RANGE'] as const).map((m) => {
               const on = m === 'OPTIONS' ? p.options.length > 0 : p.options.length === 0
@@ -416,6 +434,7 @@ function PledgeSection({ d, set, error }: { d: ChallengeDraft; set: (p: Partial<
               <NumberField id="p-max" label="Tối đa" unit="km" step={10} min={1} max={5000} value={p.maxKm} onChange={(v) => setP({ maxKm: v })} />
             </div>
           )}
+          </>)}
           <div className="space-y-2">
             <label className="flex items-center justify-between gap-3 text-sm font-medium">
               Giới hạn phần chạy vượt mục tiêu
@@ -535,6 +554,7 @@ function StepReview({ d, quote, bill, loading, failed, onRetry, clubName, onEdit
           <li><span className="text-fg-subtle">Thời gian: </span>{fmtWhen(d.start)} → {fmtWhen(d.end)} ({days} ngày)</li>
           {perDay > 0 && <li><span className="text-fg-subtle">Trung bình cần: </span>{formatScore(d.objective, perDay)}/ngày</li>}
           <li><span className="text-fg-subtle">Phạm vi: </span>{d.audience === 'CLUB_ONLY' ? `Nội bộ ${clubName ?? 'CLB'}` : AUDIENCE_LABEL[d.format === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience]}</li>
+          {d.requireHr && <li><span className="text-fg-subtle">Nhịp tim: </span>Bắt buộc — bài không có nhịp tim không được tính</li>}
           {d.format === 'TEAM' && <li><span className="text-fg-subtle">Đội: </span>{isTeamPledge(d) ? `Tự chia theo số người đăng ký · ${d.pledge.teamSize} người/đội` : d.teamNames.filter((n) => n.trim()).join(' · ')}</li>}
           <li><span className="text-fg-subtle">Luật: </span>≥ {formatNumber(d.minKm)} km/{d.objective === 'STREAK_DAYS' ? 'ngày' : 'bài'} · pace {d.minPace}–{d.maxPace} ph/km{d.dailyCapKm > 0 ? ` · tối đa ${d.dailyCapKm} km/ngày` : ''}</li>
           {summary && <li><span className="text-fg-subtle">Thưởng: </span>{summary}</li>}
