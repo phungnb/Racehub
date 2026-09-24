@@ -10,4 +10,5 @@ export const clubKeys = {
   chat: (id: string) => ['club', id, 'chat'] as const,
   leaderboard: (id: string, period: string) => ['club', id, 'leaderboard', period] as const,
   treasury: (id: string) => ['club', id, 'treasury'] as const,
+  invite: (id: string) => ['club', id, 'invite'] as const,
 }

@@ -4,7 +4,10 @@ import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import { Copy, Download, Link2, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Sheet, Skeleton } from '@/shared/ui'
+import { useQuery } from '@tanstack/react-query'
+import { Button, ErrorState, Sheet, Skeleton } from '@/shared/ui'
+import { clubErrorMessage, getInviteCode } from '../../api/clubApi'
+import { clubKeys } from '../../hooks/keys'
 
 const BTN = 'gap-1.5 whitespace-nowrap px-2 text-sm'
 
@@ -15,7 +18,19 @@ export function clubInviteLink(code: string, slug?: string | null) {
 
 /** Link mời + mã QR vào CLB: quét bằng camera điện thoại là mở trang xin vào CLB. */
 /** `slug`: link mời riêng của CLB Pro (/c/<slug>) — ngắn, dễ nhớ, in lên áo / banner */
-export function InvitePanel({ code, name, slug }: { code: string; name: string; slug?: string | null }) {
+/** Mã mời lấy qua RPC (migration 003400) — không còn đọc trực tiếp từ bảng clubs */
+export function InvitePanel({ clubId, name, slug }: { clubId: string; name: string; slug?: string | null }) {
+  const q = useQuery({ queryKey: clubKeys.invite(clubId), queryFn: () => getInviteCode(clubId), staleTime: 5 * 60_000 })
+  if (q.isPending) return <div className="flex flex-col items-center gap-3"><Skeleton className="size-48 rounded-2xl" /><Skeleton className="h-16 w-full" /></div>
+  if (q.isError) {
+    return clubErrorMessage(q.error).includes('quyền')
+      ? <p className="text-center text-sm text-fg-muted">CLB này chỉ nhận thành viên qua link mời của ban quản trị.</p>
+      : <ErrorState onRetry={() => q.refetch()} />
+  }
+  return <InviteView code={q.data} name={name} slug={slug} />
+}
+
+function InviteView({ code, name, slug }: { code: string; name: string; slug?: string | null }) {
   const link = clubInviteLink(code, slug)
   const [qr, setQr] = useState<string | null>(null)
   useEffect(() => {
@@ -61,10 +76,10 @@ export function InvitePanel({ code, name, slug }: { code: string; name: string; 
   )
 }
 
-export function InviteSheet({ open, onClose, code, name, slug }: { open: boolean; onClose: () => void; code: string; name: string; slug?: string | null }) {
+export function InviteSheet({ open, onClose, clubId, name, slug }: { open: boolean; onClose: () => void; clubId: string; name: string; slug?: string | null }) {
   return (
     <Sheet open={open} onClose={onClose} title="Mời bạn vào CLB" description="Gửi link vào nhóm Zalo/Messenger, hoặc cho bạn quét mã QR.">
-      <InvitePanel code={code} name={name} slug={slug} />
+      {open && <InvitePanel clubId={clubId} name={name} slug={slug} />}
     </Sheet>
   )
 }

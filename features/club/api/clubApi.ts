@@ -14,7 +14,6 @@ export interface Club {
   member_count: number
   member_limit: number
   join_policy: JoinPolicy
-  invite_code: string
   /** Gói CLB (migration 002800) */
   plan?: 'FREE' | 'PRO'
   pro_until?: string | null
@@ -56,8 +55,11 @@ const normalizeMember = (r: MemberRow): ClubMember => ({ ...r, profile: one(r.pr
 
 /* ---------------------------------- Đọc ---------------------------------- */
 
+/** Cột công khai của bảng clubs (migration 003400: mã mời / ngân hàng không đọc trực tiếp được) */
+export const CLUB_COLUMNS = 'id, name, description, avatar_url, accent_color, owner_id, treasury_balance, member_count, member_limit, join_policy, plan, pro_until, slug, created_at'
+
 export async function getClub(clubId: string): Promise<Club> {
-  const { data, error } = await supabase.from('clubs').select('*').eq('id', clubId).single()
+  const { data, error } = await supabase.from('clubs').select(CLUB_COLUMNS).eq('id', clubId).single()
   if (error) throw error
   return data as Club
 }
@@ -232,6 +234,20 @@ export async function getAttendanceReport(clubId: string, from: string, to: stri
 /** /c/<slug> → mã mời (chỉ CLB đang Pro) */
 export async function resolveClubSlug(slug: string): Promise<string | null> {
   const { data, error } = await supabase.rpc('resolve_club_slug', { p_slug: slug })
+  if (error) throw error
+  return (data as string | null) ?? null
+}
+
+/** Mã mời (ban quản trị; thành viên nếu CLB không "chỉ qua mã mời") */
+export async function getInviteCode(clubId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('club_invite_code', { p_club_id: clubId })
+  if (error) throw error
+  return data as string
+}
+
+/** Đã là thành viên mà bấm lại link mời → id CLB để mở */
+export async function myClubByInvite(code: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('my_club_by_invite', { p_code: code })
   if (error) throw error
   return (data as string | null) ?? null
 }

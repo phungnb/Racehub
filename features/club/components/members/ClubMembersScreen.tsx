@@ -174,7 +174,7 @@ export function ClubMembersScreen({ clubId }: { clubId: string }) {
         confirmLabel={confirm?.kind === 'ban' ? 'Cấm' : 'Mời rời CLB'}
         onConfirm={() => confirm && act.mutate({ type: confirm.kind, m: confirm.m })} />
 
-      {club && <InviteSheet open={invite} onClose={() => setInvite(false)} code={club.invite_code} name={club.name} slug={proActive(club, now) ? club.slug : null} />}
+      {club && <InviteSheet open={invite} onClose={() => setInvite(false)} clubId={club.id} name={club.name} slug={proActive(club, now) ? club.slug : null} />}
     </div>
   )
 }

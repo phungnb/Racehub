@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Loader2, ShieldX } from 'lucide-react'
 import { supabase } from '@/shared/lib/supabase'
-import { joinClubByCode, clubErrorMessage } from '@/features/club'
+import { joinClubByCode, clubErrorMessage, myClubByInvite } from '@/features/club'
 import { savePendingClubCode } from '@/features/auth'
 import { Button, EmptyState } from '@/shared/ui'
 import { routes } from '@/shared/config/routes'
@@ -34,8 +34,8 @@ export default function JoinClubPage({ params }: PageProps<'/club/join/[code]'>)
         if (cancelled) return
         // Đã là thành viên (bấm lại link mời cũ) → vào thẳng CLB
         if (e instanceof Error && e.message.includes('ALREADY_MEMBER')) {
-          const { data } = await supabase.from('clubs').select('id').eq('invite_code', code.trim().toLowerCase()).maybeSingle()
-          if (data?.id) { router.replace(routes.club(data.id)); return }
+          const id = await myClubByInvite(code).catch(() => null)
+          if (id) { router.replace(routes.club(id)); return }
         }
         setError(clubErrorMessage(e))
       }
