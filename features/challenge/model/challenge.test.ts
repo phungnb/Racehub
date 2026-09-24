@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import * as m from './challenge'
 import {
   challengePhase, defaultDraft, draftToPayload, formatScore, planStatus, rewardSummary, settlementDue, timeLabel, timeProgress,
   validateDraft,
@@ -68,5 +69,36 @@ describe('tạo thử thách', () => {
     expect(p).toMatchObject({ title: 'Solo', max_slots: 2, audience: 'INVITE_ONLY', reward_source: 'NONE', game_mode: null })
     const t = draftToPayload({ ...defaultDraft(now), format: 'TEAM', teamNames: [' Xanh ', '', 'Đỏ'] })
     expect(t).toMatchObject({ game_mode: 'TEAM_AVG', team_names: ['Xanh', 'Đỏ'] })
+  })
+})
+
+describe('mục tiêu tự đăng ký', () => {
+  it('số tuần ISO và thứ Hai theo giờ VN', () => {
+    expect(m.isoWeek(new Date('2026-09-24T03:00:00Z'))).toBe(39)
+    expect(m.isoWeek(new Date('2026-01-01T03:00:00Z'))).toBe(1)
+    // 23:30 Chủ nhật giờ UTC = 06:30 thứ Hai giờ VN → đã sang tuần mới
+    expect(m.isoWeek(new Date('2026-09-27T23:30:00Z'))).toBe(40)
+    expect(m.vnMonday(new Date('2026-09-24T03:00:00Z')).toISOString()).toBe('2026-09-20T17:00:00.000Z')
+    expect(m.vnMonday(new Date('2026-09-24T03:00:00Z'), true).toISOString()).toBe('2026-09-27T17:00:00.000Z')
+  })
+  it('mẫu thử thách tuần: thứ Năm → lấy tuần sau; tên theo số tuần', () => {
+    const p = m.weeklyPreset(new Date('2026-09-24T03:00:00Z'), 'club-1')
+    expect(p).toMatchObject({ title: 'Thử thách tuần 40', format: 'SOLO_GOAL', audience: 'CLUB_ONLY', clubId: 'club-1' })
+    expect(p.start).toBe('2026-09-27T17:00:00.000Z')
+    expect(Date.parse(p.end!) - Date.parse(p.start!)).toBe(7 * 86_400_000)
+  })
+  it('kiểm tra + dữ liệu gửi lên; thử thách cá nhân lấy mốc thấp nhất làm mục tiêu chung', () => {
+    const d = { ...m.defaultDraft(new Date('2026-09-24T03:00:00Z')), ...m.weeklyPreset(new Date('2026-09-24T03:00:00Z'), 'c') } as m.ChallengeDraft
+    expect(m.validatePledge({ ...d.pledge, options: [0] })).toBe('Mốc từ 1 đến 5.000 km')
+    expect(m.validatePledge({ ...d.pledge, options: [], minKm: 50, maxKm: 10 })).toBe('Khoảng mục tiêu không hợp lệ')
+    expect(m.pledgePayload({ ...d.pledge, options: [60, 21, 42, 21] })).toEqual({ options: [21, 42, 60], min_km: null, max_km: null, cap_pct: null })
+    expect(m.draftToPayload(d)).toMatchObject({ target_value: 21, max_slots: 50 })
+    const t = { ...d, ...m.teamPledgePreset(new Date('2026-09-24T03:00:00Z'), 'c') } as m.ChallengeDraft
+    expect(m.draftToPayload({ ...t, gameMode: 'TEAM_AVG' })).toMatchObject({ game_mode: 'TEAM_SUM', target_value: 0 })
+  })
+  it('km được tính tối đa mục tiêu × (1 + % vượt)', () => {
+    expect(m.cappedKm(50, 30, 20)).toBe(36)
+    expect(m.cappedKm(50, 30, null)).toBe(50)
+    expect(m.cappedKm(20, 30, 20)).toBe(20)
   })
 })

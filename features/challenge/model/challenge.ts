@@ -124,7 +124,93 @@ export interface ChallengeDraft {
   rewardXu: number
   rewardSource: RewardSource
   rewardSplit: 'WINNER' | 'TOP3'
+  /** Mục tiêu tự đăng ký (migration 002000): mỗi người tự chọn mốc km của mình */
+  pledge: PledgeDraft
 }
+
+export interface PledgeDraft {
+  enabled: boolean
+  /** Các mốc cho chọn (km). Rỗng = nhập tự do trong khoảng min–max */
+  options: number[]
+  minKm: number
+  maxKm: number
+  /** Được tính vượt mục tiêu tối đa bao nhiêu % (null = không giới hạn) */
+  capPct: number | null
+}
+
+export const DEFAULT_PLEDGE: PledgeDraft = { enabled: false, options: [21, 42, 60, 100], minKm: 10, maxKm: 300, capPct: 20 }
+
+/** Thử thách này có hỗ trợ mục tiêu tự đăng ký không (chỉ tính quãng đường, cá nhân hoặc đồng đội) */
+export const pledgeSupported = (d: Pick<ChallengeDraft, 'format' | 'objective'>) =>
+  d.objective === 'DISTANCE' && (d.format === 'SOLO_GOAL' || d.format === 'TEAM')
+
+/** Số tuần ISO của ngày (theo giờ VN) — "Thử thách tuần 39" */
+export function isoWeek(date: Date): number {
+  const vn = new Date(date.getTime() + 7 * 3_600_000)
+  const d = new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate()))
+  const day = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - day)
+  const yearStart = Date.UTC(d.getUTCFullYear(), 0, 1)
+  return Math.ceil(((d.getTime() - yearStart) / DAY + 1) / 7)
+}
+
+/** 00:00 thứ Hai (giờ VN) của tuần chứa `date`, hoặc tuần sau nếu `next` */
+export function vnMonday(date: Date, next = false): Date {
+  const vn = new Date(date.getTime() + 7 * 3_600_000)
+  const day = vn.getUTCDay() || 7
+  const mondayVn = Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate() - (day - 1) + (next ? 7 : 0))
+  return new Date(mondayVn - 7 * 3_600_000)
+}
+
+/** Mẫu "Thử thách tuần" của CLB: tuần hiện tại (hoặc tuần sau nếu đã quá thứ Tư), các mốc 21/42/60/100 km */
+export function weeklyPreset(now: Date, clubId: string): Partial<ChallengeDraft> {
+  const next = ((new Date(now.getTime() + 7 * 3_600_000)).getUTCDay() || 7) > 3
+  const start = vnMonday(now, next)
+  const startIso = (start.getTime() < now.getTime() ? new Date(now.getTime() + 60_000) : start).toISOString()
+  return {
+    format: 'SOLO_GOAL', objective: 'DISTANCE', title: `Thử thách tuần ${isoWeek(start)}`,
+    description: 'Chọn mốc km của bạn cho tuần này. Hoàn thành mốc đã đăng ký là chiến thắng!',
+    audience: 'CLUB_ONLY', clubId, rewardSource: 'CLUB', maxSlots: 50,
+    start: startIso, end: new Date(start.getTime() + 7 * DAY).toISOString(),
+    pledge: { ...DEFAULT_PLEDGE, enabled: true, options: [21, 42, 60, 100], capPct: null },
+  }
+}
+
+/** Mẫu "Đua đội theo mục tiêu": bắt đầu sau 2 ngày (để đăng ký mục tiêu + chia đội), kéo dài 10 ngày */
+export function teamPledgePreset(now: Date, clubId: string): Partial<ChallengeDraft> {
+  const start = vnMonday(now, true)
+  const s = start.getTime() - now.getTime() < 2 * DAY ? new Date(start.getTime() + 7 * DAY) : start
+  return {
+    format: 'TEAM', objective: 'DISTANCE', gameMode: 'TEAM_SUM', title: 'Đua đội 10 ngày',
+    description: 'Đăng ký mục tiêu km của bạn trước ngày xuất phát. Ban quản trị chia đội để tổng mục tiêu các đội bằng nhau.',
+    audience: 'CLUB_ONLY', clubId, rewardSource: 'CLUB', teamNames: ['Đội Xanh', 'Đội Đỏ'], teamSize: 0, maxSlots: 50,
+    start: s.toISOString(), end: new Date(s.getTime() + 10 * DAY).toISOString(),
+    pledge: { ...DEFAULT_PLEDGE, enabled: true, options: [], minKm: 10, maxKm: 300, capPct: 20 },
+  }
+}
+
+/** Kiểm tra phần mục tiêu tự đăng ký */
+export function validatePledge(p: PledgeDraft): string | null {
+  if (!p.enabled) return null
+  if (p.options.length) {
+    if (p.options.length > 8) return 'Tối đa 8 mốc'
+    if (p.options.some((o) => !(o > 0) || o > 5000)) return 'Mốc từ 1 đến 5.000 km'
+  } else if (!(p.minKm > 0) || p.maxKm < p.minKm || p.maxKm > 5000) return 'Khoảng mục tiêu không hợp lệ'
+  if (p.capPct !== null && (p.capPct < 0 || p.capPct > 500)) return '% vượt từ 0 đến 500'
+  return null
+}
+
+/** Dữ liệu gửi RPC set_challenge_pledge */
+export const pledgePayload = (p: PledgeDraft) => ({
+  options: p.options.length ? [...new Set(p.options)].sort((a, b) => a - b) : null,
+  min_km: p.options.length ? null : p.minKm,
+  max_km: p.options.length ? null : p.maxKm,
+  cap_pct: p.capPct,
+})
+
+/** Km thật sự được tính cho một người: tối đa mục tiêu × (1 + % vượt) */
+export const cappedKm = (km: number, pledge: number | null, capPct: number | null) =>
+  pledge && capPct !== null ? Math.min(km, Math.round(pledge * (1 + capPct / 100) * 100) / 100) : km
 
 export function defaultDraft(now = new Date(), clubId: string | null = null): ChallengeDraft {
   const start = new Date(now.getTime() + 3_600_000)
@@ -135,6 +221,7 @@ export function defaultDraft(now = new Date(), clubId: string | null = null): Ch
     teamNames: ['Đội Xanh', 'Đội Đỏ'], teamSize: 0, maxSlots: 5,      // ≤ 5 người: miễn phí tạo
     start: start.toISOString(), end: new Date(start.getTime() + 7 * DAY).toISOString(),
     rewardXu: 0, rewardSource: clubId ? 'CLUB' : 'CREATOR', rewardSplit: 'WINNER',
+    pledge: { ...DEFAULT_PLEDGE },
   }
 }
 
@@ -149,7 +236,9 @@ export function validateDraft(d: ChallengeDraft, step: 1 | 2 | 3, now = new Date
     if (d.audience === 'CLUB_ONLY' && !d.clubId) e.clubId = 'Chọn CLB tổ chức'
   }
   if (step === 2) {
-    if ((d.format === 'SOLO_GOAL' || d.format === 'COLLECTIVE') && !(d.targetValue > 0)) e.targetValue = 'Hãy đặt mục tiêu'
+    const pledge = d.pledge.enabled && pledgeSupported(d)
+    if (pledge) { const pe = validatePledge(d.pledge); if (pe) e.pledge = pe }
+    if (!pledge && (d.format === 'SOLO_GOAL' || d.format === 'COLLECTIVE') && !(d.targetValue > 0)) e.targetValue = 'Hãy đặt mục tiêu'
     if (d.targetValue < 0) e.targetValue = 'Mục tiêu không hợp lệ'
     if (d.minKm < 0 || d.minKm > 100) e.minKm = 'Từ 0 đến 100 km'
     if (d.objective === 'STREAK_DAYS' && !(d.minKm > 0)) e.minKm = 'Chuỗi ngày cần cự ly tối thiểu mỗi ngày'
@@ -177,9 +266,9 @@ export function validateDraft(d: ChallengeDraft, step: 1 | 2 | 3, now = new Date
 }
 
 /** Số người tối đa thực tế (máy chủ tính phí theo số này) */
-export function effectiveSlots(d: Pick<ChallengeDraft, 'format' | 'maxSlots' | 'teamSize' | 'teamNames'>): number {
+export function effectiveSlots(d: Pick<ChallengeDraft, 'format' | 'maxSlots' | 'teamSize' | 'teamNames'> & { pledge?: PledgeDraft }): number {
   if (d.format === 'DUEL') return 2
-  if (d.format === 'SOLO_GOAL') return 1
+  if (d.format === 'SOLO_GOAL') return d.pledge?.enabled ? d.maxSlots : 1
   if (d.format === 'TEAM' && d.teamSize > 0) {
     const teams = d.teamNames.filter((t) => t.trim()).length
     return Math.min(d.maxSlots, d.teamSize * Math.max(teams, 1))
@@ -189,13 +278,15 @@ export function effectiveSlots(d: Pick<ChallengeDraft, 'format' | 'maxSlots' | '
 
 /** Dữ liệu gửi lên RPC create_challenge_v2 */
 export function draftToPayload(d: ChallengeDraft) {
+  const pledge = d.pledge?.enabled && pledgeSupported(d)
   return {
     title: d.title.trim(),
     description: d.description.trim(),
     format: d.format,
     objective: d.objective,
-    game_mode: d.format === 'TEAM' ? d.gameMode : null,
-    target_value: d.targetValue || 0,
+    game_mode: d.format === 'TEAM' ? (pledge ? 'TEAM_SUM' : d.gameMode) : null,
+    // Mục tiêu tự đăng ký: mục tiêu chung chỉ là mốc thấp nhất (máy chủ yêu cầu > 0 với thử thách cá nhân)
+    target_value: pledge ? (d.format === 'SOLO_GOAL' ? Math.min(...(d.pledge.options.length ? d.pledge.options : [d.pledge.minKm])) : 0) : d.targetValue || 0,
     min_km: d.minKm,
     min_pace: d.minPace,
     max_pace: d.maxPace,
