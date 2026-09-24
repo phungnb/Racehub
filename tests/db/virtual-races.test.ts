@@ -88,3 +88,60 @@ describe('giải chạy ảo (002700)', () => {
     expect((await db.query(`select 1 from public.notifications where kind = 'RACE_CANCELLED'`)).rows.length).toBe(3)
   })
 })
+
+describe('BIB điện tử do BTC thiết kế (002900)', () => {
+  let db: PGlite
+  let race = ''
+  const url = (rid: string, file = 'logo.png') => `https://x.supabase.co/storage/v1/object/public/race-media/${rid}/${ORG}/${file}`
+  beforeAll(async () => {
+    db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed })
+    race = await rpc<string>(db, ORG, `select public.create_virtual_race($1::jsonb) as r`, [JSON.stringify({ title: 'Giải có BIB đẹp', club_id: CLUB,
+      distances: [10], bib_prefix: 'NB', start_at: new Date(Date.now() + 3600_000).toISOString(), end_at: new Date(Date.now() + 5 * 86400_000).toISOString() })])
+  }, 240_000)
+
+  it('BTC lưu thiết kế: làm sạch trường, chặn ảnh ngoài kho của giải, VĐV thấy trong chi tiết giải', async () => {
+    const q = `select public.set_race_bib_design($1, $2::jsonb) as r`
+    const good = { template: 'stripe', colors: { bg: '#FFFFFF', band: '#1f4fd8', number: '#111111' }, logo_url: url(race), tagline: 'No Beer No Run',
+      sponsors: [{ name: 'Nhà tài trợ A' }, { name: '', logo_url: url(race, 'sp1.png') }, { name: '' }], show_qr: true, hack: '<script>' }
+    expect(await fails(rpc(db, R1, q, [race, JSON.stringify(good)]))).toContain('FORBIDDEN')
+    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...good, logo_url: 'https://evil.com/a.png' })]))).toContain('INVALID_BIB_IMAGE')
+    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...good, logo_url: url('00000000-0000-0000-0000-000000000000') })]))).toContain('INVALID_BIB_IMAGE')
+    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...good, colors: { bg: 'red' } })]))).toContain('INVALID_BIB_DESIGN')
+    const saved = await rpc<Record<string, unknown>>(db, ORG, q, [race, JSON.stringify(good)])
+    expect(saved).toMatchObject({ template: 'stripe', colors: { bg: '#ffffff', band: '#1f4fd8', number: '#111111' }, show_name: true, show_qr: true })
+    expect(saved).not.toHaveProperty('hack')
+    expect((saved.sponsors as unknown[]).length).toBe(2)                 // bỏ nhà tài trợ trống
+    const d = await rpc<{ bib_design: { template: string } }>(db, R1, `select public.race_detail($1) as r`, [race])
+    expect(d.bib_design.template).toBe('stripe')
+  })
+
+  it('003000 + 003200: ảnh BIB có sẵn làm khung + 3 khung chữ tự do, giới hạn giá trị, sai lựa chọn bị từ chối', async () => {
+    const q = `select public.set_race_bib_design($1, $2::jsonb) as r`
+    const base = { template: 'classic', colors: {}, sponsors: [] }
+    const saved = await rpc<Record<string, unknown>>(db, ORG, q, [race, JSON.stringify({ ...base, art_url: url(race, 'bib.png'), use_art: true,
+      art_fit: { zoom: 9, x: -0.25, y: 'lạ' }, show_header: false, qr_pos: 'corner', org_text: '  BTC Hồ Tây  ',
+      boxes: { number: { x: 2, y: 0.4, align: 'left', font: 'impact', outline: true, size: 9, color: 'accent', hack: 1 }, name: { show: false } } })])
+    expect(saved).toMatchObject({ use_art: true, show_header: false, show_sponsors: true, qr_pos: 'corner', art_fit: { zoom: 3, x: -0.25, y: 0 },
+      org_text: 'BTC Hồ Tây', show_name: false,
+      boxes: {
+        number: { show: true, x: 1, y: 0.4, align: 'left', font: 'impact', italic: false, outline: true, size: 2.5, color: 'accent' },
+        name: { show: false, font: 'sans', color: 'text' },
+        org: { show: true, x: 0.42, y: 0.3, align: 'center', font: 'sans', size: 1 },
+      } })
+    expect((saved.boxes as Record<string, object>).number).not.toHaveProperty('hack')
+    expect(saved).not.toHaveProperty('text')
+    const noArt = await rpc<Record<string, unknown>>(db, ORG, q, [race, JSON.stringify({ ...base, use_art: true })])
+    expect(noArt).toMatchObject({ use_art: false, qr_pos: 'right', boxes: { number: { font: 'mono', color: 'number' } } })
+    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, art_url: 'https://evil.com/bib.png' })]))).toContain('INVALID_BIB_IMAGE')
+    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, boxes: { number: { font: 'comic' } } })]))).toContain('INVALID_BIB_DESIGN')
+    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, boxes: { org: 'x' } })]))).toContain('INVALID_BIB_DESIGN')
+    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, qr_pos: 'top' })]))).toContain('INVALID_BIB_DESIGN')
+  })
+
+  it('quét QR trên BIB: xác thực VĐV theo số BIB', async () => {
+    await rpc(db, R2, `select public.register_race($1, 10) as r`, [race])
+    const v = await rpc<{ bib: string; display_name: string; status: string } | null>(db, R3, `select public.race_bib_lookup($1, 'nb-0001') as r`, [race])
+    expect(v).toMatchObject({ bib: 'NB-0001', display_name: 'VĐV 2', status: 'REGISTERED' })
+    expect(await rpc(db, R3, `select public.race_bib_lookup($1, 'NB-9999') as r`, [race])).toBeNull()
+  })
+})

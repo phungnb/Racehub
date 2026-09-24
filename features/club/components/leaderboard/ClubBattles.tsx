@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Crown, Search, Swords, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, EmptyState, ErrorState, Field, Input, Sheet, Skeleton, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
+import { useDebounced } from '@/shared/lib/search'
 import { formatNumber } from '@/shared/lib/format'
 import {
   cancelClubBattle, createClubBattle, listClubBattles, respondClubBattle, settleDueBattles,
@@ -149,7 +150,8 @@ function NewBattleSheet({ open, onClose, clubId, onCreated }: { open: boolean; o
   const [metric, setMetric] = useState<BattleMetric>('AVG_KM')
   const [days, setDays] = useState(7)
   const [message, setMessage] = useState('')
-  const found = useQuery({ queryKey: ['club-search', term], queryFn: () => searchClubs(term, 10), enabled: open && !opponent })
+  const debounced = useDebounced(term.trim())
+  const found = useQuery({ queryKey: ['club-search', debounced], queryFn: () => searchClubs(debounced, 10), enabled: open && !opponent, placeholderData: keepPreviousData })
   const create = useMutation({
     mutationFn: () => {
       const start = tomorrowVn()

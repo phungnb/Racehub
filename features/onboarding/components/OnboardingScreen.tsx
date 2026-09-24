@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, BellRing, Check, CheckCircle2, ChevronRight, KeyRound, Loader2, Search, Users, Watch } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, Field, Input, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
+import { useDebounced } from '@/shared/lib/search'
 import { ICONS } from '@/shared/config/brand'
 import { routes } from '@/shared/config/routes'
 import { useInvalidateProfile, useMyProfile, useSession } from '@/features/auth'
@@ -186,7 +187,8 @@ function ClubStep({ onDone }: { onDone: () => void }) {
   const [search, setSearch] = useState('')
   const [joined, setJoined] = useState<Record<string, 'APPROVED' | 'PENDING'>>({})
   const qc = useQueryClient()
-  const clubs = useQuery({ queryKey: ['club-search', search.trim()], queryFn: () => searchClubs(search, 8), staleTime: 30_000 })
+  const term = useDebounced(search.trim())
+  const clubs = useQuery({ queryKey: ['club-search', term], queryFn: () => searchClubs(term, 8), staleTime: 30_000, placeholderData: keepPreviousData })
   const mine = (inbox.data ?? []).filter((c) => c.member_status === 'APPROVED' || c.member_status === 'PENDING')
 
   const byCode = useMutation({

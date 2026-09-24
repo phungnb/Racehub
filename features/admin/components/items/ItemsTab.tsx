@@ -5,6 +5,7 @@ import { Coins, Pencil, Plus, Search, Shirt, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, EmptyState, ErrorState, Input, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
+import { matchesSearch } from '@/shared/lib/search'
 import { formatCoin } from '@/shared/lib/format'
 import { LayerThumb, RARITY_META, SLOTS, type Slot } from '@/features/character'
 import { adminErrorMessage, type AdminItem } from '../../api/adminApi'
@@ -25,7 +26,7 @@ export function ItemsTab() {
   const slots = SLOTS.filter((s) => items.some((i) => i.slot === s.slot))
   const shown = items.filter((i) =>
     (filter === 'all' ? i.is_active : filter === 'hidden' ? !i.is_active : i.slot === filter && i.is_active)
-    && (!search.trim() || `${i.name} ${i.code}`.toLowerCase().includes(search.trim().toLowerCase())))
+    && matchesSearch(search, i.name, i.code))
 
   const setActive = async (it: AdminItem, active: boolean) => {
     try {
