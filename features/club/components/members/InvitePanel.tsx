@@ -8,13 +8,15 @@ import { Button, Sheet, Skeleton } from '@/shared/ui'
 
 const BTN = 'gap-1.5 whitespace-nowrap px-2 text-sm'
 
-export function clubInviteLink(code: string) {
-  return typeof window === 'undefined' ? '' : `${window.location.origin}/club/join/${code}`
+export function clubInviteLink(code: string, slug?: string | null) {
+  if (typeof window === 'undefined') return ''
+  return slug ? `${window.location.origin}/c/${slug}` : `${window.location.origin}/club/join/${code}`
 }
 
 /** Link mời + mã QR vào CLB: quét bằng camera điện thoại là mở trang xin vào CLB. */
-export function InvitePanel({ code, name }: { code: string; name: string }) {
-  const link = clubInviteLink(code)
+/** `slug`: link mời riêng của CLB Pro (/c/<slug>) — ngắn, dễ nhớ, in lên áo / banner */
+export function InvitePanel({ code, name, slug }: { code: string; name: string; slug?: string | null }) {
+  const link = clubInviteLink(code, slug)
   const [qr, setQr] = useState<string | null>(null)
   useEffect(() => {
     let alive = true
@@ -59,10 +61,10 @@ export function InvitePanel({ code, name }: { code: string; name: string }) {
   )
 }
 
-export function InviteSheet({ open, onClose, code, name }: { open: boolean; onClose: () => void; code: string; name: string }) {
+export function InviteSheet({ open, onClose, code, name, slug }: { open: boolean; onClose: () => void; code: string; name: string; slug?: string | null }) {
   return (
     <Sheet open={open} onClose={onClose} title="Mời bạn vào CLB" description="Gửi link vào nhóm Zalo/Messenger, hoặc cho bạn quét mã QR.">
-      <InvitePanel code={code} name={name} />
+      <InvitePanel code={code} name={name} slug={slug} />
     </Sheet>
   )
 }

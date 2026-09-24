@@ -212,3 +212,29 @@ export function adminErrorMessage(e: unknown): string {
   if (err?.code === '42501') return MESSAGES.FORBIDDEN
   return 'Không thực hiện được. Hãy thử lại.'
 }
+
+// ---------------------------------------------------------------------
+// Gói CLB Pro (migration 002800)
+// ---------------------------------------------------------------------
+export interface AdminClub {
+  id: string
+  name: string
+  avatar_url: string | null
+  accent_color: string | null
+  member_count: number
+  plan: 'FREE' | 'PRO'
+  pro_until: string | null
+  slug: string | null
+  active: boolean
+}
+
+export async function adminListClubs(query: string): Promise<AdminClub[]> {
+  const { data, error } = await supabase.rpc('admin_list_clubs', { p_query: query })
+  if (error) throw error
+  return (data ?? []) as AdminClub[]
+}
+
+export async function adminSetClubPlan(clubId: string, plan: 'FREE' | 'PRO', until: string | null, reason: string) {
+  const { error } = await supabase.rpc('admin_set_club_plan', { p_club_id: clubId, p_plan: plan, p_until: until, p_reason: reason })
+  if (error) throw error
+}

@@ -15,6 +15,10 @@ export interface Club {
   member_limit: number
   join_policy: JoinPolicy
   invite_code: string
+  /** Gói CLB (migration 002800) */
+  plan?: 'FREE' | 'PRO'
+  pro_until?: string | null
+  slug?: string | null
   created_at: string
 }
 
@@ -189,6 +193,52 @@ export async function reviewRun(activityId: string, status: 'APPROVED' | 'REJECT
   if (error) throw error
 }
 
+export interface ClubPlan {
+  plan: 'FREE' | 'PRO'
+  active: boolean
+  pro_until: string | null
+  slug: string | null
+  captains: number
+  captain_limit: number | null
+}
+
+export interface AttendanceRow {
+  user_id: string
+  display_name: string | null
+  role: string
+  joined_at: string
+  runs: number
+  km: number
+  events_going: number
+  events_checked_in: number
+  dues_paid: number
+}
+
+export async function getClubPlan(clubId: string): Promise<ClubPlan> {
+  const { data, error } = await supabase.rpc('club_plan', { p_club_id: clubId })
+  if (error) throw error
+  return data as ClubPlan
+}
+
+export async function setClubSlug(clubId: string, slug: string | null): Promise<string | null> {
+  const { data, error } = await supabase.rpc('set_club_slug', { p_club_id: clubId, p_slug: slug })
+  if (error) throw error
+  return data as string | null
+}
+
+export async function getAttendanceReport(clubId: string, from: string, to: string) {
+  const { data, error } = await supabase.rpc('club_attendance_report', { p_club_id: clubId, p_from: from, p_to: to })
+  if (error) throw error
+  return data as { events: number; dues: number; members: AttendanceRow[] }
+}
+
+/** /c/<slug> → mã mời (chỉ CLB đang Pro) */
+export async function resolveClubSlug(slug: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('resolve_club_slug', { p_slug: slug })
+  if (error) throw error
+  return (data as string | null) ?? null
+}
+
 export async function rotateInviteCode(clubId: string): Promise<string> {
   const { data, error } = await supabase.rpc('rotate_invite_code', { p_club_id: clubId })
   if (error) throw error
@@ -256,6 +306,18 @@ const MESSAGES: Record<string, string> = {
   POST_NOT_FOUND: 'Bài đăng không còn tồn tại.',
   INVALID_IMAGE_PATH: 'Ảnh không hợp lệ, hãy tải lại.',
   RATE_LIMITED: 'Bạn gửi hơi nhanh, đợi một chút rồi thử lại nhé.',
+  CAPTAIN_LIMIT: 'Gói miễn phí có tối đa 2 Quản trị viên. Nâng cấp CLB Pro để thêm.',
+  PRO_REQUIRED: 'Tính năng dành cho CLB Pro.',
+  INVALID_SLUG: 'Link riêng dài 3–30 ký tự, chỉ gồm chữ thường không dấu, số và dấu gạch ngang.',
+  SLUG_TAKEN: 'Link này đã có CLB khác dùng.',
+  BATTLE_EXISTS: 'Hai CLB đang có một trận đấu (hoặc lời mời) chưa kết thúc.',
+  BATTLE_NOT_PENDING: 'Lời thách đấu này đã được trả lời.',
+  BATTLE_EXPIRED: 'Trận đấu đã hết giờ.',
+  BATTLE_NOT_FOUND: 'Không tìm thấy trận đấu.',
+  INVALID_OPPONENT: 'Hãy chọn một CLB khác để thách đấu.',
+  INVALID_DURATION: 'Trận đấu dài từ 1 ngày đến 2 tháng.',
+  START_IN_PAST: 'Giờ bắt đầu đã qua.',
+  INVALID_TIME_RANGE: 'Thời gian không hợp lệ.',
 }
 
 export function clubErrorMessage(e: unknown): string {

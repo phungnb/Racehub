@@ -59,6 +59,9 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001002300_anti_cheat.sql` | **Chống gian lận:** bài Strava mới được máy chủ tải dữ liệu chi tiết và chấm điểm (tốc độ duy trì, đoạn đi xe, GPS nhảy, sải chân, nhịp tim so với pace, so với lịch sử); bài chạy GPS trong app kiểm tra tốc độ duy trì / đoạn đi xe. Nghi vấn → chờ duyệt (chưa cộng Xu, chưa tính thử thách), tab Duyệt bài hiện lý do + mức rủi ro | Chạy độc lập |
 | `20261001002400_review_flow_hr.sql` | **Duyệt bài chuyên nghiệp + nhịp tim:** bài bình thường ghi nhận ngay, chỉ bài nghi gian lận chờ duyệt kèm mức nghi vấn và lý do; báo người chạy + ban quản trị CLB; chủ nhiệm / quản trị viên CLB duyệt trong tab Thành viên. Thử thách có tùy chọn Bắt buộc có nhịp tim | Cần file 2300 |
 | `20261001002500_nbnr_collection.sql` | **Bộ sưu tập CLB NBNR:** áo, quần, tất đôi, mũ, băng đô (ảnh lớp trong public/character/layers/, cần deploy trước) | Cần file 1300 |
+| `20261001002600_club_battles.sql` | **CLB đấu CLB + Xếp hạng CLB:** ban quản trị gửi lời thách đấu (tổng km hoặc km trung bình / thành viên), CLB kia nhận lời; bảng hai phía; tất toán + báo kết quả (cron hằng ngày `/api/cron/challenges`). Xếp hạng CLB tuần / tháng theo km trung bình, hạng Đồng → Kim cương | Chạy độc lập |
+| `20261001002700_virtual_races.sql` | **Giải chạy ảo:** BTC (admin hoặc ban quản trị CLB) tạo giải nhiều cự ly; VĐV đăng ký nhận BIB; bài hợp lệ ≥ cự ly tự ghi thành tích (quy đổi theo pace); kết quả, dashboard BTC, xuất CSV, giấy chứng nhận | Chạy độc lập |
+| `20261001002800_club_pro.sql` | **Gói CLB Pro:** gói miễn phí tối đa 2 Quản trị viên; Pro: không giới hạn, link mời riêng `/c/<slug>`, báo cáo chuyên cần CSV. Admin bật Pro ở Quản trị → CLB Pro (chưa có thanh toán trong app) | Cần file 2600 (dùng hàm báo tin CLB) |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

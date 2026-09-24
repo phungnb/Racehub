@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { CheckCircle2, Coins, LayoutDashboard, ScrollText, Shirt, Ticket, type LucideIcon } from 'lucide-react'
+import { CheckCircle2, Coins, Crown, LayoutDashboard, ScrollText, Shirt, Ticket, type LucideIcon } from 'lucide-react'
 import { ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { adminErrorMessage } from '../api/adminApi'
@@ -12,8 +12,9 @@ import { PassesTab } from './economy/PassesTab'
 import { PolicyTab } from './economy/PolicyTab'
 import { ItemsTab } from './items/ItemsTab'
 import { ReviewTab } from './ReviewTab'
+import { ClubsProTab } from './ClubsProTab'
 
-type Tab = 'overview' | 'grant' | 'passes' | 'policy' | 'items' | 'review'
+type Tab = 'overview' | 'grant' | 'passes' | 'policy' | 'items' | 'review' | 'clubs'
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
   { id: 'grant', label: 'Cộng/Trừ Xu', icon: Coins },
@@ -21,6 +22,7 @@ const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'policy', label: 'Chính sách', icon: ScrollText },
   { id: 'items', label: 'Vật phẩm', icon: Shirt },
   { id: 'review', label: 'Duyệt bài', icon: CheckCircle2 },
+  { id: 'clubs', label: 'CLB Pro', icon: Crown },
 ]
 
 /** Bảng điều phối của quản trị viên hệ thống: dòng Xu, cộng/trừ Xu, vé miễn phí, chính sách, vật phẩm, duyệt bài */
@@ -45,6 +47,7 @@ export function AdminConsole() {
       </nav>
 
       {tab === 'review' ? <ReviewTab />
+        : tab === 'clubs' ? <ClubsProTab />
         : tab === 'items' ? <ItemsTab />
         : o.isPending ? <div className="space-y-2"><Skeleton className="h-28" /><Skeleton className="h-40" /><Skeleton className="h-40" /></div>
         : o.isError ? <ErrorState message={adminErrorMessage(o.error)} onRetry={() => void o.refetch()} />

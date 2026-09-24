@@ -27,3 +27,7 @@ export const canManage = (actor: string | null | undefined, target: string | nul
 export const CLUB_ACCENTS = ['#b6ff3b', '#38bdf8', '#f472b6', '#fb923c', '#a78bfa', '#facc15', '#34d399', '#f87171'] as const
 export const DEFAULT_ACCENT = CLUB_ACCENTS[0]
 export const accentOf = (c: { accent_color?: string | null } | null | undefined) => c?.accent_color || DEFAULT_ACCENT
+
+/** CLB đang ở gói Pro còn hạn (migration 002800) */
+export const proActive = (c: { plan?: string | null; pro_until?: string | null } | null | undefined, now: number) =>
+  c?.plan === 'PRO' && (!c.pro_until || Date.parse(c.pro_until) > now)
