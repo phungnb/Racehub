@@ -115,6 +115,20 @@ describe('BIB điện tử do BTC thiết kế (002900)', () => {
     expect(d.bib_design.template).toBe('stripe')
   })
 
+  it('003000: ảnh BIB có sẵn làm khung + bố cục số / tên, giới hạn giá trị, sai lựa chọn bị từ chối', async () => {
+    const q = `select public.set_race_bib_design($1, $2::jsonb) as r`
+    const base = { template: 'classic', colors: {}, sponsors: [] }
+    const saved = await rpc<Record<string, unknown>>(db, ORG, q, [race, JSON.stringify({ ...base, art_url: url(race, 'bib.png'), use_art: true,
+      art_fit: { zoom: 9, x: -0.25, y: 'lạ' }, show_header: false, text: { layout: 'inline', align: 'left', font: 'outline', y: 0.9, scale: 0.2 }, qr_pos: 'corner' })])
+    expect(saved).toMatchObject({ use_art: true, show_header: false, show_sponsors: true, qr_pos: 'corner',
+      art_fit: { zoom: 3, x: -0.25, y: 0 }, text: { layout: 'inline', align: 'left', font: 'outline', y: 0.85, scale: 0.5, name_scale: 1 } })
+    const noArt = await rpc<Record<string, unknown>>(db, ORG, q, [race, JSON.stringify({ ...base, use_art: true })])
+    expect(noArt).toMatchObject({ use_art: false, text: { layout: 'below', align: 'center', font: 'mono' }, qr_pos: 'right' })
+    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, art_url: 'https://evil.com/bib.png' })]))).toContain('INVALID_BIB_IMAGE')
+    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, text: { layout: 'diagonal' } })]))).toContain('INVALID_BIB_DESIGN')
+    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, qr_pos: 'top' })]))).toContain('INVALID_BIB_DESIGN')
+  })
+
   it('quét QR trên BIB: xác thực VĐV theo số BIB', async () => {
     await rpc(db, R2, `select public.register_race($1, 10) as r`, [race])
     const v = await rpc<{ bib: string; display_name: string; status: string } | null>(db, R3, `select public.race_bib_lookup($1, 'nb-0001') as r`, [race])
