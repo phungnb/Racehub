@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/shared/lib/supabase'
-import { GPS, evaluatePoint, isStationary, nextSplit, rollingPace, smoothPoint, splitAnnouncement, type Split, type TrackPoint } from '../model/tracker'
+import { GPS, evaluatePoint, isStationary, nextSplit, rollingPace, segmentMovingS, smoothPoint, splitAnnouncement, type Split, type TrackPoint } from '../model/tracker'
 
 export type RunPhase = 'IDLE' | 'LOCATING' | 'RUNNING' | 'PAUSED' | 'FINISHED' | 'SAVING' | 'SAVED'
 export type GpsState = 'OFF' | 'SEARCHING' | 'GOOD' | 'WEAK' | 'DENIED' | 'UNSUPPORTED'
@@ -25,6 +25,10 @@ export function useRunTracker() {
   const [elapsedS, setElapsedS] = useState(0)
   const [movingS, setMovingS] = useState(0)
   const [currentPace, setCurrentPace] = useState(0)
+  /** Pace trung bình = thời gian di chuyển của các đoạn GPS / quãng đường GPS (cùng một nguồn → luôn khớp) */
+  const [avgPace, setAvgPace] = useState(0)
+  const recentSpeed = useRef(2.8)
+  const lastAcceptAt = useRef(0)
   const [autoPaused, setAutoPaused] = useState(false)
   const [splits, setSplits] = useState<Split[]>([])
   const [voiceOn, setVoiceOn] = useState(true)
@@ -99,8 +103,15 @@ export function useRunTracker() {
     if (raw.current.length > 60) raw.current.splice(0, raw.current.length - 60)
     if (isStationary(raw.current)) return
     const sp = smoothPoint(raw.current)!
-    const v = evaluatePoint(lastAccepted.current, sp)
+    const anchor = lastAccepted.current
+    const v = evaluatePoint(anchor, sp)
     if (!v.accept) return
+    if (anchor) {
+      const dt = (Date.parse(sp.recorded_at) - Date.parse(anchor.recorded_at)) / 1000
+      movingRef.current += segmentMovingS(dt, v.distance, recentSpeed.current)
+      if (dt <= GPS.SEGMENT_MAX_S) recentSpeed.current = 0.7 * recentSpeed.current + 0.3 * v.speed
+    }
+    lastAcceptAt.current = Date.now()
     lastAccepted.current = sp
     points.current.push(sp)
     if (v.speed > GPS.AUTO_PAUSE_MPS || v.distance === 0) {
@@ -110,7 +121,9 @@ export function useRunTracker() {
     const prev = distanceRef.current
     distanceRef.current += v.distance
     setDistanceM(distanceRef.current)
+    setMovingS(movingRef.current)
     setCurrentPace(rollingPace(points.current))
+    setAvgPace(distanceRef.current >= 50 ? movingRef.current / (distanceRef.current / 1000) : 0)
 
     const split = nextSplit(prev, distanceRef.current, movingRef.current, splitsRef.current)
     if (split) {
@@ -139,10 +152,11 @@ export function useRunTracker() {
       const idle = (now - lastMoveAt.current) / 1000 > GPS.AUTO_PAUSE_AFTER_S
       setAutoPaused(idle)
       setElapsedS((s) => s + dt)
-      if (!idle) {
-        movingRef.current += dt
-        setMovingS(movingRef.current)
-      }
+      // Đồng hồ chạy mượt giữa hai điểm GPS; con số chính xác được chốt mỗi khi nhận điểm mới
+      const live = idle || !lastAcceptAt.current ? 0 : Math.min((now - lastAcceptAt.current) / 1000, GPS.SEGMENT_MAX_S)
+      setMovingS(movingRef.current + live)
+      if (idle) setCurrentPace(0)
+      else setCurrentPace(rollingPace(points.current, 30, now))
     }, 1000)
     return () => clearInterval(id)
   }, [phase])
@@ -158,7 +172,9 @@ export function useRunTracker() {
     splitsRef.current = []
     raw.current = []
     setGapS(0)
-    setDistanceM(0); setElapsedS(0); setMovingS(0); setCurrentPace(0); setSplits([]); setAutoPaused(false)
+    setDistanceM(0); setElapsedS(0); setMovingS(0); setCurrentPace(0); setAvgPace(0); setSplits([]); setAutoPaused(false)
+    recentSpeed.current = 2.8
+    lastAcceptAt.current = 0
     setGps('SEARCHING')
     setPhase('LOCATING')
     phaseRef.current = 'LOCATING'
@@ -181,6 +197,7 @@ export function useRunTracker() {
     lastTick.current = Date.now()
     lastMoveAt.current = Date.now()
     lastAccepted.current = null           // không nối đoạn GPS qua quãng tạm dừng
+    lastAcceptAt.current = 0
     raw.current = []
     setPhase('RUNNING')
     speak('Tiếp tục')
@@ -255,7 +272,7 @@ export function useRunTracker() {
   useEffect(() => () => { stopWatch(); releaseWakeLock() }, [releaseWakeLock, stopWatch])
 
   return {
-    phase, gps, distanceM, elapsedS, movingS, currentPace, autoPaused, splits, voiceOn, result, error, gapS,
+    phase, gps, distanceM, elapsedS, movingS, currentPace, avgPace, autoPaused, splits, voiceOn, result, error, gapS,
     setVoiceOn, start, startAnyway, pause, resume, finish, discard, save,
   }
 }
