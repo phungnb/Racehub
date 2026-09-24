@@ -238,3 +238,27 @@ export async function adminSetClubPlan(clubId: string, plan: 'FREE' | 'PRO', unt
   const { error } = await supabase.rpc('admin_set_club_plan', { p_club_id: clubId, p_plan: plan, p_until: until, p_reason: reason })
   if (error) throw error
 }
+
+/* ------------------------------ Kiểm tra hệ thống (migration 003500) ------------------------------ */
+export interface SystemCheck {
+  migrations: { file: string; label: string; ok: boolean }[]
+  buckets: { id: string; ok: boolean; limit_mb: number }[]
+  stats: {
+    pg_net: boolean; push_url: string | null; admins: number; users: number; clubs: number
+    push_stuck?: number; challenges_overdue?: number; battles_overdue?: number; pending_reviews?: number
+  }
+  checked_at: string
+}
+export interface ServerCheckItem { key: string; label: string; status: 'ok' | 'warn' | 'fail'; detail: string }
+
+export async function getSystemCheck(): Promise<SystemCheck> {
+  const { data, error } = await supabase.rpc('admin_system_check')
+  if (error) throw error
+  return data as SystemCheck
+}
+
+export async function getServerCheck(): Promise<{ items: ServerCheckItem[]; origin: string }> {
+  const res = await fetch('/api/admin/system-check', { cache: 'no-store' })
+  if (!res.ok) throw new Error(`SERVER_CHECK_${res.status}`)
+  return res.json()
+}
