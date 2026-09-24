@@ -66,6 +66,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001003000_bib_layout.sql` | **BIB đa dạng:** tải ảnh BIB có sẵn (Canva / Photoshop) làm khung + căn chỉnh (thu phóng, dịch ngang / dọc, kéo trên ảnh xem trước); bố cục số / tên (tên dưới, tên trên, cùng hàng), căn trái / giữa / phải, vị trí dọc, cỡ chữ, 4 kiểu chữ; QR phải / trái / góc dưới; bật / tắt đầu BIB và dải tài trợ | Cần file 2900 |
 | `20261001003100_smart_search.sql` | **Tìm kiếm linh hoạt:** không dấu / hoa thường / Unicode tổ hợp (Unikey), nhiều từ không cần đúng thứ tự, viết tắt chữ cái đầu ("nbnr"), link riêng CLB; xếp khớp nhất trước. Áp cho tìm CLB (`search_clubs` mới), VĐV, admin tìm tài khoản / CLB Pro. CLB "chỉ qua mã mời" chỉ hiện khi gõ đúng tên | Cần file 2800 |
 | `20261001003200_bib_text_boxes.sql` | **BIB 3 khung chữ:** Đơn vị tổ chức, Số BIB, Tên VĐV — mỗi khung tự đặt vị trí (kéo trên ảnh xem trước), căn lề, 10 font có tiếng Việt, nghiêng, viền rỗng, cỡ, màu; chữ Đơn vị tổ chức tự nhập | Cần file 3000 |
+| `20261001003300_search_suggest_media_fix.sql` | **Gợi ý tìm kiếm admin + sửa kho ảnh BIB:** ô chọn người nhận Xu / vé có sổ xuống gợi ý ngay khi bấm (người mới + CLB đông nhất), gõ 1 ký tự đã lọc; kho `race-media` kiểm tra đường dẫn an toàn và nâng giới hạn lên 10 MB (app tự nén ảnh) | Cần file 3100 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

@@ -51,7 +51,7 @@ export function GrantXuTab({ policy }: { policy: EconomyPolicy }) {
   return (
     <div className="space-y-4">
       <Card className="space-y-4">
-        <Field label="Người nhận" htmlFor="grant-target" hint="Có thể là ví của một người hoặc quỹ của một CLB">
+        <Field label="Người nhận" htmlFor="grant-target" hint="Ví của một người hoặc quỹ CLB. Không cần gõ dấu: “nguyen an”, “nbnr”, email hoặc ID.">
           <AccountPicker id="grant-target" value={target} onChange={setTarget} />
         </Field>
 

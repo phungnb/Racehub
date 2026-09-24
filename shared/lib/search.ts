@@ -56,3 +56,24 @@ export function useDebounced<T>(value: T, ms = 250): T {
   }, [value, ms])
   return v
 }
+
+/** Các đoạn [start, end) trong `text` khớp từ nào đó của câu tìm (so khớp không dấu) — để tô đậm gợi ý */
+export function matchRanges(text: string, query: string): [number, number][] {
+  const tokens = searchKey(query).split(' ').filter(Boolean)
+  if (!tokens.length || !text) return []
+  // Bỏ dấu từng ký tự để vị trí trong chuỗi gốc và chuỗi đã chuẩn hóa trùng nhau
+  const flat = [...text].map((ch) => searchKey(ch) || ' ').join('')
+  const out: [number, number][] = []
+  for (const t of tokens) {
+    // ưu tiên chỗ khớp ở đầu một từ ("an" trong "Văn An" → tô "An")
+    const atWord = ` ${flat}`.indexOf(` ${t}`)
+    const i = atWord >= 0 ? atWord : flat.indexOf(t)
+    if (i >= 0) out.push([i, i + t.length])
+  }
+  out.sort((a, b) => a[0] - b[0])
+  return out.reduce<[number, number][]>((m, r) => {
+    const last = m[m.length - 1]
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]); else m.push([...r])
+    return m
+  }, [])
+}

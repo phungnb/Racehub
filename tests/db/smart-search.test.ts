@@ -59,4 +59,18 @@ describe('Tìm kiếm linh hoạt (003100)', () => {
     const one = (await q<Record<string, unknown>[]>(`select public.search_clubs('ho tay runners') as r`))[0]
     expect(one).not.toHaveProperty('invite_code')
   })
+
+  it('003300 admin: ô trống gợi ý người + CLB; 1 ký tự khớp đầu từ; người thường bị chặn', async () => {
+    const rows = async (s: string) => (await asUser<{ kind: string; name: string }>(db, ME, '/rpc', `select * from public.admin_search_accounts($1)`, [s])).rows
+    await expect(rows('')).rejects.toThrow(/FORBIDDEN/)
+    await db.query(`update public.profiles set role = 'SYSTEM_ADMIN' where id = $1`, [ME])
+    const sug = await rows('')
+    expect(sug.filter((r) => r.kind === 'USER').length).toBeGreaterThan(0)
+    expect(sug.filter((r) => r.kind === 'CLUB').map((r) => r.name)[0]).toBe('Hồ Tây Runners')   // CLB đông nhất
+    const d = await rows('d')
+    expect(d.map((r) => r.name)).toEqual(expect.arrayContaining(['Đặng Anh Dũng', 'Ẩn Danh']))
+    expect(d.map((r) => r.name)).not.toContain('Nguyễn Văn An')
+    expect((await rows('no')).map((r) => r.name)).toEqual(['No Beer No Run'])
+    expect((await rows('nguyen an')).map((r) => r.name)).toEqual(['Nguyễn Văn An'])
+  })
 })

@@ -138,6 +138,16 @@ describe('BIB điện tử do BTC thiết kế (002900)', () => {
     expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, qr_pos: 'top' })]))).toContain('INVALID_BIB_DESIGN')
   })
 
+  it('kho ảnh race-media: BTC tải lên được, người ngoài bị chặn; không làm hỏng upload của kho khác', async () => {
+    // giống Supabase: storage.objects bật RLS, authenticated có quyền ghi bảng
+    await db.exec(`alter table storage.objects enable row level security; grant select, insert on storage.objects to authenticated;`)
+    const put = (uid: string, bucket: string, name: string) => asUser(db, uid, '/storage/v1/object', `insert into storage.objects (bucket_id, name) values ($1, $2)`, [bucket, name])
+    await put(ORG, 'race-media', `${race}/${ORG}/bib.png`)
+    expect(await fails(put(R1, 'race-media', `${race}/${R1}/bib.png`))).toMatch(/row-level security/)
+    expect(await fails(put(ORG, 'race-media', `khong-phai-uuid/${ORG}/bib.png`))).toMatch(/row-level security/)   // 003300: không lỗi ép kiểu uuid
+    await put(R1, 'avatars', `${R1}/a.png`)                                   // kho khác vẫn tải bình thường
+  })
+
   it('quét QR trên BIB: xác thực VĐV theo số BIB', async () => {
     await rpc(db, R2, `select public.register_race($1, 10) as r`, [race])
     const v = await rpc<{ bib: string; display_name: string; status: string } | null>(db, R3, `select public.race_bib_lookup($1, 'nb-0001') as r`, [race])
