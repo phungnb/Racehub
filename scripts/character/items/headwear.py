@@ -97,6 +97,43 @@ def logo_tick(x, y, cx, cy, size):
     return (upper | lower).astype(np.float32)
 
 
+def halftone(x, y, pitch, radius):
+    """Chấm bi lưới xen kẽ (tọa độ khung, bán kính theo từng điểm) → mặt nạ 0..1 mép mềm."""
+    row = np.floor(y / pitch)
+    ox = (row % 2) * pitch / 2
+    cx = (np.floor((x - ox) / pitch) + 0.5) * pitch + ox
+    cy = (row + 0.5) * pitch
+    d = np.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+    return np.clip((radius - d) * SS / 1.5 + 0.5, 0, 1)
+
+
+def paint_dots(rgb, base_color, dm, color):
+    """Tô chấm màu `color` giữ nguyên độ sáng khối (lấy tỉ lệ sáng so với màu gốc)."""
+    lum = rgb.mean(-1, keepdims=True) / max(hexrgb(base_color).mean(), 1)
+    return rgb * (1 - dm[..., None]) + np.clip(hexrgb(color) * lum, 0, 255) * dm[..., None]
+
+
+def logo_badge(x, y, cx, cy, r):
+    """Logo tròn CLB: vòng ngoài, mặt vàng, 3 vằn hổ → (mask vòng, mask mặt, mask vằn)."""
+    d = np.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+    edge = lambda rr: np.clip((rr - d) * SS / 1.5 + 0.5, 0, 1)
+    ring, face = edge(r), edge(r * 0.74)
+    px, py = (x - cx) / r, (y - cy) / r
+    stripes = np.zeros_like(x)
+    for k in (-0.36, 0, 0.36):
+        w = 0.13 * np.clip((0.1 - py) / 0.65, 0, 1)
+        stripes = np.maximum(stripes, ((np.abs(px - k) < w) & (py > -0.55) & (py < 0.1)).astype(np.float32))
+    return ring, face, stripes * face
+
+
+def put_badge(rgb, x, y, cx, cy, r, alpha, ring='#123a9c', face='#ffc21a', mark='#ff7a1a'):
+    ring_m, face_m, mark_m = logo_badge(x, y, cx, cy, r)
+    for m, c in ((ring_m, ring), (face_m, face), (mark_m, mark)):
+        m = m * alpha
+        rgb = rgb * (1 - m[..., None]) + hexrgb(c) * m[..., None]
+    return rgb
+
+
 def finish(rgb, alpha, shadow=None):
     """Ghép bóng đổ + món đồ, thu nhỏ về khung chuẩn → RGBA uint8."""
     out = np.zeros((H * SS, W * SS, 4), np.float32)
@@ -132,7 +169,7 @@ def soft_shadow(mask, dy, blur, opacity):
     return np.asarray(sh, np.float32) / 255 * opacity
 
 
-def headband(g, color, style='terry', logo='#ffffff', seed=1, under_hair=True):
+def headband(g, color, style='terry', logo='#ffffff', seed=1, under_hair=True, dots=None):
     hd = HEAD[g]
     rng = np.random.default_rng(seed)
     thick = 23 if style == 'terry' else 11
@@ -142,6 +179,10 @@ def headband(g, color, style='terry', logo='#ffffff', seed=1, under_hair=True):
     rgb = fabric(rgb, v, style, rng)
     if style == 'terry':
         rgb = stitch(rgb, v, hexrgb(color) * 0.6)
+    if dots:                             # chấm bi toàn dải, nhỏ dần về hai bên theo phối cảnh
+        x, y = grid()
+        rad = 1.2 * (0.5 + 0.5 * np.sqrt(np.clip(1 - u ** 2, 0, 1))) * np.clip(np.minimum(v, 1 - v) / 0.18, 0, 1)
+        rgb = paint_dots(rgb, color, halftone(x, y, 4.0, rad) * mask, dots)
     if logo:
         x, y = grid()
         cx = hd['cx'] - 2
@@ -232,7 +273,7 @@ def brim(g, y_band, depth, half_ratio, color, under):
     return rgb, alpha, sh
 
 
-def crown(g, y_band, height, width_extra, color, seam, rng, vents=True, logo=None):
+def crown(g, y_band, height, width_extra, color, seam, rng, vents=True, logo=None, dots=None, badge=False):
     """Thân mũ chạy dáng thấp, 6 múi, vải mỏng: khối vòm dẹt + đường may + lỗ thoáng."""
     hd = HEAD[g]
     x, y = grid()
@@ -283,7 +324,12 @@ def crown(g, y_band, height, width_extra, color, seam, rng, vents=True, logo=Non
     rgb = rgb + 70 * rimlight[..., None]
     spec = np.exp(-((nx + 0.32) ** 2) / 0.03 - ((ny - 0.62) ** 2) / 0.05)
     rgb = rgb + 38 * spec[..., None]
-    if logo:
+    if dots:                             # chấm bi hai bên thân mũ, to dần về phía sau (kiểu mũ CLB NBNR)
+        rad = 1.25 * np.clip((np.abs(dx) - 0.28) / 0.5, 0, 1)
+        rgb = paint_dots(rgb, color, halftone(x, y, 4.2, rad) * alpha * (dy > 0.06), dots)
+    if badge:
+        rgb = put_badge(rgb, x, y, hd['cx'] - 1, base - height * 0.45, height * 0.2, alpha)
+    elif logo:
         lm = logo_tick(x, y, hd['cx'] - 1, base - height * 0.42, height * 0.14) * alpha
         rgb = rgb * (1 - lm[..., None]) + hexrgb(logo) * lm[..., None]
     return np.clip(rgb, 0, 255), alpha, (dx, dy, inside)
@@ -307,13 +353,14 @@ def visor(g, color, under='#2a2f38', logo='#ffffff', seed=2):
     return to_frame(out)
 
 
-def cap(g, color, under='#2a2f38', seam=None, logo='#ffffff', seed=3):
+def cap(g, color, under='#2a2f38', seam=None, logo='#ffffff', seed=3, dots=None, badge=False):
     hd = HEAD[g]
     rng = np.random.default_rng(seed)
     y_band = hd['hairline'] + 2
     height = 55 if g == 'male' else 50
     extra = 9 if g == 'male' else 7
-    crgb, calpha, (dx, dy, inside) = crown(g, y_band, height, extra, color, seam or color, rng, logo=logo)
+    crgb, calpha, (dx, dy, inside) = crown(g, y_band, height, extra, color, seam or color, rng, vents=not dots,
+                                          logo=logo, dots=dots, badge=badge)
     # che tóc thò ra ngoài thân mũ (phía trên vành) bằng nền
     x, y = grid()
     above = y < band_line(g, y_band, x) - 1
@@ -352,6 +399,10 @@ CATALOG = [
     ('hat_band_terry_blue', 'Băng đô bông Xanh', 'Thấm mồ hôi, không cay mắt', 'common', 25, 1, lambda g: headband(g, '#2f6bff', 'terry', under_hair=g == 'male')),
     ('hat_band_thin_black', 'Băng đô mảnh Đen', 'Thun co giãn, không trượt', 'common', 15, 1, lambda g: headband(g, '#1d2128', 'thin', logo='#b6ff3b', under_hair=g == 'male')),
     ('hat_band_thin_lime', 'Băng đô mảnh Chanh', 'Thun co giãn, không trượt', 'common', 15, 1, lambda g: headband(g, '#b6ff3b', 'thin', logo='#1d2128', under_hair=g == 'male')),
+    ('hat_cap_nbnr', 'Mũ CLB NBNR', 'No Beer No Run — xanh dương, chấm bi vàng, logo hổ', 'epic', 120, 1,
+     lambda g: cap(g, '#1f4fd8', under='#123a9c', logo=None, dots='#ffc21a', badge=True)),
+    ('hat_band_nbnr', 'Băng đô CLB NBNR', 'Băng đô bông xanh dương chấm bi vàng', 'rare', 40, 1,
+     lambda g: headband(g, '#1f4fd8', 'terry', logo=None, dots='#ffc21a', under_hair=g == 'male')),
     ('hat_band_thin_pink', 'Băng đô mảnh Hồng', 'Thun co giãn, không trượt', 'common', 15, 1, lambda g: headband(g, '#ff6b9a', 'thin', logo='#ffffff', under_hair=g == 'male')),
 ]
 LAYERS = ROOT / 'public/character/layers'
