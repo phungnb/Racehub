@@ -138,3 +138,45 @@ export async function getShineOverview(): Promise<ShineOverview> {
 }
 export const saveShineItem = (i: ShineItem) => call<string>('admin_save_shine_item', { p: i })
 export const setShineConfig = (p: Partial<ShineConfig>) => call<ShineConfig>('admin_set_shine_config', { p })
+
+// ---------------------------------------------------------------------
+// Khuyến mãi vật phẩm (migration 005100)
+// ---------------------------------------------------------------------
+export type ItemPromoKind = 'FREE' | 'TRIAL' | 'SALE' | 'FLASH' | 'BUNDLE' | 'EVENT' | 'FIRST_PURCHASE' | 'COMEBACK'
+export interface ItemPromo {
+  id?: string
+  kind: ItemPromoKind
+  title: string
+  badge?: string | null
+  item_type?: 'AVATAR' | 'GIFT' | null
+  item_code?: string | null
+  bundle_items?: string[] | null
+  discount_pct?: number
+  fixed_price?: number | null
+  quantity_limit?: number | null
+  per_user_limit?: number | null
+  trial_days?: number | null
+  segment?: 'ALL' | 'NEW' | 'COMEBACK' | 'VIP'
+  event_key?: string | null
+  starts_at?: string | null
+  ends_at?: string | null
+  is_active?: boolean
+  // chỉ đọc
+  live?: boolean; sold?: number; buyers?: number; xu_paid?: number; item_name?: string | null; base_price?: number | null
+}
+export interface ItemPromoCatalog {
+  promotions: ItemPromo[]
+  avatar_items: { code: string; name: string; price_xu: number; slot: string; rarity: string }[]
+  gifts: { code: string; name: string; price_xu: number }[]
+}
+export async function listItemPromos(): Promise<ItemPromoCatalog> {
+  const d = await call<ItemPromoCatalog>('admin_list_item_promotions')
+  return {
+    promotions: (d.promotions ?? []).map((p) => ({ ...p, sold: Number(p.sold ?? 0), xu_paid: Number(p.xu_paid ?? 0),
+      base_price: p.base_price == null ? null : Number(p.base_price) })),
+    avatar_items: (d.avatar_items ?? []).map((x) => ({ ...x, price_xu: Number(x.price_xu) })),
+    gifts: (d.gifts ?? []).map((x) => ({ ...x, price_xu: Number(x.price_xu) })),
+  }
+}
+export const saveItemPromo = (p: ItemPromo) => call<ItemPromo>('admin_save_item_promotion', { p })
+export const endItemPromo = (id: string) => call<void>('admin_end_item_promotion', { p_id: id })

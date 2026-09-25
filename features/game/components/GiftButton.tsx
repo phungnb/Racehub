@@ -9,7 +9,7 @@ import { Avatar, Button, Field, Input, Sheet } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
-import { gameErrorMessage, type Gift, type GiftTier } from '../api/gameApi'
+import { gameErrorMessage, giftCost, type Gift, type GiftTier } from '../api/gameApi'
 import { useGiftCatalog, useSendGift } from '../hooks/useGame'
 
 const QTY = [1, 5, 10, 99] as const
@@ -59,7 +59,7 @@ export function GiftButton({ toUser, toName, toAvatar, postId, activityId, total
   const balance = Number(profile.xu ?? 0)
   const gifts = catalog.data?.gifts ?? []
   const gift: Gift | undefined = gifts.find((g) => g.code === code) ?? gifts[0]
-  const cost = gift ? gift.price_xu * qty : 0
+  const cost = gift ? giftCost(gift, qty) : 0
   const left = catalog.data ? Math.max(0, catalog.data.daily_cap - catalog.data.sent_today) : Infinity
   const blocked = !gift || gift.locked || balance < cost || cost > left
 
@@ -85,7 +85,7 @@ export function GiftButton({ toUser, toName, toAvatar, postId, activityId, total
       </button>
       {burst && <GiftBurst {...burst} onDone={() => setBurst(null)} />}
       <Sheet open={open} onClose={() => setOpen(false)} title="Tặng quà cổ vũ"
-        description="Quà dùng Xu của bạn; người nhận có thêm điểm Tỏa sáng trên hồ sơ (không nhận Xu)."
+        description="Quà dùng Xu của bạn; người nhận có thêm điểm Tỏa sáng theo số Xu bạn thực trả (không nhận Xu)."
         footer={
           <Button block size="lg" variant="coin" onClick={submit} loading={send.isPending} disabled={blocked}>
             <span className="text-lg" aria-hidden>{gift?.emoji ?? '🎁'}</span>
@@ -109,7 +109,11 @@ export function GiftButton({ toUser, toName, toAvatar, postId, activityId, total
                     className={cn('relative flex flex-col items-center gap-0.5 rounded-xl border p-2 text-center', on ? 'border-coin bg-coin/15' : t.ring, g.locked && 'opacity-60')}>
                     <span className="text-3xl leading-none" aria-hidden>{g.emoji}</span>
                     <span className="line-clamp-1 text-[11px] font-medium">{g.name}</span>
-                    <span className="font-mono text-[11px] font-semibold text-coin">{formatCoin(g.price_xu)}</span>
+                    <span className="font-mono text-[11px] font-semibold text-coin">
+                      {giftCost(g, 1) < g.price_xu && <s className="mr-0.5 text-[9px] text-fg-subtle">{formatCoin(g.price_xu)}</s>}
+                      {giftCost(g, 1) > 0 ? formatCoin(giftCost(g, 1)) : 'Free'}
+                    </span>
+                    {g.offer && !g.seasonal && <span className="absolute left-1 top-1 max-w-[80%] truncate rounded bg-danger px-1 text-[9px] font-bold text-white">{g.offer.badge}</span>}
                     {g.locked && <Lock className="absolute right-1 top-1 size-3 text-fg-subtle" aria-label="Cần VIP" />}
                     {g.seasonal && <span className="absolute left-1 top-1 rounded bg-danger/80 px-1 text-[9px] font-bold text-white">Mùa</span>}
                   </button>

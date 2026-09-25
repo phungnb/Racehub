@@ -171,6 +171,10 @@ function AccountCard() {
       ) : (
         <Button variant="secondary" block onClick={() => setConfirm(true)}><LogOut className="size-4" aria-hidden />Đăng xuất</Button>
       )}
+      <p className="flex justify-center gap-4 pt-1 text-xs text-fg-muted">
+        <a href="/privacy" className="underline hover:text-fg">Chính sách quyền riêng tư</a>
+        <a href="/terms" className="underline hover:text-fg">Điều khoản sử dụng</a>
+      </p>
     </Card>
   )
 }

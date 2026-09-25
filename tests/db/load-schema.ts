@@ -6,7 +6,7 @@ import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
 const ROOT = path.resolve(__dirname, '../..')
 
 /** Bỏ các lệnh chỉ có trên Supabase thật (extension không có trong PGlite). */
-function sanitize(sql: string) {
+export function sanitize(sql: string) {
   return sql
     .replace(/^CREATE EXTENSION IF NOT EXISTS "(pg_stat_statements|supabase_vault|uuid-ossp|pg_graphql)".*$/gm, '')
     .replace(/^CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA "extensions";$/gm,

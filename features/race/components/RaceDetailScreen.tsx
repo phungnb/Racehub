@@ -2,11 +2,13 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { routes } from '@/shared/config/routes'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Award, BadgeCheck, CalendarDays, Clock, Download, Flag, Maximize2, Medal, Palette, ScrollText, Timer, Users, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Input, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
+import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Input, RankSearch, useImageSaver, scrollToRow, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
+import { filterSearch } from '@/shared/lib/search'
 import { cn } from '@/shared/lib/cn'
 import { formatNumber } from '@/shared/lib/format'
 import {
@@ -19,7 +21,7 @@ import { fmtDate, PHASE } from './RaceCard'
 import { BibDesigner } from './BibDesigner'
 import { CertDesigner } from './CertDesigner'
 import { raceLinks } from './useRaceAssets'
-import { downloadCanvas, EBib } from './EBib'
+import { EBib } from './EBib'
 
 const fmtDateTime = (iso: string) => new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
 
@@ -182,6 +184,10 @@ function Rules() {
 function Results({ r }: { r: Race }) {
   const [km, setKm] = useState<number>(r.me?.distance_km != null ? Number(r.me.distance_km) : Number(r.distances[0]))
   const q = useQuery({ queryKey: ['race', r.id, 'results', km], queryFn: () => getRaceResults(r.id, km), refetchInterval: 60_000 })
+  const [find, setFind] = useState('')
+  const all = q.data ?? []
+  const list = filterSearch(all, find, (x) => [x.display_name, x.bib])
+  const mine = all.find((x) => x.is_me)
   return (
     <section>
       <SectionTitle>Kết quả</SectionTitle>
@@ -197,9 +203,14 @@ function Results({ r }: { r: Race }) {
       {q.isPending ? <Skeleton className="h-40" /> : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : !q.data.length ? (
         <EmptyState icon={Timer} title="Chưa có ai hoàn thành" description="Kết quả tự cập nhật khi VĐV có bài chạy hợp lệ." />
       ) : (
+        <div className="space-y-2">
+        {all.length > 5 && (
+          <RankSearch value={find} onChange={setFind} total={all.length} matched={list.length} placeholder="Tìm tên hoặc số BIB…"
+            onFindMe={mine ? () => requestAnimationFrame(() => scrollToRow(`race-res-${mine.user_id}`)) : undefined} />
+        )}
         <ol className="space-y-1.5">
-          {q.data.map((x) => (
-            <li key={x.user_id} className={cn('flex items-center gap-3 rounded-xl border px-3 py-2.5', x.is_me ? 'border-brand/50 bg-brand/10' : 'border-border bg-surface')}>
+          {list.map((x) => (
+            <li key={x.user_id} id={`race-res-${x.user_id}`} className={cn('flex scroll-mt-20 items-center gap-3 rounded-xl border px-3 py-2.5', x.is_me ? 'border-brand/50 bg-brand/10' : 'border-border bg-surface')}>
               <span className={cn('w-7 text-center font-mono text-sm font-bold', x.rank <= 3 ? ['text-medal-gold', 'text-medal-silver', 'text-medal-bronze'][x.rank - 1] : 'text-fg-muted')}>{x.rank}</span>
               <Avatar src={x.avatar_url} name={x.display_name ?? 'VĐV'} size="sm" />
               <span className="min-w-0 flex-1">
@@ -210,6 +221,7 @@ function Results({ r }: { r: Race }) {
             </li>
           ))}
         </ol>
+        </div>
       )}
     </section>
   )
@@ -218,13 +230,14 @@ function Results({ r }: { r: Race }) {
 function Organizer({ r }: { r: Race }) {
   const refresh = useRefresh(r.id)
   const dash = useQuery({ queryKey: ['race', r.id, 'dashboard'], queryFn: () => getRaceDashboard(r.id) })
+  const router = useRouter()
   const [cancelOpen, setCancelOpen] = useState(false)
   const [design, setDesign] = useState<'bib' | 'cert' | null>(null)
   const closeDesign = useCallback(() => setDesign(null), [])
   const [reason, setReason] = useState('')
   const cancel = useMutation({
     mutationFn: () => cancelRace(r.id, reason),
-    onSuccess: () => { toast.success('Đã hủy giải và báo cho VĐV'); setCancelOpen(false); refresh() },
+    onSuccess: () => { toast.success('Đã hủy giải và báo cho VĐV'); setCancelOpen(false); refresh(); router.replace(routes.races) },
     onError: (e) => toast.error(raceErrorMessage(e)),
   })
   const exportCsv = () => {
@@ -298,14 +311,12 @@ function CertificateSheet({ r, onClose }: { r: Race; onClose: () => void }) {
       verifyUrl: links.verify, raceUrl: links.race, clubUrl: links.club,
     })
   }, [r, me, finishers])
-  const download = () => {
-    const a = document.createElement('a')
-    a.href = ref.current!.toDataURL('image/png')
-    a.download = `chung-nhan-${me.bib.toLowerCase()}.png`
-    a.click()
-  }
+  const saver = useImageSaver()
   return (
-    <Sheet open onClose={onClose} title="Giấy chứng nhận hoàn thành" footer={<Button block onClick={download}><Download className="size-4" aria-hidden />Tải ảnh</Button>}>
+    <Sheet open onClose={onClose} title="Giấy chứng nhận hoàn thành"
+      footer={<Button block loading={saver.busy} onClick={() => void saver.saveCanvas(ref.current, `chung-nhan-${me.bib.toLowerCase()}.png`, `Chứng nhận ${r.title}`)}>
+        <Download className="size-4" aria-hidden />Lưu ảnh về máy</Button>}>
+      {saver.sheet}
       <canvas ref={ref} width={size.w} height={size.h} style={{ aspectRatio: `${size.w} / ${size.h}` }}
         className={cn('mx-auto w-full rounded-xl', size.h > size.w && 'max-w-xs')} aria-label="Giấy chứng nhận" />
     </Sheet>
@@ -324,6 +335,7 @@ function EBibCard({ r }: { r: Race }) {
   const me = r.me!
   const ref = useRef<HTMLCanvasElement | null>(null)
   const [full, setFull] = useState(false)
+  const saver = useImageSaver()
   const data = bibData(r, me.bib, me.display_name, Number(me.distance_km))
   return (
     <div className="space-y-2">
@@ -331,7 +343,8 @@ function EBibCard({ r }: { r: Race }) {
         <EBib ref={ref} design={r.bib_design} data={data} />
       </button>
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="secondary" onClick={() => downloadCanvas(ref.current, `bib-${me.bib.toLowerCase()}.png`)}><Download className="size-4" aria-hidden />Tải BIB</Button>
+        <Button variant="secondary" loading={saver.busy} onClick={() => void saver.saveCanvas(ref.current, `bib-${me.bib.toLowerCase()}.png`, `BIB ${r.title}`)}>
+          <Download className="size-4" aria-hidden />Lưu BIB</Button>
         <Button variant="secondary" onClick={() => setFull(true)}><Maximize2 className="size-4" aria-hidden />Toàn màn hình</Button>
       </div>
       {full && (
@@ -343,6 +356,7 @@ function EBibCard({ r }: { r: Race }) {
           </div>
         </div>
       )}
+      {saver.sheet}
     </div>
   )
 }

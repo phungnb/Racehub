@@ -11,12 +11,16 @@
     "check": "npm run lint && npm run typecheck && npm run test",
     "test": "vitest run",
     "app:sync": "cap sync",
-    "app:icons": "python3 scripts/make-app-icons.py"
+    "app:icons": "python3 scripts/make-app-icons.py",
+    "db:bundle": "node scripts/db-bundle.mjs"
   },
   "dependencies": {
     "@capacitor-community/background-geolocation": "^1.2.26",
     "@capacitor/app": "^7.1.2",
+    "@capacitor/browser": "^7.0.5",
     "@capacitor/core": "^7.6.9",
+    "@capacitor/filesystem": "^7.1.8",
+    "@capacitor/share": "^7.0.4",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "@tanstack/react-query": "^5.103.2",

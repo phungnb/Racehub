@@ -5,7 +5,7 @@ import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Camera, Crown, Download, EyeOff, Eye, Megaphone, Palette, Settings2, Trophy, Undo2, UserSquare2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Skeleton } from '@/shared/ui'
+import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Skeleton, useImageSaver } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import { useMyProfile } from '@/features/auth'
@@ -89,21 +89,16 @@ function HonorImage({ h, mode, ctx, cat, rows, me, name }: {
   const n = Math.max(1, ...h.categories.map((c) => c.count), cat.count)
   const size = HONOR_FORMATS[resolveHonor(design, mode, n).format]
   const data = honorData(ctx, cat, rows, me)
-  const download = () => {
-    try {
-      const a = document.createElement('a')
-      a.href = ref.current!.toDataURL('image/png')
-      a.download = `${name}.png`
-      a.click()
-    } catch { toast.error('Không tải được ảnh (ảnh đại diện từ nguồn ngoài chặn tải về). Hãy đổi ảnh vinh danh.') }
-  }
+  const saver = useImageSaver()
   return (
     <div className="space-y-2">
       <div className={cn('mx-auto', size.h > size.w * 1.4 ? 'max-w-xs' : size.h >= size.w ? 'max-w-md' : '')}>
         <DesignCanvas ref={ref} size={size} label={`Ảnh vinh danh ${cat.title}`} drawKey={JSON.stringify([design, data, n])}
           draw={(c) => drawHonor(c, design, mode, data, {}, n)} />
       </div>
-      <Button block variant="secondary" onClick={download}><Download className="size-4" aria-hidden />Tải ảnh {mode === 'card' ? 'của tôi' : 'vinh danh'}</Button>
+      <Button block variant="secondary" loading={saver.busy} onClick={() => void saver.saveCanvas(ref.current, `${name}.png`, `Vinh danh ${ctx.challenge}`)}>
+        <Download className="size-4" aria-hidden />Lưu ảnh {mode === 'card' ? 'của tôi' : 'vinh danh'}</Button>
+      {saver.sheet}
     </div>
   )
 }

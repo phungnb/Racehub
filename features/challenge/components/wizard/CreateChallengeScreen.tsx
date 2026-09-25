@@ -13,7 +13,8 @@ import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { capacityTier, creationFee, DEFAULT_POLICY, runPolicyText, xuToVnd } from '@/shared/lib/economy'
 import { routes } from '@/shared/config/routes'
-import { challengeErrorMessage, createChallenge, quoteChallenge, setChallengeOptions, setChallengePledge, type ChallengeQuote } from '../../api/challengeApi'
+import { challengeErrorMessage, createChallenge, hasRulesInfo, quoteChallenge, setChallengeOptions, setChallengePledge, setChallengeRules, type ChallengeQuote } from '../../api/challengeApi'
+import { RulesInfoForm } from '../detail/RulesInfo'
 import {
   AUDIENCE_LABEL, defaultDraft, draftFromTemplate, effectiveSlots, FORMAT_META, formatScore, OBJECTIVE_META, pledgePayload, pledgeSupported, rewardSummary,
   isTeamPledge, TEAM_MODE_META, validateDraft, weeklyPreset,
@@ -91,6 +92,10 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
         // Bật mục tiêu tự đăng ký ngay sau khi tạo (cùng người tạo, trước khi ai tham gia)
         await setChallengePledge(r.challenge_id, pledgePayload(d.pledge, d.format === 'TEAM'))
           .catch((e) => toast.error(`Đã tạo thử thách nhưng chưa bật được mục tiêu tự đăng ký: ${challengeErrorMessage(e)}`))
+      }
+      if (hasRulesInfo(d.rules)) {
+        await setChallengeRules(r.challenge_id, d.rules)
+          .catch((e) => toast.error(`Đã tạo thử thách nhưng chưa lưu được thể lệ (sửa lại ở tab Luật chơi): ${challengeErrorMessage(e)}`))
       }
       toast.success(d.audience === 'CLUB_ONLY' ? 'Đã tạo và báo cho cả CLB!' : 'Đã tạo thử thách!')
       router.replace(`/challenges/${r.challenge_id}${r.invite_code ? `?code=${r.invite_code}` : ''}`)
@@ -379,6 +384,11 @@ function StepRules({ d, set, errors }: StepProps) {
             hint="0 = không giới hạn. Nên đặt cho thử thách đội để một người không gánh cả đội" error={errors.dailyCapKm} />
         </div>
       </details>
+      <details className="rounded-xl border border-border bg-surface p-4" open={hasRulesInfo(d.rules)}>
+        <summary className="cursor-pointer text-sm font-semibold">Thể lệ thưởng, phạt & thông tin khác (không bắt buộc)</summary>
+        <p className="mt-2 text-xs text-fg-muted">Hiện ở tab Luật chơi. Sửa được sau khi tạo; nếu thử thách đã bắt đầu, người tham gia được báo khi bạn sửa.</p>
+        <div className="mt-4"><RulesInfoForm value={d.rules} onChange={(rules) => set({ rules })} /></div>
+      </details>
     </div>
   )
 }
@@ -587,6 +597,10 @@ function StepReview({ d, quote, bill, loading, failed, onRetry, clubName, onEdit
           {d.format === 'TEAM' && <li><span className="text-fg-subtle">Đội: </span>{isTeamPledge(d) ? `Tự chia theo số người đăng ký · ${d.pledge.teamSize} người/đội` : d.teamNames.filter((n) => n.trim()).join(' · ')}</li>}
           <li><span className="text-fg-subtle">Luật: </span>≥ {formatNumber(d.minKm)} km/{d.objective === 'STREAK_DAYS' ? 'ngày' : 'bài'} · pace {d.minPace}–{d.maxPace} ph/km{d.dailyCapKm > 0 ? ` · tối đa ${d.dailyCapKm} km/ngày` : ''}</li>
           {summary && <li><span className="text-fg-subtle">Thưởng: </span>{summary}</li>}
+          {hasRulesInfo(d.rules) && <li><span className="text-fg-subtle">Thể lệ BTC: </span>
+            {[d.rules.prizes && 'thưởng', d.rules.penalties && 'phạt', d.rules.fees && 'lệ phí', d.rules.conduct && 'quy định', d.rules.contact && 'liên hệ',
+              d.rules.custom?.length && `${d.rules.custom.length} mục khác`].filter(Boolean).join(' · ')}
+            <button type="button" className="ml-1 text-brand underline-offset-2 hover:underline" onClick={() => onEdit(1)}>Sửa</button></li>}
         </ul>
       </Card>
 

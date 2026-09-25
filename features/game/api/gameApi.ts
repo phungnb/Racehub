@@ -43,6 +43,16 @@ export type GiftTier = 'CHEER' | 'BOOST' | 'HYPE' | 'LEGEND'
 export interface Gift {
   code: string; name: string; emoji: string; price_xu: number; tier: GiftTier; description: string | null
   vip_tier: number; seasonal: boolean; locked: boolean
+  /** Khuyến mãi đang áp (migration 005100): Tỏa sáng người nhận tính theo Xu thực trả */
+  offer?: { kind: string; title: string; badge: string; price: number; eligible: boolean; ends_at: string | null
+    left: number | null; per_user_limit: number | null; used: number } | null
+}
+
+/** Tổng Xu phải trả khi tặng qty món (khớp logic máy chủ send_gift) */
+export function giftCost(g: Pick<Gift, 'price_xu' | 'offer'>, qty: number) {
+  const o = g.offer
+  const ok = o && o.eligible && o.kind !== 'TRIAL' && (o.per_user_limit == null || o.used + qty <= o.per_user_limit) && (o.left == null || o.left >= qty)
+  return (ok ? Number(o.price) : Number(g.price_xu)) * qty
 }
 export interface GiftCatalog { gifts: Gift[]; daily_cap: number; sent_today: number }
 export interface GiftWall {

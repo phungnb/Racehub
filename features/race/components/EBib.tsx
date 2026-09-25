@@ -17,11 +17,3 @@ export const EBib = forwardRef<HTMLCanvasElement | null, {
   })
 
 export { DesignCanvas }
-
-export function downloadCanvas(c: HTMLCanvasElement | null, name: string) {
-  if (!c) return
-  const a = document.createElement('a')
-  a.href = c.toDataURL('image/png')
-  a.download = name
-  a.click()
-}

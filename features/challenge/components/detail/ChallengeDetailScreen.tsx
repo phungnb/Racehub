@@ -7,7 +7,9 @@ import {
   ArrowLeft, CalendarDays, Check, CircleSlash, Clock, Coins, Copy, Crown, Gauge, Hourglass, Info, Lock, LogOut, MoreHorizontal,
   Route, Share2, Shield, Timer, Trophy, Users, UsersRound, HeartPulse } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, LevelBadge, ProgressRing, SegmentedControl, Sheet, Skeleton } from '@/shared/ui'
+import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Field, LevelBadge, ProgressRing, RankSearch, scrollToRow, SegmentedControl, Sheet, Skeleton, Textarea } from '@/shared/ui'
+import { filterSearch } from '@/shared/lib/search'
+import { routes } from '@/shared/config/routes'
 import { cn } from '@/shared/lib/cn'
 import { formatNumber, formatPace } from '@/shared/lib/format'
 import { challengeErrorMessage, type ChallengeDetail, type LeaderboardEntry, type TeamStanding } from '../../api/challengeApi'
@@ -18,8 +20,10 @@ import {
 import { useChallenge, useChallengeActions } from '../../hooks/useChallenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
 import { PledgePanel } from './PledgePanel'
+import { RulesInfoCard } from './RulesInfo'
 import { TopSupported } from '@/features/game'
 import { HonorPanel, useHonor } from '../honor/HonorPanel'
+import { ChallengeVouchers } from '@/features/voucher'
 
 const fmtDateTime = (iso: string) => new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
 
@@ -96,8 +100,11 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
         ? c.pledge_enabled
           ? <PledgePanel d={d} />
           : <Leaderboard d={d} rows={leaderboard.data} loading={leaderboard.isLoading} error={leaderboard.isError} standings={standings} />
-        : <Rules d={d} />}
+        : <div className="space-y-3"><Rules d={d} />
+            <RulesInfoCard challengeId={c.id} rules={c.rules_info} updatedAt={c.rules_updated_at}
+              canEdit={d.can_manage && (phase === 'UPCOMING' || phase === 'LIVE')} /></div>}
       {tab !== 'RULES' && tab !== 'HONOR' && <TopSupported challengeId={c.id} />}
+      {tab === 'RANK' && <ChallengeVouchers challengeId={c.id} canManage={d.can_manage} />}
 
       <ActionBar d={d} phase={phase} code={code ?? null} />
     </div>
@@ -248,10 +255,13 @@ function Leaderboard({ d, rows, loading, error, standings }: {
   d: ChallengeDetail; rows?: LeaderboardEntry[]; loading: boolean; error: boolean; standings: TeamStanding[]
 }) {
   const [team, setTeam] = useState<string | 'ALL'>('ALL')
+  const [q, setQ] = useState('')
   const c = d.challenge
   if (loading) return <div className="space-y-2">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-14" />)}</div>
   if (error) return <ErrorState message="Không tải được bảng xếp hạng." />
-  const list = (rows ?? []).filter((r) => team === 'ALL' || r.team_id === team)
+  const inTeam = (rows ?? []).filter((r) => team === 'ALL' || r.team_id === team)
+  const list = filterSearch(inTeam, q, (r) => [r.display_name])
+  const meRow = d.me ? (rows ?? []).find((r) => r.participant_id === d.me?.id) : undefined
   const teamOf = new Map(standings.map((t) => [t.team_id, t]))
   return (
     <div className="space-y-2">
@@ -266,15 +276,19 @@ function Leaderboard({ d, rows, loading, error, standings }: {
           ))}
         </div>
       )}
+      {(rows?.length ?? 0) > 5 && (
+        <RankSearch value={q} onChange={setQ} total={inTeam.length} matched={list.length}
+          onFindMe={meRow ? () => { setTeam('ALL'); requestAnimationFrame(() => scrollToRow(`lb-${meRow.participant_id}`)) } : undefined} />
+      )}
       {list.length === 0 ? (
-        <EmptyState icon={Trophy} title="Chưa có ai trên bảng" description="Hãy tham gia và chạy bài đầu tiên để lên bảng xếp hạng." />
+        q.trim() ? null : <EmptyState icon={Trophy} title="Chưa có ai trên bảng" description="Hãy tham gia và chạy bài đầu tiên để lên bảng xếp hạng." />
       ) : (
         <ol className="space-y-1.5">
           {list.map((r) => {
             const me = r.participant_id === d.me?.id
             const t = r.team_id ? teamOf.get(r.team_id) : undefined
             return (
-              <li key={r.participant_id} className={cn('flex items-center gap-3 rounded-xl border px-3 py-2.5',
+              <li key={r.participant_id} id={`lb-${r.participant_id}`} className={cn('flex scroll-mt-20 items-center gap-3 rounded-xl border px-3 py-2.5',
                 me ? 'border-brand/50 bg-brand/10' : 'border-border bg-surface')}>
                 <span className={cn('w-7 text-center font-mono text-sm font-bold',
                   r.rank === 1 ? 'text-medal-gold' : r.rank === 2 ? 'text-medal-silver' : r.rank === 3 ? 'text-medal-bronze' : 'text-fg-muted')}>{r.rank}</span>
@@ -334,6 +348,7 @@ function ActionBar({ d, phase, code }: { d: ChallengeDetail; phase: ReturnType<t
   const c = d.challenge
   const a = useChallengeActions(c.id)
   const [sheet, setSheet] = useState<'team' | 'invite' | 'menu' | 'leave' | 'cancel' | null>(null)
+  const [reason, setReason] = useState('')
   const joined = !!d.me && d.me.status !== 'LEFT'
   const open = phase === 'UPCOMING' || phase === 'LIVE'
   const teamLocked = c.format === 'TEAM' && phase !== 'UPCOMING'
@@ -407,8 +422,15 @@ function ActionBar({ d, phase, code }: { d: ChallengeDetail; phase: ReturnType<t
         description={phase === 'UPCOMING' ? 'Bạn có thể tham gia lại trước khi thử thách bắt đầu.' : 'Kết quả của bạn sẽ không được xếp hạng nữa.'}
         onConfirm={() => run(a.leave.mutateAsync(), 'Đã rời thử thách')} />
       <ConfirmSheet open={sheet === 'cancel'} onClose={() => setSheet(null)} loading={a.cancel.isPending} confirmLabel="Hủy thử thách"
-        title="Hủy thử thách?" description="Mọi người tham gia sẽ nhận thông báo. Tiền treo thưởng được hoàn lại cho nguồn đã treo."
-        onConfirm={() => run(a.cancel.mutateAsync(undefined), 'Đã hủy thử thách', () => router.refresh())} />
+        title="Hủy thử thách?" description="Mọi người tham gia sẽ nhận thông báo kèm lý do. Tiền treo thưởng được hoàn lại cho nguồn đã treo. Thử thách sẽ biến mất khỏi danh sách."
+        onConfirm={() => run(a.cancel.mutateAsync(reason.trim() || undefined), 'Đã hủy thử thách',
+          // Rời trang ngay: về danh sách thử thách của CLB (nếu là thử thách CLB) hoặc danh sách chung
+          () => router.replace(c.target_club_id ? routes.clubTab(c.target_club_id, 'challenges') : routes.challenges))}>
+        <Field label="Lý do (gửi kèm thông báo, không bắt buộc)" htmlFor="cancel-reason">
+          <Textarea id="cancel-reason" value={reason} maxLength={300} rows={2} onChange={(e) => setReason(e.target.value)}
+            placeholder="VD: Đổi lịch sang tuần sau do thời tiết xấu." />
+        </Field>
+      </ConfirmSheet>
     </>
   )
 }

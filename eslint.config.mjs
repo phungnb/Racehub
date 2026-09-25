@@ -6,14 +6,17 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   // Override default ignores of eslint-config-next.
-  // Nợ kỹ thuật tạm thời: code cũ dùng `any` và gọi dữ liệu trong useEffect.
-  // Hai luật này sẽ bật lại mức "error" khi các màn hình chuyển sang
-  // TanStack Query + type sinh từ DB (xem docs/architecture/frontend.md §5).
+  // Không dùng `any` và không setState đồng bộ trong useEffect (dùng TanStack Query / state dẫn xuất).
+  // Test DB đọc kết quả JSON tự do nên được phép dùng `any`.
   {
     rules: {
-      "@typescript-eslint/no-explicit-any": "warn",
-      "react-hooks/set-state-in-effect": "warn",
+      "@typescript-eslint/no-explicit-any": "error",
+      "react-hooks/set-state-in-effect": "error",
     },
+  },
+  {
+    files: ["tests/**/*.ts"],
+    rules: { "@typescript-eslint/no-explicit-any": "off" },
   },
   // Ranh giới module (docs/CAU_TRUC_THU_MUC.md): ngoài một feature chỉ được
   // import qua cổng công khai '@/features/<tên>' (hoặc '<tên>/server').

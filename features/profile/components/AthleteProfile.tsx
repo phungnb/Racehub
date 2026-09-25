@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   fmtDuration,
   fmtKm,
@@ -34,16 +35,16 @@ const TONES = [
 
 /** Avatar ảnh hoặc chữ cái đầu; dùng chung cho tìm kiếm & hồ sơ */
 export function AthleteAvatar({ name, url, size = 40 }: { name: string; url?: string | null; size?: number }) {
-  const [broken, setBroken] = useState(false)
-  useEffect(() => setBroken(false), [url])
+  // Nhớ link ảnh lỗi (không dùng effect để reset khi đổi ảnh)
+  const [brokenUrl, setBrokenUrl] = useState<string | null>(null)
 
-  if (url && !broken) {
-    // eslint-disable-next-line @next/next/no-img-element
+  if (url && url !== brokenUrl) {
     return (
+      // eslint-disable-next-line @next/next/no-img-element -- ảnh đại diện link ngoài (Strava / kho ảnh)
       <img
         src={url}
         alt=""
-        onError={() => setBroken(true)}
+        onError={() => setBrokenUrl(url)}
         className="shrink-0 rounded-full object-cover bg-surface-2"
         style={{ width: size, height: size }}
       />
@@ -71,26 +72,14 @@ const PERIODS: [Period, string][] = [
 ]
 
 export default function AthleteProfile({ userId, onClose }: Props) {
-  const [data, setData] = useState<AthleteProfileData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
   const [period, setPeriod] = useState<Period>('month')
   // Bậc Tỏa sáng (khung ảnh đại diện) lấy từ tường quà
   const wall = useGiftWall(userId)
   const shine = wall.data?.tier ?? 0
-
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(false)
-    getAthleteProfile(userId)
-      .then((d) => !cancelled && setData(d))
-      .catch(() => !cancelled && setError(true))
-      .finally(() => !cancelled && setLoading(false))
-    return () => {
-      cancelled = true
-    }
-  }, [userId])
+  const q = useQuery<AthleteProfileData | null>({ queryKey: ['athlete', userId], queryFn: () => getAthleteProfile(userId) })
+  const data = q.data ?? null
+  const loading = q.isPending
+  const error = q.isError
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()

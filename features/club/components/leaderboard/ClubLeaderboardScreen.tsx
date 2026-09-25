@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Crown, Trophy } from 'lucide-react'
-import { Avatar, EmptyState, ErrorState, LevelBadge, SegmentedControl, Skeleton } from '@/shared/ui'
+import { Avatar, EmptyState, ErrorState, LevelBadge, RankSearch, scrollToRow, SegmentedControl, Skeleton } from '@/shared/ui'
+import { filterSearch } from '@/shared/lib/search'
 import { cn } from '@/shared/lib/cn'
 import { formatDuration, formatKm } from '@/shared/lib/format'
 import type { LeaderboardPeriod, LeaderboardRow } from '../../api/hubApi'
@@ -57,6 +58,8 @@ function MemberLeaderboard({ clubId }: { clubId: string }) {
   const ran = rows.filter((r) => r.run_count > 0)
   const idle = rows.filter((r) => r.run_count === 0)
   const me = rows.find((r) => r.user_id === uid)
+  const [q, setQ] = useState('')
+  const found = q.trim() ? filterSearch(rows, q, (r) => [r.display_name]) : null
   const myRow = useRef<HTMLLIElement>(null)
   const [myRowVisible, setMyRowVisible] = useState(true)
   useEffect(() => {
@@ -75,11 +78,22 @@ function MemberLeaderboard({ clubId }: { clubId: string }) {
         <div className="space-y-2"><Skeleton className="h-40" />{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-14" />)}</div>
       ) : lb.isError ? (
         <ErrorState error={lb.error} onRetry={() => lb.refetch()} />
+      ) : found ? (
+        <>
+          <RankSearch value={q} onChange={setQ} total={rows.length} matched={found.length} />
+          <ol className="space-y-1.5">
+            {found.map((r) => <RankRow key={r.user_id} r={r} me={r.user_id === uid} />)}
+          </ol>
+        </>
       ) : ran.length === 0 ? (
         <EmptyState icon={Trophy} title={period === 'WEEK' ? 'Tuần này chưa ai chạy' : 'Chưa có bài chạy nào'}
           description="Bài chạy hợp lệ (GPS trong app hoặc đồng bộ Strava) sẽ tự cộng vào BXH." />
       ) : (
         <>
+          {rows.length > 5 && (
+            <RankSearch value={q} onChange={setQ} total={rows.length} matched={rows.length}
+              onFindMe={me && me.run_count > 0 ? () => requestAnimationFrame(() => scrollToRow(me.rank <= 3 ? 'club-podium' : `club-rank-${me.user_id}`)) : undefined} />
+          )}
           <Podium rows={ran.slice(0, 3)} meId={uid} />
           <ol className="space-y-1.5">
             {ran.slice(3).map((r) => <RankRow key={r.user_id} r={r} me={r.user_id === uid} ref={r.user_id === uid ? myRow : undefined} />)}
@@ -116,7 +130,7 @@ function Podium({ rows, meId }: { rows: LeaderboardRow[]; meId?: string }) {
   const height = ['h-20', 'h-28', 'h-16']
   const tone = ['text-medal-silver', 'text-medal-gold', 'text-medal-bronze']
   return (
-    <div className="grid grid-cols-3 items-end gap-2 rounded-[var(--radius-card)] border border-border bg-surface px-3 pt-5">
+    <div id="club-podium" className="grid scroll-mt-20 grid-cols-3 items-end gap-2 rounded-[var(--radius-card)] border border-border bg-surface px-3 pt-5">
       {order.map((r, i) => r ? (
         <div key={r.user_id} className="flex flex-col items-center text-center">
           {i === 1 && <Crown className="mb-1 size-5 text-medal-gold" aria-hidden />}
@@ -134,10 +148,10 @@ function Podium({ rows, meId }: { rows: LeaderboardRow[]; meId?: string }) {
 
 function RankRow({ r, me, floating, ref }: { r: LeaderboardRow; me?: boolean; floating?: boolean; ref?: React.Ref<HTMLLIElement> }) {
   return (
-    <li ref={ref} className={cn('flex list-none items-center gap-3 rounded-xl border px-3 py-2.5',
+    <li ref={ref} id={floating ? undefined : `club-rank-${r.user_id}`} className={cn('flex list-none scroll-mt-20 items-center gap-3 rounded-xl border px-3 py-2.5',
       floating ? 'border-brand/60 bg-surface shadow-lg shadow-black/50 ring-1 ring-brand/30'   // nổi trên danh sách: nền đặc, không lộ dòng bên dưới
         : me ? 'border-brand/50 bg-brand/10' : 'border-border bg-surface')}>
-      <span className="w-7 text-center font-mono text-sm font-bold text-fg-muted">{r.rank}</span>
+      <span className="w-7 text-center font-mono text-sm font-bold text-fg-muted">{r.run_count > 0 ? r.rank : '—'}</span>
       <Avatar src={r.avatar_url} name={r.display_name} size="sm" />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">

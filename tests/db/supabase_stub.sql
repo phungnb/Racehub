@@ -11,10 +11,12 @@ grant usage on schema public, auth, extensions to anon, authenticated, service_r
 
 create table auth.users (
   id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb,
-  email_confirmed_at timestamptz default now(), phone_confirmed_at timestamptz
+  email_confirmed_at timestamptz default now(), phone_confirmed_at timestamptz,
+  created_at timestamptz default now(), last_sign_in_at timestamptz, banned_until timestamptz
 );
+create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid not null, created_at timestamptz default now());
 create function auth.uid() returns uuid language sql stable as
-  $$ select nullif(current_setting('request.jwt.claims', true)::json->>'sub', '')::uuid $$;
+  $$ select nullif(nullif(current_setting('request.jwt.claims', true), '')::json->>'sub', '')::uuid $$;
 grant execute on function auth.uid() to public;
 
 create table storage.objects (id uuid default gen_random_uuid(), bucket_id text, name text);

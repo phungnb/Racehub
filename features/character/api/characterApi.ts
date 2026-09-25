@@ -3,13 +3,15 @@ import { supabase } from '@/shared/lib/supabase'
 import type { CharacterItem, CharacterState, Gender, Look, Slot } from '../model/catalog'
 import { systemErrorMessage } from '@/shared/lib/errors'
 
-const normItem = (i: CharacterItem): CharacterItem => ({ ...i, price_xu: Number(i.price_xu ?? 0) })
+const normItem = (i: CharacterItem): CharacterItem => ({ ...i, price_xu: Number(i.price_xu ?? 0),
+  offer: i.offer ? { ...i.offer, price: Number(i.offer.price), base: Number(i.offer.base) } : null })
 
 export async function getCharacterState(): Promise<CharacterState> {
   const { data, error } = await supabase.rpc('character_state')
   if (error) throw error
   const s = data as CharacterState
-  return { ...s, balance: Number(s.balance ?? 0), items: (s.items ?? []).map(normItem) }
+  return { ...s, balance: Number(s.balance ?? 0), items: (s.items ?? []).map(normItem),
+    bundles: (s.bundles ?? []).map((b) => ({ ...b, price: Number(b.price ?? 0), base: Number(b.base ?? 0) })) }
 }
 
 export async function getCharacter(userId: string): Promise<Look> {
@@ -22,7 +24,19 @@ export async function getCharacter(userId: string): Promise<Look> {
 export async function buyItem(code: string, key: string) {
   const { data, error } = await supabase.rpc('buy_avatar_item', { p_code: code, p_idempotency_key: key })
   if (error) throw error
-  return data as { code?: string; balance: number; duplicate?: boolean }
+  return data as { code?: string; balance: number; duplicate?: boolean; paid?: number }
+}
+
+export async function tryItem(code: string) {
+  const { data, error } = await supabase.rpc('try_avatar_item', { p_code: code })
+  if (error) throw error
+  return data as { code: string; expires_at: string }
+}
+
+export async function buyBundle(id: string, key: string) {
+  const { data, error } = await supabase.rpc('buy_item_bundle', { p_promo_id: id, p_idempotency_key: key })
+  if (error) throw error
+  return data as { items: number; paid: number; balance: number; duplicate?: boolean }
 }
 
 export async function saveCharacter(look: { gender?: Gender }, equipped: Partial<Record<Slot, string | null>>) {
@@ -39,6 +53,11 @@ const MESSAGES: Record<string, string> = {
   ITEM_NOT_OWNED: 'Bạn chưa sở hữu vật phẩm này.',
   SLOT_REQUIRED: 'Nhân vật cần có áo, quần, tất và giày.',
   INVALID_LOOK: 'Dáng người không hợp lệ.',
+  TRIAL_USED: 'Bạn đã dùng thử món này rồi.',
+  PROMO_NOT_AVAILABLE: 'Chương trình đã kết thúc hoặc hết lượt.',
+  PROMO_LIMIT_REACHED: 'Bạn đã dùng hết lượt của chương trình này.',
+  PROMO_NOT_ELIGIBLE: 'Chương trình này không áp dụng cho tài khoản của bạn.',
+  SHINE_ONLY: 'Vật phẩm này chỉ đổi bằng Tỏa sáng.',
 }
 
 export function characterErrorMessage(e: unknown): string {

@@ -239,6 +239,18 @@ export async function resolveClubSlug(slug: string): Promise<string | null> {
   return (data as string | null) ?? null
 }
 
+export interface ClubInvitePreview {
+  id: string; name: string; description: string | null; avatar_url: string | null; accent_color: string | null
+  member_count: number; join_policy: 'OPEN' | 'APPROVAL' | 'INVITE_ONLY'; plan: string | null; full: boolean
+  my_status: 'PENDING' | 'APPROVED' | 'BANNED' | 'LEFT' | null
+}
+/** Xem trước CLB từ mã mời (chưa đăng nhập cũng xem được — migration 005500) */
+export async function clubInvitePreview(code: string): Promise<ClubInvitePreview | null> {
+  const { data, error } = await supabase.rpc('club_invite_preview', { p_code: code.trim() })
+  if (error) throw error
+  return (data as ClubInvitePreview | null) ?? null
+}
+
 /** Mã mời (ban quản trị; thành viên nếu CLB không "chỉ qua mã mời") */
 export async function getInviteCode(clubId: string): Promise<string> {
   const { data, error } = await supabase.rpc('club_invite_code', { p_club_id: clubId })

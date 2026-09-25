@@ -8,7 +8,6 @@ const [ORG, R1, R2, R3, R4, OUT] = [1, 2, 3, 4, 5, 6].map(id)
 const CLUB = '00000000-0000-0000-0000-0000000049c1'
 const CH = '00000000-0000-0000-0000-0000000049d1'
 const CH2 = '00000000-0000-0000-0000-0000000049d2'
-const RUNNERS = [R1, R2, R3, R4]
 
 async function seed(db: PGlite) {
   const users = [ORG, R1, R2, R3, R4, OUT]

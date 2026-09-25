@@ -1,18 +1,18 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ChevronRight, Coins, Lock, RotateCcw, Sparkles, UserRound, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, ChevronRight, Coins, Gift, Lock, RotateCcw, Shirt, Sparkles, Timer, UserRound, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, ConfirmSheet, ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import { characterErrorMessage } from '../api/characterApi'
-import { useBuyItem, useCharacterState, useSaveCharacter } from '../hooks/useCharacter'
+import { useBuyBundle, useBuyItem, useCharacterState, useSaveCharacter, useTryItem } from '../hooks/useCharacter'
 import {
-  itemStatus, outfitDiff, RARITY_META, resolveOutfit, SLOTS,
-  type CharacterItem, type CharacterState, type Slot,
+  buyPrice, canTry, itemStatus, outfitDiff, RARITY_META, resolveOutfit, SLOTS,
+  type CharacterItem, type CharacterState, type ItemBundle, type ItemOffer, type Slot,
 } from '../model/catalog'
 import { ItemCard } from './ItemCard'
 import { PaperDoll } from './PaperDoll'
@@ -36,16 +36,20 @@ function Editor({ state }: { state: CharacterState }) {
   const [buying, setBuying] = useState<CharacterItem | null>(null)
   const buyKey = useRef(`shop-${crypto.randomUUID()}`)
   const buy = useBuyItem()
+  const tryOn = useTryItem()
+  const buyB = useBuyBundle()
+  const [bundle, setBundle] = useState<ItemBundle | null>(null)
   const save = useSaveCharacter()
 
   const byCode = useMemo(() => new Map(items.map((i) => [i.code, i])), [items])
   const outfit = useMemo(() => resolveOutfit(items, draft), [items, draft])
   const diff = outfitDiff(state.equipped, draft)
-  const unowned = outfit.filter((i) => !i.owned)
+  const [now] = useState(() => Date.now())
+  const unowned = outfit.filter((i) => !i.owned && !(i.trial_until && Date.parse(i.trial_until) > now))
   const dirty = Object.keys(diff).length > 0
 
   const trying = byCode.get(draft[tab] ?? '')
-  const tryingUnowned = trying && !trying.owned ? trying : unowned[0]
+  const tryingUnowned = trying && unowned.includes(trying) ? trying : unowned[0]
 
   const select = (it: CharacterItem) => setDraft((d) => ({ ...d, [it.slot]: it.code }))
   const unequip = (slot: Slot) => setDraft((d) => { const n = { ...d }; delete n[slot]; return n })
@@ -71,6 +75,16 @@ function Editor({ state }: { state: CharacterState }) {
     setBuying(null)
   }
 
+  const doTry = async (it: CharacterItem) => {
+    try { const r = await tryOn.mutateAsync(it.code); toast.success(`Đang mặc thử ${it.name} tới ${new Date(r.expires_at).toLocaleDateString('vi-VN')}`, { description: 'Bấm Lưu bộ đồ để mặc ra ngoài.' }) }
+    catch (e) { toast.error(characterErrorMessage(e)) }
+  }
+  const doBundle = async () => {
+    if (!bundle) return
+    try { const r = await buyB.mutateAsync({ id: bundle.id, key: `bundle-${crypto.randomUUID()}` }); toast.success(`Đã nhận ${r.items} món trong ${bundle.title}`) }
+    catch (e) { toast.error(characterErrorMessage(e)) }
+    setBundle(null)
+  }
   const slotMeta = SLOTS.find((s) => s.slot === tab)
   const list = items.filter((i) => i.slot === tab)
   const status = (i: CharacterItem) => itemStatus(i, state.level, state.equipped)
@@ -113,6 +127,18 @@ function Editor({ state }: { state: CharacterState }) {
       </div>
 
       {state.gender_set === false && <GenderNudge />}
+      {(state.bundles ?? []).filter((b) => !b.bought).map((b) => (
+        <button key={b.id} type="button" onClick={() => setBundle(b)}
+          className="flex w-full items-center gap-3 rounded-2xl border border-coin/50 bg-gradient-to-r from-coin/15 to-transparent p-3 text-left">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-coin/20 text-coin"><Gift className="size-5" aria-hidden /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold">{b.title}{b.badge ? <span className="ml-1.5 rounded-full bg-danger px-1.5 py-0.5 text-[10px] font-black text-white">{b.badge}</span> : null}</span>
+            <span className="block text-xs text-fg-muted">{b.items.length} món · <s>{formatCoin(b.base)}</s> → <b className="font-mono text-coin">{formatCoin(b.price)} Xu</b>
+              {b.left != null && ` · còn ${b.left}`}{b.ends_at && <> · <Countdown to={b.ends_at} /></>}</span>
+          </span>
+          <ChevronRight className="size-5 text-fg-subtle" aria-hidden />
+        </button>
+      ))}
 
       {list.length === 0 ? (
         <p className="py-10 text-center text-sm text-fg-muted">Chưa có vật phẩm cho ô này.</p>
@@ -141,9 +167,11 @@ function Editor({ state }: { state: CharacterState }) {
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{tryingUnowned.name}</p>
-              <p className={cn('truncate text-xs', RARITY_META[tryingUnowned.rarity].text)}>
-                {RARITY_META[tryingUnowned.rarity].label}{tryingUnowned.description ? ` · ${tryingUnowned.description}` : ''}
-              </p>
+              {tryingUnowned.offer ? <OfferLine o={tryingUnowned.offer} /> : (
+                <p className={cn('truncate text-xs', RARITY_META[tryingUnowned.rarity].text)}>
+                  {RARITY_META[tryingUnowned.rarity].label}{tryingUnowned.description ? ` · ${tryingUnowned.description}` : ''}
+                </p>
+              )}
             </div>
             <Button variant="secondary" className="shrink-0"
               onClick={() => setDraft((d) => ({ ...d, [tryingUnowned.slot]: state.equipped[tryingUnowned.slot] }))}>Bỏ thử</Button>
@@ -151,9 +179,13 @@ function Editor({ state }: { state: CharacterState }) {
               <Link href={routes.shine} className="shrink-0"><Button variant="coin"><Sparkles className="size-4" aria-hidden />Đổi bằng Tỏa sáng</Button></Link>
             ) : state.level < tryingUnowned.unlock_level ? (
               <Button className="shrink-0" disabled><Lock className="size-4" aria-hidden />Cấp {tryingUnowned.unlock_level}</Button>
+            ) : canTry(tryingUnowned) ? (
+              <Button className="shrink-0" onClick={() => void doTry(tryingUnowned)} loading={tryOn.isPending}>
+                <Shirt className="size-4" aria-hidden />Mặc thử {tryingUnowned.offer?.trial_days} ngày
+              </Button>
             ) : (
-              <Button variant="coin" className="shrink-0" onClick={() => setBuying(tryingUnowned)} disabled={state.balance < tryingUnowned.price_xu}>
-                <Coins className="size-4" aria-hidden />{tryingUnowned.price_xu > 0 ? `Mua ${formatCoin(tryingUnowned.price_xu)}` : 'Nhận'}
+              <Button variant="coin" className="shrink-0" onClick={() => setBuying(tryingUnowned)} disabled={state.balance < buyPrice(tryingUnowned)}>
+                <Coins className="size-4" aria-hidden />{buyPrice(tryingUnowned) > 0 ? `Mua ${formatCoin(buyPrice(tryingUnowned))}` : 'Nhận miễn phí'}
               </Button>
             )}
           </div>
@@ -168,9 +200,32 @@ function Editor({ state }: { state: CharacterState }) {
       </div>
 
       <ConfirmSheet open={!!buying} onClose={() => setBuying(null)} onConfirm={doBuy} loading={buy.isPending} danger={false}
-        title={buying ? `Mua ${buying.name}?` : ''} confirmLabel={buying?.price_xu ? `Mua ${formatCoin(buying.price_xu)} Xu` : 'Nhận'}
-        description={buying ? `Ví còn ${formatCoin(state.balance - (buying.price_xu ?? 0))} Xu sau khi mua. Vật phẩm là của bạn vĩnh viễn.` : undefined} />
+        title={buying ? `Mua ${buying.name}?` : ''} confirmLabel={buying && buyPrice(buying) > 0 ? `Mua ${formatCoin(buyPrice(buying))} Xu` : 'Nhận'}
+        description={buying ? `${buying.offer?.eligible && buyPrice(buying) < buying.price_xu ? `${buying.offer.title}: giá gốc ${formatCoin(buying.price_xu)} Xu. ` : ''}Ví còn ${formatCoin(state.balance - buyPrice(buying))} Xu sau khi mua. Vật phẩm là của bạn vĩnh viễn.` : undefined} />
+      <ConfirmSheet open={!!bundle} onClose={() => setBundle(null)} onConfirm={doBundle} loading={buyB.isPending} danger={false}
+        title={bundle ? `Mua ${bundle.title}?` : ''} confirmLabel={bundle ? `Mua ${formatCoin(bundle.price)} Xu` : ''}
+        description={bundle ? `Gồm: ${bundle.items.map((c) => byCode.get(c)?.name ?? c).join(', ')}. Giá lẻ ${formatCoin(bundle.base)} Xu. Món đã có sẽ được bỏ qua.` : undefined} />
     </div>
+  )
+}
+
+/** Đồng hồ đếm ngược tới hết chương trình */
+function Countdown({ to }: { to: string }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
+  const ms = Math.max(0, Date.parse(to) - now)
+  const d = Math.floor(ms / 86_400_000), h = Math.floor((ms % 86_400_000) / 3_600_000), m = Math.floor((ms % 3_600_000) / 60_000), sec = Math.floor((ms % 60_000) / 1000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return <span className="font-mono">{d > 0 ? `còn ${d} ngày ${pad(h)}:${pad(m)}` : `còn ${pad(h)}:${pad(m)}:${pad(sec)}`}</span>
+}
+
+function OfferLine({ o }: { o: ItemOffer }) {
+  return (
+    <p className="flex items-center gap-1 truncate text-xs text-danger">
+      <Timer className="size-3 shrink-0" aria-hidden />
+      <span className="truncate">{o.title}{!o.eligible ? ' (bạn chưa đủ điều kiện)' : ''}{o.left != null ? ` · còn ${o.left}` : ''}</span>
+      {o.ends_at && <> · <Countdown to={o.ends_at} /></>}
+    </p>
   )
 }
 

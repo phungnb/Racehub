@@ -5,7 +5,7 @@ import { shineTier } from '@/shared/lib/shine'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
-import { BarChart3, ChevronRight, Copy, Crown, Gift, Pencil, Settings, Share2, Sparkles, Watch } from 'lucide-react'
+import { BarChart3, ChevronRight, Crown, Gift, Pencil, Settings, Sparkles, Watch, Ticket, Store } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, LevelBadge, ProgressBar, SegmentedControl, Skeleton } from '@/shared/ui'
 import { formatKm, formatNumber } from '@/shared/lib/format'
@@ -110,27 +110,16 @@ function Devices({ profile }: { profile: Profile }) {
   )
 }
 
-function Invite({ profile }: { profile: Profile }) {
-  const link = typeof window !== 'undefined' ? `${window.location.origin}/join/${profile.id}` : ''
-  const share = async () => {
-    if (navigator.share) {
-      await navigator.share({ title: 'Chạy cùng mình trên RaceHub', url: link }).catch(() => undefined)
-    } else {
-      await navigator.clipboard.writeText(link)
-      toast.success('Đã sao chép link mời')
-    }
-  }
+function Invite() {
   return (
-    <div className="flex items-center gap-3">
+    <Link href={routes.invite} className="flex items-center gap-3">
       <span className="grid size-10 place-items-center rounded-xl bg-coin/15 text-coin"><Gift className="size-5" aria-hidden /></span>
       <div className="min-w-0 flex-1">
         <p className="font-semibold">Mời bạn bè</p>
-        <p className="text-xs text-fg-muted">Bạn nhận thưởng Xu khi bạn bè chạy đủ 3 km đầu tiên.</p>
+        <p className="text-xs text-fg-muted">Mã giới thiệu, link, QR — cả hai nhận Xu khi bạn bè chạy đủ km đầu tiên.</p>
       </div>
-      <Button size="sm" variant="secondary" onClick={share} aria-label="Chia sẻ link mời">
-        {typeof navigator !== 'undefined' && 'share' in navigator ? <Share2 className="size-4" /> : <Copy className="size-4" />}
-      </Button>
-    </div>
+      <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+    </Link>
   )
 }
 
@@ -167,6 +156,18 @@ export function MeScreen({ profile }: { profile: Profile }) {
                 <span className="block text-xs text-fg-muted">Đổi quà nhận được lấy lượt tạo thử thách, khiên, vật phẩm; cảm ơn người tặng</span></span>
               <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
             </Link>
+            <Link href={routes.vouchers} className="flex items-center gap-3 p-4">
+              <span className="grid size-10 place-items-center rounded-xl bg-danger/15 text-danger"><Ticket className="size-5" aria-hidden /></span>
+              <span className="min-w-0 flex-1"><span className="block font-semibold">Voucher của tôi</span>
+                <span className="block text-xs text-fg-muted">Quà từ nhà tài trợ khi hoàn thành thử thách / nhiệm vụ</span></span>
+              <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+            </Link>
+            <Link href={routes.market} className="flex items-center gap-3 p-4">
+              <span className="grid size-10 place-items-center rounded-xl bg-brand/15 text-brand"><Store className="size-5" aria-hidden /></span>
+              <span className="min-w-0 flex-1"><span className="block font-semibold">Chợ Runner</span>
+                <span className="block text-xs text-fg-muted">HLV, cửa hàng, dịch vụ đã xác minh · đăng ký hồ sơ đối tác</span></span>
+              <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+            </Link>
             <Link href={routes.plan} className="flex items-center gap-3 p-4">
               <span className="grid size-10 place-items-center rounded-xl bg-coin/15 text-coin"><Crown className="size-5" aria-hidden /></span>
               <span className="min-w-0 flex-1"><span className="block font-semibold">Gói VIP & Nạp Xu</span>
@@ -174,7 +175,7 @@ export function MeScreen({ profile }: { profile: Profile }) {
               <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
             </Link>
           </Card>
-          <Card><Invite profile={profile} /></Card>
+          <Card><Invite /></Card>
           <Card className="space-y-1">
             <Row icon={Watch}>Thiết bị & nguồn dữ liệu</Row>
             <Devices profile={profile} />
