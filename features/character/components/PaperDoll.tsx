@@ -7,10 +7,11 @@ import { cn } from '@/shared/lib/cn'
 import { fontFamily, type FontKey } from '@/shared/design/engine'
 import {
   baseUrl, FRAME, hexToRgb, isTintSlot, jerseyName, layerUrl, LAYER_ORDER, luma, maskUrl, PRINT_ZONES, TINT_SLOTS, tintPixel,
-  type CharacterItem, type Gender, type ItemPrint, type PrintZone, type Slot, type TintSlot,
+  type CharacterItem, type Gender, type ItemPattern, type ItemPrint, type PrintZone, type Slot, type TintSlot,
 } from '../model/catalog'
+import { drawPattern } from '../model/patterns'
 
-interface Region { idx: Uint32Array; alpha: Float32Array; mean: number }
+interface Region { idx: Uint32Array; alpha: Float32Array; mean: number; box: { x0: number; y0: number; w: number; h: number } }
 interface Prepared {
   base: ImageData
   regions: Partial<Record<TintSlot, Region>>
@@ -56,15 +57,17 @@ function prepare(gender: Gender): Promise<Prepared> {
         const m = ctx.getImageData(0, 0, W, H).data
         const idx: number[] = []
         const alpha: number[] = []
-        let sum = 0, n = 0
+        let sum = 0, n = 0, x0: number = W, y0: number = H, x1 = 0, y1 = 0
         for (let i = 0; i < W * H; i++) {
           const a = m[i * 4] / 255
           if (a < 0.02) continue
           idx.push(i)
           alpha.push(a)
+          if (a > 0.3) { const x = i % W, y = (i - x) / W; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y }
           if (a > 0.5) { sum += luma(px.data[i * 4], px.data[i * 4 + 1], px.data[i * 4 + 2]); n++ }
         }
-        regions[slot] = { idx: Uint32Array.from(idx), alpha: Float32Array.from(alpha), mean: n ? sum / n : 128 }
+        regions[slot] = { idx: Uint32Array.from(idx), alpha: Float32Array.from(alpha), mean: n ? sum / n : 128,
+          box: { x0, y0, w: Math.max(1, x1 - x0 + 1), h: Math.max(1, y1 - y0 + 1) } }
       })
       const topAlpha = new Float32Array(W * H)
       const topShade = new Float32Array(W * H)
@@ -94,19 +97,46 @@ function loadLayer(src: string) {
   return p
 }
 
-function paint(p: Prepared, tints: [TintSlot, string][]): ImageData {
+function paint(p: Prepared, tints: [TintSlot, string][], patterns: [TintSlot, ItemPattern][] = [], gender: Gender = 'male'): ImageData {
   const out = new ImageData(new Uint8ClampedArray(p.base.data), p.base.width, p.base.height)
   const d = out.data
+  const b = p.base.data
   for (const [slot, hex] of tints) {
     const region = p.regions[slot]
     const rgb = hexToRgb(hex)
     if (!region || !rgb) continue
     for (let k = 0; k < region.idx.length; k++) {
       const o = region.idx[k] * 4
-      const [r, g, b] = tintPixel(d[o], d[o + 1], d[o + 2], region.alpha[k], rgb, region.mean)
+      const [r, g, bl] = tintPixel(d[o], d[o + 1], d[o + 2], region.alpha[k], rgb, region.mean)
       d[o] = r
       d[o + 1] = g
-      d[o + 2] = b
+      d[o + 2] = bl
+    }
+  }
+  // Họa tiết: vẽ độ phủ trong hộp bao vùng, rồi đổi màu đúng như TINT (giữ nếp vải) và trộn theo độ phủ
+  for (const [slot, pat] of patterns) {
+    const region = p.regions[slot]
+    const rgb = hexToRgb(pat.color)
+    if (!region || !rgb) continue
+    const { x0, y0, w, h } = region.box
+    const cv = document.createElement('canvas')
+    cv.width = w
+    cv.height = h
+    const c = cv.getContext('2d', { willReadFrequently: true })!
+    drawPattern(c, slot, pat.kind, w, h, gender)
+    const cov = c.getImageData(0, 0, w, h).data
+    const W = p.base.width
+    for (let k = 0; k < region.idx.length; k++) {
+      const i = region.idx[k]
+      const x = (i % W) - x0, y = ((i - (i % W)) / W) - y0
+      if (x < 0 || y < 0 || x >= w || y >= h) continue
+      const a = cov[(y * w + x) * 4 + 3] / 255
+      if (a <= 0) continue
+      const o = i * 4
+      const [r, g, bl] = tintPixel(b[o], b[o + 1], b[o + 2], region.alpha[k], rgb, region.mean)
+      d[o] = d[o] * (1 - a) + r * a
+      d[o + 1] = d[o + 1] * (1 - a) + g * a
+      d[o + 2] = d[o + 2] * (1 - a) + bl * a
     }
   }
   return out
@@ -174,14 +204,15 @@ async function paintPrint(p: Prepared, gender: Gender, print: ItemPrint, persona
   return off
 }
 
-interface DrawSpec { tints: [TintSlot, string][]; layers: { slot: Slot; url: string }[]; print: ItemPrint | null; printShade: boolean; personal: string | null }
+interface DrawSpec { tints: [TintSlot, string][]; patterns: [TintSlot, ItemPattern][]; layers: { slot: Slot; url: string }[]; print: ItemPrint | null; printShade: boolean; personal: string | null }
 
 function specOf(gender: Gender, items: CharacterItem[], personalName?: string | null): DrawSpec {
   const top = items.find((i) => i.slot === 'top')
   return {
     tints: items.filter((i) => i.render_kind === 'TINT' && i.color && isTintSlot(i.slot)).map((i) => [i.slot, i.color!] as [TintSlot, string]),
+    patterns: items.filter((i) => i.render_kind === 'TINT' && i.print?.pattern && isTintSlot(i.slot)).map((i) => [i.slot, i.print!.pattern!] as [TintSlot, ItemPattern]),
     layers: items.map((i) => ({ slot: i.slot, url: layerUrl(i, gender) })).filter((x): x is { slot: Slot; url: string } => !!x.url),
-    print: top?.print ?? null,
+    print: top?.print && (top.print.logo_url || top.print.title || top.print.subtitle || top.print.personal === 'NAME') ? top.print : null,
     printShade: top?.render_kind !== 'LAYER',
     personal: top?.print?.personal === 'NAME' ? jerseyName(personalName) || null : null,
   }
@@ -193,7 +224,7 @@ async function compose(ctx: CanvasRenderingContext2D, gender: Gender, spec: Draw
   const [p, imgs] = await Promise.all([prepare(gender), Promise.all(spec.layers.map((l) => loadLayer(l.url)))])
   const printCanvas = spec.print ? await paintPrint(p, gender, spec.print, spec.personal, spec.printShade) : null
   if (isCancelled?.()) return false
-  ctx.putImageData(paint(p, spec.tints), ox, oy)
+  ctx.putImageData(paint(p, spec.tints, spec.patterns, gender), ox, oy)
   const topAt = LAYER_ORDER.indexOf('top')
   const under = spec.layers.map((l, k) => ({ ...l, img: imgs[k] })).filter((l) => LAYER_ORDER.indexOf(l.slot) <= topAt)
   const over = spec.layers.map((l, k) => ({ ...l, img: imgs[k] })).filter((l) => LAYER_ORDER.indexOf(l.slot) > topAt)

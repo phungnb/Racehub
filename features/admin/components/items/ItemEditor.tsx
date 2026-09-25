@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, ImageUp, Palette, Layers } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Field, Input, SegmentedControl, Sheet, SwitchRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import {
-  FRAME, PaperDoll, PrintFields, RARITY_META, SLOTS, hasPrint, isTintSlot, uploadPrintLogo,
-  type CharacterItem, type Gender, type ItemLifecycle, type ItemPrint, type Rarity, type RenderKind, type Slot,
+  FRAME, PaperDoll, PATTERNS, PrintFields, RARITY_META, SLOTS, hasPrint, isTintSlot, uploadPrintLogo,
+  type CharacterItem, type Gender, type ItemLifecycle, type ItemPattern, type ItemPrint, type Rarity, type RenderKind, type Slot,
 } from '@/features/character'
 import { useMyProfile } from '@/features/auth'
 import { useAchievements } from '@/features/game'
@@ -46,18 +46,16 @@ async function readStats(file: File, url: string): Promise<LayerStats> {
 }
 
 /** Thêm / sửa vật phẩm: màu (áo, quần, tất, giày) hoặc lớp ảnh PNG khung chuẩn; xem thử ngay trên nhân vật Nam/Nữ */
-export function ItemEditor({ item, onClose, preset }: { item: AdminItem | null; onClose: () => void; preset?: 'uniform' }) {
+export function ItemEditor({ item, onClose }: { item: AdminItem | null; onClose: () => void }) {
   const isNew = !item
-  // Thiết kế áo / đồng phục: áo đổi màu + vùng in bật sẵn
-  const uni = isNew && preset === 'uniform'
-  const [kind, setKind] = useState<RenderKind>(item?.render_kind ?? (uni ? 'TINT' : 'LAYER'))
-  const [slot, setSlot] = useState<Slot>(item?.slot ?? (uni ? 'top' : 'hat'))
-  const [name, setName] = useState(item?.name ?? (uni ? 'Áo ' : ''))
+  const [kind, setKind] = useState<RenderKind>(item?.render_kind ?? 'LAYER')
+  const [slot, setSlot] = useState<Slot>(item?.slot ?? 'hat')
+  const [name, setName] = useState(item?.name ?? '')
   const [code, setCode] = useState(item?.code ?? '')
   const [codeTouched, setCodeTouched] = useState(!isNew)
   const [description, setDescription] = useState(item?.description ?? '')
   const [rarity, setRarity] = useState<Rarity>(item?.rarity ?? 'common')
-  const [color, setColor] = useState<string | null>(item ? item.color : uni ? '#1d4ed8' : '#e11d48')
+  const [color, setColor] = useState<string | null>(item ? item.color : '#e11d48')
   const [price, setPrice] = useState(item ? String(item.price_xu) : '30')
   const [level, setLevel] = useState(item?.unlock_level ?? 1)
   const [status, setStatus] = useState<ItemLifecycle>(item?.status ?? 'DRAFT')
@@ -68,7 +66,8 @@ export function ItemEditor({ item, onClose, preset }: { item: AdminItem | null; 
   const [from, setFrom] = useState(toLocalInput(item?.available_from))
   const [to, setTo] = useState(toLocalInput(item?.available_to))
   const [supply, setSupply] = useState(item?.supply_limit ? String(item.supply_limit) : '')
-  const [print, setPrint] = useState<ItemPrint | null>(item?.print ?? (uni ? { title: '', personal: 'NAME', text_color: '#ffffff', font: 'sport' } : null))
+  const [print, setPrint] = useState<ItemPrint | null>(item?.print && hasPrint(item.print) ? { ...item.print, pattern: null } : null)
+  const [pattern, setPattern] = useState<ItemPattern | null>(item?.print?.pattern ?? null)
   const [uploading, setUploading] = useState(false)
   const collections = useAvatarCollections()
   const badges = useAchievements()
@@ -89,6 +88,13 @@ export function ItemEditor({ item, onClose, preset }: { item: AdminItem | null; 
   const blobs = useRef<string[]>([])
   useEffect(() => () => { for (const u of blobs.current) URL.revokeObjectURL(u) }, [])
 
+  // In (chỉ áo) + họa tiết (món đổi màu có họa tiết cho ô đó)
+  const patternChoices = kind === 'TINT' && isTintSlot(slot) ? PATTERNS[slot] ?? [] : []
+  const design = (): ItemPrint | null => {
+    const txt = slot === 'top' && print && hasPrint(print) ? print : null
+    const pat = pattern && patternChoices.some((x) => x.kind === pattern.kind) ? pattern : null
+    return txt || pat ? { ...(txt ?? {}), pattern: pat } : null
+  }
   const finalCode = codeTouched ? code : suggestCode(slot, name)
   const slotChoices = kind === 'TINT' ? SLOTS.filter((s) => isTintSlot(s.slot)) : SLOTS
   const priceNum = Number(price)
@@ -105,12 +111,12 @@ export function ItemEditor({ item, onClose, preset }: { item: AdminItem | null; 
     }
   }
 
-  const preview: CharacterItem = useMemo(() => ({
+  const preview: CharacterItem = {
     code: finalCode || 'preview', name, description: null, slot, rarity, render_kind: kind, price_xu: 0, unlock_level: 1, is_default: false,
     color: kind === 'TINT' ? color : null,
     layer_urls: kind === 'LAYER' ? Object.fromEntries(Object.entries(layers).map(([g, l]) => [g, l!.url])) : null,
-    print: slot === 'top' ? print : null,
-  }), [finalCode, name, slot, rarity, kind, color, layers, print])
+    print: design(),
+  }
 
   const problems: string[] = []
   if (!CODE_PATTERN.test(finalCode)) problems.push('Mã chỉ gồm chữ thường không dấu, số, dấu _ (3–48 ký tự).')
@@ -140,7 +146,7 @@ export function ItemEditor({ item, onClose, preset }: { item: AdminItem | null; 
         price_xu: priceNum, unlock_level: level, sort: item?.sort ?? 100, status,
         collection: collection || null, club_id: club?.id ?? null, required_badge: badge || null, required_challenge: challenge?.id ?? null,
         available_from: fromLocalInput(from), available_to: fromLocalInput(to), supply_limit: supply ? Number(supply) : null,
-        print: slot === 'top' && print && hasPrint(print) ? print : null,
+        print: design(),
       })
       toast.success(isNew ? `Đã thêm ${name.trim()}` : 'Đã lưu vật phẩm')
       onClose()
@@ -160,7 +166,7 @@ export function ItemEditor({ item, onClose, preset }: { item: AdminItem | null; 
           )
 
   return (
-    <Sheet open onClose={onClose} title={uni ? 'Thiết kế áo / đồng phục' : isNew ? 'Thêm vật phẩm' : `Sửa: ${item.name}`}
+    <Sheet open onClose={onClose} title={isNew ? 'Thêm vật phẩm' : `Sửa: ${item.name}`}
       description="Xem thử ngay trên nhân vật trước khi lưu"
       footer={
         <div className="flex gap-2">
@@ -174,20 +180,12 @@ export function ItemEditor({ item, onClose, preset }: { item: AdminItem | null; 
           <PaperDoll gender={gender} items={[preview]} personalName={profile?.display_name ?? 'Runner'} className="size-full" fit="contain" label="Xem thử vật phẩm" />
           <SegmentedControl value={gender} onChange={setGender} options={GENDERS} className="absolute right-2 top-2 w-28 bg-bg/85" />
         </div>
-        {uni && (
-          <p className="rounded-xl bg-surface-2 p-3 text-xs text-fg-muted">
-            Chọn màu áo, tải logo, nhập chữ in rồi xem thử ở trên. Muốn làm đồng phục riêng: chọn CLB ở mục <b>Chỉ thành viên CLB</b> bên dưới.
-            Lưu xong ở trạng thái Nháp, kiểm tra lại rồi bấm Bán.
-          </p>
-        )}
-        {uni && printBlock}
 
-        {isNew && !uni && (
+        {isNew && (
           <SegmentedControl value={kind} onChange={(k) => { setKind(k); if (k === 'TINT' && !isTintSlot(slot)) setSlot('top') }}
             options={[{ value: 'LAYER', label: 'Lớp ảnh PNG' }, { value: 'TINT', label: 'Đổi màu' }]} />
         )}
 
-        {!uni && (
         <Field label="Ô trang phục">
             <div className="flex flex-wrap gap-1.5">
               {slotChoices.map((s) => (
@@ -199,7 +197,6 @@ export function ItemEditor({ item, onClose, preset }: { item: AdminItem | null; 
               ))}
             </div>
           </Field>
-        )}
 
         <Field label="Tên" htmlFor="item-name">
           <Input id="item-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Mũ lưỡi trai Đỏ" />
@@ -222,6 +219,27 @@ export function ItemEditor({ item, onClose, preset }: { item: AdminItem | null; 
                 <Palette className="size-4" aria-hidden />Màu gốc
               </Button>
             </div>
+            {patternChoices.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <p className="text-sm font-medium text-fg-muted">Họa tiết (màu thứ hai theo nếp vải)</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[{ kind: null, label: 'Trơn' }, ...patternChoices].map((x) => (
+                    <button key={x.kind ?? 'none'} type="button" aria-pressed={(pattern?.kind ?? null) === x.kind}
+                      onClick={() => setPattern(x.kind ? { kind: x.kind, color: pattern?.color ?? '#ffffff' } : null)}
+                      className={cn('rounded-full border px-3 py-1.5 text-xs font-semibold', (pattern?.kind ?? null) === x.kind ? 'border-brand bg-brand/10 text-fg' : 'border-border text-fg-muted')}>
+                      {x.label}
+                    </button>
+                  ))}
+                </div>
+                {pattern && (
+                  <label className="flex items-center gap-3 text-sm">
+                    <input type="color" aria-label="Màu họa tiết" value={pattern.color} onChange={(e) => setPattern({ ...pattern, color: e.target.value })}
+                      className="h-10 w-14 cursor-pointer rounded-xl border border-border bg-bg" />
+                    <span className="font-mono">{pattern.color}</span>
+                  </label>
+                )}
+              </div>
+            )}
           </Field>
         ) : (
           <Field label={`Ảnh lớp (PNG ${FRAME.width}×${FRAME.height}, nền trong suốt)`}
@@ -276,7 +294,7 @@ export function ItemEditor({ item, onClose, preset }: { item: AdminItem | null; 
           </div>
         </Field>
 
-        {!uni && printBlock}
+        {printBlock}
 
         <div className="space-y-3 rounded-2xl border border-border p-3">
           <p className="text-sm font-semibold">Điều kiện mở khóa & bán</p>

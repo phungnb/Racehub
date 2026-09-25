@@ -8,7 +8,7 @@ import { cn } from '@/shared/lib/cn'
 import { adminListClubs } from '../../api/adminApi'
 import { adminListChallenges } from '../../api/consoleApi'
 
-export interface Picked { id: string; name: string }
+export interface Picked { id: string; name: string; logo?: string | null; accent?: string | null }
 
 /** Chọn một mục bằng ô tìm kiếm (CLB / thử thách); đã chọn thì hiện tên + nút bỏ */
 function SearchPick({ value, onChange, placeholder, search, label }: {
@@ -55,7 +55,7 @@ function SearchPick({ value, onChange, placeholder, search, label }: {
 
 export function ClubPick(props: { value: Picked | null; onChange: (v: Picked | null) => void }) {
   return <SearchPick {...props} label="CLB" placeholder="Tìm CLB (đồng phục: chỉ thành viên mua / mặc)"
-    search={async (q) => (await adminListClubs(q)).map((c) => ({ id: c.id, name: c.name }))} />
+    search={async (q) => (await adminListClubs(q)).map((c) => ({ id: c.id, name: c.name, logo: c.avatar_url, accent: c.accent_color }))} />
 }
 
 export function ChallengePick(props: { value: Picked | null; onChange: (v: Picked | null) => void }) {

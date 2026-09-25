@@ -12,6 +12,7 @@ import { adminErrorMessage, ITEM_STATUS, type AdminItem } from '../../api/adminA
 import { useAvatarItems, useSetItemStatus, useUniformRequests } from '../../hooks/useAdmin'
 import { CollectionsPanel } from './CollectionsPanel'
 import { ItemEditor } from './ItemEditor'
+import { KitSheet } from './KitSheet'
 import { UniformReviewPanel } from './UniformReviewPanel'
 
 type Filter = 'all' | 'draft' | 'archived' | 'retired' | Slot
@@ -70,7 +71,7 @@ function ItemsPane() {
         </div>
         <div className="flex shrink-0 flex-col gap-1.5">
           <Button size="sm" onClick={() => setEditing('new')}><Plus className="size-4" aria-hidden />Thêm</Button>
-          <Button size="sm" variant="secondary" onClick={() => setEditing('uniform')}><Shirt className="size-4" aria-hidden />Thiết kế áo</Button>
+          <Button size="sm" variant="secondary" onClick={() => setEditing('uniform')}><Shirt className="size-4" aria-hidden />Thiết kế bộ đồ</Button>
         </div>
       </Card>
 
@@ -142,7 +143,8 @@ function ItemsPane() {
         </ul>
       )}
 
-      {editing && <ItemEditor item={editing === 'new' || editing === 'uniform' ? null : editing} preset={editing === 'uniform' ? 'uniform' : undefined} onClose={() => setEditing(null)} />}
+      {editing === 'uniform' ? <KitSheet onClose={() => setEditing(null)} />
+        : editing && <ItemEditor item={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </div>
   )
 }

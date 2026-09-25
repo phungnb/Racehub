@@ -85,6 +85,27 @@ function Editor({ state }: { state: CharacterState }) {
     catch (e) { toast.error(characterErrorMessage(e)) }
     setBundle(null)
   }
+  // Bộ đồng phục (cùng mã bộ, ≥ 2 món): mặc thử một chạm, mua phần còn thiếu
+  const kits = useMemo(() => {
+    const m = new Map<string, CharacterItem[]>()
+    for (const i of items) if (i.kit) m.set(i.kit, [...(m.get(i.kit) ?? []), i])
+    return [...m.entries()].filter(([, l]) => l.length >= 2).map(([code, l]) => {
+      const top = l.find((i) => i.slot === 'top') ?? l[0]
+      return { code, items: SLOTS.flatMap((x) => l.filter((i) => i.slot === x.slot)), title: top.club_name ? `Đồng phục ${top.club_name}` : top.name }
+    })
+  }, [items])
+  const [buyingKit, setBuyingKit] = useState(false)
+  const buyKit = async (list: CharacterItem[]) => {
+    setBuyingKit(true)
+    try {
+      for (const i of list) await buy.mutateAsync({ code: i.code, key: `kit-${i.code}-${crypto.randomUUID()}` })
+      toast.success('Đã đủ bộ đồng phục', { description: 'Bấm Lưu bộ đồ để mặc ra ngoài.' })
+    } catch (e) {
+      toast.error(characterErrorMessage(e))
+    } finally {
+      setBuyingKit(false)
+    }
+  }
   const slotMeta = SLOTS.find((s) => s.slot === tab)
   const [col, setCol] = useState<string | null>(null)
   const collections = state.collections ?? []
@@ -129,6 +150,34 @@ function Editor({ state }: { state: CharacterState }) {
       </div>
 
       {state.gender_set === false && <GenderNudge />}
+      {kits.map((k) => {
+        const missing = k.items.filter((i) => !i.owned && !(i.trial_until && Date.parse(i.trial_until) > now))
+        const cost = missing.reduce((t, i) => t + buyPrice(i), 0)
+        const blocked = missing.some((i) => i.lock || i.acquire === 'shine')
+        const wearing = k.items.every((i) => draft[i.slot] === i.code)
+        return (
+          <div key={k.code} className="flex items-center gap-3 rounded-2xl border border-brand/40 bg-gradient-to-r from-brand/10 to-transparent p-3">
+            <span className="flex h-11 w-9 shrink-0 flex-col overflow-hidden rounded-lg border border-border" aria-hidden>
+              {k.items.map((i) => <span key={i.code} className={i.slot === 'top' ? 'flex-[3]' : 'flex-1'} style={{ background: i.color ?? 'var(--color-surface-2)' }} />)}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold">{k.title}</span>
+              <span className="block text-xs text-fg-muted">
+                {k.items.length} món{missing.length ? ` · thiếu ${missing.length}${cost > 0 ? ` (${formatCoin(cost)} Xu)` : ''}` : ' · đã đủ bộ'}
+              </span>
+            </span>
+            {missing.length > 0 && !blocked && wearing ? (
+              <Button size="sm" variant="coin" className="shrink-0" loading={buyingKit} disabled={state.balance < cost}
+                onClick={() => void buyKit(missing)}>{cost > 0 ? `Mua ${formatCoin(cost)}` : 'Nhận'}</Button>
+            ) : (
+              <Button size="sm" className="shrink-0" disabled={wearing}
+                onClick={() => setDraft((d) => ({ ...d, ...Object.fromEntries(k.items.map((i) => [i.slot, i.code])) }))}>
+                <Shirt className="size-4" aria-hidden />{wearing ? 'Đang mặc' : 'Mặc cả bộ'}
+              </Button>
+            )}
+          </div>
+        )
+      })}
       {(state.bundles ?? []).filter((b) => !b.bought).map((b) => (
         <button key={b.id} type="button" onClick={() => setBundle(b)}
           className="flex w-full items-center gap-3 rounded-2xl border border-coin/50 bg-gradient-to-r from-coin/15 to-transparent p-3 text-left">
