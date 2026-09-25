@@ -240,7 +240,7 @@ function History() {
     onError: (e) => toast.error(adminErrorMessage(e)),
   })
   if (q.isPending) return <Skeleton className="h-40" />
-  if (q.isError) return <ErrorState message={adminErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState message={adminErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   if (!q.data.length) return <EmptyState icon={Gift} title="Chưa có khuyến mãi nào" />
   return (
     <ul className="divide-y divide-border rounded-xl border border-border bg-surface">

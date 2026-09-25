@@ -17,7 +17,7 @@ export default function AppLayout({ children }: LayoutProps<'/'>) {
   const router = useRouter()
   const pathname = usePathname()
   const { session, loading } = useSession()
-  const { profile, isError, refetch } = useMyProfile()
+  const { profile, isError, error, refetch } = useMyProfile()
   usePushSync(session?.user.id ?? null)
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export default function AppLayout({ children }: LayoutProps<'/'>) {
       <OfflineBanner />
       <TopBar profile={profile} />
       <main className="flex-1 px-4 pb-32 pt-4">
-        {isError ? <ErrorState message="Không tải được hồ sơ của bạn." onRetry={() => refetch()} /> : children}
+        {isError ? <ErrorState message="Không tải được hồ sơ của bạn." error={error} onRetry={() => refetch()} /> : children}
       </main>
       <BottomTabBar />
     </div>

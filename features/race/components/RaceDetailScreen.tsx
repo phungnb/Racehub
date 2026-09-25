@@ -25,7 +25,7 @@ export function RaceDetailScreen({ id }: { id: string }) {
   const q = useQuery({ queryKey: ['race', id], queryFn: () => getRace(id) })
   const [now] = useState(() => Date.now())
   if (q.isPending) return <div className="space-y-3"><Skeleton className="h-40" /><Skeleton className="h-32" /><Skeleton className="h-64" /></div>
-  if (q.isError) return <ErrorState message={raceErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState message={raceErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   const r = q.data
   const phase = racePhase(r, now)
   return (
@@ -192,7 +192,7 @@ function Results({ r }: { r: Race }) {
           </button>
         ))}
       </div>
-      {q.isPending ? <Skeleton className="h-40" /> : q.isError ? <ErrorState onRetry={() => void q.refetch()} /> : !q.data.length ? (
+      {q.isPending ? <Skeleton className="h-40" /> : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : !q.data.length ? (
         <EmptyState icon={Timer} title="Chưa có ai hoàn thành" description="Kết quả tự cập nhật khi VĐV có bài chạy hợp lệ." />
       ) : (
         <ol className="space-y-1.5">
@@ -246,7 +246,7 @@ function Organizer({ r }: { r: Race }) {
             </div>
           ))}
         </div>
-        {dash.isPending ? <Skeleton className="h-24" /> : dash.isError ? <ErrorState message={raceErrorMessage(dash.error)} /> : (
+        {dash.isPending ? <Skeleton className="h-24" /> : dash.isError ? <ErrorState message={raceErrorMessage(dash.error)} error={dash.error} /> : (
           <ul className="max-h-72 divide-y divide-border overflow-y-auto rounded-xl border border-border text-sm">
             {dash.data.length === 0 && <li className="p-3 text-center text-fg-subtle">Chưa có VĐV đăng ký</li>}
             {dash.data.map((x) => (

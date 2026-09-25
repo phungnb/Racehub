@@ -19,14 +19,14 @@ import { ClubAvatar } from './ClubAvatar'
 /** Khung chung cho mọi tab của một CLB: đầu trang có màu CLB + thanh tab dính khi cuộn. */
 export function ClubShell({ clubId, children }: { clubId: string; children: ReactNode }) {
   const pathname = usePathname()
-  const { club, membership, isMember, isStaff, isLoading, isError, refetch } = useClub(clubId)
+  const { club, membership, isMember, isStaff, isLoading, isError, error, refetch } = useClub(clubId)
   const inbox = useClubInbox()
   const members = useClubMembers(clubId, isStaff)
   const unread = inbox.data?.find((c) => c.club_id === clubId)?.unread_count ?? 0
   const pending = isStaff ? (members.data ?? []).filter((m) => m.status === 'PENDING').length : 0
 
   if (isLoading) return <ShellSkeleton />
-  if (isError || !club) return <ErrorState message="Không tải được CLB." onRetry={refetch} />
+  if (isError || !club) return <ErrorState message="Không tải được CLB." error={error} onRetry={refetch} />
 
   const accent = accentOf(club)
   const base = routes.club(clubId)

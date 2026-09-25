@@ -1,6 +1,7 @@
 import { supabase } from '@/shared/lib/supabase'
 import { normalizeActivity, type ActivitySummary } from '../model/activity'
 import type { Split, TrackPoint } from '../model/route'
+import { systemErrorMessage } from '@/shared/lib/errors'
 
 export type { ActivitySummary }
 
@@ -67,8 +68,7 @@ export async function requestActivityEnrich(id: string): Promise<boolean> {
 }
 
 export function activityErrorMessage(e: unknown): string {
-  const m = e instanceof Error ? e.message : String(e)
+  const m = (e as { message?: string } | null)?.message ?? String(e)
   if (m.includes('ACTIVITY_NOT_FOUND')) return 'Không tìm thấy bài chạy, hoặc người chạy đã để riêng tư.'
-  if (m.includes('Failed to fetch')) return 'Mất kết nối mạng. Thử lại sau.'
-  return 'Không tải được bài chạy. Thử lại sau.'
+  return systemErrorMessage(e, 'Không tải được bài chạy. Thử lại sau.')
 }

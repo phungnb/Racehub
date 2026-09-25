@@ -54,7 +54,7 @@ export function ChallengesScreen() {
       {q.isLoading ? (
         <div className="space-y-3">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-32" />)}</div>
       ) : q.isError ? (
-        <ErrorState onRetry={() => q.refetch()} />
+        <ErrorState error={q.error} onRetry={() => q.refetch()} />
       ) : !q.data?.length ? (
         <EmptyState icon={tab === 'DISCOVER' ? Compass : tab === 'CLUB' ? Shield : Trophy} {...EMPTY[tab]}
           action={tab === 'MINE'

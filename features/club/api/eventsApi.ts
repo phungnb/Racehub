@@ -1,6 +1,7 @@
 // Sự kiện, điểm danh, bình chọn, thu chi CLB — mọi thao tác qua RPC (migration 001500).
 import { supabase } from '@/shared/lib/supabase'
 import type { CashEntry } from '../model/finance'
+import { systemErrorMessage } from '@/shared/lib/errors'
 
 export type RsvpStatus = 'GOING' | 'MAYBE' | 'NOT_GOING'
 
@@ -207,5 +208,5 @@ export function eventsErrorMessage(e: unknown): string {
   const err = e as { message?: string } | null
   console.warn('[CLB] Lỗi gốc:', err?.message)
   const key = Object.keys(MESSAGES).find((k) => (err?.message ?? '').includes(k))
-  return key ? MESSAGES[key] : 'Không thực hiện được. Hãy thử lại.'
+  return key ? MESSAGES[key] : systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')
 }

@@ -1,5 +1,6 @@
 // Thách đấu CLB — nhiều CLB cùng tranh tài (migration 003600)
 import { supabase } from '@/shared/lib/supabase'
+import { systemErrorMessage } from '@/shared/lib/errors'
 
 export type CupMetric = 'TOTAL_KM' | 'AVG_KM'
 export type CupStatus = 'PENDING_REVIEW' | 'OPEN' | 'REJECTED' | 'CANCELLED' | 'FINISHED'
@@ -82,5 +83,5 @@ const MESSAGES: Record<string, string> = {
 export function cupErrorMessage(e: unknown): string {
   const msg = (e as { message?: string } | null)?.message ?? ''
   const code = Object.keys(MESSAGES).find((k) => msg.includes(k))
-  return code ? MESSAGES[code] : 'Có lỗi xảy ra, thử lại sau.'
+  return code ? MESSAGES[code] : systemErrorMessage(e, 'Có lỗi xảy ra, thử lại sau.')
 }

@@ -36,7 +36,7 @@ export function SettingsScreen() {
 
       <SectionTitle>Hồ sơ</SectionTitle>
       {q.isPending ? <Skeleton className="h-[34rem]" />
-        : q.isError ? <ErrorState message={profileErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+        : q.isError ? <ErrorState message={profileErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
         : <ProfileCard key={JSON.stringify(q.data)} profile={q.data} />}
 
       <SectionTitle>Thông báo & ứng dụng</SectionTitle>

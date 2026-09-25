@@ -25,7 +25,7 @@ export function InvitePanel({ clubId, name, slug }: { clubId: string; name: stri
   if (q.isError) {
     return clubErrorMessage(q.error).includes('quyền')
       ? <p className="text-center text-sm text-fg-muted">CLB này chỉ nhận thành viên qua link mời của ban quản trị.</p>
-      : <ErrorState onRetry={() => q.refetch()} />
+      : <ErrorState error={q.error} onRetry={() => q.refetch()} />
   }
   return <InviteView code={q.data} name={name} slug={slug} />
 }

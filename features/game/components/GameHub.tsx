@@ -20,7 +20,7 @@ import { StreakSheet } from './StreakSheet'
 export function GameHub({ profile }: { profile: Profile }) {
   const q = useGameState(profile.id)
   if (q.isPending) return <div className="space-y-3"><Skeleton className="h-56" /><Skeleton className="h-48" /><Skeleton className="h-24" /></div>
-  if (q.isError) return <ErrorState message={gameErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState message={gameErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   return <Hub profile={profile} s={q.data} />
 }
 

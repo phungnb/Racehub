@@ -32,7 +32,7 @@ export function ClubEventScreen({ clubId, eventId }: { clubId: string; eventId: 
         <ArrowLeft className="size-4" aria-hidden />Lịch CLB
       </Link>
       {q.isPending ? <div className="space-y-3"><Skeleton className="h-56" /><Skeleton className="h-40" /></div>
-        : q.isError ? <ErrorState message={eventsErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+        : q.isError ? <ErrorState message={eventsErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
         : <Detail clubId={clubId} e={q.data} />}
     </div>
   )
@@ -171,7 +171,7 @@ function QrSheet({ clubId, eventId, onClose }: { clubId: string; eventId: string
   return (
     <Sheet open onClose={onClose} title="QR điểm danh" description="Thành viên mở camera điện thoại, quét mã là điểm danh xong">
       <div className="flex flex-col items-center gap-3 pb-2">
-        {t.isError ? <ErrorState message={eventsErrorMessage(t.error)} onRetry={() => void t.refetch()} />
+        {t.isError ? <ErrorState message={eventsErrorMessage(t.error)} error={t.error} onRetry={() => void t.refetch()} />
           : img ? (
             // eslint-disable-next-line @next/next/no-img-element -- ảnh QR tạo tại chỗ (data URL)
             <img src={img} alt="Mã QR điểm danh" className="size-72 rounded-2xl bg-white p-3" />

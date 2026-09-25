@@ -24,7 +24,7 @@ export function ProSection({ club }: { club: Club }) {
   const q = useQuery({ queryKey: ['club', club.id, 'plan'], queryFn: () => getClubPlan(club.id) })
   const [report, setReport] = useState(false)
   if (q.isPending) return <Skeleton className="h-40" />
-  if (q.isError) return <ErrorState message={clubErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState message={clubErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   const p = q.data
   return (
     <section>
@@ -126,7 +126,7 @@ function ReportSheet({ club, onClose }: { club: Club; onClose: () => void }) {
             </button>
           ))}
         </div>
-        {q.isPending ? <Skeleton className="h-48" /> : q.isError ? <ErrorState message={clubErrorMessage(q.error)} /> : (
+        {q.isPending ? <Skeleton className="h-48" /> : q.isError ? <ErrorState message={clubErrorMessage(q.error)} error={q.error} /> : (
           <>
             <div className="grid grid-cols-3 gap-2 text-center">
               <Mini label="Người chạy" value={`${active}/${q.data.members.length}`} />

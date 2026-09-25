@@ -27,7 +27,7 @@ export function GiftsTab() {
     onError: (e) => toast.error(adminErrorMessage(e)),
   })
   if (q.isPending) return <Skeleton className="h-96" />
-  if (q.isError) return <ErrorState message={adminErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState message={adminErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   const burn = q.data.reduce((s, g) => s + g.burn_30d, 0)
   const d = edit?.draft
   const set = (patch: Partial<Draft>) => edit && setEdit({ ...edit, draft: { ...edit.draft, ...patch } })
@@ -118,7 +118,7 @@ export function OrganizersTab() {
       </Card>
       <section>
         <SectionTitle>Đang có quyền</SectionTitle>
-        {q.isPending ? <Skeleton className="h-24" /> : q.isError ? <ErrorState message={adminErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+        {q.isPending ? <Skeleton className="h-24" /> : q.isError ? <ErrorState message={adminErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
           : !q.data.length ? <EmptyState icon={Flag} title="Chưa cấp cho ai" description="Hiện chỉ admin tạo được giải chạy ảo." />
           : (
             <ul className="divide-y divide-border rounded-xl border border-border bg-surface">

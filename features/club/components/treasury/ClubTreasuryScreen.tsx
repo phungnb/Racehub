@@ -50,7 +50,7 @@ function XuTreasury({ clubId }: { clubId: string }) {
         {log.isLoading ? (
           <div className="space-y-2">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-14" />)}</div>
         ) : log.isError ? (
-          <ErrorState onRetry={() => log.refetch()} />
+          <ErrorState error={log.error} onRetry={() => log.refetch()} />
         ) : !log.data?.length ? (
           <EmptyState icon={HandCoins} title="Chưa có khoản nào" description="Hãy là người góp quỹ đầu tiên cho CLB." />
         ) : (

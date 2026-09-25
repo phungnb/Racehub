@@ -1,6 +1,7 @@
 // Lớp game: mọi thao tác qua RPC (migration 000800). Client chỉ đọc và hiển thị.
 import { supabase } from '@/shared/lib/supabase'
 import type { Achievement, GameEvent, GameState, LeagueRow, Quest, Wallet } from '../model/game'
+import { systemErrorMessage } from '@/shared/lib/errors'
 
 const n = (v: unknown) => Number(v ?? 0)
 const toEvent = (e: GameEvent): GameEvent => ({ ...e, xu: n(e.xu), xp: n(e.xp), payload: e.payload ?? {} })
@@ -139,7 +140,7 @@ export function gameErrorMessage(e: unknown): string {
   console.warn('[Game] Lỗi gốc:', err?.code, err?.message)
   const raw = err?.message ?? ''
   const key = Object.keys(MESSAGES).find((k) => raw.includes(k))
-  return key ? MESSAGES[key] : 'Không thực hiện được. Hãy thử lại.'
+  return key ? MESSAGES[key] : systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')
 }
 
 /* ------------------------- Phong độ (migration 004200) ------------------------- */

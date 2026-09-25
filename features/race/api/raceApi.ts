@@ -2,6 +2,7 @@
 import { prepareImage } from '@/shared/lib/image'
 import { supabase } from '@/shared/lib/supabase'
 import type { BibDesign, StoredDesign } from '../model/bib'
+import { systemErrorMessage } from '@/shared/lib/errors'
 
 export type RaceScope = 'UPCOMING' | 'MINE' | 'PAST'
 
@@ -161,7 +162,6 @@ const STORAGE_MESSAGES: [RegExp, string][] = [
   [/row-level security|unauthorized|403/i, 'Bạn không có quyền tải ảnh cho giải này (chỉ người tạo giải, ban quản trị CLB hoặc admin).'],
   [/maximum allowed size|too large|413/i, 'Ảnh vượt giới hạn của kho ảnh. Chạy migration 003300 để nâng lên 10 MB.'],
   [/mime type|not supported/i, 'Định dạng ảnh không được hỗ trợ. Dùng PNG, JPG hoặc WebP.'],
-  [/failed to fetch|network/i, 'Mất kết nối mạng, thử lại.'],
 ]
 
 export function raceErrorMessage(e: unknown): string {
@@ -170,5 +170,5 @@ export function raceErrorMessage(e: unknown): string {
   if (code) return MESSAGES[code]
   const storage = STORAGE_MESSAGES.find(([re]) => re.test(msg))
   if (storage) return storage[1]
-  return msg ? `Có lỗi xảy ra: ${msg}` : 'Có lỗi xảy ra, thử lại sau.'
+  return systemErrorMessage(e, 'Có lỗi xảy ra, thử lại sau.')
 }

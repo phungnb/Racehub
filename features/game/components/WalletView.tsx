@@ -25,7 +25,7 @@ const dayLabel = (iso: string) => {
 export function WalletView() {
   const q = useWallet()
   if (q.isPending) return <div className="space-y-2"><Skeleton className="h-32" /><Skeleton className="h-14" /><Skeleton className="h-14" /><Skeleton className="h-14" /></div>
-  if (q.isError) return <ErrorState message={gameErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState message={gameErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   const head = q.data.pages[0]
   const items = q.data.pages.flatMap((p) => p.items)
   const byDay = items.reduce<[string, WalletItem[]][]>((acc, it) => {

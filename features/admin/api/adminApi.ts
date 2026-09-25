@@ -3,6 +3,7 @@ import { supabase } from '@/shared/lib/supabase'
 import { toPolicy, type EconomyPolicy } from '@/shared/lib/economy'
 import type { CharacterItem, Gender, RenderKind, Rarity, Slot } from '@/features/character'
 import type { PendingRun } from '@/features/activity'
+import { systemErrorMessage } from '@/shared/lib/errors'
 
 export type AccountKind = 'USER' | 'CLUB'
 
@@ -229,7 +230,7 @@ export function adminErrorMessage(e: unknown): string {
   const key = Object.keys(MESSAGES).find((k) => raw.includes(k))
   if (key) return MESSAGES[key]
   if (err?.code === '42501') return MESSAGES.FORBIDDEN
-  return 'Không thực hiện được. Hãy thử lại.'
+  return systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')
 }
 
 // ---------------------------------------------------------------------
@@ -265,6 +266,7 @@ export interface SystemCheck {
   stats: {
     pg_net: boolean; push_url: string | null; admins: number; users: number; clubs: number
     push_stuck?: number; challenges_overdue?: number; battles_overdue?: number; pending_reviews?: number
+    client_errors_24h?: number; not_deployed_24h?: number
     cups_overdue?: number; cups_pending?: number
   }
   checked_at: string

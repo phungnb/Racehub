@@ -2,6 +2,7 @@
 import { supabase } from '@/shared/lib/supabase'
 import type { ClubRole, JoinPolicy, MemberStatus } from '../model/roles'
 import type { PendingRun } from '@/features/activity'
+import { systemErrorMessage } from '@/shared/lib/errors'
 
 export interface Club {
   id: string
@@ -341,5 +342,5 @@ export function clubErrorMessage(e: unknown): string {
   const key = Object.keys(MESSAGES).find((k) => raw.includes(k))
   if (key) return MESSAGES[key]
   if (err?.code === '42501') return MESSAGES.FORBIDDEN
-  return 'Không thực hiện được. Hãy thử lại.'
+  return systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')
 }

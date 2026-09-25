@@ -18,7 +18,7 @@ export function LeagueSheet({ open, onClose, league }: { open: boolean; onClose:
       {q.isPending ? (
         <div className="space-y-2">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-12" />)}</div>
       ) : q.isError ? (
-        <ErrorState onRetry={() => void q.refetch()} />
+        <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       ) : (
         <ol className="space-y-1">
           {q.data.map((r, i) => {

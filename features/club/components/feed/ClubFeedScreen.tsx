@@ -51,7 +51,7 @@ export function ClubFeedScreen({ clubId }: { clubId: string }) {
       {loading ? (
         <div className="space-y-3">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-40" />)}</div>
       ) : posts.isError || pinned.isError ? (
-        <ErrorState message="Không tải được bảng tin." onRetry={() => { void posts.refetch(); void pinned.refetch() }} />
+        <ErrorState message="Không tải được bảng tin." error={posts.error} onRetry={() => { void posts.refetch(); void pinned.refetch() }} />
       ) : (
         <>
           {(pinned.data ?? []).map((p) => (

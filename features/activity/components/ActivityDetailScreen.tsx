@@ -40,7 +40,7 @@ export function ActivityDetailScreen({ id }: { id: string }) {
       className="-ml-2 grid size-11 shrink-0 place-items-center rounded-full text-fg-muted hover:bg-surface-2"><ArrowLeft className="size-5" aria-hidden /></button>
   )
   if (q.isPending) return <div className="space-y-4">{back}<Skeleton className="h-64" /><Skeleton className="h-28" /><Skeleton className="h-60" /></div>
-  if (q.isError) return <div className="space-y-4">{back}<ErrorState message={activityErrorMessage(q.error)} onRetry={() => void q.refetch()} /></div>
+  if (q.isError) return <div className="space-y-4">{back}<ErrorState message={activityErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} /></div>
 
   const a = q.data
   const pace = a.avg_pace_s || paceFrom(a.distance_m, a.moving_s)

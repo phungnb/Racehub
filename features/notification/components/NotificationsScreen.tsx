@@ -68,7 +68,7 @@ function PushPrompt() {
 }
 
 export function NotificationsScreen() {
-  const { data, isLoading, isError, refetch } = useNotifications()
+  const { data, isLoading, isError, error, refetch } = useNotifications()
   const markRead = useMarkNotificationsRead()
   const unread = (data ?? []).filter((n) => !n.read_at).length
 
@@ -88,7 +88,7 @@ export function NotificationsScreen() {
       {isLoading ? (
         <div className="space-y-2">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : isError ? (
-        <ErrorState onRetry={() => refetch()} />
+        <ErrorState error={error} onRetry={() => refetch()} />
       ) : !data?.length ? (
         <EmptyState icon={Bell} title="Chưa có thông báo"
           description="Khi CLB có thông báo mới, ai đó nhắc tên hay cổ vũ bạn, bạn sẽ thấy ở đây." />

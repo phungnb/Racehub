@@ -42,7 +42,7 @@ export function CommentsSheet({ post, meId, isStaff, onClose }: { post: ClubPost
       {q.isLoading ? (
         <div className="space-y-3">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-12" />)}</div>
       ) : q.isError ? (
-        <ErrorState onRetry={() => q.refetch()} />
+        <ErrorState error={q.error} onRetry={() => q.refetch()} />
       ) : !q.data?.length ? (
         <p className="py-8 text-center text-sm text-fg-muted">Chưa có bình luận. Hãy là người đầu tiên!</p>
       ) : (

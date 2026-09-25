@@ -14,7 +14,7 @@ export function ActivityList({ userId }: { userId: string }) {
   const q = useQuery({ queryKey: ['activities', 'mine', userId], queryFn: () => listMyRecentActivities(userId) })
 
   if (q.isPending) return <div className="space-y-2"><Skeleton className="h-16" /><Skeleton className="h-16" /></div>
-  if (q.isError) return <ErrorState onRetry={() => q.refetch()} />
+  if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />
   if (q.data.length === 0) {
     return <EmptyState icon={Footprints} title="Chưa có bài chạy nào"
       description="Kết nối Strava hoặc bấm nút Chạy để ghi lại buổi chạy đầu tiên." />

@@ -1,5 +1,6 @@
 import { supabase } from '@/shared/lib/supabase'
 import type { ExportRow, PerfRun } from '../model/insights'
+import { systemErrorMessage } from '@/shared/lib/errors'
 
 export interface Period { start: string; km: number; runs: number; moving_s: number; elev_m: number }
 export interface Trends { weeks: Period[]; months: Period[] }
@@ -31,5 +32,5 @@ export function insightsErrorMessage(e: unknown): string {
   const raw = (e as { message?: string } | null)?.message ?? ''
   if (raw.includes('VIP_REQUIRED')) return 'Tính năng này dành cho gói VIP cao hơn.'
   if (raw.includes('INVALID_RANGE')) return 'Khoảng ngày không hợp lệ (tối đa 3 năm).'
-  return 'Không tải được dữ liệu. Hãy thử lại.'
+  return systemErrorMessage(e, 'Không tải được dữ liệu. Hãy thử lại.')
 }

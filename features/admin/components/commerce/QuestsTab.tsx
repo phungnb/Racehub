@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Target } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Card, EmptyState, ErrorState, Field, Input, Sheet, Skeleton, Textarea } from '@/shared/ui'
+import { Button, EmptyState, ErrorState, Field, Input, Sheet, Skeleton, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { adminErrorMessage } from '../../api/adminApi'
@@ -45,7 +45,7 @@ export function QuestsTab() {
       <Button block onClick={() => setEdit({ ...EMPTY, starts_at: new Date().toISOString(), ends_at: new Date(Date.now() + 7 * 86_400_000).toISOString() })}>
         <Plus className="size-4" aria-hidden />Tạo nhiệm vụ
       </Button>
-      {q.isPending ? <Skeleton className="h-40" /> : q.isError ? <ErrorState message={adminErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+      {q.isPending ? <Skeleton className="h-40" /> : q.isError ? <ErrorState message={adminErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
         : !q.data.length ? <EmptyState icon={Target} title="Chưa có nhiệm vụ" />
         : (
           <ul className="divide-y divide-border rounded-xl border border-border bg-surface">

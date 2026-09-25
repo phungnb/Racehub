@@ -31,7 +31,7 @@ export function CupsScreen() {
       </div>
       <SegmentedControl value={scope} onChange={setScope} options={TABS} />
       {q.isPending ? <div className="space-y-3">{[0, 1].map((i) => <Skeleton key={i} className="h-28" />)}</div>
-        : q.isError ? <ErrorState onRetry={() => void q.refetch()} />
+        : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} />
         : !q.data.length ? (
           <EmptyState icon={Swords} title={scope === 'MINE' ? 'CLB của bạn chưa tham gia thách đấu nào' : 'Chưa có thách đấu nào'}
             description="Chủ nhiệm / quản trị viên CLB tạo thách đấu là mở ngay; người dùng khác tạo thì chờ admin duyệt." />

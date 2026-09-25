@@ -45,7 +45,7 @@ export function ClubBattles({ clubId, isStaff }: { clubId: string; isStaff: bool
       {isStaff && (
         <Button block onClick={() => setOpen(true)}><Swords className="size-4" aria-hidden />Thách đấu CLB khác</Button>
       )}
-      {q.isPending ? <Skeleton className="h-44" /> : q.isError ? <ErrorState onRetry={() => void q.refetch()} /> : !q.data.length ? (
+      {q.isPending ? <Skeleton className="h-44" /> : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : !q.data.length ? (
         <EmptyState icon={Swords} title="Chưa có trận đấu nào"
           description={isStaff ? 'Gửi lời thách đấu tới CLB bạn bè — mọi km hợp lệ của thành viên đều tính cho CLB.' : 'Ban quản trị CLB có thể thách đấu CLB khác.'} />
       ) : (

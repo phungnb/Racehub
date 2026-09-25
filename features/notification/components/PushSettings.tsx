@@ -25,7 +25,7 @@ export function PushSettingsCard() {
       <InstallRow />
       <DeviceRow configured={q.data?.configured ?? true} />
       {q.isPending ? <Skeleton className="h-64" />
-        : q.isError ? <ErrorState message={pushErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+        : q.isError ? <ErrorState message={pushErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
         : <Preferences key={JSON.stringify(q.data)} settings={q.data} />}
     </Card>
   )

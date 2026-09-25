@@ -16,7 +16,7 @@ export function CupDetailScreen({ id }: { id: string }) {
   const q = useQuery({ queryKey: ['cup', id], queryFn: () => getCup(id), refetchInterval: 60_000 })
   const [now] = useState(() => Date.now())
   if (q.isPending) return <div className="space-y-3"><Skeleton className="h-40" /><Skeleton className="h-64" /></div>
-  if (q.isError) return <ErrorState message={cupErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState message={cupErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   const c = q.data
   const phase = cupPhase(c, now)
   return (
