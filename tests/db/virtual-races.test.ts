@@ -103,43 +103,68 @@ describe('BIB điện tử do BTC thiết kế (002900)', () => {
       distances: [10], bib_prefix: 'NB', max_participants: 5, start_at: new Date(Date.now() + 3600_000).toISOString(), end_at: new Date(Date.now() + 5 * 86400_000).toISOString() })])
   }, 240_000)
 
-  it('BTC lưu thiết kế: làm sạch trường, chặn ảnh ngoài kho của giải, VĐV thấy trong chi tiết giải', async () => {
+  it('004800: BTC lưu thiết kế BIB theo lớp — làm sạch từng lớp, chặn ảnh ngoài kho, VĐV thấy trong chi tiết giải', async () => {
     const q = `select public.set_race_bib_design($1, $2::jsonb) as r`
-    const good = { template: 'stripe', colors: { bg: '#FFFFFF', band: '#1f4fd8', number: '#111111' }, logo_url: url(race), tagline: 'No Beer No Run',
-      sponsors: [{ name: 'Nhà tài trợ A' }, { name: '', logo_url: url(race, 'sp1.png') }, { name: '' }], show_qr: true, hack: '<script>' }
+    const layers = [
+      { id: 'num', type: 'text', bind: 'number', font: 'impact', size: 9999, x: 2, y: 0.5, align: 'center', color: 'number', fx: 'glow', fx_color: '#FF0000', hack: 1 },
+      { id: 'tag', type: 'text', bind: 'lạ', text: 'No Beer No Run', font: 'vibes', rot: -12, fx: 'marker', color: '#ABCDEF' },
+      { id: 'logo', type: 'image', role: 'logo', src: url(race), w: 0.2, h: 0.1 },
+      { id: 'sp1', type: 'image', role: 'sponsor', src: null, name: '  Nhà tài trợ A  ' },
+      { id: 'q1', type: 'qr', source: 'verify', w: 0.9, label: 'Quét để xác thực' },
+      { id: 'q2', type: 'qr', source: 'link', url: 'https://zalo.me/g/abc', label: 'Nhóm Zalo' },
+      { id: 'band', type: 'shape', shape: 'slash', fill: 'accent', w: 0.5, h: 0.1 },
+      { type: 'script', src: 'x' },
+    ]
+    const good = { v: 2, template: 'marathon', colors: { bg: '#FFFFFF', band: '#E11D48' }, strip: true, layers, hack: '<script>' }
     expect(await fails(rpc(db, R1, q, [race, JSON.stringify(good)]))).toContain('FORBIDDEN')
-    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...good, logo_url: 'https://evil.com/a.png' })]))).toContain('INVALID_BIB_IMAGE')
-    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...good, logo_url: url('00000000-0000-0000-0000-000000000000') })]))).toContain('INVALID_BIB_IMAGE')
-    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...good, colors: { bg: 'red' } })]))).toContain('INVALID_BIB_DESIGN')
-    const saved = await rpc<Record<string, unknown>>(db, ORG, q, [race, JSON.stringify(good)])
-    expect(saved).toMatchObject({ template: 'stripe', colors: { bg: '#ffffff', band: '#1f4fd8', number: '#111111' }, show_name: true, show_qr: true })
+    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ template: 'classic' })]))).toContain('APP_OUTDATED')     // bản app cũ (thiết kế bản 1)
+    const bad = (l: object) => rpc(db, ORG, q, [race, JSON.stringify({ ...good, layers: [l] })])
+    expect(await fails(bad({ type: 'image', src: 'https://evil.com/a.png' }))).toContain('INVALID_BIB_IMAGE')
+    expect(await fails(bad({ type: 'qr', source: 'fee', src: url('00000000-0000-0000-0000-000000000000') }))).toContain('INVALID_BIB_IMAGE')
+    expect(await fails(bad({ type: 'text', font: 'comic' }))).toContain('INVALID_BIB_DESIGN')
+    expect(await fails(bad({ type: 'text', fx: 'fire' }))).toContain('INVALID_BIB_DESIGN')
+    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...good, layers: Array.from({ length: 41 }, () => ({ type: 'shape' })) })]))).toContain('INVALID_BIB_DESIGN')
+    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...good, template: 'lạ' })]))).toContain('INVALID_BIB_DESIGN')
+    // QR phí tham gia: ảnh QR ngân hàng đã lưu của CLB tổ chức (kho club-media) được chấp nhận
+    const clubQr = `https://x.supabase.co/storage/v1/object/public/club-media/${CLUB}/bank/qr.png`
+    await rpc(db, ORG, q, [race, JSON.stringify({ ...good, layers: [{ type: 'qr', source: 'fee', src: clubQr }] })])
+
+    const saved = await rpc<{ v: number; template: string; colors: object; strip: boolean; layers: Record<string, unknown>[] }>(db, ORG, q, [race, JSON.stringify(good)])
+    expect(saved).toMatchObject({ v: 2, template: 'marathon', colors: { bg: '#ffffff', band: '#e11d48' }, strip: true, decor: true, pins: true })
     expect(saved).not.toHaveProperty('hack')
-    expect((saved.sponsors as unknown[]).length).toBe(2)                 // bỏ nhà tài trợ trống
-    const d = await rpc<{ bib_design: { template: string } }>(db, R1, `select public.race_detail($1) as r`, [race])
-    expect(d.bib_design.template).toBe('stripe')
+    expect(saved.layers.map((l) => l.id)).toEqual(['num', 'tag', 'logo', 'sp1', 'q1', 'q2', 'band'])     // lớp lạ bị bỏ, giữ thứ tự
+    expect(saved.layers[0]).toMatchObject({ bind: 'number', size: 800, x: 1.2, fx: 'glow', fx_color: '#ff0000' })
+    expect(saved.layers[0]).not.toHaveProperty('hack')
+    expect(saved.layers[1]).toMatchObject({ bind: 'custom', text: 'No Beer No Run', font: 'vibes', rot: -12, color: '#abcdef' })
+    expect(saved.layers[3]).toMatchObject({ name: 'Nhà tài trợ A', src: null })
+    expect(saved.layers[4]).toMatchObject({ w: 0.6, card: true })
+    expect(saved.layers[5]).toMatchObject({ source: 'link', url: 'https://zalo.me/g/abc' })
+    const d = await rpc<{ bib_design: { template: string }; cert_design: unknown }>(db, R1, `select public.race_detail($1) as r`, [race])
+    expect(d.bib_design.template).toBe('marathon')
+    expect(d.cert_design).toBeNull()
   })
 
-  it('003000 + 003200: ảnh BIB có sẵn làm khung + 3 khung chữ tự do, giới hạn giá trị, sai lựa chọn bị từ chối', async () => {
-    const q = `select public.set_race_bib_design($1, $2::jsonb) as r`
-    const base = { template: 'classic', colors: {}, sponsors: [] }
-    const saved = await rpc<Record<string, unknown>>(db, ORG, q, [race, JSON.stringify({ ...base, art_url: url(race, 'bib.png'), use_art: true,
-      art_fit: { zoom: 9, x: -0.25, y: 'lạ' }, show_header: false, qr_pos: 'corner', org_text: '  BTC Hồ Tây  ',
-      boxes: { number: { x: 2, y: 0.4, align: 'left', font: 'impact', outline: true, size: 9, color: 'accent', hack: 1 }, name: { show: false } } })])
-    expect(saved).toMatchObject({ use_art: true, show_header: false, show_sponsors: true, qr_pos: 'corner', art_fit: { zoom: 3, x: -0.25, y: 0 },
-      org_text: 'BTC Hồ Tây', show_name: false,
-      boxes: {
-        number: { show: true, x: 1, y: 0.4, align: 'left', font: 'impact', italic: false, outline: true, size: 2.5, color: 'accent' },
-        name: { show: false, font: 'sans', color: 'text' },
-        org: { show: true, x: 0.42, y: 0.3, align: 'center', font: 'sans', size: 1 },
-      } })
-    expect((saved.boxes as Record<string, object>).number).not.toHaveProperty('hack')
-    expect(saved).not.toHaveProperty('text')
-    const noArt = await rpc<Record<string, unknown>>(db, ORG, q, [race, JSON.stringify({ ...base, use_art: true })])
-    expect(noArt).toMatchObject({ use_art: false, qr_pos: 'right', boxes: { number: { font: 'mono', color: 'number' } } })
-    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, art_url: 'https://evil.com/bib.png' })]))).toContain('INVALID_BIB_IMAGE')
-    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, boxes: { number: { font: 'comic' } } })]))).toContain('INVALID_BIB_DESIGN')
-    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, boxes: { org: 'x' } })]))).toContain('INVALID_BIB_DESIGN')
-    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, qr_pos: 'top' })]))).toContain('INVALID_BIB_DESIGN')
+  it('004800: giấy chứng nhận do BTC thiết kế + tài nguyên có sẵn (QR / tài khoản ngân hàng CLB) chỉ BTC xem', async () => {
+    const q = `select public.set_race_cert_design($1, $2::jsonb) as r`
+    const cert = { format: 'landscape', template: 'ivory', layers: [
+      { id: 'n', type: 'text', bind: 'name', font: 'vibes', size: 120 },
+      { id: 't', type: 'text', bind: 'time' },
+      { id: 's', type: 'image', role: 'signature', src: url(race, 'ky.png') },
+      { id: 'l', type: 'shape', shape: 'laurel', fill: 'band' }] }
+    expect(await fails(rpc(db, R1, q, [race, JSON.stringify(cert)]))).toContain('FORBIDDEN')
+    expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...cert, format: 'A3' })]))).toContain('INVALID_BIB_DESIGN')
+    const saved = await rpc<{ format: string; template: string; layers: { bind?: string }[] }>(db, ORG, q, [race, JSON.stringify(cert)])
+    expect(saved).toMatchObject({ v: 2, format: 'landscape', template: 'ivory' })
+    expect(saved.layers[1].bind).toBe('time')
+    const d = await rpc<{ cert_design: { template: string } }>(db, R1, `select public.race_detail($1) as r`, [race])
+    expect(d.cert_design.template).toBe('ivory')
+    await rpc(db, ORG, `select public.set_race_cert_design($1, null) as r`, [race])
+    expect((await rpc<{ cert_design: unknown }>(db, R1, `select public.race_detail($1) as r`, [race])).cert_design).toBeNull()
+
+    await db.query(`update public.clubs set bank_bin = '970436', bank_account_no = '0123456789', bank_account_name = 'NBNR' where id = $1`, [CLUB])
+    expect(await fails(rpc(db, R1, `select public.race_design_assets($1) as r`, [race]))).toContain('FORBIDDEN')
+    const a = await rpc<{ club: { name: string }; bank: { bin: string } }>(db, ORG, `select public.race_design_assets($1) as r`, [race])
+    expect(a).toMatchObject({ club: { name: 'NBNR' }, bank: { bin: '970436', account_no: '0123456789' } })
   })
 
   it('kho ảnh race-media: BTC tải lên được, người ngoài bị chặn; không làm hỏng upload của kho khác', async () => {

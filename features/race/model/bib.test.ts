@@ -1,63 +1,73 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn() } }))
-const { applyPreset, artRect, bibPayload, BIB_SIZE, DEFAULT_BIB, DEFAULT_BOXES, hitBox, moveBox, panArt, resolveBib, TEMPLATES } = await import('./bib')
+const { arrangeSponsors, autoBib, bibNumber, bibPayload, freshBib, fromV1, keepAssets, resolveBib, STRIP_H, TEMPLATES } = await import('./bib')
+const { imageLayer, qrLayer, textLayer } = await import('./design')
 
-describe('thiết kế BIB', () => {
-  it('thiết kế trống / hỏng → mẫu cổ điển, màu theo mẫu, 3 khung chữ mặc định', () => {
+const texts = (ls: { type: string }[]) => ls.filter((l): l is ReturnType<typeof textLayer> => l.type === 'text')
+
+describe('thiết kế BIB bản 2 (lớp)', () => {
+  it('số BIB in lên bỏ tiền tố chữ viết tắt', () => {
+    expect(bibNumber('HT-0421')).toBe('0421')
+    expect(bibNumber('A-B-0007')).toBe('0007')
+    expect(bibNumber('0421')).toBe('0421')
+  })
+  it('chưa có thiết kế → bố cục tự động mẫu cổ điển: số, tên, giải, cự ly, QR xác thực, ô logo', () => {
     const r = resolveBib(null)
     expect(r.template).toBe('classic')
     expect(r.palette).toEqual(TEMPLATES.classic.colors)
-    expect(r.boxes).toEqual(DEFAULT_BOXES)
-    expect(resolveBib({ template: 'lạ' as never }).template).toBe('classic')
+    const binds = texts(r.layers).map((l) => l.bind)
+    expect(binds).toEqual(expect.arrayContaining(['number', 'name', 'race', 'distance', 'org', 'dates']))
+    expect(r.layers.some((l) => l.type === 'qr' && l.source === 'verify')).toBe(true)
+    expect(r.layers.some((l) => l.type === 'image' && l.role === 'logo')).toBe(true)
   })
-  it('màu BTC chọn đè lên màu mẫu; tối đa 4 nhà tài trợ', () => {
-    const r = resolveBib({ template: 'neon', colors: { number: '#ff0000' }, sponsors: Array.from({ length: 6 }, (_, i) => ({ name: `S${i}`, logo_url: null })) })
-    expect(r.palette).toMatchObject({ bg: TEMPLATES.neon.colors.bg, number: '#ff0000' })
-    expect(r.sponsors).toHaveLength(4)
+  it('bố cục tự động giữ logo / QR / nhà tài trợ BTC đã thêm; logo tài trợ dàn đều trong dải dưới', () => {
+    const logo = imageLayer({ x: 0.3, y: 0.3, role: 'logo', src: 'https://a/logo.png' })
+    const fee = qrLayer({ x: 0.1, y: 0.1, source: 'fee', src: 'https://a/qr.png' })
+    const club = qrLayer({ x: 0.1, y: 0.1, source: 'club' })
+    const sp = [1, 2, 3].map((i) => imageLayer({ x: 0, y: 0, role: 'sponsor', name: `S${i}` }))
+    const ls = autoBib('marathon', keepAssets([logo, fee, club, ...sp]), { strip: true })
+    expect(ls.find((l) => l.id === logo.id)).toMatchObject({ src: 'https://a/logo.png' })
+    const qrs = ls.filter((l) => l.type === 'qr')
+    expect(qrs.map((q) => q.id)).toEqual([fee.id, club.id])
+    expect(qrs[0].y).toBeLessThan(qrs[1].y)                              // xếp dọc, không chồng
+    const placed = ls.filter((l) => l.type === 'image' && l.role === 'sponsor')
+    expect(placed.map((l) => l.y)).toEqual([1 - STRIP_H / 2, 1 - STRIP_H / 2, 1 - STRIP_H / 2])
+    expect(placed[0].x).toBeLessThan(placed[1].x)
+    expect(placed[1].x).toBeCloseTo(0.5)
+    // Kéo lệch rồi “Xếp đều” đưa về dải
+    const moved = placed.map((l, i) => ({ ...l, x: 0.1 * i, y: 0.2 }))
+    expect(arrangeSponsors(moved).every((l) => l.y === 1 - STRIP_H / 2)).toBe(true)
   })
-  it('dữ liệu gửi lên: chỉ lưu màu khác mẫu, bỏ nhà tài trợ trống, cắt khoảng trắng', () => {
-    const p = bibPayload({ ...DEFAULT_BIB, colors: { bg: '#FFFFFF', band: '#ff0000' }, tagline: '  ', org_text: '  ', use_art: true,
-      sponsors: [{ name: ' A ', logo_url: null }, { name: '', logo_url: null }] })
+  it('thiết kế bản 1 (3 khung chữ + đầu BIB + QR cố định) vẫn hiển thị: đổi sang lớp giữ vị trí, font, ẩn / hiện', () => {
+    const v1 = { template: 'neon', logo_url: 'https://a/logo.png', tagline: 'No Beer No Run', qr_pos: 'left', org_text: 'BTC Hồ Tây',
+      sponsors: [{ name: 'A', logo_url: null }], boxes: { number: { x: 0.6, y: 0.5, font: 'impact', size: 1.2, outline: true }, name: { show: false } } }
+    const d = fromV1(v1)
+    expect(d.template).toBe('neon')
+    const t = texts(d.layers)
+    expect(t.find((l) => l.bind === 'number')).toMatchObject({ x: 0.6, y: 0.5, font: 'impact', size: 360, fx: 'outline' })
+    expect(t.find((l) => l.bind === 'name')?.hidden).toBe(true)
+    expect(t.find((l) => l.text === 'BTC Hồ Tây')).toBeTruthy()          // chữ Đơn vị tổ chức riêng
+    expect(t.find((l) => l.text === 'No Beer No Run')).toBeTruthy()
+    expect(d.layers.find((l) => l.type === 'qr')?.x).toBeLessThan(0.3)
+    expect(d.strip).toBe(true)
+    expect(resolveBib(v1).layers.length).toBe(d.layers.length)           // resolveBib nhận ra bản 1
+  })
+  it('dữ liệu lưu hỏng: mẫu lạ về cổ điển, màu sai bị bỏ, lớp lạ bị bỏ, giá trị bị kẹp', () => {
+    const r = resolveBib({ v: 2, template: 'lạ' as never, colors: { bg: 'red', band: '#ABCDEF' }, layers: [
+      { type: 'text', bind: 'number', size: 5000, x: 9, font: 'comic' }, { type: 'video' }, null] })
+    expect(r.template).toBe('classic')
+    expect(r.colors).toEqual({ band: '#abcdef' })
+    expect(r.layers).toHaveLength(1)
+    expect(r.layers[0]).toMatchObject({ type: 'text', bind: 'number', size: 800, x: 1.2, font: 'sans' })
+  })
+  it('dữ liệu gửi lên: chỉ lưu màu khác mẫu, bỏ chữ tự nhập trống, không bật ảnh khung khi chưa có ảnh', () => {
+    const d = freshBib()
+    const p = bibPayload({ ...d, colors: { bg: '#FFFFFF', band: '#ff0000' }, use_art: true,
+      layers: [...d.layers, textLayer({ x: 0.5, y: 0.5, text: '   ' }), textLayer({ x: 0.5, y: 0.5, text: ' Hi ' })] })
     expect(p.colors).toEqual({ band: '#ff0000' })
-    expect(p.tagline).toBeNull()
-    expect(p.org_text).toBeNull()
-    expect(p.use_art).toBe(false)                                          // chưa có ảnh thì không bật khung
-    expect(p.sponsors).toEqual([{ name: 'A', logo_url: null }])
-  })
-  it('khung chữ: giá trị lạ về mặc định, ngoài khoảng bị kẹp', () => {
-    const r = resolveBib({ boxes: { number: { x: 2, y: -1, font: 'comic' as never, size: 9, color: 'pink' as never, italic: true }, name: { show: false } } })
-    expect(r.boxes.number).toMatchObject({ x: 1, y: 0, font: 'mono', size: 2.5, color: 'number', italic: true })
-    expect(r.boxes.name.show).toBe(false)
-    expect(r.show_name).toBe(false)
-    expect(r.boxes.org).toEqual(DEFAULT_BOXES.org)
-  })
-  it('thiết kế bản 003000 (text.layout) vẫn hiển thị: đổi sang 3 khung', () => {
-    const r = resolveBib({ text: { layout: 'above', font: 'outline', scale: 1.2 } as never })
-    expect(r.boxes.name.y).toBeLessThan(r.boxes.number.y)
-    expect(r.boxes.number).toMatchObject({ outline: true, font: 'sans', size: 1.2 })
-  })
-  it('bố cục nhanh giữ font / màu, chừa chỗ QR', () => {
-    const b = applyPreset({ ...DEFAULT_BOXES, number: { ...DEFAULT_BOXES.number, font: 'impact', color: 'accent' } }, 'inline', 'right')
-    expect(b.number).toMatchObject({ font: 'impact', color: 'accent', align: 'right' })
-    expect(b.name.align).toBe('left')
-    expect(b.name.y).toBe(b.number.y)
-    expect(applyPreset(DEFAULT_BOXES, 'left', 'left').number.x).toBeGreaterThan(0.2)
-  })
-  it('kéo khung chữ theo px, kẹp trong BIB; chạm chọn khung', () => {
-    expect(moveBox(DEFAULT_BOXES.number, 140, 100)).toMatchObject({ x: DEFAULT_BOXES.number.x + 0.1, y: DEFAULT_BOXES.number.y + 0.1 })
-    expect(moveBox(DEFAULT_BOXES.number, 99999, -99999)).toMatchObject({ x: 1, y: 0 })
-    const layout = { boxes: { number: { x: 100, y: 400, w: 800, h: 200 }, name: { x: 300, y: 560, w: 300, h: 50 } } }
-    expect(hitBox(layout, 400, 570)).toBe('name')                         // khung nhỏ ưu tiên khi chồng
-    expect(hitBox(layout, 150, 450)).toBe('number')
-    expect(hitBox(layout, 1300, 100)).toBeNull()
-  })
-  it('ảnh khung phủ kín BIB; kéo dịch theo px, kẹp ở mép ảnh', () => {
-    const fit = { zoom: 1, x: 0, y: 0 }
-    expect(artRect(1400, 1000, fit)).toEqual({ x: 0, y: 0, w: BIB_SIZE.w, h: BIB_SIZE.h })
-    expect(artRect(1000, 1000, fit)).toMatchObject({ w: 1400, h: 1400, y: -200 })
-    const moved = panArt(fit, 50, 100, 1000, 1000)
-    expect(moved.x).toBe(0)
-    expect(artRect(1000, 1000, moved).y).toBeCloseTo(-100)
-    expect(panArt(fit, 0, 5000, 1000, 1000).y).toBe(1)
+    expect(p.use_art).toBe(false)
+    expect(p.layers).toHaveLength(d.layers.length + 1)
+    expect(texts(p.layers).at(-1)?.text).toBe('Hi')
+    expect(p.v).toBe(2)
   })
 })

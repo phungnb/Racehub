@@ -2,6 +2,7 @@
 import { prepareImage } from '@/shared/lib/image'
 import { supabase } from '@/shared/lib/supabase'
 import type { BibDesign, StoredDesign } from '../model/bib'
+import type { CertDesign, StoredCert } from '../model/certificate'
 import { systemErrorMessage } from '@/shared/lib/errors'
 
 export type RaceScope = 'UPCOMING' | 'MINE' | 'PAST'
@@ -36,6 +37,8 @@ export interface Race {
   bib_prefix: string
   /** Thiết kế e-BIB của BTC (migration 002900), null = mẫu mặc định */
   bib_design: StoredDesign | null
+  /** Thiết kế giấy chứng nhận của BTC (migration 004800, chỉ có ở chi tiết giải), null = mẫu mặc định */
+  cert_design?: StoredCert | null
   club: { id: string; name: string; avatar_url: string | null; accent_color: string | null } | null
   organizer: { id: string; display_name: string | null; avatar_url: string | null } | null
   registered: number
@@ -112,6 +115,17 @@ export const withdrawRace = (id: string) => call<Race>('withdraw_race', { p_race
 export const cancelRace = (id: string, reason: string) => call<void>('cancel_virtual_race', { p_race_id: id, p_reason: reason })
 
 export const setBibDesign = (id: string, p: unknown) => call<BibDesign>('set_race_bib_design', { p_race_id: id, p })
+export const setCertDesign = (id: string, p: unknown) => call<CertDesign | null>('set_race_cert_design', { p_race_id: id, p })
+
+/** Tài nguyên có sẵn cho trình thiết kế (chỉ BTC): CLB tổ chức, QR nhận tiền / tài khoản ngân hàng đã lưu */
+export interface DesignAssets {
+  club: { id: string; name: string; avatar_url: string | null } | null
+  bank_qr_url: string | null
+  bank: { bin: string; account_no: string; account_name: string } | null
+}
+export async function getDesignAssets(id: string): Promise<DesignAssets> {
+  try { return await call<DesignAssets>('race_design_assets', { p_race_id: id }) } catch { return { club: null, bank_qr_url: null, bank: null } }
+}
 
 export interface BibCheck { bib: string; display_name: string | null; avatar_url: string | null; distance_km: number; status: MyRegistration['status']; finish_time_s: number | null; finished_at: string | null }
 export const lookupBib = (id: string, bib: string) => call<BibCheck | null>('race_bib_lookup', { p_race_id: id, p_bib: bib })
@@ -130,6 +144,7 @@ export async function uploadRaceImage(raceId: string, file: File): Promise<strin
 
 const MESSAGES: Record<string, string> = {
   FORBIDDEN: 'Bạn không có quyền làm việc này.',
+  APP_OUTDATED: 'Ứng dụng vừa được cập nhật — tải lại trang rồi lưu lại thiết kế.',
   RACE_ORGANIZER_REQUIRED: 'Chỉ CLB hoặc cá nhân được RaceHub cấp quyền mới tạo được giải chạy ảo. Liên hệ admin để đăng ký.',
   CAPACITY_REQUIRED: 'Chọn quy mô (số VĐV tối đa) — phí tạo giải tính theo quy mô.',
   INSUFFICIENT_BALANCE: 'Ví của bạn không đủ Xu trả phí tạo giải.',
