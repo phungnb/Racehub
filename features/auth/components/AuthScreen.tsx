@@ -317,7 +317,8 @@ export default function AuthScreen({ onAuthSuccess }: { onAuthSuccess: () => voi
 
         {mode !== 'forgot' && (
           <p className="text-center text-[11px] text-fg-subtle">
-            Bằng việc tiếp tục, bạn đồng ý với Điều khoản sử dụng của RaceHub
+            Bằng việc tiếp tục, bạn đồng ý với <a href="/terms" className="underline hover:text-fg">Điều khoản sử dụng</a> và{' '}
+            <a href="/privacy" className="underline hover:text-fg">Chính sách quyền riêng tư</a> của RaceHub
           </p>
         )}
       </div>

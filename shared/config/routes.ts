@@ -21,6 +21,8 @@ export const routes = {
   character: '/character',
   admin: '/admin',
   welcome: '/welcome',
+  privacy: '/privacy',
+  terms: '/terms',
   activity: (id: string) => `/activities/${encodeURIComponent(id)}`,
   races: '/races',
   race: (id: string) => `/races/${encodeURIComponent(id)}`,
