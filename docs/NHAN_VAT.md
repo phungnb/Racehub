@@ -62,6 +62,42 @@ values ('top_vn_red', 'Áo Đỏ Cờ', 'Mừng Quốc khánh 2/9', 'top', 'epic
   - `is_active = false`: ẩn khỏi shop.
 - Không cần deploy lại.
 
+## 3b. Quản lý trang phục (migration 005800)
+
+**Vòng đời** (Quản trị → Vật phẩm): *Nháp* (chỉ admin thấy) → *Chờ duyệt* → *Đang bán* → *Ngừng bán* (người đã có vẫn mặc) → *Gỡ hẳn*. Món đã có người sở hữu không đưa về Nháp được. Món mới tạo mặc định là **Nháp**: xem thử kỹ rồi bấm **Bán**.
+
+**Điều kiện mở khóa** (ô *Điều kiện mở khóa & bán*):
+
+| Điều kiện | Ý nghĩa |
+|---|---|
+| Cấp 1–8 | Chưa đủ cấp thì khóa |
+| Huy hiệu | Phải có huy hiệu (mã trong `achievements`) |
+| Thử thách | Phải hoàn thành thử thách |
+| Chỉ thành viên CLB | Đồng phục: chỉ thành viên thấy / mua / mặc; rời CLB tự tháo |
+| Mở bán từ / đến | Ngoài khung giờ thì khóa (*Sắp mở bán* / *Hết thời gian*) |
+| Giới hạn số lượng | Bán hết thì *Hết hàng* |
+
+Giá **0 Xu + có điều kiện** = tự phát khi người chơi đủ điều kiện (quà cấp, quà huy hiệu, quà thử thách, đồng phục miễn phí).
+
+**Bộ sưu tập:** Quản trị → Vật phẩm → *Bộ sưu tập* (Mùa, Sự kiện, CLB, Nhà tài trợ…). Tủ đồ có nút lọc theo bộ đang mở.
+
+## 3c. Vùng in trên áo
+
+Áo (ô `top`) có 4 vùng in, vẽ theo nếp vải và bóng đổ của áo, bị cắt gọn trong mặt nạ áo:
+
+| Vùng | Nội dung | Giới hạn |
+|---|---|---|
+| Logo ngực trái | PNG / WebP / JPG nền trong suốt, ≤ 2 MB | kho `uniform-media` |
+| Chữ lớn giữa ngực | thường là tên CLB | 24 ký tự |
+| Dòng phụ | khẩu hiệu, năm thành lập | 32 ký tự |
+| Tên runner | tên gọi của **người mặc** (từ cuối họ tên, viết hoa) | tự co cho vừa |
+
+Màu chữ và kiểu chữ (Thể thao / Hiện đại / Cổ điển) chọn chung cho cả áo. Tọa độ vùng in theo khung chuẩn nằm ở `PRINT_ZONES` (`features/character/model/catalog.ts`); đổi ảnh nền thì đo lại.
+
+**Đồng phục CLB:** Chủ nhiệm / đội trưởng vào **Cài đặt CLB → Đồng phục CLB → Thiết kế mẫu áo** (màu, logo, chữ, bật tên runner, xem thử trên nhân vật) → **Gửi duyệt** (tối đa 3 mẫu chờ). Admin vào **Quản trị → Vật phẩm → Đồng phục**, xem thử, **đặt giá như vật phẩm thường** (0 Xu = phát miễn phí cho cả CLB) hoặc trả lại kèm lý do. Duyệt xong cả CLB nhận thông báo.
+
+> Áo thật chỉ bán qua **Shop đối tác ở Chợ Runner**. RaceHub không nhận tiền áo.
+
 ## 4. Đổi ảnh nhân vật / thêm tư thế
 
 1. Ảnh gốc (nền trơn, người đứng giữa) đặt tên `scripts/character/source/runner_<male|female>.png`. Thư mục này không bị deploy, chỉ dùng để sinh tài nguyên.

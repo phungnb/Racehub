@@ -58,6 +58,13 @@ const MESSAGES: Record<string, string> = {
   PROMO_LIMIT_REACHED: 'Bạn đã dùng hết lượt của chương trình này.',
   PROMO_NOT_ELIGIBLE: 'Chương trình này không áp dụng cho tài khoản của bạn.',
   SHINE_ONLY: 'Vật phẩm này chỉ đổi bằng Tỏa sáng.',
+  CLUB_ONLY: 'Đồng phục này chỉ dành cho thành viên CLB.',
+  BADGE_REQUIRED: 'Cần có huy hiệu yêu cầu để nhận vật phẩm này.',
+  CHALLENGE_REQUIRED: 'Hoàn thành thử thách để nhận vật phẩm này.',
+  NOT_YET_AVAILABLE: 'Vật phẩm chưa mở bán.',
+  SALE_ENDED: 'Vật phẩm đã hết thời gian bán.',
+  SOLD_OUT: 'Vật phẩm đã hết hàng.',
+  NOT_FOR_SALE: 'Vật phẩm này không bán.',
 }
 
 export function characterErrorMessage(e: unknown): string {

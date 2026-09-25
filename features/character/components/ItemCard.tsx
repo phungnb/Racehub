@@ -4,7 +4,7 @@ import { Check, Coins, Lock, Sparkles } from 'lucide-react'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin } from '@/shared/lib/format'
 import { LayerThumb } from './LayerThumb'
-import { buyPrice, layerUrl, RARITY_META, SLOTS, type CharacterItem, type Gender, type ItemStatus } from '../model/catalog'
+import { buyPrice, layerUrl, LOCK_LABEL, RARITY_META, SLOTS, type CharacterItem, type Gender, type ItemStatus } from '../model/catalog'
 
 /** Ô vật phẩm: mẫu màu (hoặc ảnh lớp), độ hiếm, trạng thái (đang mặc / đã có / giá / khóa cấp) */
 export function ItemCard({ item, gender, status, selected, onSelect }: {
@@ -29,6 +29,9 @@ export function ItemCard({ item, gender, status, selected, onSelect }: {
         {status !== 'EQUIPPED' && status !== 'OWNED' && item.offer && (
           <span className="absolute -left-2 -top-2 max-w-20 truncate rounded-full bg-danger px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow">{item.offer.badge}</span>
         )}
+        {item.club_id && (
+          <span className="absolute -bottom-1.5 left-1/2 max-w-20 -translate-x-1/2 truncate rounded-full bg-brand px-1.5 py-0.5 text-[9px] font-black uppercase text-brand-fg shadow">CLB</span>
+        )}
         {status === 'EQUIPPED' && (
           <span className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-brand text-brand-fg"><Check className="size-3" aria-hidden /></span>
         )}
@@ -37,7 +40,7 @@ export function ItemCard({ item, gender, status, selected, onSelect }: {
       <span className={cn('flex items-center gap-1 text-xs font-semibold', r.text)}>
         {status === 'EQUIPPED' ? <span className="text-brand">Đang mặc</span>
           : status === 'OWNED' ? <span className="text-fg-muted">{item.trial_until && !item.owned ? `Thử đến ${new Date(item.trial_until).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}` : 'Đã có'}</span>
-          : status === 'LOCKED' ? <><Lock className="size-3" aria-hidden /><span>Cấp {item.unlock_level}</span></>
+          : status === 'LOCKED' ? <><Lock className="size-3 shrink-0" aria-hidden /><span className="truncate">{!item.lock || item.lock === 'LEVEL' ? `Cấp ${item.unlock_level}` : LOCK_LABEL[item.lock]}</span></>
           : item.acquire === 'shine' ? <span className="flex items-center gap-0.5 text-coin"><Sparkles className="size-3" aria-hidden />Tỏa sáng</span>
           : item.offer?.kind === 'TRIAL' && item.offer.eligible ? <span className="text-brand">Mặc thử {item.offer.trial_days} ngày</span>
           : item.price_xu > 0 ? (

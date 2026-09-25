@@ -33,7 +33,7 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
 > ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
-> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 005700** + chạy lại 003500),
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 005800** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
 > File gộp tạo bằng `npm run db:bundle` (hoặc `node scripts/db-bundle.mjs <mốc>` để gộp từ mốc khác); test tự động bảo đảm file luôn khớp migration.
@@ -99,6 +99,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001005500_social_login_invites.sql` | **Đăng nhập Google / Apple** (tên + ảnh lấy từ tài khoản; sửa lỗi đăng ký email bị đặt tên theo email). **Mã giới thiệu ngắn** 8 ký tự (`/join/<mã>`, link cũ vẫn chạy), trang **Tôi → Mời bạn bè** (mã, QR, bạn đã mời, Xu nhận), nhập mã khi đăng ký. **Trang xem trước lời mời** (người mời / CLB) trước khi đăng ký hoặc tham gia | Cần 300, 3400, 3700; chạy lại 3500 |
 | `20261001005600_admin_console.sql` | **Quản trị toàn diện**: *Việc cần xử lý* (đơn, bài chờ duyệt, đối tác, thách đấu, lỗi), **Người dùng** (hồ sơ, email, đăng nhập cuối, số dư, CLB, giao dịch; **khóa / mở khóa** tài khoản — đăng xuất mọi thiết bị; **cấp / gỡ quyền admin**), **Thử thách** (tìm, hủy thử thách vi phạm, hoàn tiền treo), **Nhật ký quản trị** | Cần 600, 3800, 4100, 4400, 5300; chạy lại 3500 |
 | `20261001005700_club_roles_cleanup.sql` | **Sửa dứt điểm lỗi trao quyền Chủ nhiệm** (mã UNK-…): gỡ ràng buộc vai trò CŨ `club_members_role_check` (chỉ nhận OWNER/ADMIN/MEMBER) còn sót trên production khi file 500 từng chạy dở; đổi vai trò ADMIN/VICE cũ thành Quản trị viên (CAPTAIN) | **Chạy riêng được ngay**; chạy lại 3500 |
+| `20261001005800_outfit_studio.sql` | **Quản lý trang phục**: vòng đời vật phẩm (Nháp → Đang bán → Ngừng bán → Gỡ hẳn), **bộ sưu tập**, điều kiện mở khóa (cấp 1–8, huy hiệu, thử thách, chỉ thành viên CLB, khung giờ bán, giới hạn số lượng). **Vùng in trên áo** (logo, tên CLB, dòng phụ, tên runner). **Đồng phục CLB**: ban quản trị CLB gửi mẫu → admin duyệt + đặt giá → chỉ thành viên mua / mặc. Kho ảnh mới `uniform-media` | Cần 1000, 1200, 5100; chạy lại 3500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

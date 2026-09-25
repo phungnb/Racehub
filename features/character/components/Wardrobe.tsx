@@ -11,7 +11,7 @@ import { routes } from '@/shared/config/routes'
 import { characterErrorMessage } from '../api/characterApi'
 import { useBuyBundle, useBuyItem, useCharacterState, useSaveCharacter, useTryItem } from '../hooks/useCharacter'
 import {
-  buyPrice, canTry, itemStatus, outfitDiff, RARITY_META, resolveOutfit, SLOTS,
+  buyPrice, canTry, itemStatus, LOCK_LABEL, outfitDiff, RARITY_META, resolveOutfit, SLOTS,
   type CharacterItem, type CharacterState, type ItemBundle, type ItemOffer, type Slot,
 } from '../model/catalog'
 import { ItemCard } from './ItemCard'
@@ -86,7 +86,9 @@ function Editor({ state }: { state: CharacterState }) {
     setBundle(null)
   }
   const slotMeta = SLOTS.find((s) => s.slot === tab)
-  const list = items.filter((i) => i.slot === tab)
+  const [col, setCol] = useState<string | null>(null)
+  const collections = state.collections ?? []
+  const list = items.filter((i) => i.slot === tab && (!col || i.collection?.code === col))
   const status = (i: CharacterItem) => itemStatus(i, state.level, state.equipped)
 
   return (
@@ -104,7 +106,7 @@ function Editor({ state }: { state: CharacterState }) {
       {/* Nhân vật + hàng ô đồ dính trên cùng khi cuộn danh sách */}
       <div className="sticky top-[var(--topbar-h)] z-20 -mx-4 space-y-2 bg-bg px-4 pb-2 pt-2">
         <div className="relative h-[40vh] min-h-64 overflow-hidden rounded-3xl border border-border bg-[#c4c4ce]">
-          <PaperDoll gender={gender} items={outfit} className="size-full" label="Nhân vật của bạn" />
+          <PaperDoll gender={gender} items={outfit} personalName={state.display_name} className="size-full" label="Nhân vật của bạn" />
           {tryingUnowned && (
             <span className="absolute left-3 top-3 max-w-[55%] truncate rounded-full bg-bg/85 px-3 py-1 text-xs font-semibold text-coin backdrop-blur">
               Đang thử: {tryingUnowned.name}
@@ -140,6 +142,18 @@ function Editor({ state }: { state: CharacterState }) {
         </button>
       ))}
 
+      {collections.length > 0 && (
+        <div role="group" aria-label="Bộ sưu tập" className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
+          {[{ code: null as string | null, name: 'Tất cả' }, ...collections].map((c) => (
+            <button key={c.code ?? 'all'} type="button" aria-pressed={col === c.code} onClick={() => setCol(c.code)}
+              className={cn('shrink-0 rounded-full border px-3 py-1 text-xs font-semibold',
+                col === c.code ? 'border-coin bg-coin/15 text-coin' : 'border-border text-fg-muted hover:text-fg')}>
+              {c.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {list.length === 0 ? (
         <p className="py-10 text-center text-sm text-fg-muted">Chưa có vật phẩm cho ô này.</p>
       ) : (
@@ -167,7 +181,9 @@ function Editor({ state }: { state: CharacterState }) {
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{tryingUnowned.name}</p>
-              {tryingUnowned.offer ? <OfferLine o={tryingUnowned.offer} /> : (
+              {tryingUnowned.offer ? <OfferLine o={tryingUnowned.offer} /> : (tryingUnowned.lock && tryingUnowned.lock !== 'LEVEL') || tryingUnowned.club_name || tryingUnowned.left != null || tryingUnowned.available_to ? (
+                <ItemNote it={tryingUnowned} />
+              ) : (
                 <p className={cn('truncate text-xs', RARITY_META[tryingUnowned.rarity].text)}>
                   {RARITY_META[tryingUnowned.rarity].label}{tryingUnowned.description ? ` · ${tryingUnowned.description}` : ''}
                 </p>
@@ -177,8 +193,10 @@ function Editor({ state }: { state: CharacterState }) {
               onClick={() => setDraft((d) => ({ ...d, [tryingUnowned.slot]: state.equipped[tryingUnowned.slot] }))}>Bỏ thử</Button>
             {tryingUnowned.acquire === 'shine' ? (
               <Link href={routes.shine} className="shrink-0"><Button variant="coin"><Sparkles className="size-4" aria-hidden />Đổi bằng Tỏa sáng</Button></Link>
-            ) : state.level < tryingUnowned.unlock_level ? (
-              <Button className="shrink-0" disabled><Lock className="size-4" aria-hidden />Cấp {tryingUnowned.unlock_level}</Button>
+            ) : state.level < tryingUnowned.unlock_level || tryingUnowned.lock ? (
+              <Button className="shrink-0" disabled><Lock className="size-4" aria-hidden />
+                {!tryingUnowned.lock || tryingUnowned.lock === 'LEVEL' ? `Cấp ${tryingUnowned.unlock_level}` : LOCK_LABEL[tryingUnowned.lock]}
+              </Button>
             ) : canTry(tryingUnowned) ? (
               <Button className="shrink-0" onClick={() => void doTry(tryingUnowned)} loading={tryOn.isPending}>
                 <Shirt className="size-4" aria-hidden />Mặc thử {tryingUnowned.offer?.trial_days} ngày
@@ -217,6 +235,18 @@ function Countdown({ to }: { to: string }) {
   const d = Math.floor(ms / 86_400_000), h = Math.floor((ms % 86_400_000) / 3_600_000), m = Math.floor((ms % 3_600_000) / 60_000), sec = Math.floor((ms % 60_000) / 1000)
   const pad = (n: number) => String(n).padStart(2, '0')
   return <span className="font-mono">{d > 0 ? `còn ${d} ngày ${pad(h)}:${pad(m)}` : `còn ${pad(h)}:${pad(m)}:${pad(sec)}`}</span>
+}
+
+/** Dòng phụ: đồng phục CLB, lý do khóa, số lượng còn, hạn bán */
+function ItemNote({ it }: { it: CharacterItem }) {
+  return (
+    <p className="truncate text-xs text-fg-muted">
+      {it.club_name && <span className="font-semibold text-brand">Đồng phục {it.club_name}</span>}
+      {it.lock && it.lock !== 'LEVEL' && <>{it.club_name ? ' · ' : ''}<span className="text-danger">{LOCK_LABEL[it.lock]}</span></>}
+      {it.left != null && ` · còn ${it.left}`}
+      {it.available_to && it.lock !== 'ENDED' && <> · <Countdown to={it.available_to} /></>}
+    </p>
+  )
 }
 
 function OfferLine({ o }: { o: ItemOffer }) {

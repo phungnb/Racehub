@@ -3,8 +3,10 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useInvalidateProfile } from '@/features/auth'
 import type { EconomyPolicy } from '@/shared/lib/economy'
+import type { ItemLifecycle, UniformStatus } from '@/features/character'
 import {
-  getOverview, grantPass, grantXu, listAvatarItems, listPasses, saveAvatarItem, setAvatarItemActive, listPendingActivities, publishPolicy, reviewActivity, revokePass, searchAccounts,
+  getOverview, grantPass, grantXu, listAvatarCollections, listAvatarItems, listPasses, listUniformRequests, reviewUniformRequest, saveAvatarCollection, saveAvatarItem,
+  setAvatarItemActive, setAvatarItemStatus, listPendingActivities, publishPolicy, reviewActivity, revokePass, searchAccounts,
 } from '../api/adminApi'
 
 export const adminKeys = {
@@ -13,6 +15,8 @@ export const adminKeys = {
   passes: ['admin', 'passes'] as const,
   pending: ['admin', 'pending'] as const,
   items: ['admin', 'items'] as const,
+  collections: ['admin', 'collections'] as const,
+  uniforms: (status: string) => ['admin', 'uniforms', status] as const,
 }
 
 export const useEconomyOverview = () => useQuery({ queryKey: adminKeys.overview, queryFn: getOverview })
@@ -89,5 +93,35 @@ export function useSetItemActive() {
   return useMutation({
     mutationFn: ({ code, active }: { code: string; active: boolean }) => setAvatarItemActive(code, active),
     onSuccess: refresh,
+  })
+}
+
+export function useSetItemStatus() {
+  const refresh = useRefreshItems()
+  return useMutation({
+    mutationFn: ({ code, status }: { code: string; status: ItemLifecycle }) => setAvatarItemStatus(code, status),
+    onSuccess: refresh,
+  })
+}
+
+export const useAvatarCollections = () => useQuery({ queryKey: adminKeys.collections, queryFn: listAvatarCollections })
+
+export function useSaveAvatarCollection() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: saveAvatarCollection,
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: adminKeys.collections }); void qc.invalidateQueries({ queryKey: ['character'] }) },
+  })
+}
+
+export const useUniformRequests = (status: UniformStatus | 'ALL') =>
+  useQuery({ queryKey: adminKeys.uniforms(status), queryFn: () => listUniformRequests(status) })
+
+export function useReviewUniform() {
+  const qc = useQueryClient()
+  const refresh = useRefreshItems()
+  return useMutation({
+    mutationFn: ({ id, action, p }: { id: string; action: 'APPROVE' | 'REJECT'; p: Parameters<typeof reviewUniformRequest>[2] }) => reviewUniformRequest(id, action, p),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['admin', 'uniforms'] }); refresh() },
   })
 }
