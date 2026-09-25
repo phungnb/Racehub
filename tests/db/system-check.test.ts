@@ -19,7 +19,7 @@ describe('Kiểm tra hệ thống (003500)', () => {
     await expect(run(USER)).rejects.toThrow(/FORBIDDEN/)
     const r = (await run(ADMIN)).rows[0].r
     expect(r.migrations.filter((m) => !m.ok)).toEqual([])
-    expect(r.migrations).toHaveLength(56)
+    expect(r.migrations).toHaveLength(57)
     expect(r.buckets.find((b) => b.id === 'race-media')).toMatchObject({ ok: true, limit_mb: 10 })
     expect(r.stats).toMatchObject({ admins: 1, users: 2 })
 

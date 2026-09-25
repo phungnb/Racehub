@@ -1,7 +1,7 @@
--- RaceHub: gộp 21 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 22 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -5520,6 +5520,24 @@ grant execute on function public.admin_inbox(), public.admin_user_detail(uuid), 
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001005700_club_roles_cleanup.sql
+-- ===================================================================
+-- 005700: Sửa dứt điểm lỗi trao quyền Chủ nhiệm (mã UNK-…).
+-- Nguyên nhân: bảng club_members trên production còn ràng buộc CŨ club_members_role_check (chỉ cho OWNER / ADMIN / MEMBER)
+-- song song ràng buộc mới club_members_role_chk (OWNER / CAPTAIN / MEMBER). Migration 000500 có xóa ràng buộc cũ,
+-- nhưng nếu file 500 từng dừng giữa chừng trên SQL Editor thì nó vẫn còn → đổi chủ nhiệm cũ thành CAPTAIN bị chặn.
+-- Việc làm: đổi vai trò cũ ADMIN / VICE → CAPTAIN, xóa các ràng buộc cũ, giữ lại ràng buộc mới.
+-- Chạy riêng được, chạy lại nhiều lần vẫn an toàn. Sau đó chạy lại 003500 (Kiểm tra hệ thống).
+
+alter table public.club_members drop constraint if exists club_members_role_check;
+alter table public.club_members drop constraint if exists club_members_status_check;
+update public.club_members set role = 'CAPTAIN' where role in ('ADMIN', 'VICE');
+alter table public.club_members drop constraint if exists club_members_role_chk;
+alter table public.club_members add constraint club_members_role_chk check (role in ('OWNER', 'CAPTAIN', 'MEMBER'));
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -5604,7 +5622,9 @@ begin
     jsonb_build_object('file', '20261001005300', 'label', 'Chợ Runner (hồ sơ HLV / Shop / Dịch vụ đã xác minh)', 'ok', to_regclass('public.partners') is not null),
     jsonb_build_object('file', '20261001005400', 'label', 'Thể lệ thử thách + danh sách bỏ thử thách đã hủy', 'ok', to_regprocedure('public.set_challenge_rules(uuid, jsonb)') is not null),
     jsonb_build_object('file', '20261001005500', 'label', 'Đăng nhập Google / Apple + mã giới thiệu + xem trước lời mời', 'ok', to_regprocedure('public.my_referral()') is not null),
-    jsonb_build_object('file', '20261001005600', 'label', 'Quản trị: việc cần xử lý, người dùng, thử thách, nhật ký', 'ok', to_regprocedure('public.admin_inbox()') is not null));
+    jsonb_build_object('file', '20261001005600', 'label', 'Quản trị: việc cần xử lý, người dùng, thử thách, nhật ký', 'ok', to_regprocedure('public.admin_inbox()') is not null),
+    jsonb_build_object('file', '20261001005700', 'label', 'Gỡ ràng buộc vai trò CLB cũ (sửa lỗi trao quyền Chủ nhiệm)',
+      'ok', not exists (select 1 from pg_constraint where conname = 'club_members_role_check' and conrelid = 'public.club_members'::regclass)));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
