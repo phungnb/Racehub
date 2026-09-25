@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ChevronRight, Coins, Lock, RotateCcw, UserRound, X } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Coins, Lock, RotateCcw, Sparkles, UserRound, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, ConfirmSheet, ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -147,7 +147,9 @@ function Editor({ state }: { state: CharacterState }) {
             </div>
             <Button variant="secondary" className="shrink-0"
               onClick={() => setDraft((d) => ({ ...d, [tryingUnowned.slot]: state.equipped[tryingUnowned.slot] }))}>Bỏ thử</Button>
-            {state.level < tryingUnowned.unlock_level ? (
+            {tryingUnowned.acquire === 'shine' ? (
+              <Link href={routes.shine} className="shrink-0"><Button variant="coin"><Sparkles className="size-4" aria-hidden />Đổi bằng Tỏa sáng</Button></Link>
+            ) : state.level < tryingUnowned.unlock_level ? (
               <Button className="shrink-0" disabled><Lock className="size-4" aria-hidden />Cấp {tryingUnowned.unlock_level}</Button>
             ) : (
               <Button variant="coin" className="shrink-0" onClick={() => setBuying(tryingUnowned)} disabled={state.balance < tryingUnowned.price_xu}>

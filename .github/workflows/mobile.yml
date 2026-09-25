@@ -1,0 +1,57 @@
+name: App di động
+
+# Dựng app cài (Capacitor) để kiểm tra phần native còn biên dịch được:
+# - Android: tạo file APK bản thử (tải ở mục Artifacts của lần chạy, cài thẳng lên máy Android để dùng thử).
+# - iOS: biên dịch cho trình giả lập (không cần tài khoản Apple). Bản nộp App Store dựng bằng Xcode — xem docs/APP_MOBILE.md.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'claude/**']
+    paths: ['android/**', 'ios/**', 'mobile/**', 'capacitor.config.ts', 'package.json', 'package-lock.json', '.github/workflows/mobile.yml']
+  pull_request:
+    paths: ['android/**', 'ios/**', 'mobile/**', 'capacitor.config.ts', 'package.json', 'package-lock.json', '.github/workflows/mobile.yml']
+
+env:
+  # Địa chỉ web mà app mở; đặt biến CAP_SERVER_URL trong Settings → Secrets and variables → Actions → Variables nếu đổi tên miền
+  CAP_SERVER_URL: ${{ vars.CAP_SERVER_URL || 'https://racehub-iota.vercel.app' }}
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      - run: npx cap sync android
+      - name: Dựng APK bản thử
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: racehub-android-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx cap sync ios
+      - name: Biên dịch cho trình giả lập (không ký)
+        run: >
+          xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Debug
+          -sdk iphonesimulator -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO build

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { ShineAdmin } from './ShineAdmin'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Flag, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -136,6 +137,7 @@ export function OrganizersTab() {
             </ul>
           )}
       </section>
+      <ShineAdmin />
     </div>
   )
 }

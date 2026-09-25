@@ -18,6 +18,7 @@ import {
 import { useChallenge, useChallengeActions } from '../../hooks/useChallenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
 import { PledgePanel } from './PledgePanel'
+import { TopSupported } from '@/features/game'
 
 const fmtDateTime = (iso: string) => new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
 
@@ -88,6 +89,7 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
           ? <PledgePanel d={d} />
           : <Leaderboard d={d} rows={leaderboard.data} loading={leaderboard.isLoading} error={leaderboard.isError} standings={standings} />
         : <Rules d={d} />}
+      {tab === 'RANK' && <TopSupported challengeId={c.id} />}
 
       <ActionBar d={d} phase={phase} code={code ?? null} />
     </div>

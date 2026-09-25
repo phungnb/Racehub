@@ -30,8 +30,10 @@ const SIZES = { md: 'size-16 text-2xl', lg: 'size-20 text-3xl' } as const
  * Ảnh đại diện tròn có nút máy ảnh (kiểu Zalo): bấm vào là mở bảng chọn
  * ảnh từ máy / chân dung nhân vật / gỡ ảnh. `children` nhận hàm mở bảng để đặt thêm nút khác.
  */
-export function AvatarPicker({ userId, avatarUrl, name, size = 'lg', children }: {
+export function AvatarPicker({ userId, avatarUrl, name, size = 'lg', shine = 0, children }: {
   userId: string; avatarUrl: string | null; name: string | null; size?: keyof typeof SIZES
+  /** Bậc Tỏa sáng 0–4: khung phát sáng quanh ảnh */
+  shine?: number
   children?: (open: () => void) => React.ReactNode
 }) {
   const [open, setOpen] = useState(false)
@@ -83,9 +85,11 @@ export function AvatarPicker({ userId, avatarUrl, name, size = 'lg', children }:
   return (
     <div className="flex items-center gap-4">
       <button type="button" onClick={() => setOpen(true)} aria-label="Đổi ảnh đại diện" className="group relative shrink-0">
-        <span className={cn('grid place-items-center overflow-hidden rounded-full bg-brand font-black text-brand-fg ring-4 ring-bg', SIZES[size])}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- ảnh đại diện trên Supabase Storage */}
-          {avatarUrl ? <img src={avatarUrl} alt="" className="size-full object-cover" /> : initial}
+        <span className={cn(shine > 0 && `shine-frame shine-t${Math.min(4, shine)}`)}>
+          <span className={cn('grid place-items-center overflow-hidden rounded-full bg-brand font-black text-brand-fg', shine > 0 ? 'shine-inner' : 'ring-4 ring-bg', SIZES[size])}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- ảnh đại diện trên Supabase Storage */}
+            {avatarUrl ? <img src={avatarUrl} alt="" className="size-full object-cover" /> : initial}
+          </span>
         </span>
         <span className="absolute -bottom-0.5 -right-0.5 grid size-7 place-items-center rounded-full border-2 border-surface bg-surface-2 text-fg shadow-sm group-hover:bg-surface">
           <Camera className="size-3.5" aria-hidden />

@@ -104,3 +104,21 @@ body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---------------------------------------------------------------------------------------------
+   Khung Tỏa sáng quanh ảnh đại diện (migration 004700): càng được cộng đồng tặng quà, khung càng rực.
+   1 Lấp lánh (bạc) · 2 Rạng rỡ (vàng, có hào quang) · 3 Chói sáng (vàng xoay) · 4 Huyền thoại (cầu vồng xoay)
+   --------------------------------------------------------------------------------------------- */
+.shine-frame { position: relative; display: inline-grid; place-items: center; border-radius: 9999px; padding: 3px; isolation: isolate; flex-shrink: 0; }
+.shine-frame::before { content: ''; position: absolute; inset: 0; border-radius: inherit; z-index: -1; }
+.shine-frame > .shine-inner { border-radius: 9999px; box-shadow: 0 0 0 2px var(--color-bg); }
+.shine-t1::before { background: linear-gradient(135deg, #eef2f7, #9fb0c7 45%, #eef2f7 70%, #7d8da6); }
+.shine-t2::before { background: linear-gradient(135deg, #fff1b8, #f5b82e 40%, #ffe38a 65%, #c98a12); }
+.shine-t2 { box-shadow: 0 0 14px 1px rgb(245 184 46 / 0.45); }
+.shine-t3::before { background: conic-gradient(from var(--shine-angle, 0deg), #fff3c4, #f5b82e, #b6ff3b, #f5b82e, #fff3c4); animation: shine-spin 4s linear infinite; }
+.shine-t3 { box-shadow: 0 0 18px 2px rgb(245 184 46 / 0.55); }
+.shine-t4::before { background: conic-gradient(from var(--shine-angle, 0deg), #ff6ec7, #a78bfa, #60a5fa, #34d399, #fde047, #fb923c, #ff6ec7); animation: shine-spin 3s linear infinite; }
+.shine-t4 { box-shadow: 0 0 22px 3px rgb(167 139 250 / 0.6), 0 0 8px 1px rgb(253 224 71 / 0.5); }
+@property --shine-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+@keyframes shine-spin { to { --shine-angle: 360deg; } }
+.shine-badge { position: absolute; right: -2px; bottom: -2px; display: grid; place-items: center; border-radius: 9999px; background: var(--color-bg); z-index: 1; }

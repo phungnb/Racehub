@@ -51,18 +51,50 @@ export async function getEconomyMetrics(months: number): Promise<EconomyMetrics>
   return { months: (r.months ?? []).map((m) => num(m) as unknown as MetricsMonth), snapshot: num(r.snapshot ?? {}) as unknown as EconomyMetrics['snapshot'] }
 }
 
-/* ---------------- Nhiệm vụ do admin tạo (migration 004300) ---------------- */
-export type QuestPeriod = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'EVENT'
+/* ---------------- Nhiệm vụ do admin tạo (migration 004300, v2: 004600) ---------------- */
+export type QuestPeriod = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'EVENT' | 'ONCE'
 export type QuestMetric = 'TOTAL_KM' | 'RUN_COUNT' | 'RUN_KM' | 'CHECKIN' | 'WEEK_KM' | 'WEEK_RUN_DAYS' | 'CHALLENGE_JOINS'
+  | 'ACTIVE_DAYS' | 'WEEKEND_RUNS' | 'EARLY_RUNS' | 'CHALLENGE_FINISHES' | 'COMMUNITY_KM'
+export type QuestCategory = 'RUN' | 'CONSISTENCY' | 'CHALLENGE' | 'COMMUNITY' | 'NEWBIE' | 'SOCIAL'
+export interface QuestTier { target: number; xu: number }
+export interface QuestParams { min_km?: number; before_hour?: number }
+export interface QuestPasses { qty: number; max_slots: number; days: number }
 export interface AdminQuest {
   id?: string; code?: string; title: string; description: string | null; period: QuestPeriod; metric: QuestMetric; target: number
   reward_xu: number; icon?: string; sort?: number; is_active: boolean; starts_at: string | null; ends_at: string | null; min_vip_tier: number
-  completions?: number; xu_paid?: number
+  category?: QuestCategory; params?: QuestParams; tiers?: QuestTier[] | null
+  reward_item?: string | null; reward_badge?: { title: string; icon?: string } | null; reward_passes?: QuestPasses | null
+  completions?: number; participants?: number; xu_paid?: number
 }
 export const listQuests = async () => ((await call<AdminQuest[]>('admin_list_quests')) ?? []).map((q) => ({
-  ...q, target: Number(q.target), reward_xu: Number(q.reward_xu), completions: Number(q.completions ?? 0), xu_paid: Number(q.xu_paid ?? 0),
+  ...q, target: Number(q.target), reward_xu: Number(q.reward_xu), completions: Number(q.completions ?? 0), participants: Number(q.participants ?? 0),
+  xu_paid: Number(q.xu_paid ?? 0), params: q.params ?? {}, tiers: q.tiers?.length ? q.tiers.map((t) => ({ target: Number(t.target), xu: Number(t.xu) })) : null,
 }))
 export const saveQuest = (q: AdminQuest) => call<string>('admin_save_quest', { p: q })
+
+export interface QuestLimits { dailyXuCap: number; weeklyXuCap: number; maxDaily: number; maxWeekly: number; maxMonthly: number; maxEvent: number; maxOnce: number }
+type Pct = { p40?: number; p50?: number; p75?: number; p90?: number; n?: number }
+export interface QuestInsights {
+  users_total: number; new_users_14d: number; runners_7d: number; runners_30d: number; inactive_14_60: number
+  week_km: Pct; week_days: Pct; month_km: Pct; month_days: Pct; run_km: Pct
+  early_share: number; weekend_share: number; community_km_30d: number; quest_xu_30d: number; run_xu_30d: number; limits: QuestLimits
+}
+const numObj = <T,>(o: unknown): T => Object.fromEntries(Object.entries((o ?? {}) as Record<string, unknown>)
+  .map(([k, v]) => [k, v === null ? 0 : typeof v === 'object' ? numObj(v) : Number(v)])) as T
+export const getQuestInsights = async () => numObj<QuestInsights>(await call('admin_quest_insights'))
+export const setQuestLimits = async (p: Partial<QuestLimits>) => numObj<QuestLimits>(await call('admin_set_quest_limits', { p }))
+
+export interface QuestEstimate {
+  supported: boolean; samples: number; active_runners: number; tiers: { target: number; xu: number; completers: number; rate: number }[]
+  xu_per_period: number; periods: number; xu_total: number; open_ended: boolean; limits: QuestLimits
+}
+export async function estimateQuest(q: Pick<AdminQuest, 'period' | 'metric' | 'target' | 'reward_xu' | 'tiers' | 'params' | 'starts_at' | 'ends_at'>): Promise<QuestEstimate> {
+  const r = await call<Record<string, unknown>>('admin_quest_estimate', { p: q })
+  if (!r?.supported) return { supported: false } as QuestEstimate
+  return { ...numObj<QuestEstimate>({ ...r, tiers: undefined, limits: undefined, supported: undefined, open_ended: undefined }),
+    supported: true, open_ended: Boolean(r.open_ended), limits: numObj<QuestLimits>(r.limits),
+    tiers: ((r.tiers ?? []) as Record<string, unknown>[]).map((t) => numObj(t)) } as QuestEstimate
+}
 
 /* ---------------- Khuyến mãi (migration 004300) ---------------- */
 export type SegmentType = 'ALL' | 'ACTIVE' | 'INACTIVE' | 'NEW' | 'VIP' | 'FREE' | 'CLUB' | 'LEVEL' | 'USERS'
@@ -78,3 +110,31 @@ export const runGrant = (p: { title: string; message: string; segment: Segment; 
   call<{ promotion_id: string; recipients: number }>('admin_run_grant', { p })
 export const savePromo = (p: Partial<Promotion> & { kind: 'CODE' | 'SALE' }) => call<string>('admin_save_promo', { p })
 export const listPromotions = async () => (await call<Promotion[]>('admin_list_promotions')) ?? []
+
+/* ---------------- Ví Tỏa sáng (migration 004700) ---------------- */
+export type ShineKind = 'PASS' | 'SHIELD' | 'COSMETIC'
+export interface ShineItem {
+  code: string; name: string; description: string | null; kind: ShineKind; cost: number; period_limit: number | null
+  limit_period: 'WEEK' | 'MONTH'; min_senders: number; is_active: boolean; sort: number
+  params: { max_slots?: number; days?: number; item_code?: string; xu_value?: number }
+  redeemed_30d?: number; item_name?: string | null
+}
+export interface ShineConfig { tiers: number[]; perSenderWeeklyCap: number; minSenderAgeDays: number; minSenderRuns: number; thanksPerDay: number }
+export interface ShineOverview {
+  config: ShineConfig; items: ShineItem[]; gifted_30d: number; countable_30d: number; spent_30d: number; xu_equiv_30d: number
+  tiers_count: { tier: number; users: number }[] | null
+}
+export async function getShineOverview(): Promise<ShineOverview> {
+  const r = await call<ShineOverview>('admin_shine_overview')
+  const num = (v: unknown) => Number(v ?? 0)
+  return {
+    ...r, gifted_30d: num(r.gifted_30d), countable_30d: num(r.countable_30d), spent_30d: num(r.spent_30d), xu_equiv_30d: num(r.xu_equiv_30d),
+    config: { ...r.config, tiers: (r.config.tiers ?? []).map(num), perSenderWeeklyCap: num(r.config.perSenderWeeklyCap),
+      minSenderAgeDays: num(r.config.minSenderAgeDays), minSenderRuns: num(r.config.minSenderRuns), thanksPerDay: num(r.config.thanksPerDay) },
+    items: (r.items ?? []).map((i) => ({ ...i, cost: num(i.cost), min_senders: num(i.min_senders), sort: num(i.sort), redeemed_30d: num(i.redeemed_30d),
+      period_limit: i.period_limit == null ? null : num(i.period_limit) })),
+    tiers_count: (r.tiers_count ?? []).map((t) => ({ tier: num(t.tier), users: num(t.users) })),
+  }
+}
+export const saveShineItem = (i: ShineItem) => call<string>('admin_save_shine_item', { p: i })
+export const setShineConfig = (p: Partial<ShineConfig>) => call<ShineConfig>('admin_set_shine_config', { p })

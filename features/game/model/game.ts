@@ -4,7 +4,7 @@ import {
   Repeat, Route, Shield, Sparkles, Star, Sunrise, Target, Trophy, Users, type LucideIcon,
 } from 'lucide-react'
 
-export type QuestPeriod = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'EVENT'
+export type QuestPeriod = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'EVENT' | 'ONCE'
 export type GameEventKind = 'RUN' | 'QUEST' | 'BADGE' | 'STREAK' | 'LEVEL_UP' | 'LEAGUE' | 'CHEER_IN' | 'CHECKIN' | 'REFERRAL' | 'GIFT_IN' | 'COMEBACK'
 export type BadgeTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'LEGEND'
 export type LeagueZone = 'UP' | 'STAY' | 'DOWN'
@@ -27,6 +27,19 @@ export interface Quest {
   ends_at?: string | null
   min_vip_tier?: number
   locked?: boolean
+  /** Nhiệm vụ v2 (migration 004600) */
+  category?: string
+  /** Bậc tăng dần; null = một mục tiêu */
+  tiers?: { target: number; xu: number }[] | null
+  /** Số bậc đã nhận thưởng */
+  tier_paid?: number
+  params?: { min_km?: number; before_hour?: number }
+  /** Tên vật phẩm / huy hiệu thưởng thêm khi hoàn thành */
+  reward_item?: string | null
+  reward_badge?: string | null
+  reward_passes?: { qty: number; max_slots: number } | null
+  /** Km cộng đồng: phần bạn đã góp */
+  mine?: number | null
 }
 
 export interface GameEvent {
@@ -153,9 +166,26 @@ export const ratio = (progress: number, target: number) => (target > 0 ? Math.mi
 
 /** Hiển thị tiến độ nhiệm vụ: km có số lẻ, còn lại số nguyên */
 export function questProgressLabel(q: Pick<Quest, 'metric' | 'progress' | 'target'>) {
-  const km = q.metric === 'RUN_KM' || q.metric === 'WEEK_KM' || q.metric === 'TOTAL_KM'
+  const km = q.metric === 'RUN_KM' || q.metric === 'WEEK_KM' || q.metric === 'TOTAL_KM' || q.metric === 'COMMUNITY_KM'
   const f = (n: number) => (km ? n.toLocaleString('vi-VN', { maximumFractionDigits: 1 }) : String(Math.floor(n)))
-  return `${f(q.progress)}/${f(q.target)}${km ? ' km' : ''}`
+  const unit = km ? ' km' : q.metric === 'ACTIVE_DAYS' ? ' ngày' : ''
+  return `${f(q.progress)}/${f(q.target)}${unit}`
+}
+
+/** Nhiệm vụ bậc: bậc kế tiếp chưa đạt (null = đã xong hết) và Xu của nó */
+export function nextTier(q: Pick<Quest, 'tiers' | 'tier_paid'>) {
+  if (!q.tiers?.length) return null
+  const i = q.tier_paid ?? 0
+  return i < q.tiers.length ? { index: i, ...q.tiers[i] } : null
+}
+
+/** Dòng phần thưởng thêm (vật phẩm / huy hiệu / lượt tạo) */
+export function questExtras(q: Pick<Quest, 'reward_item' | 'reward_badge' | 'reward_passes'>) {
+  return [
+    q.reward_badge ? `Huy hiệu “${q.reward_badge}”` : null,
+    q.reward_item ? `Vật phẩm: ${q.reward_item}` : null,
+    q.reward_passes ? `${q.reward_passes.qty} lượt tạo thử thách` : null,
+  ].filter(Boolean) as string[]
 }
 
 /** Thứ tự thẻ trong màn tổng kết: bài chạy → nhiệm vụ → streak → huy hiệu → league → cổ vũ → lên cấp (đỉnh điểm) */

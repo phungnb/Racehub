@@ -47,7 +47,12 @@ export interface Gift {
 export interface GiftCatalog { gifts: Gift[]; daily_cap: number; sent_today: number }
 export interface GiftWall {
   shine: number; count: number
+  /** Bậc Tỏa sáng 0–4, số người tặng hợp lệ khác nhau (migration 004700) */
+  tier: number; fans: number
+  /** Chủ hồ sơ ẩn tường quà: người khác chỉ thấy bậc + điểm */
+  hidden: boolean; public: boolean
   gifts: { code: string; name: string; emoji: string; tier: GiftTier; count: number }[]
+  collection: { tier: GiftTier; owned: number; total: number }[]
   top_supporters: { user_id: string; display_name: string | null; avatar_url: string | null; shine: number }[]
 }
 
@@ -75,7 +80,8 @@ export async function getGiftWall(userId: string): Promise<GiftWall> {
   if (error) throw error
   const w = (data ?? {}) as GiftWall
   return {
-    shine: n(w.shine), count: n(w.count),
+    shine: n(w.shine), count: n(w.count), tier: n(w.tier), fans: n(w.fans), hidden: Boolean(w.hidden), public: w.public !== false,
+    collection: (w.collection ?? []).map((c) => ({ ...c, owned: n(c.owned), total: n(c.total) })),
     gifts: (w.gifts ?? []).map((g) => ({ ...g, count: n(g.count) })),
     top_supporters: (w.top_supporters ?? []).map((t) => ({ ...t, shine: n(t.shine) })),
   }
@@ -128,6 +134,15 @@ const MESSAGES: Record<string, string> = {
   CHEER_REPLACED_BY_GIFTS: 'Tặng Xu trực tiếp đã được thay bằng Quà tặng. Hãy cập nhật ứng dụng.',
   INSUFFICIENT_BALANCE: 'Số Xu trong ví không đủ.',
   SHIELD_LIMIT: 'Bạn đã có số khiên tối đa.',
+  INSUFFICIENT_SHINE: 'Tỏa sáng khả dụng chưa đủ.',
+  SHINE_LIMIT: 'Bạn đã đổi món này đủ số lần trong kỳ.',
+  SHINE_NEED_SENDERS: 'Cần Tỏa sáng từ đủ số người tặng khác nhau trong 30 ngày.',
+  SHINE_ONLY: 'Vật phẩm này chỉ đổi bằng Tỏa sáng.',
+  SHINE_ITEM_NOT_FOUND: 'Món này không còn trong cửa hàng Tỏa sáng.',
+  ALREADY_OWNED: 'Bạn đã có vật phẩm này.',
+  ALREADY_THANKED: 'Hôm nay bạn đã cảm ơn người này rồi.',
+  NOT_A_SUPPORTER: 'Chỉ cảm ơn được người đã tặng quà cho bạn trong 30 ngày.',
+  THANKS_LIMIT: 'Hôm nay bạn đã gửi đủ lời cảm ơn.',
   INVALID_AMOUNT: 'Số Xu không hợp lệ (1–10).',
   INVALID_GOAL: 'Mục tiêu tuần từ 1 đến 7 ngày.',
   MESSAGE_TOO_LONG: 'Lời nhắn tối đa 140 ký tự.',
@@ -157,7 +172,10 @@ export async function getRunnerForm(userId?: string | null): Promise<RunnerForm>
 export async function getMyQuests(): Promise<Quest[]> {
   const { data, error } = await supabase.rpc('my_quests')
   if (error) throw error
-  return ((data ?? []) as Quest[]).map((q) => ({ ...q, target: n(q.target), progress: n(q.progress), reward_xu: n(q.reward_xu), reward_xp: 0 }))
+  return ((data ?? []) as Quest[]).map((q) => ({
+    ...q, target: n(q.target), progress: n(q.progress), reward_xu: n(q.reward_xu), reward_xp: 0, tier_paid: n(q.tier_paid),
+    mine: q.mine == null ? null : n(q.mine), tiers: q.tiers?.length ? q.tiers.map((t) => ({ target: n(t.target), xu: n(t.xu) })) : null,
+  }))
 }
 
 /* ------------------------- Mã khuyến mãi (migration 004300) ------------------------- */
@@ -167,4 +185,48 @@ export async function redeemPromoCode(code: string) {
   const r = data as { error?: string; title?: string; reward?: { xu?: number; passes?: { qty: number; max_slots: number }; plan?: { code: string; months: number } } }
   if (r?.error) throw new Error(r.error)
   return r
+}
+
+/* ------------------------- Ví Tỏa sáng (migration 004700) ------------------------- */
+export interface ShineShopItem {
+  code: string; name: string; description: string | null; kind: 'PASS' | 'SHIELD' | 'COSMETIC'; cost: number
+  period_limit: number | null; limit_period: 'WEEK' | 'MONTH'; min_senders: number; used: number
+  params: { max_slots?: number; days?: number; item_code?: string; xu_value?: number }
+  item: { code: string; name: string; layer_urls?: Record<string, string> | null; color?: string | null; owned: boolean } | null
+}
+export interface Supporter { user_id: string; display_name: string | null; avatar_url: string | null; amount: number; last_at: string; thanked_today: boolean }
+export interface MyShine {
+  total: number; available: number; tier: number; tiers: number[]; fans: number; senders_30d: number; per_sender_weekly_cap: number
+  shop: ShineShopItem[]; history: { code: string; name: string; cost: number; at: string }[]; supporters: Supporter[]; thanks_left: number
+}
+export async function getMyShine(): Promise<MyShine> {
+  const { data, error } = await supabase.rpc('my_shine')
+  if (error) throw error
+  const s = (data ?? {}) as MyShine
+  return {
+    ...s, total: n(s.total), available: n(s.available), tier: n(s.tier), tiers: (s.tiers ?? []).map(n), fans: n(s.fans),
+    senders_30d: n(s.senders_30d), per_sender_weekly_cap: n(s.per_sender_weekly_cap), thanks_left: n(s.thanks_left),
+    shop: (s.shop ?? []).map((i) => ({ ...i, cost: n(i.cost), used: n(i.used), min_senders: n(i.min_senders), period_limit: i.period_limit == null ? null : n(i.period_limit) })),
+    history: (s.history ?? []).map((h) => ({ ...h, cost: n(h.cost) })),
+    supporters: (s.supporters ?? []).map((x) => ({ ...x, amount: n(x.amount) })),
+  }
+}
+export async function redeemShine(code: string, key: string) {
+  const { data, error } = await supabase.rpc('redeem_shine', { p_code: code, p_idempotency_key: key })
+  if (error) throw error
+  return data as { code: string; name: string; cost: number; available: number }
+}
+export async function sendThanks(userId: string) {
+  const { error } = await supabase.rpc('send_thanks', { p_to_user: userId })
+  if (error) throw error
+}
+export async function setGiftWallPublic(userId: string, value: boolean) {
+  const { error } = await supabase.from('profiles').update({ gift_wall_public: value }).eq('id', userId)
+  if (error) throw error
+}
+export interface TopSupported { user_id: string; display_name: string | null; avatar_url: string | null; shine: number; gifts: number; tier: number }
+export async function getChallengeTopSupported(challengeId: string): Promise<TopSupported[]> {
+  const { data, error } = await supabase.rpc('challenge_top_supported', { p_challenge_id: challengeId })
+  if (error) throw error
+  return ((data ?? []) as TopSupported[]).map((t) => ({ ...t, shine: n(t.shine), gifts: n(t.gifts), tier: n(t.tier) }))
 }

@@ -5,6 +5,7 @@ import { Download, MoreVertical, Share, SquarePlus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { ICONS } from '@/shared/config/brand'
 import { Button, Card, Sheet } from '@/shared/ui'
+import { isNativeApp } from '@/shared/lib/native'
 import {
   canPromptInstall, detectPlatform, dismissInstall, installDismissed, isIosSafari, isStandalone, promptInstall, subscribeInstall,
   type Platform,
@@ -15,7 +16,7 @@ const SERVER: InstallState = { installed: true, canPrompt: false, platform: 'des
 let cache: InstallState = SERVER
 const snapshot = (): InstallState => {
   const next: InstallState = {
-    installed: isStandalone(), canPrompt: canPromptInstall(),
+    installed: isStandalone() || isNativeApp(), canPrompt: canPromptInstall(),
     platform: detectPlatform(navigator.userAgent, navigator.maxTouchPoints), iosSafari: isIosSafari(navigator.userAgent),
   }
   if (JSON.stringify(next) !== JSON.stringify(cache)) cache = next

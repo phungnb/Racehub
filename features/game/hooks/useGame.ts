@@ -7,6 +7,7 @@ import { supabase } from '@/shared/lib/supabase'
 import {
   buyShield, checkIn, getAchievements, getActivityRewards, getGameState, getLeagueStandings, getWallet, markEventsSeen,
   getGiftCatalog, getGiftWall, getMyQuests, getRunnerForm, redeemPromoCode, sendGift, setWeeklyGoal,
+  getChallengeTopSupported, getMyShine, redeemShine, sendThanks,
 } from '../api/gameApi'
 
 export const gameKeys = {
@@ -64,6 +65,22 @@ export function useBuyShield() {
 
 export function useGiftCatalog(enabled = true) {
   return useQuery({ queryKey: ['game', 'gifts'], queryFn: getGiftCatalog, enabled, staleTime: 60_000 })
+}
+
+export const useMyShine = () => useQuery({ queryKey: ['game', 'shine'], queryFn: getMyShine })
+export function useRedeemShine() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ code, key }: { code: string; key: string }) => redeemShine(code, key),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['game'] }); void qc.invalidateQueries({ queryKey: ['character'] }); void qc.invalidateQueries({ queryKey: ['billing'] }) },
+  })
+}
+export function useSendThanks() {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: sendThanks, onSuccess: () => void qc.invalidateQueries({ queryKey: ['game', 'shine'] }) })
+}
+export function useChallengeTopSupported(challengeId: string) {
+  return useQuery({ queryKey: ['game', 'top-supported', challengeId], queryFn: () => getChallengeTopSupported(challengeId), staleTime: 60_000, retry: false })
 }
 
 export function useGiftWall(userId: string | null | undefined) {

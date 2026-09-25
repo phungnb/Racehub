@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>RaceHub — Không có mạng</title>
+  <style>
+    html,body{margin:0;height:100%;background:#0a0d12;color:#f2f5f9;font-family:system-ui,-apple-system,sans-serif}
+    main{min-height:100%;display:grid;place-items:center;padding:24px;text-align:center;box-sizing:border-box}
+    h1{font-size:20px;margin:16px 0 8px}p{color:#9aa4b5;font-size:14px;margin:0 0 24px;line-height:1.5}
+    button{background:#b6ff3b;color:#0a0d12;border:0;border-radius:12px;padding:12px 20px;font-size:15px;font-weight:700}
+  </style>
+</head>
+<body>
+  <main>
+    <div>
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#9aa4b5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h.01"/><path d="M8.5 16.43a5 5 0 0 1 7 0"/><path d="M2 8.82a15 15 0 0 1 4.17-2.65"/><path d="M10.66 5c4.01-.36 8.14.9 11.34 3.76"/><path d="M16.85 11.25a10 10 0 0 1 2.22 1.68"/><path d="M5 13a10 10 0 0 1 5.24-2.76"/><path d="m2 2 20 20"/></svg>
+      <h1>Không kết nối được RaceHub</h1>
+      <p>Điện thoại đang không có mạng hoặc máy chủ tạm thời không phản hồi.<br>Bật Wi-Fi / 4G rồi thử lại.</p>
+      <button onclick="location.href=window.RACEHUB_URL||'/'">Thử lại</button>
+    </div>
+  </main>
+  <script>window.RACEHUB_URL = 'https://racehub-iota.vercel.app/feed'</script>
+</body>
+</html>

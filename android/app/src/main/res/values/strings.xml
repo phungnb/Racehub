@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">RaceHub</string>
+    <string name="title_activity_main">RaceHub</string>
+    <string name="package_name">vn.racehub.app</string>
+    <string name="custom_url_scheme">vn.racehub.app</string>
+    <!-- Thông báo cố định khi đang ghi bài chạy nền (plugin background-geolocation) -->
+    <string name="capacitor_background_geolocation_notification_channel_name">Ghi bài chạy</string>
+</resources>
