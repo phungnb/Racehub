@@ -42,7 +42,7 @@ function ItemsPane() {
   const toggle = useSetItemStatus()
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
-  const [editing, setEditing] = useState<AdminItem | 'new' | null>(null)
+  const [editing, setEditing] = useState<AdminItem | 'new' | 'uniform' | null>(null)
 
   const items = useMemo(() => q.data ?? [], [q.data])
   const slots = SLOTS.filter((s) => items.some((i) => i.slot === s.slot))
@@ -68,7 +68,10 @@ function ItemsPane() {
           <p className="font-semibold">Vật phẩm nhân vật</p>
           <p className="text-xs text-fg-muted">{count('all')} đang bán · {count('draft')} nháp · {count('archived') + count('retired')} ngừng / gỡ</p>
         </div>
-        <Button onClick={() => setEditing('new')} className="shrink-0"><Plus className="size-4" aria-hidden />Thêm</Button>
+        <div className="flex shrink-0 flex-col gap-1.5">
+          <Button size="sm" onClick={() => setEditing('new')}><Plus className="size-4" aria-hidden />Thêm</Button>
+          <Button size="sm" variant="secondary" onClick={() => setEditing('uniform')}><Shirt className="size-4" aria-hidden />Thiết kế áo</Button>
+        </div>
       </Card>
 
       <div className="relative">
@@ -139,7 +142,7 @@ function ItemsPane() {
         </ul>
       )}
 
-      {editing && <ItemEditor item={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+      {editing && <ItemEditor item={editing === 'new' || editing === 'uniform' ? null : editing} preset={editing === 'uniform' ? 'uniform' : undefined} onClose={() => setEditing(null)} />}
     </div>
   )
 }

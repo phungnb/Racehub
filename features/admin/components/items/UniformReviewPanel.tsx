@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, Coins, Shirt, Users, X } from 'lucide-react'
+import { Check, Coins, Palette, Shirt, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, EmptyState, ErrorState, Field, Input, SegmentedControl, Sheet, Skeleton, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -9,6 +9,7 @@ import { formatCoin, formatRelative } from '@/shared/lib/format'
 import { PaperDoll, RARITY_META, uniformPreview, type Rarity, type UniformRequest, type UniformStatus } from '@/features/character'
 import { adminErrorMessage } from '../../api/adminApi'
 import { useAvatarCollections, useReviewUniform, useUniformRequests } from '../../hooks/useAdmin'
+import { ItemEditor } from './ItemEditor'
 
 const FILTERS: { value: UniformStatus | 'ALL'; label: string }[] = [
   { value: 'PENDING', label: 'Chờ duyệt' }, { value: 'APPROVED', label: 'Đã duyệt' }, { value: 'REJECTED', label: 'Từ chối' }, { value: 'ALL', label: 'Tất cả' },
@@ -21,8 +22,17 @@ export function UniformReviewPanel() {
   const q = useUniformRequests(status)
   const [approving, setApproving] = useState<UniformRequest | null>(null)
   const [rejecting, setRejecting] = useState<UniformRequest | null>(null)
+  const [designing, setDesigning] = useState(false)
   return (
     <div className="space-y-3">
+      <Card className="flex items-center gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand/15 text-brand"><Palette className="size-5" aria-hidden /></span>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">Thiết kế đồng phục</p>
+          <p className="text-xs text-fg-muted">Admin tự thiết kế cho một CLB, hoặc duyệt mẫu CLB gửi (Cài đặt CLB › Đồng phục CLB)</p>
+        </div>
+        <Button onClick={() => setDesigning(true)} className="shrink-0"><Shirt className="size-4" aria-hidden />Thiết kế</Button>
+      </Card>
       <p className="rounded-xl bg-surface-2 p-3 text-xs text-fg-muted">
         Đồng phục là vật phẩm áo thường, chỉ thành viên CLB mua / mặc. Giá do admin đặt; 0 Xu = phát miễn phí cho cả CLB.
         Áo thật do Shop đối tác bán ở Chợ Runner — RaceHub không nhận tiền.
@@ -70,6 +80,7 @@ export function UniformReviewPanel() {
       )}
       {approving && <ApproveSheet r={approving} onClose={() => setApproving(null)} />}
       {rejecting && <RejectSheet r={rejecting} onClose={() => setRejecting(null)} />}
+      {designing && <ItemEditor item={null} preset="uniform" onClose={() => setDesigning(false)} />}
     </div>
   )
 }

@@ -46,16 +46,18 @@ async function readStats(file: File, url: string): Promise<LayerStats> {
 }
 
 /** Thêm / sửa vật phẩm: màu (áo, quần, tất, giày) hoặc lớp ảnh PNG khung chuẩn; xem thử ngay trên nhân vật Nam/Nữ */
-export function ItemEditor({ item, onClose }: { item: AdminItem | null; onClose: () => void }) {
+export function ItemEditor({ item, onClose, preset }: { item: AdminItem | null; onClose: () => void; preset?: 'uniform' }) {
   const isNew = !item
-  const [kind, setKind] = useState<RenderKind>(item?.render_kind ?? 'LAYER')
-  const [slot, setSlot] = useState<Slot>(item?.slot ?? 'hat')
-  const [name, setName] = useState(item?.name ?? '')
+  // Thiết kế áo / đồng phục: áo đổi màu + vùng in bật sẵn
+  const uni = isNew && preset === 'uniform'
+  const [kind, setKind] = useState<RenderKind>(item?.render_kind ?? (uni ? 'TINT' : 'LAYER'))
+  const [slot, setSlot] = useState<Slot>(item?.slot ?? (uni ? 'top' : 'hat'))
+  const [name, setName] = useState(item?.name ?? (uni ? 'Áo ' : ''))
   const [code, setCode] = useState(item?.code ?? '')
   const [codeTouched, setCodeTouched] = useState(!isNew)
   const [description, setDescription] = useState(item?.description ?? '')
   const [rarity, setRarity] = useState<Rarity>(item?.rarity ?? 'common')
-  const [color, setColor] = useState<string | null>(item ? item.color : '#e11d48')
+  const [color, setColor] = useState<string | null>(item ? item.color : uni ? '#1d4ed8' : '#e11d48')
   const [price, setPrice] = useState(item ? String(item.price_xu) : '30')
   const [level, setLevel] = useState(item?.unlock_level ?? 1)
   const [status, setStatus] = useState<ItemLifecycle>(item?.status ?? 'DRAFT')
@@ -66,7 +68,7 @@ export function ItemEditor({ item, onClose }: { item: AdminItem | null; onClose:
   const [from, setFrom] = useState(toLocalInput(item?.available_from))
   const [to, setTo] = useState(toLocalInput(item?.available_to))
   const [supply, setSupply] = useState(item?.supply_limit ? String(item.supply_limit) : '')
-  const [print, setPrint] = useState<ItemPrint | null>(item?.print ?? null)
+  const [print, setPrint] = useState<ItemPrint | null>(item?.print ?? (uni ? { title: '', personal: 'NAME', text_color: '#ffffff', font: 'sport' } : null))
   const [uploading, setUploading] = useState(false)
   const collections = useAvatarCollections()
   const badges = useAchievements()
@@ -149,8 +151,16 @@ export function ItemEditor({ item, onClose }: { item: AdminItem | null; onClose:
     }
   }
 
+  const printBlock = slot === 'top' && (
+            <div className="space-y-3 rounded-2xl border border-border p-3">
+              <SwitchRow checked={!!print} onChange={(on) => setPrint(on ? (item?.print ?? { personal: 'NONE', text_color: '#ffffff', font: 'sport' }) : null)}
+                label="In lên áo" description="Logo ngực, chữ lớn, dòng phụ, tên runner — vẽ theo nếp vải của áo" />
+              {print && <PrintFields value={print} onChange={setPrint} upload={(f) => uploadPrintLogo(`items/${finalCode || 'moi'}`, f)} onUploading={setUploading} />}
+            </div>
+          )
+
   return (
-    <Sheet open onClose={onClose} title={isNew ? 'Thêm vật phẩm' : `Sửa: ${item.name}`}
+    <Sheet open onClose={onClose} title={uni ? 'Thiết kế áo / đồng phục' : isNew ? 'Thêm vật phẩm' : `Sửa: ${item.name}`}
       description="Xem thử ngay trên nhân vật trước khi lưu"
       footer={
         <div className="flex gap-2">
@@ -164,23 +174,32 @@ export function ItemEditor({ item, onClose }: { item: AdminItem | null; onClose:
           <PaperDoll gender={gender} items={[preview]} personalName={profile?.display_name ?? 'Runner'} className="size-full" fit="contain" label="Xem thử vật phẩm" />
           <SegmentedControl value={gender} onChange={setGender} options={GENDERS} className="absolute right-2 top-2 w-28 bg-bg/85" />
         </div>
+        {uni && (
+          <p className="rounded-xl bg-surface-2 p-3 text-xs text-fg-muted">
+            Chọn màu áo, tải logo, nhập chữ in rồi xem thử ở trên. Muốn làm đồng phục riêng: chọn CLB ở mục <b>Chỉ thành viên CLB</b> bên dưới.
+            Lưu xong ở trạng thái Nháp, kiểm tra lại rồi bấm Bán.
+          </p>
+        )}
+        {uni && printBlock}
 
-        {isNew && (
+        {isNew && !uni && (
           <SegmentedControl value={kind} onChange={(k) => { setKind(k); if (k === 'TINT' && !isTintSlot(slot)) setSlot('top') }}
             options={[{ value: 'LAYER', label: 'Lớp ảnh PNG' }, { value: 'TINT', label: 'Đổi màu' }]} />
         )}
 
+        {!uni && (
         <Field label="Ô trang phục">
-          <div className="flex flex-wrap gap-1.5">
-            {slotChoices.map((s) => (
-              <button key={s.slot} type="button" onClick={() => setSlot(s.slot)} aria-pressed={slot === s.slot}
-                className={cn('flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm font-semibold',
-                  slot === s.slot ? 'border-brand bg-brand/10 text-fg' : 'border-border text-fg-muted')}>
-                <s.icon className="size-4" aria-hidden />{s.label}
-              </button>
-            ))}
-          </div>
-        </Field>
+            <div className="flex flex-wrap gap-1.5">
+              {slotChoices.map((s) => (
+                <button key={s.slot} type="button" onClick={() => setSlot(s.slot)} aria-pressed={slot === s.slot}
+                  className={cn('flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm font-semibold',
+                    slot === s.slot ? 'border-brand bg-brand/10 text-fg' : 'border-border text-fg-muted')}>
+                  <s.icon className="size-4" aria-hidden />{s.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+        )}
 
         <Field label="Tên" htmlFor="item-name">
           <Input id="item-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Mũ lưỡi trai Đỏ" />
@@ -257,13 +276,7 @@ export function ItemEditor({ item, onClose }: { item: AdminItem | null; onClose:
           </div>
         </Field>
 
-        {slot === 'top' && (
-          <div className="space-y-3 rounded-2xl border border-border p-3">
-            <SwitchRow checked={!!print} onChange={(on) => setPrint(on ? (item?.print ?? { personal: 'NONE', text_color: '#ffffff', font: 'sport' }) : null)}
-              label="In lên áo" description="Logo ngực, chữ lớn, dòng phụ, tên runner — vẽ theo nếp vải của áo" />
-            {print && <PrintFields value={print} onChange={setPrint} upload={(f) => uploadPrintLogo(`items/${finalCode || 'moi'}`, f)} onUploading={setUploading} />}
-          </div>
-        )}
+        {!uni && printBlock}
 
         <div className="space-y-3 rounded-2xl border border-border p-3">
           <p className="text-sm font-semibold">Điều kiện mở khóa & bán</p>
