@@ -50,4 +50,18 @@ describe('trao quyền Chủ nhiệm (005000)', () => {
     expect([OWN, CAP]).toContain(owners[0].user_id)
     expect(await fails(call(db, PEND, `select public.leave_club($1, $2)`, [CLUB, OUT]))).toBe('OK')   // thành viên thường rời bình thường
   })
+
+  it('production còn ràng buộc vai trò cũ (OWNER / ADMIN / MEMBER) → migration 005700 gỡ, trao quyền chạy lại được', async () => {
+    const fs = await import('node:fs')
+    const path = await import('node:path')
+    const db2 = await createDb({ withMigrations: true, seed })
+    await db2.exec(`insert into public.club_members (club_id, user_id, role, status) values
+      ('${CLUB}', '${OWN}', 'OWNER', 'APPROVED'), ('${CLUB}', '${MEM}', 'MEMBER', 'APPROVED') on conflict do nothing;
+      alter table public.club_members add constraint club_members_role_check check (role in ('OWNER', 'ADMIN', 'MEMBER'));`)
+    const q = `select public.transfer_club_ownership($1, $2)`
+    expect(await fails(call(db2, OWN, q, [CLUB, MEM]))).toContain('club_members_role_check')      // đúng lỗi người dùng gặp
+    await db2.exec(fs.readFileSync(path.join(__dirname, '../../supabase/migrations/20261001005700_club_roles_cleanup.sql'), 'utf8').replace(/notify pgrst[^;]*;/g, ''))
+    await call(db2, OWN, q, [CLUB, MEM])
+    expect([await role(db2, OWN), await role(db2, MEM)]).toEqual(['CAPTAIN', 'OWNER'])
+  }, 240_000)
 })

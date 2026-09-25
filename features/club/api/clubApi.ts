@@ -347,6 +347,8 @@ const MESSAGES: Record<string, string> = {
 }
 
 export function clubErrorMessage(e: unknown): string {
+  // Lỗi ràng buộc vai trò cũ trên CSDL (migration 005700 chưa chạy)
+  if (/club_members_role/.test((e as { message?: string } | null)?.message ?? '')) return 'Hệ thống cần cập nhật (migration 005700) trước khi đổi vai trò / trao quyền. Hãy báo quản trị viên.'
   const err = e as { message?: string; code?: string; details?: string; hint?: string } | null
   // Ghi lỗi gốc ra Console (F12) để chẩn đoán; người dùng chỉ thấy câu tiếng Việt
   console.warn('[CLB] Lỗi gốc:', err?.code, err?.message, err?.details ?? '', err?.hint ?? '')
