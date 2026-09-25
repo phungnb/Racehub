@@ -43,6 +43,7 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   SHINE: { icon: Sparkles, tone: 'text-coin' },
   THANKS: { icon: Heart, tone: 'text-danger' },
   HONOR: { icon: Crown, tone: 'text-coin' },
+  CLUB_ROLE: { icon: Crown, tone: 'text-coin' },
 }
 
 /** Gợi ý bật thông báo đẩy khi thiết bị hỗ trợ mà chưa bật (ẩn được trong phiên) */
