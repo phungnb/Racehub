@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import {
   ArrowLeft, CalendarDays, Check, CircleSlash, Clock, Coins, Copy, Crown, Gauge, Hourglass, Info, Lock, LogOut, MoreHorizontal,
@@ -19,12 +19,14 @@ import { useChallenge, useChallengeActions } from '../../hooks/useChallenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
 import { PledgePanel } from './PledgePanel'
 import { TopSupported } from '@/features/game'
+import { HonorPanel, useHonor } from '../honor/HonorPanel'
 
 const fmtDateTime = (iso: string) => new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
 
 export function ChallengeDetailScreen({ id, code }: { id: string; code?: string | null }) {
   const { detail, leaderboard, teams } = useChallenge(id, code)
-  const [tab, setTab] = useState<'RANK' | 'RULES'>('RANK')
+  const [tab, setTab] = useState<'RANK' | 'RULES' | 'HONOR'>(useSearchParams().get('tab') === 'honor' ? 'HONOR' : 'RANK')
+  const honor = useHonor(id, !!detail.data)
 
   if (detail.isLoading) return <DetailSkeleton />
   if (detail.isError || !detail.data) {
@@ -44,6 +46,8 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
   const phase = challengePhase(c)
   const Icon = FORMAT_ICON[c.format] ?? Trophy
   const standings = teams.data ?? d.teams ?? []
+  // Vinh danh: BTC luôn thấy tab (để thiết lập); người khác chỉ thấy khi đã công bố
+  const showHonor = !!honor.data && (honor.data.can_manage || (honor.data.enabled && honor.data.status === 'PUBLISHED'))
 
   return (
     <div className="space-y-4 pb-28 animate-fade-in">
@@ -83,13 +87,17 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
         <MiniStat icon={Coins} label="Thưởng" value={c.reward_xu > 0 ? `${formatNumber(c.reward_xu)} Xu` : '—'} tone={c.reward_xu > 0 ? 'text-coin' : undefined} />
       </div>
 
-      <SegmentedControl value={tab} onChange={setTab} options={[{ value: 'RANK', label: 'Bảng xếp hạng' }, { value: 'RULES', label: 'Luật chơi' }]} />
-      {tab === 'RANK'
+      <SegmentedControl value={tab} onChange={setTab} options={[
+        { value: 'RANK', label: 'Bảng xếp hạng' },
+        ...(showHonor ? [{ value: 'HONOR' as const, label: 'Vinh danh' }] : []),
+        { value: 'RULES', label: 'Luật chơi' }]} />
+      {tab === 'HONOR' && showHonor ? <HonorPanel d={d} participants={leaderboard.data ?? []} />
+        : tab === 'RANK' || tab === 'HONOR'
         ? c.pledge_enabled
           ? <PledgePanel d={d} />
           : <Leaderboard d={d} rows={leaderboard.data} loading={leaderboard.isLoading} error={leaderboard.isError} standings={standings} />
         : <Rules d={d} />}
-      {tab === 'RANK' && <TopSupported challengeId={c.id} />}
+      {tab !== 'RULES' && tab !== 'HONOR' && <TopSupported challengeId={c.id} />}
 
       <ActionBar d={d} phase={phase} code={code ?? null} />
     </div>

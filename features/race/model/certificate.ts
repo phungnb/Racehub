@@ -5,7 +5,7 @@ import { bibNumber } from './bib'
 import {
   artRect, cleanFit, cleanLayers, DEFAULT_FIT, drawCover, drawLayers, imageLayer, isHex, loadImage, qrLayer, shapeLayer, textLayer,
   type ArtFit, type Binds, type ColorKey, type DrawOptions, type FontKey, type ImageLayer, type Layer, type Layout, type Palette, type QrLayer,
-} from './design'
+} from '@/shared/design/engine'
 
 export type CertFormat = 'portrait' | 'landscape'
 export const CERT_FORMATS: Record<CertFormat, { label: string; hint: string; w: number; h: number }> = {

@@ -18,7 +18,7 @@ import { canRegister, dashboardCsv, distanceLabel, racePace, racePhase, raceTime
 import { fmtDate, PHASE } from './RaceCard'
 import { BibDesigner } from './BibDesigner'
 import { CertDesigner } from './CertDesigner'
-import { raceLinks } from './studio/useRaceAssets'
+import { raceLinks } from './useRaceAssets'
 import { downloadCanvas, EBib } from './EBib'
 
 const fmtDateTime = (iso: string) => new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })

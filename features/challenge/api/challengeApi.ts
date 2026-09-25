@@ -4,6 +4,8 @@ import type { Audience, ChallengeDraft, ChallengeFormat, Objective, RewardSource
 import { draftToPayload, effectiveSlots, type pledgePayload } from '../model/challenge'
 import { toPolicy, type EconomyPolicy } from '@/shared/lib/economy'
 import { systemErrorMessage } from '@/shared/lib/errors'
+import { prepareImage } from '@/shared/lib/image'
+import type { HonorCategory, StoredHonorDesign } from '../model/honor'
 
 export type ChallengeTab = 'MINE' | 'DISCOVER' | 'CLUB' | 'ENDED'
 
@@ -323,6 +325,71 @@ const MESSAGES: Record<string, string> = {
   INVALID_AMOUNT: 'Số Xu thưởng không hợp lệ.',
   FORBIDDEN: 'Bạn không có quyền làm việc này.',
   RATE_LIMITED: 'Bạn thao tác hơi nhanh, thử lại sau ít phút.',
+  HONOR_PRO_REQUIRED: 'Vinh danh là tính năng của CLB Pro hoặc gói VIP (người tạo thử thách).',
+  HONOR_REVIEW_PENDING: 'Chỉ công bố được sau khi thử thách kết thúc 24 giờ (thời gian duyệt bài / khiếu nại).',
+  HONOR_NOT_CONFIGURED: 'Hãy bật vinh danh và chọn ít nhất một hạng mục.',
+  HONOR_NOT_AVAILABLE: 'Thử thách đã hủy, không vinh danh được.',
+  INVALID_HONOR_CATEGORIES: 'Hạng mục vinh danh không hợp lệ (tối đa 8, mỗi hạng mục 1–10 người).',
+  INVALID_HONOR_DESIGN: 'Thiết kế ảnh vinh danh không hợp lệ.',
+  INVALID_BIB_DESIGN: 'Thiết kế không hợp lệ.',
+  INVALID_HONOR_IMAGE: 'Ảnh phải được tải lên từ trang vinh danh của thử thách này.',
+  NOT_A_PARTICIPANT: 'Người này không tham gia thử thách.',
+}
+
+// ---------------------------------------------------------------------
+// Vinh danh (migration 004900)
+// ---------------------------------------------------------------------
+export interface Honoree {
+  category: string
+  rank: number
+  user_id: string
+  value: number | null
+  hidden: boolean
+  is_me: boolean
+  display_name: string
+  avatar_url: string | null
+  photo_url: string | null
+  /** Ảnh riêng đã chọn (chỉ chính runner / BTC thấy, kể cả khi đang ẩn) */
+  own_photo: string | null
+}
+export interface HonorState {
+  enabled: boolean
+  status: 'DRAFT' | 'PUBLISHED'
+  published_at: string | null
+  categories: HonorCategory[]
+  design: StoredHonorDesign | null
+  card_design: StoredHonorDesign | null
+  can_manage: boolean
+  allowed: boolean
+  ended: boolean
+  review_until: string
+  honorees: Honoree[]
+  preview: boolean
+}
+async function honorRpc(fn: string, args: Record<string, unknown>): Promise<HonorState> {
+  const { data, error } = await supabase.rpc(fn, args)
+  if (error) throw error
+  const h = data as HonorState
+  return { ...h, honorees: (h.honorees ?? []).map((x) => ({ ...x, value: x.value == null ? null : Number(x.value) })) }
+}
+export const getHonor = (id: string) => honorRpc('challenge_honor', { p_challenge_id: id })
+export const saveHonor = (id: string, p: { enabled: boolean; categories: HonorCategory[]; design: unknown; card_design: unknown }) =>
+  honorRpc('save_challenge_honor', { p_challenge_id: id, p })
+export const publishHonor = (id: string) => honorRpc('publish_challenge_honor', { p_challenge_id: id })
+export const unpublishHonor = (id: string) => honorRpc('unpublish_challenge_honor', { p_challenge_id: id })
+export const setHonorPref = (id: string, userId: string, p: { photo_url?: string | null; hidden?: boolean }) =>
+  honorRpc('set_honor_pref', { p_challenge_id: id, p_user_id: userId, p })
+
+/** Ảnh vinh danh: kho honor-media/<challenge_id>/<user_id>/… (BTC hoặc người tham gia) */
+export async function uploadHonorImage(challengeId: string, file: File): Promise<string> {
+  const blob = await prepareImage(file)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('AUTH_REQUIRED')
+  const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg'
+  const path = `${challengeId}/${user.id}/${Date.now()}.${ext}`
+  const { error } = await supabase.storage.from('honor-media').upload(path, blob, { contentType: blob.type, upsert: false })
+  if (error) throw error
+  return supabase.storage.from('honor-media').getPublicUrl(path).data.publicUrl
 }
 
 export function challengeErrorMessage(e: unknown): string {

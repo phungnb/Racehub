@@ -11,13 +11,13 @@ import {
   arrangeSponsors, autoBib, BIB_BINDS, BIB_SIZE, bibPayload, COLOR_LABEL, editableBib, keepAssets, TEMPLATES,
   type BibData, type BibDesign, type BibTemplate,
 } from '../model/bib'
-import { COLOR_KEYS, DEFAULT_FIT, imageLayer, panArt, type ImageLayer, type Layer } from '../model/design'
+import { COLOR_KEYS, DEFAULT_FIT, imageLayer, panArt, type ImageLayer, type Layer } from '@/shared/design/engine'
 import { EBib } from './EBib'
 import { fmtDate } from './RaceCard'
-import { FileButton, ImagePick, Section, Slider, Toggle, useImageSize, imageAspect } from './studio/bits'
-import { Studio } from './studio/Studio'
-import { useHistory } from './studio/useHistory'
-import { raceLinks, useRaceAssets } from './studio/useRaceAssets'
+import { FileButton, ImagePick, Section, Slider, Toggle, useImageSize, imageAspect } from '@/shared/design/studio/bits'
+import { Studio } from '@/shared/design/studio/Studio'
+import { useHistory } from '@/shared/design/studio/useHistory'
+import { raceLinks, useRaceAssets } from './useRaceAssets'
 
 /** Ban tổ chức thiết kế e-BIB: mọi phần tử kéo thả được, bố cục tự động theo mẫu, ảnh BIB có sẵn, QR tùy chọn, logo tài trợ */
 export function BibDesigner({ r, onClose }: { r: Race; onClose: () => void }) {

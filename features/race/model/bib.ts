@@ -5,7 +5,7 @@ import { distanceLabel } from './race'
 import {
   artRect, cleanFit, cleanLayers, DEFAULT_FIT, distribute, drawCover, drawLayers, imageLayer, isHex, loadImage, qrLayer, textLayer,
   type ArtFit, type Binds, type ColorKey, type DrawOptions, type FontKey, type ImageLayer, type Layer, type Layout, type Palette, type QrLayer,
-} from './design'
+} from '@/shared/design/engine'
 
 export type BibTemplate = 'classic' | 'marathon' | 'stripe' | 'split' | 'gradient' | 'speed' | 'neon' | 'minimal'
 export type BibColors = Palette

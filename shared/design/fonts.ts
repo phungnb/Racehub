@@ -5,7 +5,7 @@ import {
   Lobster, Montserrat, Oswald, Pacifico, Patrick_Hand, Paytone_One, Playfair_Display, Protest_Revolution, Protest_Strike,
   Roboto_Condensed, Roboto_Slab, Rowdies, Saira_Condensed, Sedgwick_Ave, Sigmar_One, Tourney, Unbounded, Yeseva_One,
 } from 'next/font/google'
-import { registerFonts } from '../model/design'
+import { registerFonts } from './engine'
 
 // next/font chỉ nhận tham số viết trực tiếp (không dùng biến / spread)
 const montserrat = Montserrat({ subsets: ['latin', 'vietnamese'], preload: false, display: 'swap', weight: ['900'], style: ['normal', 'italic'] })

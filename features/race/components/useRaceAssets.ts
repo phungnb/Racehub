@@ -3,9 +3,9 @@
 // Tài nguyên có sẵn cho trình thiết kế của một giải: link QR tự sinh, QR phí tham gia đã lưu của CLB, gợi ý QR
 import { useQuery } from '@tanstack/react-query'
 import { vietQrPayload } from '@/shared/lib/vietqr'
-import { getDesignAssets, type Race } from '../../api/raceApi'
-import type { QrLayer } from '../../model/design'
-import type { QrSuggestion } from './Studio'
+import { getDesignAssets, type Race } from '../api/raceApi'
+import type { QrLayer } from '@/shared/design/engine'
+import type { QrSuggestion } from '@/shared/design/studio/Studio'
 
 export function raceLinks(r: Pick<Race, 'id' | 'club'>, bib?: string) {
   const origin = typeof window === 'undefined' ? '' : window.location.origin

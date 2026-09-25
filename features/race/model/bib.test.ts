@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn() } }))
 const { arrangeSponsors, autoBib, bibNumber, bibPayload, freshBib, fromV1, keepAssets, resolveBib, STRIP_H, TEMPLATES } = await import('./bib')
-const { imageLayer, qrLayer, textLayer } = await import('./design')
+const { imageLayer, qrLayer, textLayer } = await import('@/shared/design/engine')
 
 const texts = (ls: { type: string }[]) => ls.filter((l): l is ReturnType<typeof textLayer> => l.type === 'text')
 

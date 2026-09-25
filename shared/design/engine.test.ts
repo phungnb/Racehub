@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn() } }))
 const {
   artRect, cleanLayers, distribute, duplicateLayer, hitTest, imageLayer, moveInStack, moveLayer, paint, panArt, scaleLayer, shapeLayer, textLayer, textOf,
-} = await import('./design')
+} = await import('./engine')
 
 const size = { w: 1400, h: 1000 }
 const pal = { bg: '#ffffff', band: '#1f4fd8', number: '#000000', text: '#111111', accent: '#ffc21a' }
