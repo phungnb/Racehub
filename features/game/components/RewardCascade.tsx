@@ -19,6 +19,7 @@ const KIND: Record<GameEvent['kind'], { icon: LucideIcon; tone: string; label: s
   CHECKIN: { icon: CalendarCheck, tone: 'bg-brand/15 text-brand', label: 'Điểm danh' },
   REFERRAL: { icon: UserPlus, tone: 'bg-brand/15 text-brand', label: 'Giới thiệu bạn bè' },
   GIFT_IN: { icon: Gift, tone: 'bg-coin/15 text-coin', label: 'Quà tặng' },
+  COMEBACK: { icon: Sparkles, tone: 'bg-brand/15 text-brand', label: 'Chào mừng trở lại' },
 }
 
 function usePrefersReducedMotion() {

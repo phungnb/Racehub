@@ -37,7 +37,8 @@ export function GrantXuTab({ policy }: { policy: EconomyPolicy }) {
     if (!target) return
     try {
       const r = await grant.mutateAsync({ kind: target.kind, id: target.id, amount: signed, coinKind: kind, reason: reason.trim(), key: key.current })
-      toast.success(r.duplicate ? 'Lệnh này đã được thực hiện trước đó.' : `${mode === 'ADD' ? 'Đã cộng' : 'Đã trừ'} ${formatCoin(amount)} Xu cho ${target.name}`)
+      toast.success(r.pending ? 'Vượt ngưỡng tự duyệt — đã gửi yêu cầu, chờ một admin khác duyệt ở tab Phê duyệt.'
+        : r.duplicate ? 'Lệnh này đã được thực hiện trước đó.' : `${mode === 'ADD' ? 'Đã cộng' : 'Đã trừ'} ${formatCoin(amount)} Xu cho ${target.name}`)
       setTarget({ ...target, balance: Number(r.balance) })
       setReason('')
       key.current = `grant-${crypto.randomUUID()}`

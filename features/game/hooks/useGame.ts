@@ -6,7 +6,7 @@ import { useInvalidateProfile } from '@/features/auth'
 import { supabase } from '@/shared/lib/supabase'
 import {
   buyShield, checkIn, getAchievements, getActivityRewards, getGameState, getLeagueStandings, getWallet, markEventsSeen,
-  getGiftCatalog, getGiftWall, sendGift, setWeeklyGoal,
+  getGiftCatalog, getGiftWall, getRunnerForm, sendGift, setWeeklyGoal,
 } from '../api/gameApi'
 
 export const gameKeys = {
@@ -100,4 +100,8 @@ export function useWallet() {
     initialPageParam: null as string | null,
     getNextPageParam: (last) => (last.items.length === 30 ? last.items[last.items.length - 1].created_at : undefined),
   })
+}
+
+export function useRunnerForm(userId?: string | null) {
+  return useQuery({ queryKey: ['game', 'form', userId ?? 'me'], queryFn: () => getRunnerForm(userId), staleTime: 5 * 60_000 })
 }

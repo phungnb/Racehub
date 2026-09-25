@@ -31,7 +31,7 @@ export function useGrantXu() {
     mutationFn: grantXu,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['admin'] })
-      refreshProfile()               // admin tự cộng cho mình thì ví trên thanh trên cũng đổi
+      refreshProfile()
     },
   })
 }

@@ -50,3 +50,12 @@ export async function getEconomyMetrics(months: number): Promise<EconomyMetrics>
   const num = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, k === 'month' ? v : v === null ? null : Number(v)]))
   return { months: (r.months ?? []).map((m) => num(m) as unknown as MetricsMonth), snapshot: num(r.snapshot ?? {}) as unknown as EconomyMetrics['snapshot'] }
 }
+
+export interface Approval {
+  id: string; action: 'GRANT_XU' | 'GRANT_PASS' | 'GRANT_PLAN'; summary: string; payload: Record<string, unknown>
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED'; requested_by: string; requester: string | null; decider: string | null
+  decided_at: string | null; note: string | null; created_at: string; mine: boolean
+}
+export const listApprovals = async (status: Approval['status'] | 'ALL') => (await call<Approval[]>('admin_list_approvals', { p_status: status })) ?? []
+export const decideApproval = (id: string, approve: boolean, note: string) =>
+  call<{ status: string }>('admin_decide_approval', { p_id: id, p_approve: approve, p_note: note || null })

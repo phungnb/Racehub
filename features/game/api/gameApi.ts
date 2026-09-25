@@ -136,3 +136,13 @@ export function gameErrorMessage(e: unknown): string {
   const key = Object.keys(MESSAGES).find((k) => raw.includes(k))
   return key ? MESSAGES[key] : 'Không thực hiện được. Hãy thử lại.'
 }
+
+/* ------------------------- Phong độ (migration 004200) ------------------------- */
+export type FormStatus = 'NEW' | 'RISING' | 'STEADY' | 'SLOWING' | 'RESTING' | 'LONG_BREAK'
+export interface RunnerForm { status: FormStatus; last_run_at: string | null; days_since: number | null; km_28d: number; km_prev_28d: number; runs_28d: number; comeback_xu: number; comeback_days: number }
+export async function getRunnerForm(userId?: string | null): Promise<RunnerForm> {
+  const { data, error } = await supabase.rpc('runner_form', { p_user: userId ?? null })
+  if (error) throw error
+  const f = (data ?? {}) as RunnerForm
+  return { ...f, km_28d: n(f.km_28d), km_prev_28d: n(f.km_prev_28d), runs_28d: n(f.runs_28d), comeback_xu: n(f.comeback_xu), comeback_days: n(f.comeback_days) }
+}

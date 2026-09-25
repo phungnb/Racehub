@@ -284,6 +284,7 @@ export async function setChallengePledge(id: string, p: ReturnType<typeof pledge
 
 const MESSAGES: Record<string, string> = {
   VIP_REQUIRED: 'Nhân bản thử thách cũ dành cho VIP2 trở lên.',
+  REWARD_TOO_LARGE: 'Mỗi thử thách chỉ treo thưởng tối đa 50% số dư quỹ CLB.',
   REWARD_NOT_ALLOWED: 'Chỉ thử thách CLB mới treo thưởng được (trích quỹ CLB). Thử thách cá nhân không treo thưởng Xu.',
   PLEDGES_MISSING: 'Còn thành viên chưa đăng ký mục tiêu. Nhắc họ, hoặc chia đội luôn (người chưa đăng ký tính 0 km).',
   PLEDGE_LOCKED: 'Mục tiêu đã khóa (đã xuất phát hoặc đã chia đội).',

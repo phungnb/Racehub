@@ -9,7 +9,7 @@ import {
   paceOf,
   type AthleteProfileData,
 } from '../api/athleteApi'
-import { GiftWall } from '@/features/game'
+import { FormChip, GiftWall } from '@/features/game'
 import ActivityHistory from './ActivityHistory'
 
 /* ────────────────────────────────────────────────────────────
@@ -131,6 +131,7 @@ export default function AthleteProfile({ userId, onClose }: Props) {
                   <AthleteAvatar name={name} url={data.avatar_url} size={88} />
                 </div>
                 <h3 className="text-lg font-black text-white">{name}</h3>
+                <FormChip userId={userId} className="mt-1" />
                 {data.can_view_profile && (
                   <>
                     {data.region && <p className="text-fg-muted">📍 {data.region}</p>}

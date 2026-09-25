@@ -6,6 +6,7 @@ export interface RunPolicy { freeKm: number; dailyCap: number; tiers: RunTier[] 
 export interface CapacityTier { max: number; xu: number }
 export interface StreakReward { weeks: number; xu: number }
 export interface ReferralPolicy { inviterXu: number; refereeXu: number; monthlyCap: number; minKm: number }
+export interface ComebackPolicy { minRestDays: number; xu: number; cooldownDays: number }
 export interface GamePolicy { shieldPrice: number; maxShields: number; defaultWeeklyGoal: number }
 
 export interface EconomyPolicy {
@@ -17,6 +18,7 @@ export interface EconomyPolicy {
   giftDailyCapXu: number
   streakRewards: StreakReward[]        // mốc chuỗi tuần liên tiếp
   referral: ReferralPolicy
+  comeback: ComebackPolicy             // thưởng quay lại sau nghỉ dài (không hạ cấp)
   levelUpXu: Record<string, number>    // "2": 20 …
   capacityTiers: CapacityTier[]        // phí tạo thử thách / giải theo quy mô
   game: GamePolicy
@@ -31,6 +33,7 @@ export const DEFAULT_POLICY: EconomyPolicy = {
   giftDailyCapXu: 20000,
   streakRewards: [{ weeks: 2, xu: 10 }, { weeks: 4, xu: 20 }, { weeks: 8, xu: 50 }],
   referral: { inviterXu: 20, refereeXu: 10, monthlyCap: 10, minKm: 3 },
+  comeback: { minRestDays: 28, xu: 10, cooldownDays: 90 },
   levelUpXu: { 2: 20, 3: 50, 4: 100, 5: 200, 6: 300, 7: 500, 8: 1000 },
   capacityTiers: [
     { max: 5, xu: 0 }, { max: 20, xu: 150 }, { max: 50, xu: 400 }, { max: 100, xu: 800 },
@@ -50,6 +53,7 @@ export function toPolicy(raw: unknown): EconomyPolicy {
   const run = (r.run ?? {}) as Record<string, unknown>
   const ref = (r.referral ?? {}) as Record<string, unknown>
   const game = (r.game ?? {}) as Record<string, unknown>
+  const cb = (r.comeback ?? {}) as Record<string, unknown>
   return {
     xuVnd: n(r.xuVnd, d.xuVnd),
     xpPerKm: n(r.xpPerKm, d.xpPerKm),
@@ -65,6 +69,7 @@ export function toPolicy(raw: unknown): EconomyPolicy {
       inviterXu: n(ref.inviterXu, d.referral.inviterXu), refereeXu: n(ref.refereeXu, d.referral.refereeXu),
       monthlyCap: n(ref.monthlyCap, d.referral.monthlyCap), minKm: n(ref.minKm, d.referral.minKm),
     },
+    comeback: { minRestDays: n(cb.minRestDays, d.comeback.minRestDays), xu: n(cb.xu, d.comeback.xu), cooldownDays: n(cb.cooldownDays, d.comeback.cooldownDays) },
     levelUpXu: r.levelUpXu && typeof r.levelUpXu === 'object'
       ? Object.fromEntries(Object.entries(r.levelUpXu as Record<string, unknown>).map(([k, v]) => [k, n(v, 0)])) : { ...d.levelUpXu },
     capacityTiers: arr(r.capacityTiers, (t) => ({ max: n(t.max, 0), xu: n(t.xu, 0) }), d.capacityTiers).sort((a, b) => a.max - b.max),
@@ -164,5 +169,6 @@ export function validatePolicy(p: EconomyPolicy): string | null {
   if (p.streakRewards.some((s) => !(Number.isInteger(s.weeks) && s.weeks >= 1 && s.xu >= 0))) return 'Mốc chuỗi tuần không hợp lệ.'
   if (!(p.referral.inviterXu >= 0 && p.referral.refereeXu >= 0 && p.referral.monthlyCap >= 0 && p.referral.minKm >= 0)) return 'Thưởng giới thiệu không hợp lệ.'
   if (!(p.game.shieldPrice >= 0)) return 'Giá khiên không hợp lệ.'
+  if (!(p.comeback.minRestDays >= 7 && p.comeback.minRestDays <= 365 && p.comeback.xu >= 0 && p.comeback.cooldownDays >= 0)) return 'Thưởng quay lại không hợp lệ (nghỉ tối thiểu 7–365 ngày).'
   return null
 }

@@ -32,6 +32,7 @@ language sql immutable as $$
     'streakRewards', jsonb_build_array(jsonb_build_object('weeks', 2, 'xu', 10), jsonb_build_object('weeks', 4, 'xu', 20),
                                        jsonb_build_object('weeks', 8, 'xu', 50)),
     'referral', jsonb_build_object('inviterXu', 20, 'refereeXu', 10, 'monthlyCap', 10, 'minKm', 3),
+    'comeback', jsonb_build_object('minRestDays', 28, 'xu', 10, 'cooldownDays', 90),
     'levelUpXu', jsonb_build_object('2', 20, '3', 50, '4', 100, '5', 200, '6', 300, '7', 500, '8', 1000),
     'capacityTiers', jsonb_build_array(
        jsonb_build_object('max', 5, 'xu', 0), jsonb_build_object('max', 20, 'xu', 150), jsonb_build_object('max', 50, 'xu', 400),
@@ -80,7 +81,7 @@ update public.profiles set level = private.level_for_xp(coalesce(xp, 0)) where l
 -- Loại sự kiện thưởng mới
 alter table public.game_events drop constraint if exists game_events_kind_check;
 alter table public.game_events add constraint game_events_kind_check
-  check (kind in ('RUN', 'QUEST', 'BADGE', 'STREAK', 'LEVEL_UP', 'LEAGUE', 'CHEER_IN', 'CHECKIN', 'REFERRAL', 'GIFT_IN'));
+  check (kind in ('RUN', 'QUEST', 'BADGE', 'STREAK', 'LEVEL_UP', 'LEAGUE', 'CHEER_IN', 'CHECKIN', 'REFERRAL', 'GIFT_IN', 'COMEBACK'));
 
 -- Lên cấp: thông báo + Xu một lần theo cấu hình levelUpXu
 create or replace function private.level_up_event(p_user uuid, p_level integer, p_activity uuid default null) returns void
@@ -275,7 +276,7 @@ create or replace function private.game_revoke_activity(p_activity uuid) returns
 language plpgsql security definer set search_path = public as $$
 declare e record;
 begin
-  for e in select * from public.game_events where activity_id = p_activity and kind in ('QUEST', 'BADGE', 'STREAK', 'CHECKIN') loop
+  for e in select * from public.game_events where activity_id = p_activity and kind in ('QUEST', 'BADGE', 'STREAK', 'CHECKIN', 'COMEBACK') loop
     if e.xu > 0 then
       perform private.ledger_post('GAME_REVERSAL', 'game_reversal:' || e.id, 'Thu hồi thưởng — bài chạy không còn hợp lệ', e.user_id,
         jsonb_build_array(
@@ -378,6 +379,9 @@ language sql immutable as $$
      and coalesce((c->'referral'->>'inviterXu')::numeric, 0) between 0 and 100000
      and coalesce((c->'referral'->>'refereeXu')::numeric, 0) between 0 and 100000
      and coalesce((c->'referral'->>'monthlyCap')::numeric, 10) between 0 and 1000
+     and coalesce((c->'comeback'->>'xu')::numeric, 10) between 0 and 10000
+     and coalesce((c->'comeback'->>'minRestDays')::numeric, 28) between 7 and 365
+     and coalesce((c->'comeback'->>'cooldownDays')::numeric, 90) between 0 and 3650
      and coalesce((c->'game'->>'shieldPrice')::numeric, 200) between 0 and 100000
 $$;
 

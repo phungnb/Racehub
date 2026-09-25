@@ -76,7 +76,7 @@ export async function grantXu(input: { kind: AccountKind; id: string; amount: nu
     p_reason: input.reason, p_idempotency_key: input.key,
   })
   if (error) throw error
-  return data as { transaction_id: string; balance: number; duplicate?: boolean }
+  return data as { transaction_id?: string; balance?: number; duplicate?: boolean; pending?: boolean; approval_id?: string }
 }
 
 export async function listPasses(): Promise<Pass[]> {
@@ -91,7 +91,7 @@ export async function grantPass(input: { kind: AccountKind; id: string; quantity
     p_expires_at: input.expiresAt, p_note: input.note || null,
   })
   if (error) throw error
-  return data as string
+  return data as string | null        // null = vượt ngưỡng, đã thành yêu cầu chờ admin khác duyệt
 }
 
 export async function revokePass(id: string, reason: string) {
@@ -199,6 +199,11 @@ const MESSAGES: Record<string, string> = {
   SLOT_LOCKED: 'Đã có người sở hữu món này, không đổi sang ô khác được. Hãy tạo mã mới.',
   ITEM_REQUIRED: 'Không ngừng bán được bản nguyên bản (bộ mặc định của mọi người).',
   ITEM_NOT_FOUND: 'Không tìm thấy vật phẩm.',
+  SELF_ACTION_FORBIDDEN: 'Không thể tự cấp cho chính mình hoặc CLB mình là thành viên — nhờ một admin khác thực hiện.',
+  SAME_ADMIN: 'Người yêu cầu không tự duyệt được — cần một admin khác.',
+  APPROVAL_DONE: 'Yêu cầu này đã được xử lý.',
+  APPROVAL_EXPIRED: 'Yêu cầu đã quá 7 ngày và hết hạn — tạo lại nếu vẫn cần.',
+  APPROVAL_NOT_FOUND: 'Không tìm thấy yêu cầu.',
   ORDER_NOT_FOUND: 'Không tìm thấy đơn hàng.',
   ORDER_NOT_PENDING: 'Đơn đã được xử lý hoặc đã hủy.',
   INVALID_PLAN: 'Gói không hợp lệ cho loại tài khoản này (VIP cho cá nhân, CLB Pro cho CLB).',

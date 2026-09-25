@@ -144,6 +144,14 @@ export function PolicyTab({ policy, raw }: { policy: EconomyPolicy; raw: Record<
         </div>
       </Section>
 
+      <Section title="Chào mừng trở lại" hint="Cấp độ không bao giờ bị hạ khi nghỉ. Bài chạy đầu tiên sau kỳ nghỉ dài được thưởng, mỗi người tối đa một lần mỗi kỳ chờ.">
+        <div className="grid grid-cols-3 gap-3">
+          <Num id="pol-cb-days" label="Nghỉ tối thiểu" unit="ngày" value={p.comeback.minRestDays} onChange={(v) => set({ comeback: { ...p.comeback, minRestDays: v } })} />
+          <Num id="pol-cb-xu" label="Thưởng" unit="Xu" value={p.comeback.xu} onChange={(v) => set({ comeback: { ...p.comeback, xu: v } })} />
+          <Num id="pol-cb-cool" label="Kỳ chờ" unit="ngày" value={p.comeback.cooldownDays} onChange={(v) => set({ comeback: { ...p.comeback, cooldownDays: v } })} />
+        </div>
+      </Section>
+
       <Section title="Thưởng lên cấp" hint="Trả một lần khi đạt cấp">
         <div className="grid grid-cols-2 gap-3">
           {LEVELS.slice(1).map((l) => (

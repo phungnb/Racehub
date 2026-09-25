@@ -8,6 +8,7 @@ import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { levelProgress } from '@/features/progression'
 import type { Profile } from '@/shared/types/profile'
 import { gameErrorMessage } from '../api/gameApi'
+import { FormChip } from './FormChip'
 import { useGameState, useMarkSeen } from '../hooks/useGame'
 import { leagueTier, timeLeft, type GameState } from '../model/game'
 import { LeagueSheet } from './LeagueSheet'
@@ -73,6 +74,7 @@ function TodayCard({ profile, s, onStreak }: { profile: Profile; s: GameState; o
         <Avatar src={profile.avatar_url} name={profile.display_name} size="md" />
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2"><span className="truncate font-bold">{profile.display_name || 'Runner'}</span><LevelBadge level={lv.current.level} /></p>
+          <FormChip showHint className="mt-1" />
           <div className="mt-1 flex items-center gap-2">
             <ProgressBar value={lv.value} max={lv.span} tone="xp" className="h-1.5" />
             <span className="shrink-0 font-mono text-xs text-fg-subtle">{lv.next ? `${formatNumber(lv.remaining)} XP` : 'Tối đa'}</span>
