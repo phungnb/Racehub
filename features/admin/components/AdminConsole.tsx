@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Activity, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, type LucideIcon } from 'lucide-react'
+import { Activity, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, type LucideIcon } from 'lucide-react'
 import { ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { adminErrorMessage } from '../api/adminApi'
@@ -22,50 +22,90 @@ import { MetricsTab } from './commerce/MetricsTab'
 import { QuestsTab } from './commerce/QuestsTab'
 import { PromotionsTab } from './commerce/PromotionsTab'
 import { CupReviewList } from '@/features/cup'
+import type { AdminInbox } from '../api/consoleApi'
+import { InboxPanel, useAdminInbox } from './console/InboxPanel'
+import { UsersTab } from './console/UsersTab'
+import { ChallengesTab } from './console/ChallengesTab'
+import { AuditTab } from './console/AuditTab'
 
-type Tab = 'overview' | 'metrics' | 'orders' | 'promos' | 'quests' | 'plans' | 'grant' | 'passes' | 'policy' | 'gifts' | 'organizers' | 'items' | 'review' | 'clubs' | 'cups' | 'partners' | 'system'
-const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
-  { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
-  { id: 'metrics', label: 'Chỉ số', icon: BarChart3 },
-  { id: 'orders', label: 'Đơn hàng', icon: Receipt },
-  { id: 'promos', label: 'Khuyến mãi', icon: Megaphone },
-  { id: 'quests', label: 'Nhiệm vụ', icon: Target },
-  { id: 'plans', label: 'Gói & giá', icon: Tags },
-  { id: 'grant', label: 'Cộng/Trừ Xu', icon: Coins },
-  { id: 'passes', label: 'Lượt tạo', icon: Ticket },
-  { id: 'policy', label: 'Chính sách', icon: ScrollText },
-  { id: 'gifts', label: 'Quà tặng', icon: Gift },
-  { id: 'organizers', label: 'Tổ chức giải', icon: Flag },
-  { id: 'items', label: 'Vật phẩm', icon: Shirt },
-  { id: 'review', label: 'Duyệt bài', icon: CheckCircle2 },
-  { id: 'clubs', label: 'CLB Pro', icon: Crown },
-  { id: 'cups', label: 'Thách đấu', icon: Swords },
-  { id: 'partners', label: 'Đối tác', icon: Store },
-  { id: 'system', label: 'Hệ thống', icon: Activity },
+type Tab = 'overview' | 'metrics' | 'users' | 'review' | 'challenges' | 'clubs' | 'cups' | 'partners' | 'organizers'
+  | 'orders' | 'plans' | 'promos' | 'quests' | 'gifts' | 'items' | 'grant' | 'passes' | 'policy' | 'system' | 'audit'
+type Badge = keyof AdminInbox
+const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; label: string; icon: LucideIcon; badge?: Badge }[] }[] = [
+  { id: 'home', label: 'Tổng quan', icon: LayoutDashboard, tabs: [
+    { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard }, { id: 'metrics', label: 'Chỉ số', icon: BarChart3 }] },
+  { id: 'people', label: 'Người dùng', icon: Users, tabs: [
+    { id: 'users', label: 'Người dùng', icon: Users }, { id: 'review', label: 'Duyệt bài chạy', icon: CheckCircle2, badge: 'reviews' }] },
+  { id: 'community', label: 'Cộng đồng', icon: Trophy, tabs: [
+    { id: 'challenges', label: 'Thử thách', icon: Trophy }, { id: 'clubs', label: 'CLB Pro', icon: Crown }, { id: 'cups', label: 'Thách đấu CLB', icon: Swords, badge: 'cups' },
+    { id: 'partners', label: 'Đối tác', icon: Store, badge: 'partners' }, { id: 'organizers', label: 'Tổ chức giải', icon: Flag }] },
+  { id: 'sales', label: 'Kinh doanh', icon: Receipt, tabs: [
+    { id: 'orders', label: 'Đơn hàng', icon: Receipt, badge: 'orders' }, { id: 'plans', label: 'Gói & giá', icon: Tags }, { id: 'promos', label: 'Khuyến mãi', icon: Megaphone },
+    { id: 'quests', label: 'Nhiệm vụ', icon: Target }, { id: 'gifts', label: 'Quà tặng', icon: Gift }, { id: 'items', label: 'Vật phẩm', icon: Shirt }] },
+  { id: 'economy', label: 'Kinh tế', icon: Coins, tabs: [
+    { id: 'grant', label: 'Cộng/Trừ Xu', icon: Coins }, { id: 'passes', label: 'Lượt tạo', icon: Ticket }, { id: 'policy', label: 'Chính sách', icon: ScrollText }] },
+  { id: 'system', label: 'Hệ thống', icon: Activity, tabs: [
+    { id: 'system', label: 'Kiểm tra hệ thống', icon: Activity, badge: 'errors' }, { id: 'audit', label: 'Nhật ký quản trị', icon: History }] },
 ]
+const ALL_TABS = GROUPS.flatMap((g) => g.tabs.map((t) => t.id))
+const groupOf = (t: Tab) => GROUPS.find((g) => g.tabs.some((x) => x.id === t)) ?? GROUPS[0]
 
-/** Bảng điều phối của quản trị viên hệ thống: dòng Xu, cộng/trừ Xu, vé miễn phí, chính sách, vật phẩm, duyệt bài */
 export function AdminConsole() {
-  const [tab, setTab] = useState<Tab>('overview')
+  const [tab, setTabState] = useState<Tab>(() => {
+    const t = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null
+    return t && (ALL_TABS as string[]).includes(t) ? (t as Tab) : 'overview'
+  })
+  // Giữ tab trên thanh địa chỉ (?tab=…) để tải lại / gửi link vẫn đúng chỗ
+  const setTab = (t: string) => {
+    if (!(ALL_TABS as string[]).includes(t)) return
+    setTabState(t as Tab)
+    window.history.replaceState(null, '', `?tab=${t}`)
+    window.scrollTo({ top: 0 })
+  }
   const o = useEconomyOverview()
+  const inbox = useAdminInbox().data
+  const count = (b?: Badge) => (b && inbox ? Number(inbox[b]) : 0)
+  const group = groupOf(tab)
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold">Quản trị RaceHub</h1>
-        <p className="text-sm text-fg-muted">Đơn hàng, bảng giá, điều phối Xu, lượt tạo, chính sách kinh tế, quà tặng và vật phẩm</p>
+        <p className="text-sm text-fg-muted">Người dùng, cộng đồng, bán hàng, kinh tế Xu và sức khỏe hệ thống — mọi thao tác đều được ghi nhật ký.</p>
       </div>
-      <nav className="flex flex-wrap gap-2" role="tablist" aria-label="Khu vực quản trị">
-        {TABS.map((t) => (
-          <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}
-            className={cn('flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold',
-              tab === t.id ? 'border-brand bg-brand text-brand-fg' : 'border-border text-fg-muted hover:text-fg')}>
-            <t.icon className="size-4" aria-hidden />{t.label}
-          </button>
-        ))}
+      <nav className="space-y-2" aria-label="Khu vực quản trị">
+        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]" role="tablist" aria-label="Nhóm">
+          {GROUPS.map((g) => {
+            const n = g.tabs.reduce((a, t) => a + count(t.badge), 0)
+            return (
+              <button key={g.id} role="tab" aria-selected={group.id === g.id} onClick={() => setTab(g.tabs[0].id)}
+                className={cn('relative flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold',
+                  group.id === g.id ? 'border-brand bg-brand text-brand-fg' : 'border-border text-fg-muted hover:text-fg')}>
+                <g.icon className="size-4" aria-hidden />{g.label}
+                {n > 0 && <span className="rounded-full bg-danger px-1.5 text-[11px] font-bold leading-4 text-white">{n}</span>}
+              </button>
+            )
+          })}
+        </div>
+        {group.tabs.length > 1 && (
+          <div className="flex flex-wrap gap-1.5" role="tablist" aria-label={group.label}>
+            {group.tabs.map((t) => (
+              <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}
+                className={cn('flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium',
+                  tab === t.id ? 'bg-surface-2 text-fg shadow-sm' : 'text-fg-subtle hover:text-fg')}>
+                <t.icon className="size-4" aria-hidden />{t.label}
+                {count(t.badge) > 0 && <span className="rounded-full bg-danger/15 px-1.5 text-[11px] font-bold text-danger">{count(t.badge)}</span>}
+              </button>
+            ))}
+          </div>
+        )}
       </nav>
 
+      {tab === 'overview' && <InboxPanel onGo={setTab} />}
       {tab === 'system' ? <SystemTab />
+        : tab === 'users' ? <UsersTab />
+        : tab === 'challenges' ? <ChallengesTab />
+        : tab === 'audit' ? <AuditTab />
         : tab === 'metrics' ? <MetricsTab />
         : tab === 'orders' ? <OrdersTab />
         : tab === 'promos' ? <PromotionsTab />

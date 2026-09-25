@@ -5,7 +5,7 @@ import QRCode from 'qrcode'
 import { Copy, Download, Link2, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useQuery } from '@tanstack/react-query'
-import { Button, ErrorState, Sheet, Skeleton } from '@/shared/ui'
+import { Button, ErrorState, Sheet, Skeleton, useImageSaver } from '@/shared/ui'
 import { clubErrorMessage, getInviteCode } from '../../api/clubApi'
 import { clubKeys } from '../../hooks/keys'
 
@@ -32,6 +32,7 @@ export function InvitePanel({ clubId, name, slug }: { clubId: string; name: stri
 
 function InviteView({ code, name, slug }: { code: string; name: string; slug?: string | null }) {
   const link = clubInviteLink(code, slug)
+  const saver = useImageSaver()
   const [qr, setQr] = useState<string | null>(null)
   useEffect(() => {
     let alive = true
@@ -63,15 +64,12 @@ function InviteView({ code, name, slug }: { code: string; name: string; slug?: s
       </div>
       <div className="grid grid-cols-3 gap-2">
         <Button variant="secondary" className={BTN} onClick={() => copy(link, 'link mời')}><Copy className="size-4" aria-hidden />Sao chép</Button>
-        <Button variant="secondary" className={BTN} disabled={!qr} onClick={() => {
-          if (!qr) return
-          const a = document.createElement('a')
-          a.href = qr
-          a.download = `QR-${name.replace(/[^\p{L}\p{N}]+/gu, '-')}.png`
-          a.click()
+        <Button variant="secondary" className={BTN} disabled={!qr} loading={saver.busy} onClick={async () => {
+          if (qr) void saver.saveBlob(await (await fetch(qr)).blob(), `QR-${name.replace(/[^\p{L}\p{N}]+/gu, '-')}.png`, `Vào CLB ${name}`)
         }}><Download className="size-4" aria-hidden />Lưu QR</Button>
         <Button className={BTN} onClick={share}><Share2 className="size-4" aria-hidden />Chia sẻ</Button>
       </div>
+      {saver.sheet}
     </div>
   )
 }

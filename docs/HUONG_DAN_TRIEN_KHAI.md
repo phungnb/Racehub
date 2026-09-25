@@ -23,6 +23,7 @@ Sao chép `.env.example` thành `.env.local` (máy local / Codespaces), hoặc �
 | `CRON_SECRET` | Tự tạo bằng `openssl rand -hex 24` | **Mới (Sprint 2)**. Vercel dùng để gọi `/api/cron/club-recap` (bài Tổng kết tuần, 07:00 sáng thứ Hai), `/api/cron/challenges` (tất toán thử thách) và `/api/cron/leagues` (chốt league 00:10 thứ Hai). Lịch nằm trong `vercel.json` |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Tự tạo một lần: `npx web-push generate-vapid-keys` | **Mới (PWA-02)**. Bật thông báo đẩy. Khóa riêng chỉ đặt ở server. Đổi khóa thì mọi thiết bị phải bật lại thông báo |
 | `VAPID_SUBJECT` | `mailto:<email của bạn>` hoặc `https://<tên-miền>` | Không bắt buộc (mặc định dùng tên miền app) |
+| `NEXT_PUBLIC_AUTH_PROVIDERS` | `google,apple` (hoặc chỉ `google`) | Không bắt buộc. Hiện nút **Tiếp tục với Google / Apple** ở màn đăng nhập — chỉ đặt **sau khi** đã bật nhà cung cấp trong Supabase (mục 4c) |
 | `NEXT_PUBLIC_SUPPORT_EMAIL` | Email hỗ trợ của bạn | Không bắt buộc. Hiện ở trang `/privacy`, `/terms` (người dùng yêu cầu xóa dữ liệu, khiếu nại) |
 
 Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo lỗi rõ tên biến bị thiếu, thay vì âm thầm dùng key sai như trước.
@@ -32,7 +33,7 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
 > ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
-> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 005300** + chạy lại 003500),
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 005600** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
 > File gộp tạo bằng `npm run db:bundle` (hoặc `node scripts/db-bundle.mjs <mốc>` để gộp từ mốc khác); test tự động bảo đảm file luôn khớp migration.
@@ -94,6 +95,9 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001005100_item_promotions.sql` | **Khuyến mãi vật phẩm (Xu).** Quản trị → Khuyến mãi → Vật phẩm: 8 loại (Giảm giá, Flash sale ≤72h, Miễn phí, Dùng thử đồ nhân vật, Gói đồ, Sự kiện, Lần mua đầu, Chào mừng trở lại) + 5 chiến dịch dựng sẵn. Mỗi vật phẩm một chương trình (không cộng dồn); giới hạn tổng / mỗi người (số thật); nhóm được hưởng. Quà giảm giá / miễn phí: **Tỏa sáng người nhận tính theo Xu thực trả**. Tủ đồ + hộp quà hiện giá gạch, nhãn, đếm ngược | Cần 4700; chạy lại 3500 |
 | `20261001005200_sponsor_vouchers.sql` | **Voucher tài trợ** (bước đầu của Market, RaceHub không giữ tiền). BTC thử thách (mục "Quà nhà tài trợ") hoặc admin (Khuyến mãi → Voucher, gắn cho nhiệm vụ) tạo voucher: nhà tài trợ, ưu đãi, điều kiện dùng, link; phát khi **hoàn thành** hoặc **Top N khi chốt hạng**; mã riêng (dán danh sách, phát bù người đã đạt) hoặc mã chung. Runner nhận thông báo, xem ở **Tôi → Voucher của tôi**, sao chép mã, đánh dấu đã dùng | Cần 4600; chạy lại 3500 |
 | `20261001005300_market_partners.sql` | **Chợ Runner** (Market giai đoạn 2, RaceHub không giữ tiền). Runner đăng ký hồ sơ **HLV / Cửa hàng / Dịch vụ** (Tôi → Hồ sơ đối tác): giới thiệu, chuyên môn, bảng dịch vụ + giá tham khảo, tỉnh/thành, liên hệ (điện thoại, Zalo, Facebook, website, email). Admin duyệt ở **Quản trị → Đối tác** (xác minh / từ chối kèm lý do / ẩn). Hồ sơ đã xác minh hiện ở `/market`; HLV hiện thành tích chạy thật (cấp, km 12 tháng). Người dùng liên hệ và thanh toán trực tiếp với đối tác | Cần 3100, 4100; chạy lại 3500 |
+| `20261001005400_challenge_rules_lists.sql` | **Thể lệ thử thách**: người tạo điền thể lệ thưởng, phạt, lệ phí / đóng góp (RaceHub không thu hộ), điều kiện, liên hệ BTC, tối đa 5 mục tự đặt — hiện ở tab **Luật chơi**, sửa được khi còn mở (đã bắt đầu thì báo người tham gia). **Thử thách / giải chạy ảo đã hủy** không còn nằm ở tab *Của tôi / Khám phá / CLB* | Cần 600, 2700; chạy lại 3500 |
+| `20261001005500_social_login_invites.sql` | **Đăng nhập Google / Apple** (tên + ảnh lấy từ tài khoản; sửa lỗi đăng ký email bị đặt tên theo email). **Mã giới thiệu ngắn** 8 ký tự (`/join/<mã>`, link cũ vẫn chạy), trang **Tôi → Mời bạn bè** (mã, QR, bạn đã mời, Xu nhận), nhập mã khi đăng ký. **Trang xem trước lời mời** (người mời / CLB) trước khi đăng ký hoặc tham gia | Cần 300, 3400, 3700; chạy lại 3500 |
+| `20261001005600_admin_console.sql` | **Quản trị toàn diện**: *Việc cần xử lý* (đơn, bài chờ duyệt, đối tác, thách đấu, lỗi), **Người dùng** (hồ sơ, email, đăng nhập cuối, số dư, CLB, giao dịch; **khóa / mở khóa** tài khoản — đăng xuất mọi thiết bị; **cấp / gỡ quyền admin**), **Thử thách** (tìm, hủy thử thách vi phạm, hoàn tiền treo), **Nhật ký quản trị** | Cần 600, 3800, 4100, 4400, 5300; chạy lại 3500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 
@@ -191,7 +195,7 @@ Thông báo trong giờ yên lặng của người nhận vẫn vào chuông, ch
 
 File 500 đã tự thêm `club_messages`, `club_posts`, `notifications` vào Realtime; file 600 thêm `challenge_participants` (BXH thử thách cập nhật tức thì). Kiểm tra lại trong **Supabase → Database → Publications → supabase_realtime**: ba bảng này phải được bật. Nếu chưa có thì chat vẫn gửi được, nhưng người khác phải tải lại trang mới thấy tin mới.
 
-## Bước 4 — Cấu hình Strava
+## Bước 4 — Cấu hình Strava và đăng nhập Google / Apple
 
 ### 4a. Webhook Strava (bài chạy tự về, không cần bấm "Đồng bộ")
 Cần một địa chỉ **công khai** (domain production, hoặc cổng 3000 của Codespaces đặt *Public* trong tab Ports). Mỗi app Strava chỉ có **1** subscription, nên khi đổi domain phải xóa rồi tạo lại.
@@ -217,6 +221,17 @@ Chưa đăng ký webhook thì app vẫn chạy: khi vừa kết nối Strava, ap
 ### 4b. Callback domain
 
 strava.com/settings/api → **Authorization Callback Domain** = domain của app (ví dụ `racehub.vn`, hoặc domain Codespaces/Vercel khi thử nghiệm). Đường dẫn callback giữ nguyên: `/api/strava/callback`.
+
+### 4c. Đăng nhập Google / Apple (không bắt buộc)
+
+1. **Supabase → Authentication → URL Configuration → Redirect URLs**: thêm `https://<tên-miền>/**` và `vn.racehub.app://**` (app cài).
+2. **Google**: Google Cloud Console → APIs & Services → Credentials → *Create OAuth client ID* (loại **Web application**).
+   *Authorized redirect URI* = `https://<project>.supabase.co/auth/v1/callback`. Dán Client ID + Secret vào **Supabase → Authentication → Providers → Google** → bật.
+3. **Apple** (cần Apple Developer 99 USD/năm): tạo *Services ID* (vd `vn.racehub.web`), bật *Sign in with Apple*, Return URL = `https://<project>.supabase.co/auth/v1/callback`;
+   tạo *Key* Sign in with Apple → dán Team ID, Key ID, Services ID, file .p8 vào **Supabase → Providers → Apple** → bật.
+4. Vercel: đặt `NEXT_PUBLIC_AUTH_PROVIDERS=google,apple` (hoặc `google`) → deploy lại. Nút đăng nhập mới hiện.
+5. **App cài**: Google cấm đăng nhập trong WebView nên app mở trình duyệt hệ thống rồi quay lại qua `vn.racehub.app://auth/callback`
+   — cần **dựng lại app** (đã thêm plugin Browser / Share / Filesystem và khai báo scheme). App bản cũ sẽ báo "hãy cập nhật app".
 
 ## Bước 5 — Deploy và kiểm tra
 

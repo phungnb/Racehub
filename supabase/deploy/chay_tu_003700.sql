@@ -1,7 +1,7 @@
--- RaceHub: gộp 18 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 21 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -5063,6 +5063,463 @@ grant execute on function public.my_partners(), public.save_partner(jsonb), publ
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001005400_challenge_rules_lists.sql
+-- ===================================================================
+-- 005400: Thử thách — thể lệ bổ sung + danh sách gọn.
+-- • Thể lệ bổ sung (không bắt buộc) do người tạo điền: thưởng, phạt, lệ phí / đóng góp, điều kiện tham gia, liên hệ BTC,
+--   và tối đa 5 mục tự đặt tên. Sửa được khi thử thách còn mở; nếu đã bắt đầu thì người tham gia được báo "BTC cập nhật thể lệ".
+--   RaceHub không thu tiền hộ: lệ phí / phạt (nếu có) do BTC tự thu, app chỉ hiển thị.
+-- • Danh sách thử thách: thử thách ĐÃ HỦY không còn nằm ở tab "Của tôi", "Khám phá", "CLB" (chỉ còn trong "Đã kết thúc").
+--   Giải chạy ảo đã hủy cũng rời tab "Của tôi" (vẫn xem được ở "Đã qua").
+-- Cần 000600, 002700. Chạy lại nhiều lần vẫn an toàn. Không dùng SELECT … INTO, khối DO, LIMIT (SQL Editor).
+
+alter table public.challenges add column if not exists rules_info jsonb not null default '{}'::jsonb;
+alter table public.challenges add column if not exists rules_updated_at timestamptz;
+
+-- Chuẩn hóa thể lệ: chỉ giữ khóa hợp lệ, cắt độ dài, bỏ mục rỗng
+create or replace function private.challenge_rules_clean(p jsonb) returns jsonb
+language plpgsql immutable as $$
+declare v_out jsonb := '{}'::jsonb; k text; v text; n int;
+begin
+  if p is null or jsonb_typeof(p) <> 'object' then return v_out; end if;
+  foreach k in array array['prizes', 'penalties', 'fees', 'conduct', 'contact'] loop
+    v := nullif(trim(coalesce(p->>k, '')), '');
+    n := case k when 'contact' then 200 when 'fees' then 600 else 1500 end;
+    if v is not null then v_out := v_out || jsonb_build_object(k, left(v, n)); end if;
+  end loop;
+  if jsonb_typeof(p->'custom') = 'array' then
+    if jsonb_array_length(p->'custom') > 5 then raise exception 'TOO_MANY_RULES'; end if;
+    v_out := v_out || jsonb_build_object('custom', (
+      select coalesce(jsonb_agg(jsonb_build_object('title', left(trim(e->>'title'), 60), 'body', left(trim(e->>'body'), 1500)) order by o), '[]'::jsonb)
+        from jsonb_array_elements(p->'custom') with ordinality t(e, o)
+       where char_length(trim(coalesce(e->>'title', ''))) >= 2 and char_length(trim(coalesce(e->>'body', ''))) >= 1));
+    if v_out->'custom' = '[]'::jsonb then v_out := v_out - 'custom'; end if;
+  end if;
+  return v_out;
+end $$;
+
+create or replace function public.set_challenge_rules(p_challenge_id uuid, p jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  c public.challenges := (select x from public.challenges x where x.id = p_challenge_id);
+  v_new jsonb := private.challenge_rules_clean(p);
+  r record;
+begin
+  if c.id is null then raise exception 'CHALLENGE_NOT_FOUND'; end if;
+  if c.created_by is distinct from v_uid and not (c.target_club_id is not null and public.club_is_staff(c.target_club_id))
+     and not public.is_system_admin() then
+    raise exception 'FORBIDDEN';
+  end if;
+  if c.status <> 'ACTIVE' or c.end_date <= now() then raise exception 'CHALLENGE_CLOSED'; end if;
+  if v_new = c.rules_info then return v_new; end if;
+  update public.challenges set rules_info = v_new, rules_updated_at = now() where id = c.id;
+  -- Đã bắt đầu: báo người tham gia (trừ người sửa)
+  if now() >= c.start_date then
+    for r in select p2.profile_id from public.challenge_participants p2
+              where p2.challenge_id = c.id and p2.status <> 'LEFT' and p2.profile_id <> v_uid loop
+      perform private.notify(r.profile_id, c.target_club_id, 'CHALLENGE_RULES', 'BTC cập nhật thể lệ: ' || c.title,
+        'Xem lại phần Luật chơi để nắm thể lệ mới.', '/challenges/' || c.id, v_uid, false);
+    end loop;
+  end if;
+  return v_new;
+end $$;
+
+-- Danh sách thử thách: như 000600, bỏ thử thách đã hủy khỏi tab Của tôi / Khám phá / CLB; giới hạn 60 bằng row_number
+create or replace function public.list_challenges(p_tab text default 'MINE', p_club_id uuid default null)
+returns table (
+  id uuid, title text, description text, format text, objective text, game_mode text, target_value numeric,
+  start_date timestamptz, end_date timestamptz, status text, target_audience text, target_club_id uuid,
+  club_name text, club_accent text, reward_xu numeric, participant_count integer, max_slots integer,
+  my_status text, my_score numeric, my_rank integer, total_score numeric, created_by uuid
+)
+language sql stable security definer set search_path = public as $$
+  with base as (
+    select c.*,
+           (select count(*)::int from public.challenge_participants p where p.challenge_id = c.id and p.status <> 'LEFT') as n,
+           (select coalesce(sum(p.current_progress), 0) from public.challenge_participants p where p.challenge_id = c.id and p.status <> 'LEFT') as total,
+           me.status as my_status, me.current_progress as my_score,
+           case when me.id is not null then (select count(*)::int + 1 from public.challenge_participants o
+                  where o.challenge_id = c.id and o.status <> 'LEFT' and o.current_progress > me.current_progress) end as my_rank
+      from public.challenges c
+      left join public.challenge_participants me on me.challenge_id = c.id and me.profile_id = auth.uid()
+     where c.status in ('ACTIVE', 'FINISHED', 'CANCELLED')
+       and case upper(coalesce(p_tab, 'MINE'))
+         when 'MINE' then c.status <> 'CANCELLED'
+                          and ((me.id is not null and me.status <> 'LEFT') or c.created_by = auth.uid())
+                          and (c.status = 'ACTIVE' or c.end_date > now() - interval '30 days')
+         when 'DISCOVER' then c.target_audience = 'PUBLIC' and c.status = 'ACTIVE' and c.end_date > now()
+                          and (c.format <> 'TEAM' or c.start_date > now())
+                          and (me.id is null or me.status = 'LEFT')
+         when 'CLUB' then c.status <> 'CANCELLED'
+                          and c.target_audience = 'CLUB_ONLY' and public.club_is_member(c.target_club_id)
+                          and (p_club_id is null or c.target_club_id = p_club_id)
+                          and (c.status = 'ACTIVE' or c.end_date > now() - interval '60 days')
+         when 'ENDED' then me.id is not null and (c.status <> 'ACTIVE' or c.end_date <= now())
+         else false end
+  ), ranked as (
+    select b.*, row_number() over (
+             order by (b.status = 'ACTIVE' and b.end_date > now()) desc,
+                      case when upper(coalesce(p_tab, 'MINE')) = 'DISCOVER' then -b.n else 0 end,
+                      b.end_date) as rn
+      from base b
+  )
+  select b.id, b.title, b.description, b.format, b.objective, b.game_mode, b.target_value, b.start_date, b.end_date,
+         b.status, b.target_audience, b.target_club_id, cl.name, cl.accent_color, b.reward_xu, b.n, b.max_slots,
+         b.my_status, b.my_score, b.my_rank, round(b.total, 2), b.created_by
+    from ranked b left join public.clubs cl on cl.id = b.target_club_id
+   where b.rn <= 60
+   order by b.rn
+$$;
+
+-- Giải chạy ảo: như 002700, tab "Của tôi" bỏ giải đã hủy
+create or replace function public.list_races(p_scope text default 'UPCOMING') returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  return (select coalesce(jsonb_agg(private.race_card(t.race) order by
+            case when upper(p_scope) = 'PAST' then extract(epoch from (t.race).end_at) * -1 else extract(epoch from (t.race).start_at) end), '[]'::jsonb)
+    from (select x as race, row_number() over (order by x.start_at desc) as rn from public.virtual_races x
+           where private.race_visible(x)
+             and case upper(coalesce(p_scope, 'UPCOMING'))
+                   when 'MINE' then x.status <> 'CANCELLED'
+                                and exists (select 1 from public.race_registrations g where g.race_id = x.id and g.user_id = auth.uid() and g.status <> 'WITHDRAWN')
+                   when 'PAST' then x.end_at < now()
+                   else x.end_at >= now() and x.status = 'PUBLISHED' end) t
+   where t.rn <= 100);
+end $$;
+
+revoke all on function private.challenge_rules_clean(jsonb) from public, anon, authenticated;
+revoke all on function public.set_challenge_rules(uuid, jsonb) from public, anon;
+grant execute on function public.set_challenge_rules(uuid, jsonb) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001005500_social_login_invites.sql
+-- ===================================================================
+-- 005500: Đăng nhập Google / Apple + lời mời chuyên nghiệp.
+-- • Hồ sơ mới: lấy tên / ảnh từ Google, Apple (full_name, name, picture) hoặc tên nhập lúc đăng ký email (display_name).
+--   Trước đây đăng ký email luôn ra tên = phần trước @ của email. Email ẩn của Apple (privaterelay) → "Runner".
+-- • Mã giới thiệu ngắn, dễ đọc (8 ký tự, không có 0/O/1/I): link mời /join/<mã> thay cho /join/<uuid dài>.
+--   Nhập mã ở màn đăng ký hoặc Tôi → Mời bạn bè (trong 14 ngày đầu). Link cũ /join/<uuid> vẫn dùng được.
+-- • my_referral(): mã, số bạn đã mời / đã nhận thưởng / Xu đã nhận, luật thưởng hiện hành.
+-- • Xem trước lời mời khi CHƯA đăng nhập: referral_preview (tên người mời), club_invite_preview (tên, logo, số thành viên CLB).
+-- Cần 000300, 003400, 003700. Chạy lại nhiều lần vẫn an toàn. Không dùng SELECT … INTO, khối DO, LIMIT (SQL Editor).
+
+-- ---------------------------------------------------------------------
+-- 1. Hồ sơ mới từ đăng ký email / Google / Apple
+-- ---------------------------------------------------------------------
+create or replace function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  m jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb);
+  v_name text := coalesce(
+    nullif(left(trim(m->>'display_name'), 60), ''), nullif(left(trim(m->>'full_name'), 60), ''), nullif(left(trim(m->>'name'), 60), ''),
+    case when new.email is not null and new.email not ilike '%privaterelay.appleid.com' and new.email not ilike '%@phone.racehub.vn'
+         then nullif(split_part(new.email, '@', 1), '') end,
+    'Runner');
+begin
+  insert into public.profiles (id, display_name, avatar_url)
+  values (new.id, v_name, coalesce(nullif(m->>'avatar_url', ''), nullif(m->>'picture', '')))
+  on conflict (id) do nothing;
+  return new;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 2. Mã giới thiệu ngắn
+-- ---------------------------------------------------------------------
+alter table public.profiles add column if not exists referral_code text;
+create unique index if not exists profiles_referral_code_key on public.profiles (referral_code);
+
+-- 8 ký tự từ bảng 32 chữ dễ đọc, suy ra cố định từ id (2^40 tổ hợp) — chạy lại vẫn ra đúng mã cũ
+create or replace function private.referral_code_for(p_id uuid, p_salt int default 0) returns text
+language sql immutable as $$
+  select string_agg(substr('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', ((n >> (5 * i)) & 31)::int + 1, 1), '' order by i)
+    from (select ('x' || substr(md5(p_id::text || case when p_salt > 0 then ':' || p_salt else '' end), 1, 10))::bit(40)::bigint as n) s,
+         generate_series(0, 7) as i
+$$;
+
+create or replace function private.assign_referral_code() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare v_code text; v_salt int := 0;
+begin
+  if new.referral_code is not null then return new; end if;
+  loop
+    v_code := private.referral_code_for(new.id, v_salt);
+    exit when not exists (select 1 from public.profiles p where p.referral_code = v_code and p.id <> new.id);
+    v_salt := v_salt + 1;
+  end loop;
+  new.referral_code := v_code;
+  return new;
+end $$;
+drop trigger if exists trg_assign_referral_code on public.profiles;
+create trigger trg_assign_referral_code before insert or update of referral_code on public.profiles
+  for each row execute function private.assign_referral_code();
+-- Cấp mã cho tài khoản cũ (trigger tự tính mã khi đặt về null)
+update public.profiles set referral_code = null where referral_code is null;
+
+-- Tìm người mời theo mã ngắn hoặc uuid (link cũ)
+create or replace function private.referrer_by_code(p_code text) returns uuid
+language sql stable security definer set search_path = public as $$
+  select p.id from public.profiles p
+   where p.referral_code = upper(trim(coalesce(p_code, '')))
+      or (trim(coalesce(p_code, '')) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' and p.id = trim(p_code)::uuid)
+$$;
+
+create or replace function public.apply_referral_code(p_code text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_ref uuid := private.referrer_by_code(p_code);
+begin
+  perform private.require_uid();
+  if v_ref is null then raise exception 'REFERRER_NOT_FOUND'; end if;
+  return public.apply_referral(v_ref) || jsonb_build_object('referrer_name', private.display_name(v_ref));
+end $$;
+
+create or replace function public.referral_preview(p_code text) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select case when r.id is null then null else jsonb_build_object(
+    'display_name', r.display_name, 'avatar_url', r.avatar_url, 'code', r.referral_code,
+    'referee_xu', coalesce((private.economy_config()->'referral'->>'refereeXu')::numeric, 0),
+    'min_km', coalesce((private.economy_config()->'referral'->>'minKm')::numeric, 3)) end
+    from (select p.id, p.display_name, p.avatar_url, p.referral_code from public.profiles p where p.id = private.referrer_by_code(p_code)) r
+    right join (select 1) one on true
+$$;
+
+create or replace function public.my_referral() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  me public.profiles := (select p from public.profiles p where p.id = v_uid);
+  cfg jsonb := private.economy_config()->'referral';
+begin
+  return jsonb_build_object(
+    'code', me.referral_code,
+    'invited', (select count(*) from public.profiles p where p.referred_by = v_uid),
+    'rewarded', (select count(*) from public.ledger_transactions t join public.ledger_entries e on e.transaction_id = t.id
+                  where t.type = 'REFERRAL_INVITER' and e.account_id = v_uid and e.amount > 0),
+    'xu_earned', (select coalesce(sum(e.amount), 0) from public.ledger_transactions t join public.ledger_entries e on e.transaction_id = t.id
+                  where t.type = 'REFERRAL_INVITER' and e.account_id = v_uid and e.amount > 0),
+    'friends', (select coalesce(jsonb_agg(jsonb_build_object('display_name', x.display_name, 'avatar_url', x.avatar_url, 'joined_at', x.created_at,
+                  'rewarded', exists (select 1 from public.ledger_transactions t where t.idempotency_key = 'referral_inviter:' || x.id)) order by x.created_at desc), '[]'::jsonb)
+                  from (select p.id, p.display_name, p.avatar_url, p.created_at, row_number() over (order by p.created_at desc) as rn
+                          from public.profiles p where p.referred_by = v_uid) x where x.rn <= 50),
+    'referred_by', (select jsonb_build_object('display_name', r.display_name, 'avatar_url', r.avatar_url) from public.profiles r where r.id = me.referred_by),
+    'can_enter_code', me.referred_by is null and me.created_at >= now() - interval '14 days',
+    'enter_until', case when me.referred_by is null then me.created_at + interval '14 days' end,
+    'rules', jsonb_build_object('inviter_xu', coalesce((cfg->>'inviterXu')::numeric, 0), 'referee_xu', coalesce((cfg->>'refereeXu')::numeric, 0),
+                                'min_km', coalesce((cfg->>'minKm')::numeric, 3), 'monthly_cap', coalesce((cfg->>'monthlyCap')::int, 10)));
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 3. Xem trước lời mời CLB (chưa đăng nhập cũng xem được; không trả mã mời)
+-- ---------------------------------------------------------------------
+create or replace function public.club_invite_preview(p_code text) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select case when c.id is null then null else jsonb_build_object(
+    'id', c.id, 'name', c.name, 'description', left(c.description, 280), 'avatar_url', c.avatar_url, 'accent_color', c.accent_color,
+    'member_count', c.member_count, 'join_policy', c.join_policy, 'plan', c.plan,
+    'full', c.member_count >= coalesce(c.member_limit, 2147483647),
+    'my_status', (select m.status from public.club_members m where m.club_id = c.id and m.user_id = auth.uid())) end
+    from (select x.* from public.clubs x where x.invite_code = lower(trim(coalesce(p_code, '')))) c
+    right join (select 1) one on true
+$$;
+
+revoke all on function private.referral_code_for(uuid, int), private.assign_referral_code(), private.referrer_by_code(text) from public, anon, authenticated;
+revoke all on function public.apply_referral_code(text), public.my_referral(), public.referral_preview(text), public.club_invite_preview(text) from public, anon;
+grant execute on function public.apply_referral_code(text), public.my_referral() to authenticated;
+grant execute on function public.referral_preview(text), public.club_invite_preview(text) to anon, authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001005600_admin_console.sql
+-- ===================================================================
+-- 005600: Trang Quản trị toàn diện.
+-- • admin_inbox: "Việc cần xử lý" — đơn chờ xác nhận, bài chờ duyệt, hồ sơ đối tác, thách đấu CLB chờ duyệt, lỗi hệ thống 24 giờ, người mới.
+-- • Người dùng: admin_user_detail (hồ sơ, email, lần đăng nhập cuối, gói VIP, số dư, CLB, bài chạy, giao dịch gần đây, nhật ký),
+--   admin_set_user_ban (khóa / mở tài khoản: chặn đăng nhập + đăng xuất mọi thiết bị), admin_set_user_role (cấp / gỡ quyền admin).
+-- • Thử thách: admin_list_challenges (tìm, lọc trạng thái), admin_cancel_challenge (hủy bất kỳ lúc nào, hoàn tiền treo, báo người tham gia).
+-- • Nhật ký quản trị: admin_audit_list (lọc theo hành động / người làm, xem trang trước).
+-- Mọi thao tác ghi admin_audit_log (không sửa / xóa được). Cần 000600, 003800, 004100, 004400, 005300.
+-- Chạy lại nhiều lần vẫn an toàn. Không dùng SELECT … INTO, khối DO, LIMIT (SQL Editor).
+
+alter table public.profiles add column if not exists banned_at timestamptz;
+alter table public.profiles add column if not exists banned_reason text;
+
+-- ---------------------------------------------------------------------
+-- 1. Việc cần xử lý
+-- ---------------------------------------------------------------------
+create or replace function public.admin_inbox() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform private.require_admin();
+  return jsonb_build_object(
+    'orders', (select count(*) from public.orders o where o.status = 'PENDING' and (o.expires_at is null or o.expires_at > now())),
+    'reviews', (select count(*) from public.activities a where a.validation_status = 'PENDING' and coalesce(a.status, '') <> 'DELETED'),
+    'partners', (select count(*) from public.partners p where p.status = 'PENDING'),
+    'cups', (select count(*) from public.club_cups c where c.status = 'PENDING_REVIEW'),
+    'errors', (select count(distinct e.code) from private.client_errors e where e.last_at > now() - interval '24 hours'),
+    'new_users_7d', (select count(*) from public.profiles p where p.created_at > now() - interval '7 days'),
+    'active_7d', (select count(distinct a.user_id) from public.activities a where a.started_at > now() - interval '7 days'),
+    'banned', (select count(*) from public.profiles p where p.banned_at is not null));
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 2. Người dùng
+-- ---------------------------------------------------------------------
+create or replace function public.admin_user_detail(p_user uuid) returns jsonb
+language plpgsql stable security definer set search_path = public, auth as $$
+declare
+  pr public.profiles := (select x from public.profiles x where x.id = p_user);
+  au jsonb := (select to_jsonb(u) from auth.users u where u.id = p_user);
+begin
+  perform private.require_admin();
+  if pr.id is null then raise exception 'USER_NOT_FOUND'; end if;
+  return jsonb_build_object(
+    'id', pr.id, 'display_name', pr.display_name, 'avatar_url', pr.avatar_url, 'role', coalesce(pr.role, 'MEMBER'),
+    'level', pr.level, 'xp', pr.xp, 'balance', private.balance(pr.id), 'created_at', pr.created_at,
+    'email', au->>'email', 'last_sign_in_at', au->>'last_sign_in_at', 'banned_until', au->>'banned_until',
+    'banned_at', pr.banned_at, 'banned_reason', pr.banned_reason,
+    'strava_connected', coalesce((to_jsonb(pr)->>'strava_connected')::boolean, false),
+    'referral_code', to_jsonb(pr)->>'referral_code',
+    'referred_by', (select r.display_name from public.profiles r where r.id = (to_jsonb(pr)->>'referred_by')::uuid),
+    'plan', private.active_plan(pr.id),
+    'stats', jsonb_build_object(
+      'runs', (select count(*) from public.activities a where a.user_id = pr.id and a.validation_status = 'APPROVED'),
+      'km', (select round(coalesce(sum(coalesce(nullif(a.moving_distance_m, 0), a.distance_m, 0)), 0) / 1000.0, 1)
+               from public.activities a where a.user_id = pr.id and a.validation_status = 'APPROVED'),
+      'pending_runs', (select count(*) from public.activities a where a.user_id = pr.id and a.validation_status = 'PENDING'),
+      'last_run_at', (select max(a.started_at) from public.activities a where a.user_id = pr.id),
+      'challenges', (select count(*) from public.challenge_participants c where c.profile_id = pr.id and c.status <> 'LEFT'),
+      'orders_paid_vnd', (select coalesce(sum(o.amount_vnd), 0) from public.orders o where o.buyer_id = pr.id and o.status = 'PAID')),
+    'clubs', (select coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'name', c.name, 'role', m.role, 'status', m.status) order by c.name), '[]'::jsonb)
+                from public.club_members m join public.clubs c on c.id = m.club_id where m.user_id = pr.id and m.status in ('APPROVED', 'PENDING')),
+    'ledger', (select coalesce(jsonb_agg(jsonb_build_object('type', x.type, 'description', x.description, 'amount', x.amount, 'at', x.created_at) order by x.created_at desc), '[]'::jsonb)
+                 from (select t.type, t.reason as description, e.amount, t.created_at, row_number() over (order by t.created_at desc) as rn
+                         from public.ledger_entries e join public.ledger_transactions t on t.id = e.transaction_id where e.account_id = pr.id) x where x.rn <= 15),
+    'audit', (select coalesce(jsonb_agg(jsonb_build_object('action', x.action, 'actor', x.actor, 'reason', x.reason, 'at', x.created_at) order by x.created_at desc), '[]'::jsonb)
+                from (select l.action, private.display_name(l.actor_id) as actor, coalesce(l.reason, l.new_value->>'reason', l.new_value->>'note') as reason, l.created_at,
+                             row_number() over (order by l.created_at desc) as rn
+                        from public.admin_audit_log l where l.target in ('user:' || pr.id, pr.id::text)) x where x.rn <= 15));
+end $$;
+
+create or replace function public.admin_set_user_ban(p_user uuid, p_ban boolean, p_reason text default null) returns jsonb
+language plpgsql security definer set search_path = public, auth as $$
+declare
+  v_admin uuid := private.require_admin();
+  pr public.profiles := (select x from public.profiles x where x.id = p_user);
+begin
+  if pr.id is null then raise exception 'USER_NOT_FOUND'; end if;
+  if p_user = v_admin then raise exception 'CANNOT_TARGET_SELF'; end if;
+  if p_ban and (pr.role = 'SYSTEM_ADMIN' or coalesce((to_jsonb(pr)->>'is_admin')::boolean, false)) then raise exception 'CANNOT_BAN_ADMIN'; end if;
+  if p_ban and char_length(trim(coalesce(p_reason, ''))) < 3 then raise exception 'REASON_REQUIRED'; end if;
+  if p_ban then
+    update auth.users set banned_until = now() + interval '100 years' where id = p_user;
+    delete from auth.sessions where user_id = p_user;                     -- đăng xuất mọi thiết bị
+    update public.profiles set banned_at = now(), banned_reason = left(trim(p_reason), 300) where id = p_user;
+  else
+    update auth.users set banned_until = null where id = p_user;
+    update public.profiles set banned_at = null, banned_reason = null where id = p_user;
+  end if;
+  insert into public.admin_audit_log (actor_id, action, target, new_value, reason)
+  values (v_admin, case when p_ban then 'USER_BAN' else 'USER_UNBAN' end, 'user:' || p_user, jsonb_build_object('reason', p_reason), p_reason);
+  return jsonb_build_object('banned', p_ban);
+end $$;
+
+create or replace function public.admin_set_user_role(p_user uuid, p_role text, p_reason text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin uuid := private.require_admin();
+  v_role text := upper(coalesce(p_role, ''));
+  v_old text := (select coalesce(p.role, 'MEMBER') from public.profiles p where p.id = p_user);
+begin
+  if v_old is null then raise exception 'USER_NOT_FOUND'; end if;
+  if v_role not in ('SYSTEM_ADMIN', 'MEMBER') then raise exception 'INVALID_ROLE'; end if;
+  if p_user = v_admin and v_role <> 'SYSTEM_ADMIN' then raise exception 'CANNOT_TARGET_SELF'; end if;
+  if v_role = 'SYSTEM_ADMIN' and (select p.banned_at from public.profiles p where p.id = p_user) is not null then raise exception 'USER_BANNED'; end if;
+  if v_old = v_role then return jsonb_build_object('role', v_role); end if;
+  update public.profiles set role = v_role where id = p_user;
+  insert into public.admin_audit_log (actor_id, action, target, old_value, new_value, reason)
+  values (v_admin, 'USER_ROLE', 'user:' || p_user, jsonb_build_object('role', v_old), jsonb_build_object('role', v_role), p_reason);
+  perform private.notify(p_user, null, 'SYSTEM',
+    case when v_role = 'SYSTEM_ADMIN' then 'Bạn được cấp quyền quản trị RaceHub' else 'Quyền quản trị RaceHub của bạn đã được gỡ' end,
+    coalesce(p_reason, ''), case when v_role = 'SYSTEM_ADMIN' then '/admin' else '/me' end, v_admin, true);
+  return jsonb_build_object('role', v_role);
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 3. Thử thách
+-- ---------------------------------------------------------------------
+create or replace function public.admin_list_challenges(p_query text default '', p_status text default 'ALL') returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare q text := trim(coalesce(p_query, ''));
+begin
+  perform private.require_admin();
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+      'id', x.id, 'title', x.title, 'status', x.status, 'format', x.format, 'audience', x.target_audience,
+      'start_date', x.start_date, 'end_date', x.end_date, 'reward_xu', x.reward_xu, 'participants', x.n,
+      'creator', private.display_name(x.created_by), 'club', x.club_name, 'cancelled_reason', x.cancelled_reason) order by x.rn), '[]'::jsonb)
+    from (select c.*, cl.name as club_name,
+                 (select count(*) from public.challenge_participants p where p.challenge_id = c.id and p.status <> 'LEFT') as n,
+                 row_number() over (order by (c.status = 'ACTIVE' and c.end_date > now()) desc, c.start_date desc) as rn
+            from public.challenges c left join public.clubs cl on cl.id = c.target_club_id
+           where (upper(coalesce(p_status, 'ALL')) = 'ALL'
+                  or (upper(p_status) = 'LIVE' and c.status = 'ACTIVE' and c.start_date <= now() and c.end_date > now())
+                  or (upper(p_status) = 'UPCOMING' and c.status = 'ACTIVE' and c.start_date > now())
+                  or (upper(p_status) = 'ENDED' and (c.status = 'FINISHED' or (c.status = 'ACTIVE' and c.end_date <= now())))
+                  or (upper(p_status) = 'CANCELLED' and c.status = 'CANCELLED'))
+             and (q = '' or c.id::text = q or private.search_match(private.search_hay(c.title || ' ' || coalesce(cl.name, '') || ' ' || coalesce(private.display_name(c.created_by), '')), q))) x
+   where x.rn <= 100);
+end $$;
+
+create or replace function public.admin_cancel_challenge(p_challenge_id uuid, p_reason text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin uuid := private.require_admin();
+  c public.challenges := (select x from public.challenges x where x.id = p_challenge_id);
+  r record;
+begin
+  if c.id is null then raise exception 'CHALLENGE_NOT_FOUND'; end if;
+  if c.status <> 'ACTIVE' then raise exception 'CHALLENGE_CLOSED'; end if;
+  if char_length(trim(coalesce(p_reason, ''))) < 3 then raise exception 'REASON_REQUIRED'; end if;
+  update public.challenges set status = 'CANCELLED', cancelled_reason = left(trim(p_reason), 300), settled_at = now() where id = c.id;
+  perform private.challenge_refund_escrow(c);
+  for r in select p.profile_id from public.challenge_participants p where p.challenge_id = c.id
+           union select c.created_by where c.created_by is not null loop
+    perform private.notify(r.profile_id, c.target_club_id, 'CHALLENGE_CANCELLED', 'RaceHub đã hủy thử thách: ' || c.title,
+      trim(p_reason), '/challenges/' || c.id, v_admin, true);
+  end loop;
+  insert into public.admin_audit_log (actor_id, action, target, new_value, reason)
+  values (v_admin, 'CHALLENGE_CANCEL', 'challenge:' || c.id, jsonb_build_object('title', c.title), p_reason);
+  return jsonb_build_object('cancelled', true);
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 4. Nhật ký quản trị
+-- ---------------------------------------------------------------------
+create or replace function public.admin_audit_list(p_action text default null, p_actor uuid default null, p_before bigint default null) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform private.require_admin();
+  return (select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'action', x.action, 'target', x.target, 'actor_id', x.actor_id,
+      'actor', private.display_name(x.actor_id), 'old_value', x.old_value, 'new_value', x.new_value, 'reason', x.reason, 'at', x.created_at) order by x.id desc), '[]'::jsonb)
+    from (select l.*, row_number() over (order by l.id desc) as rn from public.admin_audit_log l
+           where (p_action is null or l.action ilike p_action || '%')
+             and (p_actor is null or l.actor_id = p_actor)
+             and (p_before is null or l.id < p_before)) x
+   where x.rn <= 100);
+end $$;
+
+revoke all on function public.admin_inbox(), public.admin_user_detail(uuid), public.admin_set_user_ban(uuid, boolean, text),
+  public.admin_set_user_role(uuid, text, text), public.admin_list_challenges(text, text), public.admin_cancel_challenge(uuid, text),
+  public.admin_audit_list(text, uuid, bigint) from public, anon;
+grant execute on function public.admin_inbox(), public.admin_user_detail(uuid), public.admin_set_user_ban(uuid, boolean, text),
+  public.admin_set_user_role(uuid, text, text), public.admin_list_challenges(text, text), public.admin_cancel_challenge(uuid, text),
+  public.admin_audit_list(text, uuid, bigint) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -5144,7 +5601,10 @@ begin
       exists (select 1 from pg_proc where proname = 'transfer_club_ownership' and prosrc like '%CAPTAIN%')),
     jsonb_build_object('file', '20261001005100', 'label', 'Khuyến mãi vật phẩm (Xu)', 'ok', to_regclass('public.item_promotions') is not null),
     jsonb_build_object('file', '20261001005200', 'label', 'Voucher tài trợ (thử thách / nhiệm vụ)', 'ok', to_regclass('public.voucher_campaigns') is not null),
-    jsonb_build_object('file', '20261001005300', 'label', 'Chợ Runner (hồ sơ HLV / Shop / Dịch vụ đã xác minh)', 'ok', to_regclass('public.partners') is not null));
+    jsonb_build_object('file', '20261001005300', 'label', 'Chợ Runner (hồ sơ HLV / Shop / Dịch vụ đã xác minh)', 'ok', to_regclass('public.partners') is not null),
+    jsonb_build_object('file', '20261001005400', 'label', 'Thể lệ thử thách + danh sách bỏ thử thách đã hủy', 'ok', to_regprocedure('public.set_challenge_rules(uuid, jsonb)') is not null),
+    jsonb_build_object('file', '20261001005500', 'label', 'Đăng nhập Google / Apple + mã giới thiệu + xem trước lời mời', 'ok', to_regprocedure('public.my_referral()') is not null),
+    jsonb_build_object('file', '20261001005600', 'label', 'Quản trị: việc cần xử lý, người dùng, thử thách, nhật ký', 'ok', to_regprocedure('public.admin_inbox()') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

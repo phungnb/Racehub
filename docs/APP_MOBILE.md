@@ -13,6 +13,11 @@ App cài được dựng bằng **Capacitor**. Nó là một "vỏ" native mở 
 **Cập nhật giao diện / tính năng web:** chỉ cần deploy Vercel như thường. App tự mở bản mới, **không phải nộp lại app**.
 **Chỉ phải dựng và nộp lại app khi** đổi phần native: plugin, quyền, icon, tên app, `capacitor.config.ts`.
 
+> **Bản dựng tiếp theo cần nộp lại** (đã đổi phần native): thêm plugin `@capacitor/browser` (đăng nhập Google / Apple bằng trình duyệt hệ thống),
+> `@capacitor/share` + `@capacitor/filesystem` (lưu BIB, chứng nhận, ảnh vinh danh, poster về máy / gửi Zalo), và scheme `vn.racehub.app://`
+> (AndroidManifest + Info.plist) để app nhận lại kết quả đăng nhập. App bản cũ vẫn chạy: nút lưu ảnh chuyển sang "nhấn giữ để lưu",
+> nút Google / Apple báo "hãy cập nhật app".
+
 ## Cấu trúc
 
 | Đường dẫn | Là gì |

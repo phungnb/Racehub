@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Check, Flag, Lock, Scale, Shuffle, Trophy } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, Input, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
+import { Avatar, Button, Card, Input, RankSearch, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
+import { filterSearch } from '@/shared/lib/search'
 import { cn } from '@/shared/lib/cn'
 import { formatNumber } from '@/shared/lib/format'
 import {
@@ -246,14 +247,18 @@ function MoveSheet({ member, board, onClose, onPick, loading }: {
 
 /** Bảng xếp hạng theo % mục tiêu tự đăng ký */
 function PledgeRanking({ board, team, teamsById }: { board: PledgeBoard; team: boolean; teamsById: Record<string, { color: string; name: string }> }) {
+  const [q, setQ] = useState('')
   if (!board.members.length) return <p className="py-6 text-center text-sm text-fg-muted">Chưa có ai tham gia.</p>
+  const ranked = board.members.map((m, i) => ({ m, rank: i + 1 }))
+  const list = filterSearch(ranked, q, (x) => [x.m.display_name])
   return (
-    <section>
+    <section className="space-y-2">
       <SectionTitle>Theo % mục tiêu</SectionTitle>
+      {ranked.length > 5 && <RankSearch value={q} onChange={setQ} total={ranked.length} matched={list.length} />}
       <ol className="divide-y divide-border rounded-[var(--radius-card)] border border-border bg-surface">
-        {board.members.map((m, i) => (
+        {list.map(({ m, rank }) => (
           <li key={m.participant_id} className="flex items-center gap-3 px-3 py-2.5">
-            <span className="w-6 text-center font-mono text-sm text-fg-subtle">{i + 1}</span>
+            <span className="w-6 text-center font-mono text-sm text-fg-subtle">{rank}</span>
             <Avatar src={m.avatar_url} name={m.display_name ?? 'Runner'} size="sm" />
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5 truncate text-sm font-semibold">

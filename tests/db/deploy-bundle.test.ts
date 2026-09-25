@@ -25,6 +25,7 @@ describe('file gộp triển khai (supabase/deploy)', () => {
     `)
     const r = (await asUser<{ r: { migrations: { file: string; ok: boolean }[] } }>(db, ADMIN, '/rpc', `select public.admin_system_check() as r`)).rows[0].r
     expect(r.migrations.filter((m) => !m.ok)).toEqual([])
-    expect(r.migrations.at(-1)?.file).toBe('20261001005300')
+    const latest = fs.readdirSync(path.join(__dirname, '../../supabase/migrations')).filter((f) => f.startsWith('20261001')).sort().at(-1)!.slice(0, 14)
+    expect(r.migrations.at(-1)?.file).toBe(latest)
   }, 240_000)
 })

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download, Loader2, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, SegmentedControl, Sheet, SwitchRow } from '@/shared/ui'
+import { Button, SegmentedControl, Sheet, SwitchRow, useImageSaver } from '@/shared/ui'
 import { useMyProfile } from '@/features/auth'
 import { renderCharacter, resolveOutfit, useCharacterState } from '@/features/character'
 import { paceFrom } from '@/shared/lib/format'
@@ -57,20 +57,14 @@ export function ShareActivitySheet({ activity: a, route, onClose }: { activity: 
       if ((e as Error).name !== 'AbortError') toast.error('Không chia sẻ được. Hãy tải ảnh về rồi đăng.')
     }
   }
-  const download = () => {
-    if (!img) return
-    const link = document.createElement('a')
-    link.href = img.url
-    link.download = posterFileName(a.started_at)
-    link.click()
-    toast.success('Đã tải ảnh về máy')
-  }
+  const saver = useImageSaver()
+  const download = () => { if (img) void saver.saveBlob(img.blob, posterFileName(a.started_at), a.title ?? 'Bài chạy RaceHub') }
 
   return (
     <Sheet open onClose={onClose} title="Chia sẻ bài chạy" description="Đăng lên Facebook, Zalo, Instagram Story…"
       footer={
         <div className="flex gap-2">
-          <Button variant="secondary" block onClick={download} disabled={!img || busy}><Download className="size-4" aria-hidden />Tải ảnh</Button>
+          <Button variant="secondary" block onClick={download} disabled={!img || busy} loading={saver.busy}><Download className="size-4" aria-hidden />Lưu ảnh</Button>
           {canShareFile && <Button block onClick={() => void share()} disabled={busy}><Share2 className="size-4" aria-hidden />Chia sẻ</Button>}
         </div>
       }>
@@ -89,6 +83,7 @@ export function ShareActivitySheet({ activity: a, route, onClose }: { activity: 
           <SwitchRow label="Hiện nhân vật" checked={showChar} onChange={setShowChar} description="Nhân vật đang mặc bộ đồ hiện tại" />
         </div>
       </div>
+      {saver.sheet}
     </Sheet>
   )
 }

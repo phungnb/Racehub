@@ -128,6 +128,17 @@ export interface ChallengeDraft {
   rewardSplit: 'WINNER' | 'TOP3'
   /** Mục tiêu tự đăng ký (migration 002000): mỗi người tự chọn mốc km của mình */
   pledge: PledgeDraft
+  /** Thể lệ bổ sung (migration 005400): thưởng, phạt, lệ phí, điều kiện, liên hệ */
+  rules: RulesInfoDraft
+}
+
+export interface RulesInfoDraft {
+  prizes?: string
+  penalties?: string
+  fees?: string
+  conduct?: string
+  contact?: string
+  custom?: { title: string; body: string }[]
 }
 
 export interface PledgeDraft {
@@ -238,6 +249,7 @@ export function defaultDraft(now = new Date(), clubId: string | null = null): Ch
     start: start.toISOString(), end: new Date(start.getTime() + 7 * DAY).toISOString(),
     rewardXu: 0, rewardSource: clubId ? 'CLUB' : 'NONE', rewardSplit: 'WINNER',
     pledge: { ...DEFAULT_PLEDGE },
+    rules: {},
   }
 }
 
@@ -344,6 +356,7 @@ export function draftFromTemplate(t: {
   reward_split: string | null; days: number
   pledge: { enabled: boolean; options: (number | string)[]; min_km: number | string | null; max_km: number | string | null; cap_pct: number | string | null; team_size: number | null }
   team_names: string[]
+  rules_info?: RulesInfoDraft | null
 }, allowedClubs: string[], now = new Date()): ChallengeDraft {
   const base = defaultDraft(now, null)
   const num = (v: unknown, d: number) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Number(v))
@@ -365,5 +378,6 @@ export function draftFromTemplate(t: {
       maxKm: num(t.pledge.max_km, DEFAULT_PLEDGE.maxKm), capPct: t.pledge.cap_pct === null ? null : num(t.pledge.cap_pct, 20),
       teamSize: num(t.pledge.team_size, DEFAULT_PLEDGE.teamSize),
     } : { ...DEFAULT_PLEDGE },
+    rules: t.rules_info ?? {},
   }
 }

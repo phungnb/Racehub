@@ -19,6 +19,7 @@ export const routes = {
   insights: '/me/insights',
   shine: '/me/shine',
   vouchers: '/me/vouchers',
+  invite: '/me/invite',
   market: '/market',
   marketMine: '/market/me',
   partner: (id: string) => `/market/${encodeURIComponent(id)}`,

@@ -69,6 +69,40 @@ export interface Challenge {
   pledge_team_size?: number | null
   /** Bài không có nhịp tim không được tính */
   require_hr?: boolean
+  /** Thể lệ bổ sung do BTC điền (migration 005400) */
+  rules_info?: ChallengeRulesInfo | null
+  rules_updated_at?: string | null
+}
+
+/** Thể lệ bổ sung: thưởng, phạt, lệ phí / đóng góp, điều kiện, liên hệ BTC, tối đa 5 mục tự đặt */
+export interface ChallengeRulesInfo {
+  prizes?: string
+  penalties?: string
+  fees?: string
+  conduct?: string
+  contact?: string
+  custom?: { title: string; body: string }[]
+}
+export const RULES_FIELDS = [
+  { key: 'prizes', label: 'Thể lệ thưởng', hint: 'Giải thưởng hiện vật / tiền mặt BTC trao, cách xét (Top, hoàn thành, bốc thăm…), thời gian trao.', max: 1500,
+    placeholder: 'VD: Top 1–3 nhận cúp + áo finisher. Mọi người hoàn thành nhận huy chương, trao tại buổi chạy CN 5/10.' },
+  { key: 'penalties', label: 'Thể lệ phạt', hint: 'Không đạt mục tiêu, bỏ cuộc, gian lận… bị xử lý thế nào (do BTC tự quản lý).', max: 1500,
+    placeholder: 'VD: Không hoàn thành đóng góp 50.000đ vào quỹ CLB. Gian lận bị loại và cấm tham gia 3 tháng.' },
+  { key: 'fees', label: 'Lệ phí / đóng góp', hint: 'RaceHub không thu hộ — ghi rõ cách nộp cho BTC (nếu có).', max: 600,
+    placeholder: 'VD: 100.000đ/người, chuyển khoản cho thủ quỹ CLB trước 1/10.' },
+  { key: 'conduct', label: 'Điều kiện & quy định chung', hint: 'Ai được tham gia, trang phục, an toàn, khiếu nại…', max: 1500,
+    placeholder: 'VD: Chỉ thành viên đã đóng quỹ tháng. Khiếu nại kết quả trong 24 giờ sau khi kết thúc.' },
+  { key: 'contact', label: 'Liên hệ BTC', hint: 'Tên, số điện thoại / Zalo người phụ trách.', max: 200,
+    placeholder: 'VD: Anh Nam — 0912 345 678 (Zalo)' },
+] as const satisfies readonly { key: keyof Omit<ChallengeRulesInfo, 'custom'>; label: string; hint: string; max: number; placeholder: string }[]
+
+export const hasRulesInfo = (r: ChallengeRulesInfo | null | undefined) =>
+  !!r && (RULES_FIELDS.some((f) => !!r[f.key]?.trim()) || !!r.custom?.some((x) => x.title.trim() && x.body.trim()))
+
+export async function setChallengeRules(id: string, rules: ChallengeRulesInfo) {
+  const { data, error } = await supabase.rpc('set_challenge_rules', { p_challenge_id: id, p: rules })
+  if (error) throw error
+  return data as ChallengeRulesInfo
 }
 
 export interface ChallengeParticipant {
@@ -300,6 +334,7 @@ const MESSAGES: Record<string, string> = {
   NOT_ENOUGH_MEMBERS: 'Chưa đủ người để chia đội.',
   CHALLENGE_NOT_FOUND: 'Không tìm thấy thử thách, hoặc bạn cần mã mời để xem.',
   CHALLENGE_CLOSED: 'Thử thách đã kết thúc hoặc đã bị hủy.',
+  TOO_MANY_RULES: 'Tối đa 5 mục thể lệ tự đặt.',
   CHALLENGE_FULL: 'Thử thách đã đủ người.',
   ALREADY_JOINED: 'Bạn đã tham gia thử thách này.',
   NOT_JOINED: 'Bạn chưa tham gia thử thách này.',

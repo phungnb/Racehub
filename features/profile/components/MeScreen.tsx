@@ -5,7 +5,7 @@ import { shineTier } from '@/shared/lib/shine'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
-import { BarChart3, ChevronRight, Copy, Crown, Gift, Pencil, Settings, Share2, Sparkles, Watch, Ticket, Store } from 'lucide-react'
+import { BarChart3, ChevronRight, Crown, Gift, Pencil, Settings, Sparkles, Watch, Ticket, Store } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, LevelBadge, ProgressBar, SegmentedControl, Skeleton } from '@/shared/ui'
 import { formatKm, formatNumber } from '@/shared/lib/format'
@@ -110,27 +110,16 @@ function Devices({ profile }: { profile: Profile }) {
   )
 }
 
-function Invite({ profile }: { profile: Profile }) {
-  const link = typeof window !== 'undefined' ? `${window.location.origin}/join/${profile.id}` : ''
-  const share = async () => {
-    if (navigator.share) {
-      await navigator.share({ title: 'Chạy cùng mình trên RaceHub', url: link }).catch(() => undefined)
-    } else {
-      await navigator.clipboard.writeText(link)
-      toast.success('Đã sao chép link mời')
-    }
-  }
+function Invite() {
   return (
-    <div className="flex items-center gap-3">
+    <Link href={routes.invite} className="flex items-center gap-3">
       <span className="grid size-10 place-items-center rounded-xl bg-coin/15 text-coin"><Gift className="size-5" aria-hidden /></span>
       <div className="min-w-0 flex-1">
         <p className="font-semibold">Mời bạn bè</p>
-        <p className="text-xs text-fg-muted">Bạn nhận thưởng Xu khi bạn bè chạy đủ 3 km đầu tiên.</p>
+        <p className="text-xs text-fg-muted">Mã giới thiệu, link, QR — cả hai nhận Xu khi bạn bè chạy đủ km đầu tiên.</p>
       </div>
-      <Button size="sm" variant="secondary" onClick={share} aria-label="Chia sẻ link mời">
-        {typeof navigator !== 'undefined' && 'share' in navigator ? <Share2 className="size-4" /> : <Copy className="size-4" />}
-      </Button>
-    </div>
+      <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+    </Link>
   )
 }
 
@@ -186,7 +175,7 @@ export function MeScreen({ profile }: { profile: Profile }) {
               <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
             </Link>
           </Card>
-          <Card><Invite profile={profile} /></Card>
+          <Card><Invite /></Card>
           <Card className="space-y-1">
             <Row icon={Watch}>Thiết bị & nguồn dữ liệu</Row>
             <Devices profile={profile} />

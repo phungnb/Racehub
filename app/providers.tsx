@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { toast, Toaster } from 'sonner'
-import { SessionProvider } from '@/features/auth'
+import { NativeAuthBridge, SessionProvider } from '@/features/auth'
 import { PwaBoot } from '@/features/pwa'
 import { SystemNoticeBanner } from '@/features/system'
 import { describeError, shouldRetry } from '@/shared/lib/errors'
@@ -55,6 +55,7 @@ export function Providers({ children }: { children: ReactNode }) {
       <SystemNoticeBanner />
       <SessionProvider>{children}</SessionProvider>
       <PwaBoot />
+      <NativeAuthBridge />
       <Toaster theme="dark" position="top-center" richColors closeButton />
     </QueryClientProvider>
   )
