@@ -27,7 +27,7 @@ export default function AuthScreen({ onAuthSuccess }: { onAuthSuccess: () => voi
   const safeAuthCall = async <T,>(fn: () => Promise<T>): Promise<T | null> => {
     try {
       return await fn()
-    } catch (err: any) {
+    } catch (err) {
       console.error('Auth call failed:', err)
       setErrorMsg('Không thể kết nối đến máy chủ xác thực. Vui lòng thử lại sau.')
       return null

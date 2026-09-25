@@ -11,7 +11,8 @@
     "check": "npm run lint && npm run typecheck && npm run test",
     "test": "vitest run",
     "app:sync": "cap sync",
-    "app:icons": "python3 scripts/make-app-icons.py"
+    "app:icons": "python3 scripts/make-app-icons.py",
+    "db:bundle": "node scripts/db-bundle.mjs"
   },
   "dependencies": {
     "@capacitor-community/background-geolocation": "^1.2.26",

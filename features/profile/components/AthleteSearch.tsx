@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { searchAthletes, type AthleteSearchResult } from '../api/athleteApi'
 import AthleteProfile, { AthleteAvatar } from './AthleteProfile'
 
@@ -11,37 +12,19 @@ import AthleteProfile, { AthleteAvatar } from './AthleteProfile'
 
 export default function AthleteSearch() {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<AthleteSearchResult[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
 
   const q = query.trim()
-
+  // Chờ 350ms sau lần gõ cuối rồi mới tìm (setState trong callback hẹn giờ, không đồng bộ trong effect)
+  const [debounced, setDebounced] = useState(q)
   useEffect(() => {
-    if (q.length < 2) {
-      setResults([])
-      setLoading(false)
-      setError(false)
-      return
-    }
-    let cancelled = false
-    setLoading(true)
-    const t = setTimeout(() => {
-      searchAthletes(q)
-        .then((r) => {
-          if (cancelled) return
-          setResults(r)
-          setError(false)
-        })
-        .catch(() => !cancelled && setError(true))
-        .finally(() => !cancelled && setLoading(false))
-    }, 350)
-    return () => {
-      cancelled = true
-      clearTimeout(t)
-    }
+    const t = setTimeout(() => setDebounced(q), 350)
+    return () => clearTimeout(t)
   }, [q])
+  const search = useQuery({ queryKey: ['athletes', 'search', debounced], queryFn: () => searchAthletes(debounced), enabled: debounced.length >= 2, placeholderData: (prev) => prev })
+  const results: AthleteSearchResult[] = q.length >= 2 ? search.data ?? [] : []
+  const loading = q !== debounced || search.isFetching
+  const error = search.isError
 
   return (
     <section aria-labelledby="athlete-search" className="space-y-2 text-xs">

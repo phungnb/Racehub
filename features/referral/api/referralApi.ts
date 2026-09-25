@@ -14,8 +14,8 @@ const MESSAGES: Record<string, string> = {
   REFERRER_NOT_FOUND: 'Người giới thiệu không tồn tại hoặc đã bị xoá.',
 }
 
-export function referralErrorMessage(e: any): string {
-  const raw: string = e?.message ?? ''
+export function referralErrorMessage(e: unknown): string {
+  const raw: string = (e as { message?: string } | null)?.message ?? ''
   for (const key of Object.keys(MESSAGES)) {
     if (raw.includes(key)) return MESSAGES[key]
   }

@@ -47,7 +47,10 @@ async function call<T>(fn: string, args: Record<string, unknown> = {}): Promise<
 }
 export const listPartners = (f: { kind?: PartnerKind | null; area?: string | null; query?: string | null } = {}) =>
   call<Partner[]>('list_partners', { p_kind: f.kind ?? null, p_area: f.area ?? null, p_query: f.query?.trim() || null }).then((x) => x ?? [])
-export const getPartner = (id: string) => call<Partner>('get_partner', { p_id: id })
+export const getPartner = (id: string) => call<Partner | null>('get_partner', { p_id: id }).then((p) => {
+  if (!p) throw new Error('PARTNER_NOT_FOUND')
+  return p
+})
 export const myPartners = () => call<Partner[]>('my_partners').then((x) => x ?? [])
 export const savePartner = (p: PartnerInput) => call<Partner>('save_partner', { p })
 export const adminListPartners = (status: PartnerStatus | 'ALL') => call<Partner[]>('admin_list_partners', { p_status: status }).then((x) => x ?? [])

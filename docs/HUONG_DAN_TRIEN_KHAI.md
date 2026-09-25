@@ -23,12 +23,19 @@ Sao chép `.env.example` thành `.env.local` (máy local / Codespaces), hoặc �
 | `CRON_SECRET` | Tự tạo bằng `openssl rand -hex 24` | **Mới (Sprint 2)**. Vercel dùng để gọi `/api/cron/club-recap` (bài Tổng kết tuần, 07:00 sáng thứ Hai), `/api/cron/challenges` (tất toán thử thách) và `/api/cron/leagues` (chốt league 00:10 thứ Hai). Lịch nằm trong `vercel.json` |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Tự tạo một lần: `npx web-push generate-vapid-keys` | **Mới (PWA-02)**. Bật thông báo đẩy. Khóa riêng chỉ đặt ở server. Đổi khóa thì mọi thiết bị phải bật lại thông báo |
 | `VAPID_SUBJECT` | `mailto:<email của bạn>` hoặc `https://<tên-miền>` | Không bắt buộc (mặc định dùng tên miền app) |
+| `NEXT_PUBLIC_SUPPORT_EMAIL` | Email hỗ trợ của bạn | Không bắt buộc. Hiện ở trang `/privacy`, `/terms` (người dùng yêu cầu xóa dữ liệu, khiếu nại) |
 
 Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo lỗi rõ tên biến bị thiếu, thay vì âm thầm dùng key sai như trước.
 
 ## Bước 3 — Chạy migration
 
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
+
+> ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 005300** + chạy lại 003500),
+> dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
+> (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
+> File gộp tạo bằng `npm run db:bundle` (hoặc `node scripts/db-bundle.mjs <mốc>` để gộp từ mốc khác); test tự động bảo đảm file luôn khớp migration.
 
 Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 
@@ -245,6 +252,16 @@ Checklist kiểm tra thủ công sau khi deploy:
   - [ ] Chủ nhiệm CLB: tab **Thử thách** trong CLB → **Tạo thử thách CLB**, treo thưởng từ **quỹ CLB** → bảng tin CLB có bài "Thử thách mới", thành viên nhận thông báo, quỹ CLB giảm đúng số Xu.
   - [ ] Thử thách hết hạn quá 2 giờ → mở trang chi tiết là tự tổng kết: người thắng nhận Xu, mọi người nhận thông báo kết quả.
   - [ ] Kiểm tra cron: `curl -H "Authorization: Bearer $CRON_SECRET" https://<domain>/api/cron/club-recap` → trả về `{"posted": …}`; `/api/cron/challenges` và `/api/cron/leagues` → `{"settled": …}`; gọi không có token → 401.
+- [ ] **Đợt ra mắt (003700 → 005300)** — sau khi chạy file gộp `supabase/deploy/chay_tu_003700.sql`:
+  - [ ] **Quản trị → Hệ thống**: mọi migration xanh, đủ biến môi trường, các kho ảnh (bucket) có đủ.
+  - [ ] **Trao quyền Chủ nhiệm**: Chủ nhiệm A → Thành viên → chọn B (đã duyệt) → **Trao quyền** → B thành Chủ nhiệm, A thành Đội trưởng, B nhận thông báo. A **Rời CLB** khi đang là chủ nhiệm cũng không lỗi.
+  - [ ] **Gói VIP / Nạp Xu**: Tôi → Gói VIP & Nạp Xu → tạo đơn → quét VietQR; admin **Quản trị → Đơn hàng** xác nhận → Xu / gói về đúng.
+  - [ ] **Giải chạy ảo**: tạo giải → thiết kế **BIB** và **Chứng nhận** (kéo thả, đổi font) → runner đăng ký thấy BIB, hoàn thành tải được chứng nhận.
+  - [ ] **Vinh danh** (CLB Pro / VIP): thử thách đã kết thúc → tab **Vinh danh** → thiết kế → **Công bố** → người được vinh danh nhận thông báo + huy hiệu.
+  - [ ] **Khuyến mãi vật phẩm**: Quản trị → Khuyến mãi → Vật phẩm → tạo "Giảm giá" 1 món → Tủ đồ hiện giá gạch ngang; "Mặc thử" hết hạn tự tháo.
+  - [ ] **Voucher tài trợ**: BTC thêm voucher cho thử thách (dán vài mã) → runner hoàn thành nhận thông báo, thấy mã ở **Tôi → Voucher của tôi**.
+  - [ ] **Chợ Runner**: tài khoản B đăng ký hồ sơ HLV ở `/market/me` → admin **Quản trị → Đối tác** xác minh → hồ sơ hiện ở `/market`, bấm Gọi / Zalo mở đúng.
+  - [ ] Trang `/privacy` và `/terms` mở được khi **chưa đăng nhập**, hiện đúng email hỗ trợ.
 - [ ] **Kiểm tra bảo mật** — Supabase → SQL Editor, chạy đoạn dưới. Kết quả **phải** báo lỗi `permission denied`:
   ```sql
   begin;
