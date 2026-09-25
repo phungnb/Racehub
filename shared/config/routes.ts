@@ -18,6 +18,7 @@ export const routes = {
   plan: '/me/plan',
   insights: '/me/insights',
   shine: '/me/shine',
+  vouchers: '/me/vouchers',
   character: '/character',
   admin: '/admin',
   welcome: '/welcome',

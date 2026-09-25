@@ -11,8 +11,9 @@ import { adminErrorMessage, type AccountHit } from '../../api/adminApi'
 import { listPromotions, previewSegment, runGrant, savePromo, type Promotion, type Reward, type Segment, type SegmentType } from '../../api/commerceApi'
 import { AccountPicker } from '../economy/AccountPicker'
 import { ItemPromos } from './ItemPromos'
+import { AdminVouchers } from './AdminVouchers'
 
-type View = 'grant' | 'code' | 'sale' | 'items' | 'history'
+type View = 'grant' | 'code' | 'sale' | 'items' | 'vouchers' | 'history'
 const SEGMENTS: { v: SegmentType; label: string }[] = [
   { v: 'ALL', label: 'Tất cả' }, { v: 'ACTIVE', label: 'Đang chạy' }, { v: 'INACTIVE', label: 'Lâu không chạy' }, { v: 'NEW', label: 'Người mới' },
   { v: 'VIP', label: 'Đang VIP' }, { v: 'FREE', label: 'Gói miễn phí' }, { v: 'CLUB', label: 'Thành viên CLB' }, { v: 'LEVEL', label: 'Từ cấp' },
@@ -30,9 +31,9 @@ export function PromotionsTab() {
   return (
     <div className="space-y-3">
       <SegmentedControl value={view} onChange={setView} options={[
-        { value: 'grant', label: 'Tặng nhóm' }, { value: 'code', label: 'Mã' }, { value: 'sale', label: 'Gói' }, { value: 'items', label: 'Vật phẩm' }, { value: 'history', label: 'Lịch sử' },
+        { value: 'grant', label: 'Tặng nhóm' }, { value: 'code', label: 'Mã' }, { value: 'sale', label: 'Gói' }, { value: 'items', label: 'Vật phẩm' }, { value: 'vouchers', label: 'Voucher' }, { value: 'history', label: 'Lịch sử' },
       ]} />
-      {view === 'grant' ? <GrantForm /> : view === 'code' ? <CodeForm /> : view === 'sale' ? <SaleForm /> : view === 'items' ? <ItemPromos /> : <History />}
+      {view === 'grant' ? <GrantForm /> : view === 'code' ? <CodeForm /> : view === 'sale' ? <SaleForm /> : view === 'items' ? <ItemPromos /> : view === 'vouchers' ? <AdminVouchers /> : <History />}
     </div>
   )
 }
