@@ -76,7 +76,7 @@ function TrendsTab() {
   const [by, setBy] = useState<'weeks' | 'months'>('weeks')
   const q = useQuery({ queryKey: ['insights', 'trends'], queryFn: getTrends })
   if (q.isPending) return <Skeleton className="h-72" />
-  if (q.isError) return <ErrorState message={insightsErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState message={insightsErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   const list: Period[] = q.data[by]
   const cur = list.at(-1), prev = list.at(-2)
   const label = (p: Period) => {
@@ -115,7 +115,7 @@ function RecordsTab() {
   const efforts = useMemo(() => (q.data ? bestEfforts(q.data) : []), [q.data])
   const hist = useMemo(() => (q.data ? paceHistogram(q.data) : []), [q.data])
   if (q.isPending) return <Skeleton className="h-72" />
-  if (q.isError) return <ErrorState message={insightsErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState message={insightsErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   if (!q.data.length) return <EmptyState icon={Medal} title="Chưa có bài chạy nào" description="Kỷ lục được tính từ các bài chạy đã được ghi nhận trong 3 năm gần nhất." />
   const splits = q.data.reduce((s, r) => s + r.splits.length, 0)
   return (
@@ -179,7 +179,7 @@ function ReportTab() {
             className={cn('rounded-full border px-3 py-1.5 text-sm font-semibold', key === x.key ? 'border-brand bg-brand/10' : 'border-border text-fg-muted')}>{x.label}</button>
         ))}
       </div>
-      {q.isPending ? <Skeleton className="h-48" /> : q.isError ? <ErrorState message={insightsErrorMessage(q.error)} onRetry={() => void q.refetch()} /> : s && (
+      {q.isPending ? <Skeleton className="h-48" /> : q.isError ? <ErrorState message={insightsErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} /> : s && (
         <>
           <div className="grid grid-cols-2 gap-2">
             <StatTile label="Tổng km" value={km1(s.km)} tone="brand" />

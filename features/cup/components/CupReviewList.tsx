@@ -12,7 +12,7 @@ export function CupReviewList() {
   const q = useQuery({ queryKey: ['cups', 'REVIEW'], queryFn: () => listCups('REVIEW') })
   const [now] = useState(() => Date.now())
   if (q.isPending) return <Skeleton className="h-32" />
-  if (q.isError) return <ErrorState onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />
   if (!q.data.length) return <EmptyState icon={Swords} title="Không có thách đấu chờ duyệt" description="Thách đấu do ban quản trị CLB tạo được mở ngay, không cần duyệt." />
   return (
     <div className="space-y-3">

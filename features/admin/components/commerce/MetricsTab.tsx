@@ -27,7 +27,7 @@ export function MetricsTab() {
   const [months, setMonths] = useState<6 | 12>(6)
   const q = useQuery({ queryKey: ['admin', 'metrics', months], queryFn: () => getEconomyMetrics(months) })
   if (q.isPending) return <Skeleton className="h-96" />
-  if (q.isError) return <ErrorState message={adminErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState message={adminErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   const list = q.data.months
   const cur = list.at(-1) as MetricsMonth
   const d = deriveMetrics(cur)

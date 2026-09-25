@@ -67,7 +67,7 @@ export function ClubMembersScreen({ clubId }: { clubId: string }) {
       {members.isLoading ? (
         <div className="space-y-2">{Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-14" />)}</div>
       ) : members.isError ? (
-        <ErrorState onRetry={() => members.refetch()} />
+        <ErrorState error={members.error} onRetry={() => members.refetch()} />
       ) : (
         <>
           {isStaff && <ClubRunReview clubId={clubId} />}

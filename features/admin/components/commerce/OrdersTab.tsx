@@ -39,7 +39,7 @@ export function OrdersTab() {
         { value: 'PENDING', label: 'Chờ xác nhận' }, { value: 'PAID', label: 'Đã xác nhận' }, { value: 'CANCELLED', label: 'Đã hủy' }, { value: 'ALL', label: 'Tất cả' },
       ]} />
       <p className="text-xs text-fg-muted">Đối chiếu sao kê ngân hàng: nội dung chuyển khoản = mã đơn, số tiền khớp thì bấm Xác nhận.</p>
-      {q.isPending ? <Skeleton className="h-40" /> : q.isError ? <ErrorState message={adminErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+      {q.isPending ? <Skeleton className="h-40" /> : q.isError ? <ErrorState message={adminErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
         : !q.data.length ? <EmptyState icon={Receipt} title="Không có đơn nào" />
         : (
           <ul className="divide-y divide-border rounded-xl border border-border bg-surface">

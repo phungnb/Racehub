@@ -76,7 +76,7 @@ export function AdminConsole() {
         : tab === 'clubs' ? <ClubsProTab />
         : tab === 'items' ? <ItemsTab />
         : o.isPending ? <div className="space-y-2"><Skeleton className="h-28" /><Skeleton className="h-40" /><Skeleton className="h-40" /></div>
-        : o.isError ? <ErrorState message={adminErrorMessage(o.error)} onRetry={() => void o.refetch()} />
+        : o.isError ? <ErrorState message={adminErrorMessage(o.error)} error={o.error} onRetry={() => void o.refetch()} />
         : tab === 'overview' ? <OverviewTab o={o.data} />
         : tab === 'grant' ? <GrantXuTab policy={o.data.policy} />
         : tab === 'passes' ? <PassesTab policy={o.data.policy} />

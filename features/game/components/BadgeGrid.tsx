@@ -16,7 +16,7 @@ export function BadgeGrid() {
   const q = useAchievements()
   const [sel, setSel] = useState<Achievement | null>(null)
   if (q.isPending) return <div className="grid grid-cols-3 gap-2">{Array.from({ length: 9 }, (_, i) => <Skeleton key={i} className="h-28" />)}</div>
-  if (q.isError) return <ErrorState message={gameErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState message={gameErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   if (!q.data.length) return <EmptyState icon={Award} title="Chưa có huy hiệu" description="Huy hiệu sẽ xuất hiện khi hệ thống được cấu hình." />
 
   const got = q.data.filter((a) => a.unlocked_at).length

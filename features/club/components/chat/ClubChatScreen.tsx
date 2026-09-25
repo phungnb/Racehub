@@ -81,7 +81,7 @@ export function ClubChatScreen({ clubId }: { clubId: string }) {
           {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className={cn('h-12 w-2/3', i % 2 && 'ml-auto')} />)}
         </div>
       ) : chat.isError ? (
-        <ErrorState message="Không tải được tin nhắn." onRetry={() => chat.refetch()} />
+        <ErrorState message="Không tải được tin nhắn." error={chat.error} onRetry={() => chat.refetch()} />
       ) : chat.messages.length === 0 ? (
         <EmptyState icon={MessagesSquare} title="Chưa có tin nhắn"
           description="Gửi lời chào, rủ mọi người chạy sáng mai, hoặc nhắc tên ai đó bằng @." />

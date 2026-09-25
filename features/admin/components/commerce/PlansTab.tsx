@@ -26,7 +26,7 @@ function useRefresh() {
 export function PlansTab() {
   const q = usePricing()
   if (q.isPending) return <Skeleton className="h-96" />
-  if (q.isError) return <ErrorState message={adminErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState message={adminErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   return (
     <div className="space-y-6">
       <PaymentForm current={q.data.payment} />

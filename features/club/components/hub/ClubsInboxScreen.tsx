@@ -37,7 +37,7 @@ export function ClubsInboxScreen() {
       {inbox.isLoading ? (
         <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-[72px]" />)}</div>
       ) : inbox.isError ? (
-        <ErrorState message="Không tải được CLB của bạn." onRetry={() => inbox.refetch()} />
+        <ErrorState message="Không tải được CLB của bạn." error={inbox.error} onRetry={() => inbox.refetch()} />
       ) : mine.length === 0 ? (
         <EmptyState icon={Shield} title="Bạn chưa ở CLB nào"
           description="CLB là nơi cả nhóm trò chuyện, xem ai chạy nhiều nhất tuần và cùng làm thử thách. Tạo CLB mới hoặc nhập mã mời từ bạn bè."
@@ -105,7 +105,7 @@ function Discover({ exclude }: { exclude: Set<string> }) {
         <div className="grid grid-cols-4 gap-x-2 gap-y-4">{Array.from({ length: 8 }, (_, i) => (
           <div key={i} className="flex flex-col items-center gap-1.5"><Skeleton className="size-14 rounded-2xl" /><Skeleton className="h-3 w-12" /></div>))}</div>
       ) : res.isError ? (
-        <ErrorState onRetry={() => res.refetch()} />
+        <ErrorState error={res.error} onRetry={() => res.refetch()} />
       ) : list.length === 0 ? (
         <p className="py-6 text-center text-sm text-fg-muted">{term ? `Không tìm thấy CLB nào khớp "${term}". Thử gõ không dấu hoặc vài chữ trong tên.` : 'Chưa có CLB công khai nào.'}</p>
       ) : (

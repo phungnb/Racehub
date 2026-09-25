@@ -33,7 +33,7 @@ export function TemplatePicker({ onPick }: { onPick: (t: ChallengeTemplate) => v
         <span className="rounded bg-coin/15 px-1.5 text-[11px] font-bold text-coin">VIP</span>
       </button>
       <Sheet open={open} onClose={() => setOpen(false)} title="Chọn thử thách làm mẫu" description="Giữ luật chơi, quy mô, đội và số ngày; thời gian dời về từ giờ tới. Phí tạo tính lại như thử thách mới.">
-        {q.isPending ? <Skeleton className="h-40" /> : q.isError ? <ErrorState message={challengeErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+        {q.isPending ? <Skeleton className="h-40" /> : q.isError ? <ErrorState message={challengeErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
           : !q.data.length ? <EmptyState icon={History} title="Bạn chưa tạo thử thách nào" />
           : (
             <ul className="divide-y divide-border">

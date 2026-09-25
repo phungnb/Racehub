@@ -21,7 +21,7 @@ import { PaperDoll } from './PaperDoll'
 export function Wardrobe() {
   const q = useCharacterState()
   if (q.isPending) return <div className="space-y-3"><Skeleton className="h-10" /><Skeleton className="h-[46vh]" /><Skeleton className="h-64" /></div>
-  if (q.isError) return <ErrorState message={characterErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState message={characterErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   return <Editor state={q.data} />
 }
 

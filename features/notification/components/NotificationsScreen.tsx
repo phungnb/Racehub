@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { AtSign, Award, Bell, BellRing, CalendarDays, CheckCheck, Coins, Crown, Flag, Gift, HandCoins, Heart, Medal, Megaphone, MessageCircle, ShieldAlert, Swords, Ticket, TrendingUp, Trophy, UserCheck, UserPlus, Vote, X, type LucideIcon } from 'lucide-react'
+import { AtSign, Award, Bell, BellRing, CalendarDays, CheckCheck, Coins, Crown, Flag, Footprints, Gift, HandCoins, Heart, Medal, Megaphone, MessageCircle, ShieldAlert, Swords, Ticket, TrendingUp, Trophy, UserCheck, UserPlus, Vote, X, type LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { routes } from '@/shared/config/routes'
 import { usePush } from '../hooks/usePush'
@@ -33,6 +33,7 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   RACE_FINISHED: { icon: Medal, tone: 'text-coin' },
   RACE_CANCELLED: { icon: Flag, tone: 'text-danger' },
   RUN_REVIEW: { icon: ShieldAlert, tone: 'text-warning' },
+  RUN_SYNCED: { icon: Footprints, tone: 'text-brand' },
   CLUB_RUN_REVIEW: { icon: ShieldAlert, tone: 'text-warning' },
   CLUB_PRO: { icon: Crown, tone: 'text-coin' },
   VIP: { icon: Crown, tone: 'text-coin' },
@@ -68,7 +69,7 @@ function PushPrompt() {
 }
 
 export function NotificationsScreen() {
-  const { data, isLoading, isError, refetch } = useNotifications()
+  const { data, isLoading, isError, error, refetch } = useNotifications()
   const markRead = useMarkNotificationsRead()
   const unread = (data ?? []).filter((n) => !n.read_at).length
 
@@ -88,7 +89,7 @@ export function NotificationsScreen() {
       {isLoading ? (
         <div className="space-y-2">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : isError ? (
-        <ErrorState onRetry={() => refetch()} />
+        <ErrorState error={error} onRetry={() => refetch()} />
       ) : !data?.length ? (
         <EmptyState icon={Bell} title="Chưa có thông báo"
           description="Khi CLB có thông báo mới, ai đó nhắc tên hay cổ vũ bạn, bạn sẽ thấy ở đây." />

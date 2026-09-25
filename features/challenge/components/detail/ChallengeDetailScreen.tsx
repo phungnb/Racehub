@@ -33,7 +33,7 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
         <BackLink />
         {msg.includes('mã mời')
           ? <EmptyState icon={Lock} title="Thử thách riêng tư" description="Bạn cần link mời (có mã) từ người tạo để xem và tham gia." />
-          : <ErrorState message={msg} onRetry={() => detail.refetch()} />}
+          : <ErrorState message={msg} error={detail.error} onRetry={() => detail.refetch()} />}
       </div>
     )
   }

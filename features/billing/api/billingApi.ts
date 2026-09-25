@@ -2,6 +2,7 @@
 import { supabase } from '@/shared/lib/supabase'
 import type { CapacityTier } from '@/shared/lib/economy'
 import type { Sale } from '../model/sale'
+import { systemErrorMessage } from '@/shared/lib/errors'
 
 export interface PlanPrice { months: number; price_vnd: number; active: boolean }
 export interface PlanCredit { capacity: number; per_month: number }
@@ -97,7 +98,7 @@ const MESSAGES: Record<string, string> = {
 export function billingErrorMessage(e: unknown): string {
   const raw = (e as { message?: string } | null)?.message ?? ''
   const key = Object.keys(MESSAGES).find((k) => raw.includes(k))
-  return key ? MESSAGES[key] : 'Không thực hiện được. Hãy thử lại.'
+  return key ? MESSAGES[key] : systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')
 }
 
 export const MONTH_LABEL: Record<number, string> = { 1: '1 tháng', 3: '3 tháng', 6: '6 tháng', 12: '12 tháng' }

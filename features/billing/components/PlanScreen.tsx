@@ -89,7 +89,7 @@ export function PlanScreen() {
   }
 
   if (pricing.isPending) return <Skeleton className="h-96" />
-  if (pricing.isError) return <ErrorState message={billingErrorMessage(pricing.error)} onRetry={() => void pricing.refetch()} />
+  if (pricing.isError) return <ErrorState message={billingErrorMessage(pricing.error)} error={pricing.error} onRetry={() => void pricing.refetch()} />
   const vip = pricing.data.plans.filter((p) => p.owner_type === 'USER')
   const xuSale = bestSale(sales.data ?? [], 'XU')
   const periods = Array.from(new Set(vip.flatMap((p) => p.prices.filter((x) => x.active).map((x) => x.months)))).sort((a, b) => a - b)

@@ -27,6 +27,9 @@ export function useGameState(userId: string | undefined) {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'game_events', filter: `user_id=eq.${userId}` }, () => {
         void qc.invalidateQueries({ queryKey: gameKeys.state })
         void qc.invalidateQueries({ queryKey: gameKeys.wallet })
+        // Bài chạy mới (Strava / đồng hồ) → danh sách bài chạy, phân tích cũng cập nhật ngay
+        void qc.invalidateQueries({ queryKey: ['activities'] })
+        void qc.invalidateQueries({ queryKey: ['insights'] })
         refreshProfile()
       })
       .subscribe()

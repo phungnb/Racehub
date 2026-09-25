@@ -1,5 +1,6 @@
 // Web Push: đăng ký thiết bị và cài đặt loại thông báo đẩy (migration 001700)
 import { supabase } from '@/shared/lib/supabase'
+import { systemErrorMessage } from '@/shared/lib/errors'
 
 export interface PushSettings {
   club: boolean
@@ -34,10 +35,9 @@ export function savePushSubscription(sub: PushSubscription) {
 }
 
 export function pushErrorMessage(e: unknown): string {
-  const m = e instanceof Error ? e.message : String(e)
+  const m = (e as { message?: string } | null)?.message ?? String(e)
   if (m.includes('TOO_SOON')) return 'Vừa gửi thử rồi, đợi 30 giây nhé.'
   if (m.includes('INVALID_SUBSCRIPTION')) return 'Trình duyệt trả về đăng ký không hợp lệ. Thử lại.'
   if (m.includes('INVALID_SETTINGS')) return 'Giờ yên lặng không hợp lệ.'
-  if (m.includes('Failed to fetch') || m.includes('NetworkError')) return 'Mất kết nối mạng. Thử lại sau.'
-  return 'Có lỗi xảy ra. Thử lại sau.'
+  return systemErrorMessage(e, 'Có lỗi xảy ra. Thử lại sau.')
 }

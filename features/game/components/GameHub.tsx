@@ -20,7 +20,7 @@ import { StreakSheet } from './StreakSheet'
 export function GameHub({ profile }: { profile: Profile }) {
   const q = useGameState(profile.id)
   if (q.isPending) return <div className="space-y-3"><Skeleton className="h-56" /><Skeleton className="h-48" /><Skeleton className="h-24" /></div>
-  if (q.isError) return <ErrorState message={gameErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState message={gameErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   return <Hub profile={profile} s={q.data} />
 }
 
@@ -38,7 +38,7 @@ function Hub({ profile, s }: { profile: Profile; s: GameState }) {
 
   return (
     <div className="space-y-3">
-      <UnseenRewards events={s.unseen} />
+      <UnseenRewards key={s.unseen.filter((e) => e.kind === 'RUN').map((e) => e.id).join()} events={s.unseen} />
       <TodayCard profile={profile} s={s} onStreak={() => setStreakOpen(true)} />
 
       {events.length > 0 && (
@@ -172,10 +172,15 @@ function LeagueCard({ s, onOpen }: { s: GameState; onOpen: () => void }) {
 
 /** Phần thưởng chưa xem (vd. bài chạy Strava vừa về, kết quả league tuần): mở chuỗi phần thưởng */
 function UnseenRewards({ events }: { events: GameState['unseen'] }) {
-  const [open, setOpen] = useState(false)
+  // Bài chạy mới về (mở từ thông báo "Bài chạy đã về", hoặc mở app lần đầu sau khi bài về) → tự bật màn nhận thưởng
+  const [open, setOpen] = useState(() => shouldAutoOpenRewards(events))
   const markSeen = useMarkSeen()
   if (!events.length) return null
-  const close = () => { setOpen(false); markSeen.mutate(events.map((e) => e.id)) }
+  const close = () => {
+    setOpen(false)
+    markSeen.mutate(events.map((e) => e.id))
+    if (location.search.includes('rewards=')) history.replaceState(null, '', location.pathname)
+  }
   const xu = events.reduce((sum, e) => sum + (e.kind === 'CHEER_IN' ? 0 : e.xu), 0)
   return (
     <>
@@ -192,4 +197,19 @@ function UnseenRewards({ events }: { events: GameState['unseen'] }) {
       <RewardCascade key={events.map((e) => e.id).join()} events={events} open={open} onClose={close} />
     </>
   )
+}
+
+const AUTO_KEY = 'rh-auto-rewards'
+
+/** Tự mở một lần cho mỗi bài chạy mới; mở từ link thông báo (?rewards=1) thì luôn mở */
+function shouldAutoOpenRewards(events: GameState['unseen']) {
+  if (!events.length || typeof window === 'undefined') return false
+  const runs = events.filter((e) => e.kind === 'RUN').map((e) => e.id)
+  const fromLink = new URLSearchParams(location.search).has('rewards')
+  let shown: string[] = []
+  try { shown = JSON.parse(localStorage.getItem(AUTO_KEY) ?? '[]') } catch { /* trình duyệt chặn lưu */ }
+  const fresh = runs.filter((id) => !shown.includes(id))
+  if (!fromLink && !fresh.length) return false
+  try { localStorage.setItem(AUTO_KEY, JSON.stringify([...shown, ...fresh].slice(-50))) } catch { /* bỏ qua */ }
+  return true
 }

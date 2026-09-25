@@ -29,7 +29,7 @@ export function RacesScreen({ canCreate }: { canCreate: boolean }) {
       </div>
       <SegmentedControl value={scope} onChange={setScope} options={TABS} />
       {q.isPending ? <div className="space-y-3">{[0, 1].map((i) => <Skeleton key={i} className="h-36" />)}</div>
-        : q.isError ? <ErrorState onRetry={() => void q.refetch()} />
+        : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} />
         : !q.data.length ? (
           <EmptyState icon={Flag} title={scope === 'MINE' ? 'Bạn chưa đăng ký giải nào' : 'Chưa có giải nào'}
             description={canCreate ? 'Tạo giải chạy ảo cho CLB: chọn cự ly, hạn đăng ký, số BIB — kết quả tự cập nhật từ bài chạy.' : 'Giải chạy ảo do CLB hoặc RaceHub tổ chức sẽ hiện ở đây.'} />

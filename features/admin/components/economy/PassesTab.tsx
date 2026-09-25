@@ -106,7 +106,7 @@ export function PassesTab({ policy }: { policy: EconomyPolicy }) {
       {passes.isPending ? (
         <div className="space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : passes.isError ? (
-        <ErrorState message={adminErrorMessage(passes.error)} onRetry={() => void passes.refetch()} />
+        <ErrorState message={adminErrorMessage(passes.error)} error={passes.error} onRetry={() => void passes.refetch()} />
       ) : !passes.data.length ? (
         <EmptyState icon={Ticket} title="Chưa tặng vé nào" description="Vé giúp CLB mới hoặc người tổ chức tích cực tạo thử thách lớn mà không mất Xu." />
       ) : (

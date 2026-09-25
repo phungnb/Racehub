@@ -14,7 +14,7 @@ import { GenderNudge } from './Wardrobe'
 export function CharacterHub() {
   const q = useCharacterState()
   if (q.isPending) return <Skeleton className="h-[26rem]" />
-  if (q.isError) return <ErrorState message={characterErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState message={characterErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   const s = q.data
   const owned = s.items.filter((i) => i.owned).length
   const next = s.items.filter((i) => !i.owned && i.unlock_level > s.level && i.price_xu === 0).sort((a, b) => a.unlock_level - b.unlock_level)[0]

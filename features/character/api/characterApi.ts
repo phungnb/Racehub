@@ -1,6 +1,7 @@
 // Nhân vật: đọc/ghi qua RPC (migration 000900, 001000). Không ghi thẳng bảng.
 import { supabase } from '@/shared/lib/supabase'
 import type { CharacterItem, CharacterState, Gender, Look, Slot } from '../model/catalog'
+import { systemErrorMessage } from '@/shared/lib/errors'
 
 const normItem = (i: CharacterItem): CharacterItem => ({ ...i, price_xu: Number(i.price_xu ?? 0) })
 
@@ -44,5 +45,5 @@ export function characterErrorMessage(e: unknown): string {
   const err = e as { message?: string; code?: string } | null
   console.warn('[Nhân vật] Lỗi gốc:', err?.code, err?.message)
   const key = Object.keys(MESSAGES).find((k) => (err?.message ?? '').includes(k))
-  return key ? MESSAGES[key] : 'Không thực hiện được. Hãy thử lại.'
+  return key ? MESSAGES[key] : systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')
 }

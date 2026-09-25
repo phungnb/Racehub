@@ -20,7 +20,7 @@ export function ClubChallengesTab({ clubId }: { clubId: string }) {
       {q.isLoading ? (
         <div className="space-y-3">{Array.from({ length: 2 }, (_, i) => <Skeleton key={i} className="h-32" />)}</div>
       ) : q.isError ? (
-        <ErrorState onRetry={() => q.refetch()} />
+        <ErrorState error={q.error} onRetry={() => q.refetch()} />
       ) : !q.data?.length ? (
         <EmptyState icon={Trophy} title="CLB chưa có thử thách nào"
           description={staff

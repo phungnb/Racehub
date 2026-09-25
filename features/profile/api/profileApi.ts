@@ -1,6 +1,7 @@
 // Hồ sơ của chính mình: đọc/sửa qua RPC (migration 001400). Ảnh đại diện lưu ở bucket "avatars/<user_id>/".
 import { supabase } from '@/shared/lib/supabase'
 import type { MyProfile, ProfilePatch } from '../model/profileForm'
+import { systemErrorMessage } from '@/shared/lib/errors'
 
 export async function getMyProfile(): Promise<MyProfile> {
   const { data, error } = await supabase.rpc('my_profile')
@@ -47,5 +48,5 @@ export function profileErrorMessage(e: unknown): string {
   const err = e as { message?: string; code?: string } | null
   console.warn('[Hồ sơ] Lỗi gốc:', err?.code, err?.message)
   const key = Object.keys(MESSAGES).find((k) => (err?.message ?? '').includes(k))
-  return key ? MESSAGES[key] : 'Không lưu được. Hãy thử lại.'
+  return key ? MESSAGES[key] : systemErrorMessage(e, 'Không lưu được. Hãy thử lại.')
 }

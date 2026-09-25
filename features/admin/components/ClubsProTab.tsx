@@ -24,7 +24,7 @@ export function ClubsProTab() {
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" aria-hidden />
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm CLB theo tên hoặc link riêng" className="pl-9" aria-label="Tìm CLB" />
       </div>
-      {list.isPending ? <Skeleton className="h-48" /> : list.isError ? <ErrorState message={adminErrorMessage(list.error)} onRetry={() => void list.refetch()} />
+      {list.isPending ? <Skeleton className="h-48" /> : list.isError ? <ErrorState message={adminErrorMessage(list.error)} error={list.error} onRetry={() => void list.refetch()} />
         : !list.data.length ? <EmptyState icon={Crown} title="Không tìm thấy CLB" />
         : (
           <ul className="space-y-2">

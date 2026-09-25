@@ -1,4 +1,5 @@
 import { supabase } from '@/shared/lib/supabase'
+import { systemErrorMessage } from '@/shared/lib/errors'
 
 export async function applyReferral(referrerId: string) {
   const { data, error } = await supabase.rpc('apply_referral', { p_referrer_id: referrerId })
@@ -18,5 +19,5 @@ export function referralErrorMessage(e: any): string {
   for (const key of Object.keys(MESSAGES)) {
     if (raw.includes(key)) return MESSAGES[key]
   }
-  return raw || 'Không thể xử lý lời mời giới thiệu.'
+  return systemErrorMessage(e, 'Không thể xử lý lời mời giới thiệu.')
 }

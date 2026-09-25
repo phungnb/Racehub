@@ -3,6 +3,7 @@ import { supabase } from '@/shared/lib/supabase'
 import type { Audience, ChallengeDraft, ChallengeFormat, Objective, RewardSource, RewardSplit, TeamMode } from '../model/challenge'
 import { draftToPayload, effectiveSlots, type pledgePayload } from '../model/challenge'
 import { toPolicy, type EconomyPolicy } from '@/shared/lib/economy'
+import { systemErrorMessage } from '@/shared/lib/errors'
 
 export type ChallengeTab = 'MINE' | 'DISCOVER' | 'CLUB' | 'ENDED'
 
@@ -329,5 +330,5 @@ export function challengeErrorMessage(e: unknown): string {
   console.warn('[Thử thách] Lỗi gốc:', err?.code, err?.message)
   const raw = err?.message ?? ''
   const key = Object.keys(MESSAGES).find((k) => raw.includes(k))
-  return key ? MESSAGES[key] : 'Không thực hiện được. Hãy thử lại.'
+  return key ? MESSAGES[key] : systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')
 }

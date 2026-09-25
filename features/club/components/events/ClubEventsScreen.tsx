@@ -37,7 +37,7 @@ export function ClubEventsScreen({ clubId }: { clubId: string }) {
         {q.isPending ? (
           <div className="space-y-2">{[0, 1, 2].map((k) => <Skeleton key={k} className="h-28" />)}</div>
         ) : q.isError ? (
-          <ErrorState onRetry={() => void q.refetch()} />
+          <ErrorState error={q.error} onRetry={() => void q.refetch()} />
         ) : q.data.length === 0 ? (
           <EmptyState icon={scope === 'UPCOMING' ? CalendarPlus : CalendarX2}
             title={scope === 'UPCOMING' ? 'Chưa có buổi chạy nào sắp tới' : 'Chưa có buổi chạy nào'}
@@ -53,7 +53,7 @@ export function ClubEventsScreen({ clubId }: { clubId: string }) {
           Bình chọn
         </SectionTitle>
         {polls.isPending ? <Skeleton className="h-40" />
-          : polls.isError ? <ErrorState onRetry={() => void polls.refetch()} />
+          : polls.isError ? <ErrorState error={polls.error} onRetry={() => void polls.refetch()} />
           : polls.data.length === 0 ? (
             <EmptyState icon={Vote} title="Chưa có bình chọn" description="Hỏi cả CLB chọn cung đường, giờ chạy, mẫu áo…" />
           ) : (

@@ -21,7 +21,7 @@ export function ReviewTab() {
   }
 
   if (list.isPending) return <div className="space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-24" />)}</div>
-  if (list.isError) return <ErrorState message={adminErrorMessage(list.error)} onRetry={() => void list.refetch()} />
+  if (list.isError) return <ErrorState message={adminErrorMessage(list.error)} error={list.error} onRetry={() => void list.refetch()} />
   if (!list.data.length) return <EmptyState icon={CheckCircle2} title="Không có bài chờ duyệt" description="Chỉ bài nghi gian lận mới xuất hiện ở đây." />
   return (
     <ul className="space-y-2">

@@ -65,7 +65,7 @@ export function ItemsTab() {
       {q.isPending ? (
         <div className="space-y-2">{[0, 1, 2, 3].map((k) => <Skeleton key={k} className="h-16" />)}</div>
       ) : q.isError ? (
-        <ErrorState message={adminErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+        <ErrorState message={adminErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
       ) : shown.length === 0 ? (
         <EmptyState icon={Shirt} title="Không có vật phẩm" description={search ? 'Thử từ khóa khác.' : 'Bấm Thêm để đưa món mới lên shop.'} />
       ) : (

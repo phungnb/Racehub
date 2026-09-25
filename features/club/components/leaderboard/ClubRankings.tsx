@@ -35,7 +35,7 @@ export function ClubRankings({ clubId }: { clubId: string }) {
           </span>
         ))}
       </div>
-      {q.isPending ? <Skeleton className="h-64" /> : q.isError ? <ErrorState onRetry={() => void q.refetch()} /> : !q.data.length ? (
+      {q.isPending ? <Skeleton className="h-64" /> : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : !q.data.length ? (
         <EmptyState icon={Trophy} title="Chưa có CLB nào đủ điều kiện" description="CLB cần ít nhất 3 thành viên để vào bảng xếp hạng." />
       ) : (
         <ol className="space-y-1.5">

@@ -27,6 +27,7 @@ export function useClub(clubId: string) {
     isStaff: isStaff(role),
     isLoading: club.isLoading || membership.isLoading,
     isError: club.isError || membership.isError,
+    error: club.error ?? membership.error,
     refetch: () => { void club.refetch(); void membership.refetch() },
   }
 }

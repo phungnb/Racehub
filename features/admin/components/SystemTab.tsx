@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, CheckCircle2, ChevronDown, Database, HardDrive, RefreshCw, Server, XCircle, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, Bug, CheckCircle2, ChevronDown, Database, HardDrive, Megaphone, RefreshCw, Server, XCircle, type LucideIcon } from 'lucide-react'
 import { Button, Card, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatRelative } from '@/shared/lib/format'
+import { ClientErrorsPanel, SystemNoticeEditor } from '@/features/system'
 import { getServerCheck, getSystemCheck, type ServerCheckItem } from '../api/adminApi'
 
 type Status = 'ok' | 'warn' | 'fail'
@@ -53,6 +54,10 @@ export function SystemTab() {
     ...(s.cups_pending ? [{ key: 'cup_pending', label: 'Thách đấu CLB chờ duyệt', status: 'warn' as Status, detail: `${s.cups_pending} thách đấu — xem tab Thách đấu.` }] : []),
     ...(s.pending_reviews !== undefined ? [{ key: 'reviews', label: 'Bài chạy chờ duyệt', status: (s.pending_reviews > 20 ? 'warn' : 'ok') as Status,
       detail: s.pending_reviews ? `${s.pending_reviews} bài — xem tab Duyệt bài.` : 'Không có bài nào.' }] : []),
+    ...(s.client_errors_24h !== undefined ? [{ key: 'client_errors', label: 'Lỗi người dùng gặp (24 giờ)',
+      status: (s.not_deployed_24h ? 'fail' : s.client_errors_24h > 50 ? 'warn' : 'ok') as Status,
+      detail: s.not_deployed_24h ? `${s.not_deployed_24h} lần người dùng gặp tính năng chưa cập nhật máy chủ — kiểm tra migration còn thiếu. Chi tiết ở mục "Lỗi người dùng gặp".`
+        : s.client_errors_24h ? `${s.client_errors_24h} lần — xem mục "Lỗi người dùng gặp" bên dưới.` : 'Không có lỗi nào.' }] : []),
   ] : []
   const counts = [...(server.data?.items ?? []), ...dataItems].reduce((c, i) => ({ ...c, [i.status]: c[i.status] + 1 }), { ok: 0, warn: 0, fail: 0 })
   const fails = counts.fail + missing.length + (d?.buckets.filter((b) => !b.ok).length ?? 0)
@@ -110,6 +115,14 @@ export function SystemTab() {
           {dataItems.map((i) => <Row key={i.key} status={i.status} label={i.label} detail={i.detail} />)}
         </Section>
       )}
+
+      <Section icon={Megaphone} title="Thông báo cho người dùng">
+        <SystemNoticeEditor />
+      </Section>
+
+      <Section icon={Bug} title="Lỗi người dùng gặp">
+        <ClientErrorsPanel />
+      </Section>
 
       <Section icon={CheckCircle2} title="Việc bạn tự xác nhận">
         {MANUAL.map((m) => (

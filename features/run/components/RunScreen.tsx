@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { AlertTriangle, CheckCircle2, Clock3, Gift, Gauge, Loader2, Lock, MapPin, Pause, Play, Satellite, Smartphone, Square, Timer, Unlock, Volume2, VolumeX, Watch, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock3, CloudUpload, Gift, History, Gauge, Loader2, Lock, MapPin, Pause, Play, Satellite, Smartphone, Square, Timer, Unlock, Volume2, VolumeX, Watch, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, CoinAmount, HoldButton, XpAmount } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatDuration, formatKm, formatPace } from '@/shared/lib/format'
 import { RewardCascade, useActivityRewards, useMarkSeen } from '@/features/game'
 import { useRunTracker, type GpsState } from '../hooks/useRunTracker'
+import { usePendingRunCount } from '../hooks/usePendingRuns'
 
 const GPS_LABEL: Record<GpsState, { text: string; tone: string }> = {
   OFF: { text: 'GPS tắt', tone: 'text-fg-subtle' },
@@ -41,6 +42,7 @@ function Metric({ label, value, unit, icon: Icon }: { label: string; value: stri
 
 export function RunScreen({ onSaved }: { onSaved?: () => void }) {
   const t = useRunTracker()
+  const pending = usePendingRunCount()
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [locked, setLocked] = useState(false)
   const avgPace = t.avgPace
@@ -71,9 +73,31 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
         </div>
 
         {t.error && <p role="alert" className="mb-3 rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">{t.error}</p>}
+        {t.recovery && (
+          <Card className="mb-3 space-y-3 border-coin/40 bg-coin/10">
+            <p className="flex gap-2 text-sm">
+              <History className="mt-0.5 size-4 shrink-0 text-coin" aria-hidden />
+              <span>
+                <b>Có bài chạy chưa lưu</b> — {formatKm(t.recovery.distanceM)} km · {formatDuration(t.recovery.movingS)},
+                bắt đầu {new Date(t.recovery.startedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}.
+                App đã bị đóng giữa chừng; dữ liệu đến lúc đó vẫn còn.
+              </span>
+            </p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" className="flex-1" onClick={t.dismissRecovery}>Bỏ</Button>
+              <Button size="sm" className="flex-1" onClick={t.restore}>Khôi phục</Button>
+            </div>
+          </Card>
+        )}
+        {pending > 0 && (
+          <p role="status" className="mb-3 flex gap-2 rounded-xl bg-surface-2 px-4 py-3 text-sm text-fg-muted">
+            <CloudUpload className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
+            {pending} bài chạy đang lưu trên máy, sẽ tự gửi lên RaceHub khi có mạng.
+          </p>
+        )}
         <Card className="space-y-2 text-sm text-fg-muted">
           <p className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-brand" /> Chạy ngoài trời. Đứng yên thì app tự dừng tính km.</p>
-          <p className="flex gap-2"><Smartphone className="mt-0.5 size-4 shrink-0 text-brand" /><span>Trình duyệt chỉ ghi GPS khi app đang mở: bấm <b className="text-fg">Khóa màn hình</b> rồi bỏ túi, màn hình tối lại và không bấm nhầm.</span></p>
+          <p className="flex gap-2"><Smartphone className="mt-0.5 size-4 shrink-0 text-brand" /><span>Trình duyệt chỉ ghi GPS khi màn hình còn bật: bấm <b className="text-fg">Khóa màn hình</b> rồi bỏ túi — màn hình đen, ít tốn pin, chạm nhầm không sao. <b className="text-fg">Đừng bấm nút nguồn</b>, GPS sẽ dừng.</span></p>
           <p className="flex gap-2"><Watch className="mt-0.5 size-4 shrink-0 text-brand" /> Chạy dài hoặc muốn tắt hẳn màn hình? Dùng đồng hồ Garmin / COROS / Apple Watch hoặc app Strava — bài chạy tự về RaceHub.</p>
         </Card>
       </div>
@@ -208,6 +232,27 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
     )
   }
 
+  // ---------------- Mất mạng lúc lưu: bài nằm trên máy, tự gửi sau ----------------
+  if (t.phase === 'QUEUED') {
+    return (
+      <div className="space-y-4 animate-fade-in">
+        <div className="flex flex-col items-center gap-2 rounded-[var(--radius-card)] bg-brand/10 px-4 py-6 text-center">
+          <CloudUpload className="size-12 text-brand" aria-hidden />
+          <p className="text-xl font-bold">Đã lưu bài chạy trên máy</p>
+          <p className="text-sm text-fg-muted">Mạng đang chập chờn nên chưa gửi được. RaceHub sẽ tự gửi khi có mạng và báo cho bạn — không cần làm gì thêm.</p>
+        </div>
+        <Card className="grid grid-cols-2 gap-3 text-center">
+          <div><p className="text-xs text-fg-subtle">Quãng đường</p><p className="font-mono tabular text-2xl font-bold">{formatKm(t.distanceM)} km</p></div>
+          <div><p className="text-xs text-fg-subtle">Thời gian</p><p className="font-mono tabular text-2xl font-bold">{formatDuration(t.movingS)}</p></div>
+        </Card>
+        <div className="flex gap-2">
+          <Button block variant="secondary" className="flex-1" onClick={t.discard}>Chạy tiếp</Button>
+          <Link href="/feed" className="flex-1"><Button block>Về trang chủ</Button></Link>
+        </div>
+      </div>
+    )
+  }
+
   // ---------------- Đã lưu: kết quả xác thực + phần thưởng (MH 16–17) ----------------
   const r = t.result
   const verdict = r?.validation_status === 'APPROVED'
@@ -230,7 +275,7 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
       </Card>
       {r?.activity_id && r.validation_status === 'APPROVED' && <RunRewards activityId={r.activity_id} />}
       <div className="flex gap-2">
-        <Button block variant="secondary" onClick={t.discard}>Chạy tiếp</Button>
+        <Button block variant="secondary" className="flex-1" onClick={t.discard}>Chạy tiếp</Button>
         <Link href="/feed" className="flex-1"><Button block>Về trang chủ</Button></Link>
       </div>
     </div>
@@ -262,6 +307,7 @@ function PocketMode({ distanceM, movingS, pace, status, onUnlock }: { distanceM:
           <div><p className="text-xs uppercase tracking-wider text-white/50">Pace TB</p><p className="font-mono tabular text-4xl font-bold">{formatPace(pace)}</p></div>
         </div>
       </div>
+      <p className="max-w-xs text-center text-xs text-white/40">Để nguyên màn hình này rồi bỏ túi. Không bấm nút nguồn — điện thoại sẽ dừng GPS.</p>
       <div className="flex flex-col items-center gap-2">
         <HoldButton onComplete={onUnlock} label="Giữ để mở khóa" className="bg-white/10 text-white">
           <Unlock className="size-7" aria-hidden />

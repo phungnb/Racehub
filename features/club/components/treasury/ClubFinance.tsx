@@ -36,7 +36,7 @@ export function ClubFinance({ clubId, openDue }: { clubId: string; openDue?: str
   const [sheet, setSheet] = useState<'due' | 'entry' | 'bank' | null>(null)
 
   if (q.isPending) return <div className="space-y-3"><Skeleton className="h-40" /><Skeleton className="h-24" /><Skeleton className="h-60" /></div>
-  if (q.isError) return <ErrorState message={eventsErrorMessage(q.error)} onRetry={() => void q.refetch()} />
+  if (q.isError) return <ErrorState message={eventsErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   const f = q.data
 
   return (
@@ -152,7 +152,7 @@ function DueSheet({ clubId, dueId, finance, onClose }: { clubId: string; dueId: 
 
   return (
     <Sheet open onClose={onClose} title={d?.title ?? 'Kỳ thu phí'} description={d ? `${formatVnd(d.amount_vnd)} / người${d.due_date ? ` · hạn ${new Date(d.due_date).toLocaleDateString('vi-VN')}` : ''}` : undefined}>
-      {q.isPending ? <Skeleton className="h-80" /> : q.isError || !d ? <ErrorState message={eventsErrorMessage(q.error)} onRetry={() => void q.refetch()} /> : (
+      {q.isPending ? <Skeleton className="h-80" /> : q.isError || !d ? <ErrorState message={eventsErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} /> : (
         <div className="space-y-5">
           {d.note && <p className="text-sm text-fg-muted">{d.note}</p>}
           {d.my_status && (

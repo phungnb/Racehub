@@ -74,7 +74,7 @@ function MemberLeaderboard({ clubId }: { clubId: string }) {
       {lb.isLoading ? (
         <div className="space-y-2"><Skeleton className="h-40" />{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-14" />)}</div>
       ) : lb.isError ? (
-        <ErrorState onRetry={() => lb.refetch()} />
+        <ErrorState error={lb.error} onRetry={() => lb.refetch()} />
       ) : ran.length === 0 ? (
         <EmptyState icon={Trophy} title={period === 'WEEK' ? 'Tuần này chưa ai chạy' : 'Chưa có bài chạy nào'}
           description="Bài chạy hợp lệ (GPS trong app hoặc đồng bộ Strava) sẽ tự cộng vào BXH." />
