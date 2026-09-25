@@ -157,7 +157,10 @@ export async function getRunnerForm(userId?: string | null): Promise<RunnerForm>
 export async function getMyQuests(): Promise<Quest[]> {
   const { data, error } = await supabase.rpc('my_quests')
   if (error) throw error
-  return ((data ?? []) as Quest[]).map((q) => ({ ...q, target: n(q.target), progress: n(q.progress), reward_xu: n(q.reward_xu), reward_xp: 0 }))
+  return ((data ?? []) as Quest[]).map((q) => ({
+    ...q, target: n(q.target), progress: n(q.progress), reward_xu: n(q.reward_xu), reward_xp: 0, tier_paid: n(q.tier_paid),
+    mine: q.mine == null ? null : n(q.mine), tiers: q.tiers?.length ? q.tiers.map((t) => ({ target: n(t.target), xu: n(t.xu) })) : null,
+  }))
 }
 
 /* ------------------------- Mã khuyến mãi (migration 004300) ------------------------- */

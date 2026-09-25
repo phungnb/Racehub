@@ -30,7 +30,8 @@ function Hub({ profile, s }: { profile: Profile; s: GameState }) {
   const [showWeekly, setShowWeekly] = useState(false)
   const mq = useMyQuests()
   const quests = mq.data ?? s.quests
-  const events = quests.filter((x) => x.period === 'EVENT')
+  // Sự kiện + cột mốc một lần (người mới) hiện nổi bật ở đầu
+  const events = quests.filter((x) => x.period === 'EVENT' || x.period === 'ONCE')
   const daily = quests.filter((x) => x.period === 'DAILY')
   const weekly = quests.filter((x) => x.period === 'WEEKLY' || x.period === 'MONTHLY')
   const dailyDone = daily.filter((x) => x.completed).length
@@ -44,7 +45,7 @@ function Hub({ profile, s }: { profile: Profile; s: GameState }) {
       {events.length > 0 && (
         <Card className="space-y-1 border-coin/40 bg-gradient-to-br from-coin/10 to-surface">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Sự kiện đang diễn ra</h2>
+            <h2 className="font-semibold">{events.every((x) => x.period === 'ONCE') ? 'Cột mốc của bạn' : 'Sự kiện & cột mốc'}</h2>
             <span className="font-mono text-xs text-fg-muted">{events.filter((x) => x.completed).length}/{events.length}</span>
           </div>
           <QuestList quests={events} />
