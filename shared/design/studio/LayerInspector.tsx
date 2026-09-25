@@ -5,10 +5,10 @@ import { ArrowDownToLine, ArrowUpToLine, ChevronDown, ChevronUp, Copy, Eye, EyeO
 import { Button, Input } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import {
-  ALIGNS, FONT_GROUPS, FONTS, IMAGE_ROLES, QR_SOURCES, SHAPES, TEXT_FX,
+  ALIGNS, FONT_GROUPS, FONTS, IMAGE_ROLES, PHOTO_SHAPES, QR_SOURCES, SHAPES, TEXT_FX,
   type Binds, type FontGroup, type FontKey, type Layer, type Palette, type QrLayer, type Size,
-} from '../../model/design'
-import { FONT_FAMILIES } from '../designFonts'
+} from '../engine'
+import { FONT_FAMILIES } from '../fonts'
 import { Chips, FileButton, PaintPicker, Pill, Slider } from './bits'
 
 export function previewFamily(f: FontKey) {
@@ -50,11 +50,13 @@ export interface InspectorProps {
   onChange: (patch: Partial<Layer>, record?: boolean) => void
   onUpload: (file: File | undefined, apply: (url: string, aspect: number) => void) => void
   onAction: (a: 'delete' | 'duplicate' | 'up' | 'down' | 'top' | 'bottom') => void
+  /** Trường ảnh cho khung ảnh runner (hạng 1, hạng 2…) */
+  photoBinds?: Record<string, string>
   /** QR phí tham gia đã lưu (ảnh / mã VietQR) để điền nhanh */
   feePreset?: Partial<QrLayer> | null
 }
 
-export function LayerInspector({ layer: l, size, binds, palette, colorLabels, busy, onChange, onUpload, onAction, feePreset }: InspectorProps) {
+export function LayerInspector({ layer: l, size, binds, palette, colorLabels, busy, onChange, onUpload, onAction, feePreset, photoBinds }: InspectorProps) {
   const set = (p: Partial<Layer>) => onChange(p)
   return (
     <div className="space-y-4">
@@ -82,7 +84,7 @@ export function LayerInspector({ layer: l, size, binds, palette, colorLabels, bu
           <Chips label="Căn lề" value={l.align} options={ALIGNS} onChange={(align) => set({ align })} />
           <PaintPicker label="Màu chữ" value={l.color} palette={palette} labels={colorLabels} onChange={(color) => set({ color })} />
           <Chips label="Hiệu ứng · nền chữ" value={l.fx} options={TEXT_FX} onChange={(fx) => set({ fx })} />
-          {l.fx !== 'none' && l.fx !== 'outline' && (
+          {l.fx !== 'none' && l.fx !== 'outline' && l.fx !== 'gold' && (
             <PaintPicker label={l.fx === 'marker' ? 'Màu bút bôi' : ['box', 'pill', 'slant'].includes(l.fx) ? 'Màu nền chữ' : 'Màu hiệu ứng'}
               value={l.fx_color} palette={palette} labels={colorLabels} onChange={(fx_color) => set({ fx_color })} />
           )}
@@ -141,6 +143,42 @@ export function LayerInspector({ layer: l, size, binds, palette, colorLabels, bu
             <Pill on={l.card} onClick={() => set({ card: !l.card })}>Khung trắng (dễ quét trên nền tối)</Pill>
           </div>
           <Slider label="Cỡ mã" value={Math.round(l.w * 100)} min={5} max={60} unit="%" onChange={(v) => set({ w: v / 100 })} />
+        </>
+      )}
+
+      {l.type === 'photo' && (
+        <>
+          <div className="space-y-1.5">
+            <label htmlFor="ly-photo" className="text-xs font-medium text-fg-muted">Ảnh trong khung</label>
+            <select id="ly-photo" value={l.bind} onChange={(e) => set({ bind: e.target.value })}
+              className="h-11 w-full rounded-xl border border-border bg-surface-2 px-3 text-sm">
+              <option value="custom">Ảnh tải lên (cố định)</option>
+              {Object.entries(photoBinds ?? {}).map(([k, label]) => <option key={k} value={k}>{label} (tự điền)</option>)}
+            </select>
+            {l.bind === 'custom' ? (
+              <FileButton disabled={busy} onPick={(f) => onUpload(f, (src) => set({ src }))}
+                className="flex w-full items-center gap-3 rounded-xl border border-dashed border-border bg-surface-2 p-2 text-left text-sm">
+                <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- ảnh vừa tải lên */}
+                  {l.src ? <img src={l.src} alt="" className="h-full w-full object-cover" /> : <ImagePlus className="size-5 text-fg-subtle" aria-hidden />}
+                </span>
+                {busy ? 'Đang tải…' : l.src ? 'Đổi ảnh' : 'Tải ảnh lên'}
+              </FileButton>
+            ) : <p className="text-[11px] text-fg-muted">Ảnh runner tự điền (ảnh runner tự chọn → ảnh BTC chọn → ảnh đại diện). Chưa có ảnh thì hiện chữ cái đầu.</p>}
+          </div>
+          <Chips label="Hình khung" value={l.shape} options={PHOTO_SHAPES} onChange={(shape) => set({ shape })} />
+          <Slider label="Rộng khung" value={Math.round(l.w * 100)} min={3} max={120} unit="%" onChange={(v) => set({ w: v / 100 })} />
+          <Slider label="Cao khung" value={Math.round(l.h * 100)} min={3} max={120} unit="%" onChange={(v) => set({ h: v / 100 })} />
+          <Button size="sm" variant="secondary" onClick={() => set({ h: (l.w * size.w) / size.h })}>Khung vuông / tròn đều</Button>
+          <div className="space-y-3 rounded-xl border border-border p-3">
+            <p className="text-xs font-semibold">Căn ảnh bên trong khung</p>
+            <Slider label="Phóng ảnh" value={Math.round(l.zoom * 100)} min={100} max={400} unit="%" onChange={(v) => set({ zoom: v / 100 })} />
+            <Slider label="Dịch ngang" value={Math.round(l.ox * 100)} min={-100} max={100} onChange={(v) => set({ ox: v / 100 })} />
+            <Slider label="Dịch dọc" value={Math.round(l.oy * 100)} min={-100} max={100} onChange={(v) => set({ oy: v / 100 })} />
+          </div>
+          <Slider label="Độ dày viền" value={l.border} min={0} max={40} unit="px" onChange={(border) => set({ border })} />
+          {l.border > 0 && <PaintPicker label="Màu viền" value={l.border_color} palette={palette} labels={colorLabels} onChange={(border_color) => set({ border_color })} />}
+          <div className="flex flex-wrap gap-1.5"><Pill on={l.shadow} onClick={() => set({ shadow: !l.shadow })}>Đổ bóng</Pill></div>
         </>
       )}
 

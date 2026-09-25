@@ -11,12 +11,12 @@ import {
   autoCert, CERT_BINDS, CERT_COLOR_LABEL, CERT_FORMATS, CERT_TEMPLATES, certPayload, drawCertificate, editableCert, keepCertAssets,
   type CertDesign, type CertFormat, type CertificateData, type CertTemplate,
 } from '../model/certificate'
-import { COLOR_KEYS, DEFAULT_FIT, panArt, type Layer } from '../model/design'
-import { DesignCanvas } from './EBib'
-import { ImagePick, Section, Slider, Toggle, useImageSize } from './studio/bits'
-import { Studio } from './studio/Studio'
-import { useHistory } from './studio/useHistory'
-import { raceLinks, useRaceAssets } from './studio/useRaceAssets'
+import { COLOR_KEYS, DEFAULT_FIT, panArt, type Layer } from '@/shared/design/engine'
+import { DesignCanvas } from '@/shared/design/DesignCanvas'
+import { ImagePick, Section, Slider, Toggle, useImageSize } from '@/shared/design/studio/bits'
+import { Studio } from '@/shared/design/studio/Studio'
+import { useHistory } from '@/shared/design/studio/useHistory'
+import { raceLinks, useRaceAssets } from './useRaceAssets'
 
 /** BTC thiết kế giấy chứng nhận hoàn thành: khổ dọc (chia sẻ) / ngang A4 (in), mẫu, chữ ký, logo, QR xác thực — kéo thả như BIB */
 export function CertDesigner({ r, onClose }: { r: Race; onClose: () => void }) {

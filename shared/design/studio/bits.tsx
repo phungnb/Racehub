@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ImagePlus, X } from 'lucide-react'
 import { cn } from '@/shared/lib/cn'
-import { COLOR_KEYS, isHex, paint, type Paint, type Palette } from '../../model/design'
+import { COLOR_KEYS, isHex, paint, type Paint, type Palette } from '../engine'
 
 export function Section({ title, hint, children, action }: { title: string; hint?: string; children: ReactNode; action?: ReactNode }) {
   return (

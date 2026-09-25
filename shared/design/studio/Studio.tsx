@@ -4,15 +4,15 @@
 // tay nắm phóng to + xoay, đường gióng giữa, Hoàn tác / Làm lại, thêm chữ / trường / ảnh / QR / hình, danh sách lớp.
 import { useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import {
-  Eye, EyeOff, Image as ImageIcon, Layers, Lock, Plus, QrCode, Redo2, RotateCw, Shapes, SlidersHorizontal, Sparkles, Type, Undo2, Wand2,
+  CircleUserRound, Eye, EyeOff, Image as ImageIcon, Layers, Lock, Plus, QrCode, Redo2, RotateCw, Shapes, SlidersHorizontal, Sparkles, Type, Undo2, Wand2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import {
-  duplicateLayer, hitTest, imageLayer, layerLabel, MAX_LAYERS, moveInStack, moveLayer, qrLayer, scaleLayer, shapeLayer, SHAPES, textLayer,
+  duplicateLayer, hitTest, imageLayer, layerLabel, MAX_LAYERS, moveInStack, moveLayer, photoLayer, qrLayer, scaleLayer, shapeLayer, SHAPES, textLayer,
   type Binds, type Layer, type Layout, type Palette, type QrLayer, type ShapeKind, type Size,
-} from '../../model/design'
+} from '../engine'
 import { LayerInspector } from './LayerInspector'
 import { imageAspect } from './bits'
 
@@ -39,6 +39,12 @@ export interface StudioProps {
   /** Nội dung thêm trong tab Phần tử (nhà tài trợ…) */
   extraPanel?: ReactNode
   feePreset?: Partial<QrLayer> | null
+  /** Trường ảnh cho khung ảnh runner (có thì hiện nút "Ảnh runner") */
+  photoBinds?: Record<string, string>
+  /** Tối đa số phần tử (mặc định 40) */
+  maxLayers?: number
+  /** Ẩn công cụ QR */
+  noQr?: boolean
 }
 
 type Tab = 'edit' | 'layers' | 'style'
@@ -63,7 +69,8 @@ export function Studio(p: StudioProps) {
 
   const patch = (id: string, pt: Partial<Layer>, record = true) => update((ls) => ls.map((l) => (l.id === id ? ({ ...l, ...pt } as Layer) : l)), record)
   const add = (l: Layer) => {
-    if (layers.length >= MAX_LAYERS) { toast.error(`Tối đa ${MAX_LAYERS} phần tử`); return }
+    const max = p.maxLayers ?? MAX_LAYERS
+    if (layers.length >= max) { toast.error(`Tối đa ${max} phần tử`); return }
     update((ls) => [...ls, l])
     setSel(l.id)
     setTab('edit')
@@ -193,7 +200,13 @@ export function Studio(p: StudioProps) {
               const w = 0.18
               add(imageLayer({ x: 0.5, y: 0.5, src, role: layers.some((l) => l.type === 'image' && l.role === 'logo' && l.src) ? 'image' : 'logo', w, h: (w * size.w) / a / size.h }))
             })} />
-          <Tool icon={QrCode} label="QR" on={adding === 'qr'} onClick={() => setAdding(adding === 'qr' ? null : 'qr')} />
+          {p.photoBinds && (
+            <Tool icon={CircleUserRound} label="Ảnh runner" onClick={() => {
+              const k = Object.keys(p.photoBinds!)[0]
+              add(photoLayer({ x: 0.5, y: 0.5, bind: k ?? 'custom', w: 0.28, h: (0.28 * size.w) / size.h }))
+            }} />
+          )}
+          {!p.noQr && <Tool icon={QrCode} label="QR" on={adding === 'qr'} onClick={() => setAdding(adding === 'qr' ? null : 'qr')} />}
           <Tool icon={Shapes} label="Hình" on={adding === 'shape'} onClick={() => setAdding(adding === 'shape' ? null : 'shape')} />
           <span className="mx-1 h-6 w-px shrink-0 bg-border" aria-hidden />
           <Tool icon={Wand2} label="Tự động" onClick={() => { p.onAuto(); setSel(null) }} />
@@ -240,7 +253,7 @@ export function Studio(p: StudioProps) {
               <span className="truncate">{layerLabel(layer, p.binds)}</span>
               <Button size="sm" variant="ghost" onClick={() => setSel(null)}>Xong</Button>
             </p>
-            <LayerInspector layer={layer} size={size} binds={p.binds} palette={p.palette} colorLabels={p.colorLabels} busy={busy} feePreset={p.feePreset}
+            <LayerInspector layer={layer} size={size} binds={p.binds} palette={p.palette} colorLabels={p.colorLabels} busy={busy} feePreset={p.feePreset} photoBinds={p.photoBinds}
               onChange={(pt, record) => patch(layer.id, pt, record)} onUpload={doUpload} onAction={action} />
           </div>
         ) : (

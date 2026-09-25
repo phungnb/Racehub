@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn() } }))
 const { autoCert, certPayload, certValues, freshCert, keepCertAssets, resolveCert } = await import('./certificate')
-const { imageLayer } = await import('./design')
+const { imageLayer } = await import('@/shared/design/engine')
 
 describe('giấy chứng nhận do BTC thiết kế', () => {
   it('mặc định: khổ dọc, mẫu Đêm xanh, đủ tên / cự ly / thành tích / QR xác thực / ô chữ ký', () => {

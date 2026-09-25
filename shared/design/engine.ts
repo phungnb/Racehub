@@ -119,6 +119,8 @@ export const TEXT_FX = {
   pill: 'Nền bo tròn',
   slant: 'Băng chéo',
   underline: 'Gạch chân đậm',
+  gold: 'Nhũ vàng',
+  gradient: 'Chuyển màu',
 } as const
 export type TextFx = keyof typeof TEXT_FX
 
@@ -134,6 +136,9 @@ export type QrSource = keyof typeof QR_SOURCES
 
 export const SHAPES = { rect: 'Chữ nhật', round: 'Bo góc', pill: 'Viên thuốc', circle: 'Tròn', line: 'Đường kẻ', slash: 'Băng chéo', laurel: 'Nguyệt quế', seal: 'Con dấu' } as const
 export type ShapeKind = keyof typeof SHAPES
+
+export const PHOTO_SHAPES = { circle: 'Tròn', round: 'Bo góc', square: 'Vuông', hex: 'Lục giác', arch: 'Vòm', shield: 'Khiên' } as const
+export type PhotoShape = keyof typeof PHOTO_SHAPES
 
 export const IMAGE_ROLES = { logo: 'Logo', sponsor: 'Nhà tài trợ', image: 'Ảnh', signature: 'Chữ ký' } as const
 export type ImageRole = keyof typeof IMAGE_ROLES
@@ -196,7 +201,25 @@ export interface ShapeLayer extends LayerBase {
   h: number
   fill: Paint
 }
-export type Layer = TextLayer | ImageLayer | QrLayer | ShapeLayer
+/** Khung ảnh runner: ảnh theo trường (hạng 1, hạng 2…) hoặc ảnh tải lên; căn / phóng ảnh bên trong khung */
+export interface PhotoLayer extends LayerBase {
+  type: 'photo'
+  /** Trường ảnh (r1, r2…, me) hoặc 'custom' = dùng src */
+  bind: string
+  src: string | null
+  shape: PhotoShape
+  w: number
+  h: number
+  /** Phóng ảnh trong khung (1..4), dịch ảnh trong khung (-1..1) */
+  zoom: number
+  ox: number
+  oy: number
+  /** Viền (px trên khổ thiết kế) */
+  border: number
+  border_color: Paint
+  shadow: boolean
+}
+export type Layer = TextLayer | ImageLayer | QrLayer | ShapeLayer | PhotoLayer
 export type LayerType = Layer['type']
 export const MAX_LAYERS = 40
 
@@ -215,6 +238,10 @@ export function imageLayer(p: Partial<ImageLayer> & Pick<ImageLayer, 'x' | 'y'>)
 }
 export function qrLayer(p: Partial<QrLayer> & Pick<QrLayer, 'x' | 'y'>): QrLayer {
   return { ...BASE, id: newId(), type: 'qr', source: 'verify', src: null, url: '', w: 0.14, label: 'Quét để xác thực', card: true, ...p }
+}
+export function photoLayer(p: Partial<PhotoLayer> & Pick<PhotoLayer, 'x' | 'y'>): PhotoLayer {
+  return { ...BASE, id: newId(), type: 'photo', bind: 'custom', src: null, shape: 'circle', w: 0.25, h: 0.25, zoom: 1, ox: 0, oy: 0,
+    border: 8, border_color: 'accent', shadow: true, ...p }
 }
 export function shapeLayer(p: Partial<ShapeLayer> & Pick<ShapeLayer, 'x' | 'y'>): ShapeLayer {
   return { ...BASE, id: newId(), type: 'shape', shape: 'rect', w: 0.3, h: 0.1, fill: 'band', ...p }
@@ -253,16 +280,21 @@ export function cleanLayer(raw: unknown, binds: Binds): Layer | null {
     case 'shape':
       return { ...base, type: 'shape', shape: pick(r.shape, SHAPES, 'rect'), w: num(r.w, 0.005, 1.5, 0.3), h: num(r.h, 0.003, 1.5, 0.1),
         fill: paintOr(r.fill, 'band') }
+    case 'photo':
+      return { ...base, type: 'photo', bind: typeof r.bind === 'string' && (r.bind in binds || r.bind === 'custom') ? r.bind : 'custom',
+        src: url(r.src), shape: pick(r.shape, PHOTO_SHAPES, 'circle'), w: num(r.w, 0.03, 1.2, 0.25), h: num(r.h, 0.03, 1.2, 0.25),
+        zoom: num(r.zoom, 1, 4, 1), ox: num(r.ox, -1, 1, 0), oy: num(r.oy, -1, 1, 0), border: num(r.border, 0, 40, 8),
+        border_color: paintOr(r.border_color, 'accent'), shadow: bool(r.shadow, true) }
     default:
       return null
   }
 }
 
-export function cleanLayers(raw: unknown, binds: Binds): Layer[] {
+export function cleanLayers(raw: unknown, binds: Binds, max = MAX_LAYERS): Layer[] {
   if (!Array.isArray(raw)) return []
   const seen = new Set<string>()
   const out: Layer[] = []
-  for (const r of raw.slice(0, MAX_LAYERS)) {
+  for (const r of raw.slice(0, max)) {
     const l = cleanLayer(r, binds)
     if (!l) continue
     if (seen.has(l.id)) l.id = newId()
@@ -300,6 +332,7 @@ export function scaleLayer<L extends Layer>(l: L, k: number): L {
     case 'image': return { ...l, w: s(l.w, 0.02, 1.2), h: s(l.h, 0.02, 1.2) }
     case 'qr': return { ...l, w: s(l.w, 0.05, 0.6) }
     case 'shape': return { ...l, w: s(l.w, 0.005, 1.5), h: l.shape === 'line' ? l.h : s(l.h, 0.003, 1.5) }
+    case 'photo': return { ...l, w: s(l.w, 0.03, 1.2), h: s(l.h, 0.03, 1.2) }
   }
 }
 
@@ -404,6 +437,8 @@ export interface DrawData {
   values: Record<string, string | null | undefined>
   /** Nội dung QR tự sinh theo nguồn (xác thực VĐV, trang giải, trang CLB) */
   qr: Partial<Record<QrSource, string | null>>
+  /** Ảnh theo trường (khung ảnh runner) */
+  photos?: Record<string, string | null | undefined>
 }
 export interface DrawOptions {
   /** Đang ở trình thiết kế: hiện khung giữ chỗ cho ảnh / QR chưa có, chữ mẫu cho trường trống */
@@ -507,8 +542,25 @@ function drawText(ctx: CanvasRenderingContext2D, l: TextLayer, text: string, pal
       ctx.fillStyle = fxc
       for (let i = depth; i > 0; i--) ctx.fillText(text, i, base + i)
     }
-    ctx.fillStyle = color
-    ctx.fillText(text, 0, base)
+    if (l.fx === 'gold') {
+      // nhũ vàng: dải chuyển kim loại + viền tối mảnh + bóng nhẹ
+      const g = ctx.createLinearGradient(0, -cap / 2, 0, cap / 2)
+      g.addColorStop(0, '#fff6c8'); g.addColorStop(0.35, '#f3c64b'); g.addColorStop(0.55, '#b8861b'); g.addColorStop(0.75, '#f7d774'); g.addColorStop(1, '#8a5d0d')
+      ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowOffsetY = px * 0.04; ctx.shadowBlur = px * 0.06
+      ctx.fillStyle = g
+      ctx.fillText(text, 0, base)
+      ctx.shadowColor = 'transparent'
+      ctx.lineWidth = Math.max(1, px / 60); ctx.strokeStyle = 'rgba(90,60,5,0.55)'
+      ctx.strokeText(text, 0, base)
+    } else if (l.fx === 'gradient') {
+      const g = ctx.createLinearGradient(left, 0, left + tw, 0)
+      g.addColorStop(0, color); g.addColorStop(1, fxc)
+      ctx.fillStyle = g
+      ctx.fillText(text, 0, base)
+    } else {
+      ctx.fillStyle = color
+      ctx.fillText(text, 0, base)
+    }
   }
   ctx.restore()
   setSpacing(ctx, 0, px)
@@ -582,6 +634,74 @@ function seal(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.restore()
 }
 
+function photoPath(ctx: CanvasRenderingContext2D, shape: PhotoShape, w: number, h: number) {
+  const x = -w / 2, y = -h / 2
+  ctx.beginPath()
+  switch (shape) {
+    case 'circle': ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2); break
+    case 'round': ctx.roundRect(x, y, w, h, Math.min(w, h) * 0.16); break
+    case 'square': ctx.rect(x, y, w, h); break
+    case 'hex':
+      for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + (Math.PI / 3) * i; ctx.lineTo((Math.cos(a) * w) / 2, (Math.sin(a) * h) / 2) }
+      ctx.closePath(); break
+    case 'arch':
+      ctx.moveTo(x, y + h); ctx.lineTo(x, y + w / 2)
+      ctx.ellipse(0, y + w / 2, w / 2, w / 2, 0, Math.PI, 0); ctx.lineTo(x + w, y + h); ctx.closePath(); break
+    case 'shield':
+      ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h * 0.55)
+      ctx.quadraticCurveTo(x + w, y + h * 0.85, 0, y + h); ctx.quadraticCurveTo(x, y + h * 0.85, x, y + h * 0.55); ctx.closePath(); break
+  }
+}
+
+/** Chữ cái đầu khi runner chưa có ảnh */
+export function initials(name: string | null | undefined) {
+  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return '?'
+  return (parts.length > 1 ? parts[parts.length - 2][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)).toLocaleUpperCase('vi')
+}
+
+function drawPhoto(ctx: CanvasRenderingContext2D, l: PhotoLayer, im: HTMLImageElement | null, pal: Palette, size: Size, name: string | null, editing: boolean): Hit {
+  const X = l.x * size.w, Y = l.y * size.h
+  const w = l.w * size.w, h = l.h * size.h
+  const bc = paint(l.border_color, pal)
+  ctx.save()
+  ctx.translate(X, Y)
+  ctx.rotate((l.rot * Math.PI) / 180)
+  ctx.globalAlpha = l.opacity
+  if (l.shadow) {
+    ctx.save()
+    ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = Math.min(w, h) * 0.08; ctx.shadowOffsetY = Math.min(w, h) * 0.03
+    photoPath(ctx, l.shape, w, h); ctx.fillStyle = bc; ctx.fill()
+    ctx.restore()
+  }
+  ctx.save()
+  photoPath(ctx, l.shape, w, h)
+  ctx.clip()
+  if (im) {
+    const s = Math.max(w / im.width, h / im.height) * l.zoom
+    const dw = im.width * s, dh = im.height * s
+    ctx.drawImage(im, -dw / 2 - (l.ox * (dw - w)) / 2, -dh / 2 - (l.oy * (dh - h)) / 2, dw, dh)
+  } else {
+    const g = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2)
+    g.addColorStop(0, pal.band); g.addColorStop(1, pal.accent)
+    ctx.fillStyle = g
+    ctx.fillRect(-w / 2, -h / 2, w, h)
+    ctx.fillStyle = onColor(pal.band)
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.font = `800 ${Math.min(w, h) * 0.36}px ${baseFonts().sans}`
+    ctx.fillText(name ? initials(name) : editing ? 'Ảnh' : '', 0, Math.min(w, h) * 0.02)
+  }
+  ctx.restore()
+  if (l.border > 0) {
+    photoPath(ctx, l.shape, w, h)
+    ctx.lineWidth = l.border
+    ctx.strokeStyle = bc
+    ctx.stroke()
+  }
+  ctx.restore()
+  return { cx: X, cy: Y, w: w + l.border, h: h + l.border, rot: l.rot }
+}
+
 function drawShape(ctx: CanvasRenderingContext2D, l: ShapeLayer, pal: Palette, size: Size): Hit {
   const X = l.x * size.w, Y = l.y * size.h
   const w = l.w * size.w, h = l.shape === 'line' ? Math.max(2, l.h * size.h) : l.h * size.h
@@ -621,6 +741,7 @@ async function loadLayerAssets(layers: Layer[], data: DrawData, opts: DrawOption
   await Promise.all(layers.map(async (l) => {
     if (l.hidden) return
     if (l.type === 'image') out.set(l.id, await loadImage(l.src))
+    else if (l.type === 'photo') out.set(l.id, await loadImage(l.bind === 'custom' ? l.src : data.photos?.[l.bind] ?? null))
     else if (l.type === 'qr') {
       const text = qrContent(l, data)
       out.set(l.id, l.src && (l.source === 'fee' || l.source === 'image') ? await loadImage(l.src) : text ? await loadQr(text) : null)
@@ -653,6 +774,10 @@ export async function drawLayers(canvas: HTMLCanvasElement, size: Size, backgrou
       else if (opts.editing) layout[l.id] = { cx: l.x * size.w, cy: l.y * size.h, w: 120, h: l.size * CAP, rot: l.rot }
     } else if (l.type === 'shape') {
       layout[l.id] = drawShape(ctx, l, pal, size)
+    } else if (l.type === 'photo') {
+      const name = l.bind === 'custom' ? null : data.values[`${l.bind}_name`] ?? (opts.editing ? opts.binds?.[`${l.bind}_name`]?.sample : null) ?? null
+      if (!opts.editing && l.bind !== 'custom' && !name) continue           // hạng trống (ít người hơn số ô) → bỏ khung
+      layout[l.id] = drawPhoto(ctx, l, assets.get(l.id) ?? null, pal, size, name, !!opts.editing)
     } else if (l.type === 'image') {
       const im = assets.get(l.id)
       const w = l.w * size.w, h = l.h * size.h
@@ -707,5 +832,6 @@ export function layerLabel(l: Layer, binds: Binds) {
     case 'image': return l.name ? `${IMAGE_ROLES[l.role]}: ${l.name}` : IMAGE_ROLES[l.role]
     case 'qr': return `QR ${QR_SOURCES[l.source]}`
     case 'shape': return `Hình: ${SHAPES[l.shape]}`
+    case 'photo': return l.bind === 'custom' ? 'Khung ảnh' : `Ảnh ${binds[l.bind]?.label ?? l.bind}`
   }
 }
