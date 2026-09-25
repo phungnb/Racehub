@@ -6,24 +6,25 @@ import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/shared/lib/cn'
 import { fontFamily, type FontKey } from '@/shared/design/engine'
 import {
-  baseUrl, FRAME, hexToRgb, isTintSlot, jerseyName, layerUrl, LAYER_ORDER, luma, maskUrl, PRINT_ZONES, TINT_SLOTS, tintPixel,
-  type CharacterItem, type Gender, type ItemPattern, type ItemPrint, type PrintZone, type Slot, type TintSlot,
+  baseUrl, FRAME, genderOf, hexToRgb, isTintSlot, jerseyName, layerUrl, LAYER_ORDER, luma, maskUrl, PRINT_ZONES, TINT_SLOTS, tintPixel,
+  type Body, type CharacterItem, type ItemPattern, type ItemPrint, type PrintZone, type Slot, type TintSlot,
 } from '../model/catalog'
+import { shade as shadeHex } from '../model/kit'
 import { drawPattern } from '../model/patterns'
+import { drawLayer, layerFont, type Box } from '../model/printLayers'
 
-interface Region { idx: Uint32Array; alpha: Float32Array; mean: number; box: { x0: number; y0: number; w: number; h: number } }
+interface Region { idx: Uint32Array; alpha: Float32Array; mean: number; box: Box }
 interface Prepared {
   base: ImageData
   regions: Partial<Record<TintSlot, Region>>
-  /** Vùng áo: độ phủ mặt nạ + hệ số sáng tối từng điểm (để hình in "ăn" theo nếp vải) */
-  topAlpha: Float32Array
-  topShade: Float32Array
 }
+type Tone = NonNullable<ItemPrint['tone']>
+type Texture = NonNullable<ItemPrint['texture']>
 
 /** Phần nền mở rộng mỗi bên (px trong khung): ảnh 2:3 thành canvas vuông, lấp kín khung hiển thị */
-const SIDE = (FRAME.height - FRAME.width) / 2 + 20
+export const SIDE = (FRAME.height - FRAME.width) / 2 + 20
 /** Nền mở rộng phía trên: chừa chỗ cho mũ khi khung hiển thị cắt bớt trên/dưới */
-const TOP = 70
+export const TOP = 70
 
 export const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
   const img = new Image()
@@ -34,16 +35,16 @@ export const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve
   img.src = src
 })
 
-// Ảnh nền + mặt nạ đã giải mã, dùng chung cho mọi nhân vật cùng giới tính
-const prepared = new Map<Gender, Promise<Prepared>>()
+// Ảnh nền + mặt nạ đã giải mã, dùng chung cho mọi nhân vật cùng dáng
+const prepared = new Map<Body, Promise<Prepared>>()
 const layers = new Map<string, Promise<HTMLImageElement>>()
 
-function prepare(gender: Gender): Promise<Prepared> {
-  let p = prepared.get(gender)
+function prepare(body: Body): Promise<Prepared> {
+  let p = prepared.get(body)
   if (!p) {
     p = (async () => {
       const { width: W, height: H } = FRAME
-      const [base, ...masks] = await Promise.all([loadImage(baseUrl(gender)), ...TINT_SLOTS.map((s) => loadImage(maskUrl(gender, s)))])
+      const [base, ...masks] = await Promise.all([loadImage(baseUrl(body)), ...TINT_SLOTS.map((s) => loadImage(maskUrl(body, s)))])
       const cv = document.createElement('canvas')
       cv.width = W
       cv.height = H
@@ -69,22 +70,18 @@ function prepare(gender: Gender): Promise<Prepared> {
         regions[slot] = { idx: Uint32Array.from(idx), alpha: Float32Array.from(alpha), mean: n ? sum / n : 128,
           box: { x0, y0, w: Math.max(1, x1 - x0 + 1), h: Math.max(1, y1 - y0 + 1) } }
       })
-      const topAlpha = new Float32Array(W * H)
-      const topShade = new Float32Array(W * H)
-      const top = regions.top
-      if (top) {
-        for (let k = 0; k < top.idx.length; k++) {
-          const i = top.idx[k]
-          topAlpha[i] = top.alpha[k]
-          topShade[i] = Math.min(1.35, Math.max(0.55, luma(px.data[i * 4], px.data[i * 4 + 1], px.data[i * 4 + 2]) / Math.max(top.mean, 1)))
-        }
-      }
-      return { base: px, regions, topAlpha, topShade }
+      return { base: px, regions }
     })()
-    p.catch(() => prepared.delete(gender))       // lỗi mạng: lần sau thử lại
-    prepared.set(gender, p)
+    p.catch(() => prepared.delete(body))       // lỗi mạng: lần sau thử lại
+    prepared.set(body, p)
   }
   return p
+}
+
+/** Hộp bao vùng áo / quần / tất / giày của một dáng (toạ độ khung) — trình thiết kế dùng để đặt lớp in */
+export async function regionBoxes(body: Body): Promise<Partial<Record<TintSlot, Box>>> {
+  const p = await prepare(body)
+  return Object.fromEntries(Object.entries(p.regions).map(([k, r]) => [k, r!.box]))
 }
 
 function loadLayer(src: string) {
@@ -97,20 +94,56 @@ function loadLayer(src: string) {
   return p
 }
 
-function paint(p: Prepared, tints: [TintSlot, string][], patterns: [TintSlot, ItemPattern][] = [], gender: Gender = 'male'): ImageData {
+/** Hệ số sáng tối của vải tại điểm (so với độ sáng trung bình vùng) */
+const fabric = (b: Uint8ClampedArray, o: number, mean: number) => Math.min(1.35, Math.max(0.5, luma(b[o], b[o + 1], b[o + 2]) / Math.max(mean, 1)))
+
+function paint(p: Prepared, tints: [TintSlot, string, Tone | null][], patterns: [TintSlot, ItemPattern][], textures: [TintSlot, Texture, HTMLImageElement][], body: Body): ImageData {
   const out = new ImageData(new Uint8ClampedArray(p.base.data), p.base.width, p.base.height)
   const d = out.data
   const b = p.base.data
-  for (const [slot, hex] of tints) {
+  const W = p.base.width
+  // Màu nền: độ đậm = trộn với màu gốc; sáng / tối = pha trắng / đen vào màu đích
+  for (const [slot, hex, tone] of tints) {
     const region = p.regions[slot]
-    const rgb = hexToRgb(hex)
+    const rgb = hexToRgb(tone?.light ? shadeHex(hex, tone.light) : hex)
     if (!region || !rgb) continue
+    const k0 = tone?.strength ?? 1
     for (let k = 0; k < region.idx.length; k++) {
       const o = region.idx[k] * 4
-      const [r, g, bl] = tintPixel(d[o], d[o + 1], d[o + 2], region.alpha[k], rgb, region.mean)
+      const [r, g, bl] = tintPixel(d[o], d[o + 1], d[o + 2], region.alpha[k] * k0, rgb, region.mean)
       d[o] = r
       d[o + 1] = g
       d[o + 2] = bl
+    }
+  }
+  // Ảnh vải / ảnh áo thật: phủ trong hộp bao vùng (lấp đầy, lặp khi thu nhỏ), nhân sáng tối của vải
+  for (const [slot, tex, img] of textures) {
+    const region = p.regions[slot]
+    if (!region) continue
+    const { x0, y0, w, h } = region.box
+    const cv = document.createElement('canvas')
+    cv.width = w
+    cv.height = h
+    const c = cv.getContext('2d', { willReadFrequently: true })!
+    const k = (Math.max(w / img.naturalWidth, h / img.naturalHeight) * (tex.scale || 1))
+    const pat = c.createPattern(img, 'repeat')
+    if (!pat) continue
+    pat.setTransform(new DOMMatrix([k, 0, 0, k, (w - img.naturalWidth * k) / 2, (h - img.naturalHeight * k) / 2]))
+    c.fillStyle = pat
+    c.fillRect(0, 0, w, h)
+    const t = c.getImageData(0, 0, w, h).data
+    for (let n = 0; n < region.idx.length; n++) {
+      const i = region.idx[n]
+      const x = (i % W) - x0, y = ((i - (i % W)) / W) - y0
+      if (x < 0 || y < 0 || x >= w || y >= h) continue
+      const q = (y * w + x) * 4
+      const a = (t[q + 3] / 255) * region.alpha[n] * tex.opacity
+      if (a <= 0) continue
+      const o = i * 4
+      const f = fabric(b, o, region.mean)
+      d[o] = d[o] * (1 - a) + Math.min(255, t[q] * f) * a
+      d[o + 1] = d[o + 1] * (1 - a) + Math.min(255, t[q + 1] * f) * a
+      d[o + 2] = d[o + 2] * (1 - a) + Math.min(255, t[q + 2] * f) * a
     }
   }
   // Họa tiết: vẽ độ phủ trong hộp bao vùng, rồi đổi màu đúng như TINT (giữ nếp vải) và trộn theo độ phủ
@@ -123,9 +156,8 @@ function paint(p: Prepared, tints: [TintSlot, string][], patterns: [TintSlot, It
     cv.width = w
     cv.height = h
     const c = cv.getContext('2d', { willReadFrequently: true })!
-    drawPattern(c, slot, pat.kind, w, h, gender)
+    drawPattern(c, slot, pat.kind, w, h, genderOf(body))
     const cov = c.getImageData(0, 0, w, h).data
-    const W = p.base.width
     for (let k = 0; k < region.idx.length; k++) {
       const i = region.idx[k]
       const x = (i % W) - x0, y = ((i - (i % W)) / W) - y0
@@ -156,92 +188,126 @@ function fitText(c: CanvasRenderingContext2D, text: string, z: PrintZone, family
   c.fillText(text, z.cx, z.cy)
 }
 
-/** Vẽ hình in (logo, chữ, tên runner) lên áo: chỉ trong vùng áo, sáng tối theo nếp vải */
-async function paintPrint(p: Prepared, gender: Gender, print: ItemPrint, personal: string | null, useShade: boolean): Promise<HTMLCanvasElement> {
+const hasLegacy = (pr: ItemPrint) => !!(pr.logo_url || pr.title || pr.subtitle || pr.personal === 'NAME')
+
+/** Hình in của một vùng (áo: logo / chữ kiểu cũ + lớp tự do; quần: lớp tự do): cắt theo mặt nạ, sáng tối theo nếp vải */
+async function paintOverlay(p: Prepared, body: Body, slot: TintSlot, print: ItemPrint, personal: string | null, useShade: boolean): Promise<HTMLCanvasElement | null> {
+  const region = p.regions[slot]
+  if (!region) return null
   const { width: W, height: H } = FRAME
-  const zones = PRINT_ZONES[gender]
   const off = document.createElement('canvas')
   off.width = W
   off.height = H
   const c = off.getContext('2d', { willReadFrequently: true })!
-  // Bộ font thiết kế chỉ nạp khi áo có chữ in (không kéo vào mọi trang có nhân vật)
-  await import('@/shared/design/fonts')
-  const family = fontFamily(PRINT_FONT[print.font ?? 'sport'])
-  await document.fonts?.load(`800 32px ${family}`).catch(() => undefined)
-  const color = print.text_color ?? '#ffffff'
-  if (print.logo_url) {
-    const img = await loadLayer(print.logo_url).catch(() => null)
-    if (img) {
-      const z = zones.logo
-      const k = Math.min(z.w / img.naturalWidth, z.h / img.naturalHeight)
-      c.drawImage(img, z.cx - (img.naturalWidth * k) / 2, z.cy - (img.naturalHeight * k) / 2, img.naturalWidth * k, img.naturalHeight * k)
-    }
+  const texts = (print.layers ?? []).filter((l) => l.type === 'text')
+  const legacy = slot === 'top' && hasLegacy(print)
+  if (texts.length || legacy) {
+    // Bộ font thiết kế chỉ nạp khi có chữ in (không kéo vào mọi trang có nhân vật)
+    await import('@/shared/design/fonts')
+    await Promise.all([
+      ...(legacy ? [`800 32px ${fontFamily(PRINT_FONT[print.font ?? 'sport'])}`] : []),
+      ...texts.map((l) => layerFont(l, 32)),
+    ].map((f) => document.fonts?.load(f).catch(() => undefined)))
   }
-  if (print.title) fitText(c, print.title.toUpperCase(), zones.title, family, color)
-  if (print.subtitle) fitText(c, print.subtitle, zones.subtitle, family, color)
-  if (print.personal === 'NAME' && personal) fitText(c, personal, zones.personal, family, color)
-  // Cắt theo mặt nạ áo + nhân hệ số sáng tối (bỏ qua với áo lớp ảnh vì mặt nạ không khớp)
-  if (useShade) {
-    const xs = Object.values(zones)
-    const x0 = Math.max(0, Math.floor(Math.min(...xs.map((z) => z.cx - z.w / 2)))), x1 = Math.min(W, Math.ceil(Math.max(...xs.map((z) => z.cx + z.w / 2))))
-    const y0 = Math.max(0, Math.floor(Math.min(...xs.map((z) => z.cy - z.h / 2)))), y1 = Math.min(H, Math.ceil(Math.max(...xs.map((z) => z.cy + z.h / 2))))
-    const img = c.getImageData(x0, y0, x1 - x0, y1 - y0)
-    const d = img.data
-    for (let y = y0; y < y1; y++) {
-      for (let x = x0; x < x1; x++) {
-        const o = ((y - y0) * (x1 - x0) + (x - x0)) * 4
-        if (!d[o + 3]) continue
-        const i = y * W + x
-        const a = p.topAlpha[i]
-        if (a <= 0) { d[o + 3] = 0; continue }
-        const f = Math.pow(p.topShade[i], 0.85)
-        d[o] = Math.min(255, d[o] * f); d[o + 1] = Math.min(255, d[o + 1] * f); d[o + 2] = Math.min(255, d[o + 2] * f)
-        d[o + 3] = d[o + 3] * a * 0.94                    // mực in hơi trong: thấy nhẹ vân vải
+  if (legacy) {
+    const zones = PRINT_ZONES[body]
+    const family = fontFamily(PRINT_FONT[print.font ?? 'sport'])
+    const color = print.text_color ?? '#ffffff'
+    if (print.logo_url) {
+      const img = await loadLayer(print.logo_url).catch(() => null)
+      if (img) {
+        const z = zones.logo
+        const k = Math.min(z.w / img.naturalWidth, z.h / img.naturalHeight)
+        c.drawImage(img, z.cx - (img.naturalWidth * k) / 2, z.cy - (img.naturalHeight * k) / 2, img.naturalWidth * k, img.naturalHeight * k)
       }
     }
-    c.putImageData(img, x0, y0)
+    if (print.title) fitText(c, print.title.toUpperCase(), zones.title, family, color)
+    if (print.subtitle) fitText(c, print.subtitle, zones.subtitle, family, color)
+    if (print.personal === 'NAME' && personal) fitText(c, personal, zones.personal, family, color)
   }
+  for (const l of print.layers ?? []) {
+    const img = l.type === 'image' && l.url ? await loadLayer(l.url).catch(() => null) : null
+    drawLayer(c, l, region.box, personal, img)
+  }
+  if (!useShade) return off
+  // Chỉ giữ phần nằm trên vải; mực in hơi trong để thấy nhẹ vân vải
+  const { x0, y0, w, h } = region.box
+  const src = c.getImageData(x0, y0, w, h).data
+  const dst = new ImageData(w, h)
+  const d = dst.data
+  const b = p.base.data
+  for (let k = 0; k < region.idx.length; k++) {
+    const i = region.idx[k]
+    const x = (i % W) - x0, y = ((i - (i % W)) / W) - y0
+    if (x < 0 || y < 0 || x >= w || y >= h) continue
+    const q = (y * w + x) * 4
+    if (!src[q + 3]) continue
+    const f = Math.pow(fabric(b, i * 4, region.mean), 0.85)
+    d[q] = Math.min(255, src[q] * f); d[q + 1] = Math.min(255, src[q + 1] * f); d[q + 2] = Math.min(255, src[q + 2] * f)
+    d[q + 3] = src[q + 3] * region.alpha[k] * 0.94
+  }
+  c.clearRect(0, 0, W, H)
+  c.putImageData(dst, x0, y0)
   return off
 }
 
-interface DrawSpec { tints: [TintSlot, string][]; patterns: [TintSlot, ItemPattern][]; layers: { slot: Slot; url: string }[]; print: ItemPrint | null; printShade: boolean; personal: string | null }
+interface Overlay { slot: TintSlot; print: ItemPrint; shade: boolean }
+interface DrawSpec {
+  tints: [TintSlot, string, Tone | null][]
+  patterns: [TintSlot, ItemPattern][]
+  textures: [TintSlot, Texture][]
+  overlays: Overlay[]
+  layers: { slot: Slot; url: string }[]
+  personal: string | null
+}
 
-function specOf(gender: Gender, items: CharacterItem[], personalName?: string | null): DrawSpec {
-  const top = items.find((i) => i.slot === 'top')
+function specOf(body: Body, items: CharacterItem[], personalName?: string | null): DrawSpec {
+  const tint = items.filter((i) => i.render_kind === 'TINT' && isTintSlot(i.slot)) as (CharacterItem & { slot: TintSlot })[]
+  const overlays: Overlay[] = []
+  for (const i of items) {
+    if (!i.print || !(i.slot === 'top' || i.slot === 'bottom')) continue
+    if ((i.slot === 'top' && hasLegacy(i.print)) || (i.print.layers?.length ?? 0) > 0) overlays.push({ slot: i.slot, print: i.print, shade: i.render_kind !== 'LAYER' })
+  }
   return {
-    tints: items.filter((i) => i.render_kind === 'TINT' && i.color && isTintSlot(i.slot)).map((i) => [i.slot, i.color!] as [TintSlot, string]),
-    patterns: items.filter((i) => i.render_kind === 'TINT' && i.print?.pattern && isTintSlot(i.slot)).map((i) => [i.slot, i.print!.pattern!] as [TintSlot, ItemPattern]),
-    layers: items.map((i) => ({ slot: i.slot, url: layerUrl(i, gender) })).filter((x): x is { slot: Slot; url: string } => !!x.url),
-    print: top?.print && (top.print.logo_url || top.print.title || top.print.subtitle || top.print.personal === 'NAME') ? top.print : null,
-    printShade: top?.render_kind !== 'LAYER',
-    personal: top?.print?.personal === 'NAME' ? jerseyName(personalName) || null : null,
+    tints: tint.filter((i) => i.color).map((i) => [i.slot, i.color!, i.print?.tone ?? null]),
+    patterns: tint.filter((i) => i.print?.pattern).map((i) => [i.slot, i.print!.pattern!]),
+    textures: tint.filter((i) => i.print?.texture?.url).map((i) => [i.slot, i.print!.texture!]),
+    overlays,
+    layers: items.map((i) => ({ slot: i.slot, url: layerUrl(i, body) })).filter((x): x is { slot: Slot; url: string } => !!x.url),
+    personal: jerseyName(personalName) || null,
   }
 }
 
-/** Vẽ nhân vật hoàn chỉnh vào ctx tại (ox, oy): nền đã đổi màu → lớp dưới áo → áo + hình in → lớp trên */
-async function compose(ctx: CanvasRenderingContext2D, gender: Gender, spec: DrawSpec, ox: number, oy: number, isCancelled?: () => boolean) {
+/** Vẽ nhân vật hoàn chỉnh vào ctx tại (ox, oy): nền đã đổi màu → lớp dưới áo → hình in → lớp trên */
+async function compose(ctx: CanvasRenderingContext2D, body: Body, spec: DrawSpec, ox: number, oy: number, isCancelled?: () => boolean) {
   const { width: W, height: H } = FRAME
-  const [p, imgs] = await Promise.all([prepare(gender), Promise.all(spec.layers.map((l) => loadLayer(l.url)))])
-  const printCanvas = spec.print ? await paintPrint(p, gender, spec.print, spec.personal, spec.printShade) : null
+  const [p, imgs, texImgs] = await Promise.all([prepare(body), Promise.all(spec.layers.map((l) => loadLayer(l.url))),
+    Promise.all(spec.textures.map(([, t]) => loadLayer(t.url).catch(() => null)))])
+  const overlays = await Promise.all(spec.overlays.map((o) => paintOverlay(p, body, o.slot, o.print, spec.personal, o.shade)))
   if (isCancelled?.()) return false
-  ctx.putImageData(paint(p, spec.tints, spec.patterns, gender), ox, oy)
+  const textures = spec.textures.map(([s, t], k) => [s, t, texImgs[k]] as const).filter((x): x is [TintSlot, Texture, HTMLImageElement] => !!x[2])
+  ctx.putImageData(paint(p, spec.tints, spec.patterns, textures, body), ox, oy)
   const topAt = LAYER_ORDER.indexOf('top')
   const under = spec.layers.map((l, k) => ({ ...l, img: imgs[k] })).filter((l) => LAYER_ORDER.indexOf(l.slot) <= topAt)
   const over = spec.layers.map((l, k) => ({ ...l, img: imgs[k] })).filter((l) => LAYER_ORDER.indexOf(l.slot) > topAt)
   for (const l of under) ctx.drawImage(l.img, ox, oy, W, H)
-  if (printCanvas) ctx.drawImage(printCanvas, ox, oy, W, H)
+  for (const o of overlays) if (o) ctx.drawImage(o, ox, oy, W, H)
   for (const l of over) ctx.drawImage(l.img, ox, oy, W, H)
   return true
 }
 
 /** Vùng chân dung (đầu + vai) trong khung chuẩn, để làm ảnh đại diện */
-const PORTRAIT: Record<Gender, { cx: number; cy: number; side: number }> = {
+const PORTRAIT: Record<Body, { cx: number; cy: number; side: number }> = {
   male: { cx: 474, cy: 175, side: 330 },
   female: { cx: 450, cy: 215, side: 330 },
+  male_relax: { cx: 452, cy: 160, side: 330 },
+  male_run: { cx: 522, cy: 166, side: 330 },
+  female_tee: { cx: 455, cy: 190, side: 320 },
+  female_run: { cx: 560, cy: 175, side: 320 },
 }
 
 /** Nhân vật đầy đủ (khung chuẩn 900×1350) mặc bộ đồ `items` — dùng cho ảnh chia sẻ, ảnh đại diện */
-export async function renderCharacter(gender: Gender, items: CharacterItem[], personalName?: string | null): Promise<HTMLCanvasElement> {
+export async function renderCharacter(gender: Body, items: CharacterItem[], personalName?: string | null): Promise<HTMLCanvasElement> {
   const full = document.createElement('canvas')
   full.width = FRAME.width
   full.height = FRAME.height
@@ -250,7 +316,7 @@ export async function renderCharacter(gender: Gender, items: CharacterItem[], pe
 }
 
 /** Ảnh chân dung vuông của nhân vật đang mặc bộ đồ (JPEG), dùng làm ảnh đại diện */
-export async function renderPortrait(gender: Gender, items: CharacterItem[], size = 512, personalName?: string | null): Promise<Blob> {
+export async function renderPortrait(gender: Body, items: CharacterItem[], size = 512, personalName?: string | null): Promise<Blob> {
   const full = await renderCharacter(gender, items, personalName)
   const { cx, cy, side } = PORTRAIT[gender]
   const out = document.createElement('canvas')
@@ -262,7 +328,7 @@ export async function renderPortrait(gender: Gender, items: CharacterItem[], siz
 
 /** Nhân vật mặc bộ đồ `items` (đã theo thứ tự lớp, xem resolveOutfit) */
 export function PaperDoll({ gender, items, className, label = 'Nhân vật', fit = 'cover', personalName }: {
-  gender: Gender; items: CharacterItem[]; className?: string; label?: string
+  gender: Body; items: CharacterItem[]; className?: string; label?: string
   /** cover: lấp kín khung (có thể cắt chút đầu/chân); contain: thấy trọn khung ảnh, dùng khi cần soát món đồ */
   fit?: 'cover' | 'contain'
   /** Tên người mặc — in lên đồng phục có ô "tên runner" */

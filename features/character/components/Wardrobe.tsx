@@ -11,8 +11,8 @@ import { routes } from '@/shared/config/routes'
 import { characterErrorMessage } from '../api/characterApi'
 import { useBuyBundle, useBuyItem, useCharacterState, useSaveCharacter, useTryItem } from '../hooks/useCharacter'
 import {
-  buyPrice, canTry, itemStatus, LOCK_LABEL, outfitDiff, RARITY_META, resolveOutfit, SLOTS,
-  type CharacterItem, type CharacterState, type ItemBundle, type ItemOffer, type Slot,
+  BODIES, bodiesFor, bodyOf, baseUrl, buyPrice, layerUrl, canTry, itemStatus, LOCK_LABEL, outfitDiff, RARITY_META, resolveOutfit, SLOTS,
+  type Body, type CharacterItem, type CharacterState, type ItemBundle, type ItemOffer, type Slot,
 } from '../model/catalog'
 import { ItemCard } from './ItemCard'
 import { PaperDoll } from './PaperDoll'
@@ -32,6 +32,9 @@ function Editor({ state }: { state: CharacterState }) {
   const [tab, setTab] = useState<Slot>(tabs[0]?.slot ?? 'top')
   // Nhân vật đi theo giới tính trong hồ sơ (Cài đặt), không chọn riêng ở đây
   const gender = state.gender
+  // Dáng nhân vật (bộ sưu tập nhân vật): chọn trong tủ đồ, lưu cùng bộ đồ
+  const savedBody = bodyOf(gender, state.body)
+  const [body, setBody] = useState<Body>(savedBody)
   const [draft, setDraft] = useState<Partial<Record<Slot, string>>>(state.equipped)
   const [buying, setBuying] = useState<CharacterItem | null>(null)
   const buyKey = useRef(`shop-${crypto.randomUUID()}`)
@@ -46,18 +49,18 @@ function Editor({ state }: { state: CharacterState }) {
   const diff = outfitDiff(state.equipped, draft)
   const [now] = useState(() => Date.now())
   const unowned = outfit.filter((i) => !i.owned && !(i.trial_until && Date.parse(i.trial_until) > now))
-  const dirty = Object.keys(diff).length > 0
+  const dirty = Object.keys(diff).length > 0 || body !== savedBody
 
   const trying = byCode.get(draft[tab] ?? '')
   const tryingUnowned = trying && unowned.includes(trying) ? trying : unowned[0]
 
   const select = (it: CharacterItem) => setDraft((d) => ({ ...d, [it.slot]: it.code }))
   const unequip = (slot: Slot) => setDraft((d) => { const n = { ...d }; delete n[slot]; return n })
-  const reset = () => setDraft(state.equipped)
+  const reset = () => { setDraft(state.equipped); setBody(savedBody) }
 
   const doSave = async () => {
     try {
-      await save.mutateAsync({ look: {}, equipped: diff })
+      await save.mutateAsync({ look: body !== savedBody ? { body } : {}, equipped: diff })
       toast.success('Đã lưu bộ đồ')
     } catch (e) {
       toast.error(characterErrorMessage(e))
@@ -127,7 +130,7 @@ function Editor({ state }: { state: CharacterState }) {
       {/* Nhân vật + hàng ô đồ dính trên cùng khi cuộn danh sách */}
       <div className="sticky top-[var(--topbar-h)] z-20 -mx-4 space-y-2 bg-bg px-4 pb-2 pt-2">
         <div className="relative h-[40vh] min-h-64 overflow-hidden rounded-3xl border border-border bg-[#c4c4ce]">
-          <PaperDoll gender={gender} items={outfit} personalName={state.display_name} className="size-full" label="Nhân vật của bạn" />
+          <PaperDoll gender={body} items={outfit} personalName={state.display_name} className="size-full" label="Nhân vật của bạn" />
           {tryingUnowned && (
             <span className="absolute left-3 top-3 max-w-[55%] truncate rounded-full bg-bg/85 px-3 py-1 text-xs font-semibold text-coin backdrop-blur">
               Đang thử: {tryingUnowned.name}
@@ -136,6 +139,18 @@ function Editor({ state }: { state: CharacterState }) {
           <Link href={routes.settings} className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-bg/85 px-3 py-1.5 text-xs font-semibold text-fg-muted backdrop-blur hover:text-fg">
             {gender === 'female' ? 'Nữ' : 'Nam'}<ChevronRight className="size-3.5" aria-hidden />
           </Link>
+        </div>
+
+        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none]" role="radiogroup" aria-label="Dáng nhân vật">
+          {bodiesFor(gender).map((b) => (
+            <button key={b} type="button" role="radio" aria-checked={body === b} onClick={() => setBody(b)}
+              className={cn('flex shrink-0 items-center gap-1.5 rounded-full border py-1 pl-1 pr-3 text-xs font-semibold',
+                body === b ? 'border-brand bg-brand/15 text-fg' : 'border-border text-fg-muted')}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- ảnh tĩnh trong /public */}
+              <img src={baseUrl(b)} alt="" className="size-7 rounded-full bg-[#c4c4ce] object-cover object-top" loading="lazy" />
+              {BODIES[b].label}
+            </button>
+          ))}
         </div>
 
         <nav role="tablist" aria-label="Ô trang phục" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
@@ -203,6 +218,11 @@ function Editor({ state }: { state: CharacterState }) {
         </div>
       )}
 
+      {body !== gender && list.some((i) => i.render_kind === 'LAYER' && !layerUrl(i, body)) && (
+        <p className="rounded-xl bg-surface-2 p-2.5 text-xs text-fg-muted">
+          Một số món lớp ảnh (mũ, kính, phụ kiện…) mới có cho dáng <b>{BODIES[gender].label}</b> — chọn dáng đó để xem, hoặc chờ bản vẽ cho dáng này.
+        </p>
+      )}
       {list.length === 0 ? (
         <p className="py-10 text-center text-sm text-fg-muted">Chưa có vật phẩm cho ô này.</p>
       ) : (

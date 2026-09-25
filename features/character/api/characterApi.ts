@@ -39,7 +39,7 @@ export async function buyBundle(id: string, key: string) {
   return data as { items: number; paid: number; balance: number; duplicate?: boolean }
 }
 
-export async function saveCharacter(look: { gender?: Gender }, equipped: Partial<Record<Slot, string | null>>) {
+export async function saveCharacter(look: { gender?: Gender; body?: string | null }, equipped: Partial<Record<Slot, string | null>>) {
   const { data, error } = await supabase.rpc('save_character', { p_look: look, p_equipped: equipped })
   if (error) throw error
   return data as Look

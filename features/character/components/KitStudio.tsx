@@ -1,22 +1,23 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Ban, Check, ImageUp, Palette, Pipette, Shirt, Sparkles, Wand2 } from 'lucide-react'
+import { Ban, Check, ImageUp, Layers, Palette, Pipette, Sparkles, Trash2, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, SegmentedControl, SwitchRow } from '@/shared/ui'
+import { Slider } from '@/shared/design/studio/bits'
 import { cn } from '@/shared/lib/cn'
-import { PATTERNS, type Gender, type ItemPattern, type PatternKind, type TintSlot } from '../model/catalog'
+import { BODIES, bodiesFor, PATTERNS, PRINT_ZONES, baseUrl, type Body, type Gender, type ItemPattern, type ItemPrint, type PatternKind, type PrintLayer, type TintSlot } from '../model/catalog'
+import { legacyToLayers, newLayerId } from '../model/printLayers'
 import { drawPattern } from '../model/patterns'
 import {
   applyScheme, extractPalette, KIT_SCHEMES, kitItems, pickPrimarySecondary,
   type KitDesign, type KitPart, type KitPartSlot,
 } from '../model/kit'
-import { loadImage, PaperDoll } from './PaperDoll'
-import { PrintFields } from './PrintFields'
+import { GarmentDesigner } from './GarmentDesigner'
+import { loadImage, PaperDoll, regionBoxes } from './PaperDoll'
 
-type Tab = 'colors' | 'parts' | 'print'
+type Tab = 'colors' | 'parts' | 'design'
 type PartSlot = 'top' | KitPartSlot
-const GENDERS: { value: Gender; label: string }[] = [{ value: 'male', label: 'Nam' }, { value: 'female', label: 'Nữ' }]
 const PART_LABEL: Record<PartSlot, string> = { top: 'Áo', bottom: 'Quần', socks: 'Tất', shoes: 'Giày' }
 const BASICS = ['#ffffff', '#111827', '#1e3a8a', '#6b7280']
 
@@ -84,9 +85,9 @@ function Swatches({ colors, value, onPick, label }: { colors: string[]; value?: 
  * Kit Studio: thiết kế cả bộ đồng phục cho nhân vật 2D (áo + quần + tất + giày).
  * 1) Màu CLB: tải ảnh áo đấu thật / logo → hút màu → phối màu một chạm.
  * 2) Từng món: màu + họa tiết theo nếp vải, bật / tắt món trong bộ.
- * 3) In áo: logo, tên CLB, dòng phụ, tên runner.
+ * 3) Thiết kế in: kéo thả chữ / logo trực tiếp trên áo, quần (font, cỡ, xoay, độ mờ, viền), xem trên mọi dáng nhân vật.
  */
-export function KitStudio({ value, onChange, upload, clubLogoUrl, personalName, onUploading }: {
+export function KitStudio({ value, onChange, upload, clubLogoUrl, personalName, onUploading, gender = 'male' }: {
   value: KitDesign
   onChange: (k: KitDesign) => void
   /** Tải logo in áo lên kho, trả URL công khai */
@@ -95,9 +96,13 @@ export function KitStudio({ value, onChange, upload, clubLogoUrl, personalName, 
   clubLogoUrl?: string | null
   personalName?: string | null
   onUploading?: (busy: boolean) => void
+  /** Dáng xem thử mặc định theo giới tính người thiết kế */
+  gender?: Gender
 }) {
   const [tab, setTab] = useState<Tab>('colors')
-  const [gender, setGender] = useState<Gender>('male')
+  const [body, setBody] = useState<Body>(gender)
+  const [designSlot, setDesignSlot] = useState<'top' | 'bottom'>('top')
+  const [designKey, setDesignKey] = useState(0)
   const [source, setSource] = useState<string | null>(null)
   const [palette, setPalette] = useState<string[]>([])
   const [primary, setPrimary] = useState(value.top)
@@ -140,8 +145,10 @@ export function KitStudio({ value, onChange, upload, clubLogoUrl, personalName, 
       const blob = await (await fetch(clubLogoUrl)).blob()
       const type = blob.type === 'image/webp' || blob.type === 'image/jpeg' ? blob.type : 'image/png'
       const url = await upload(new File([blob], `logo.${type.split('/')[1]}`, { type }))
-      onChange({ ...value, print: { ...value.print, logo_url: url } })
-      toast.success('Đã gắn logo CLB lên ngực áo')
+      const logo: PrintLayer = { id: newLayerId(), type: 'image', url, x: 0.72, y: 0.2, w: 0.16, rot: 0, opacity: 1 }
+      onChange({ ...value, print: { ...value.print, logo_url: null, layers: [...(value.print.layers ?? []), logo].slice(-12) } })
+      setDesignKey((k) => k + 1)
+      toast.success('Đã gắn logo CLB lên ngực áo', { description: 'Kéo để đặt vị trí, kéo góc để đổi cỡ.' })
     } catch {
       toast.error('Không lấy được logo CLB. Hãy tải ảnh logo lên.')
     } finally {
@@ -154,11 +161,29 @@ export function KitStudio({ value, onChange, upload, clubLogoUrl, personalName, 
   const patternOf = (slot: PartSlot): ItemPattern | null => (slot === 'top' ? value.print.pattern ?? null : value[slot]?.pattern ?? null)
   const setColor = (slot: PartSlot, c: string) => {
     if (slot === 'top') onChange({ ...value, top: c })
-    else setPartValue(slot, { color: c, pattern: value[slot]?.pattern ?? null })
+    else setPartValue(slot, { ...(value[slot] ?? { pattern: null }), color: c })
   }
   const setPattern = (slot: PartSlot, p: ItemPattern | null) => {
     if (slot === 'top') onChange({ ...value, print: { ...value.print, pattern: p } })
     else if (value[slot]) setPartValue(slot, { ...value[slot]!, pattern: p })
+  }
+  /** Mở thẻ thiết kế: thiết kế kiểu cũ (vùng cố định) → lớp tự do để kéo thả */
+  const toDesign = async () => {
+    const pr = value.print
+    if (!(pr.logo_url || pr.title || pr.subtitle || pr.personal === 'NAME')) return
+    const box = (await regionBoxes(body)).top
+    if (!box) return
+    const conv = legacyToLayers(pr, PRINT_ZONES[body], box)
+    onChange({ ...value, print: { ...pr, logo_url: null, title: null, subtitle: null, personal: 'NONE', layers: [...(pr.layers ?? []), ...conv].slice(-12) } })
+    setDesignKey((k) => k + 1)
+  }
+  type FabricValue = { tone: ItemPrint['tone']; texture: ItemPrint['texture'] }
+  const fabricOf = (slot: PartSlot): FabricValue => (slot === 'top'
+    ? { tone: value.print.tone ?? null, texture: value.print.texture ?? null }
+    : { tone: value[slot]?.tone ?? null, texture: value[slot]?.texture ?? null })
+  const setFabric = (slot: PartSlot, f: FabricValue) => {
+    if (slot === 'top') onChange({ ...value, print: { ...value.print, ...f } })
+    else if (value[slot]) setPartValue(slot, { ...value[slot]!, ...f })
   }
   const choices = [primary, secondary, ...palette, ...BASICS]
   const patterns = PATTERNS[part as TintSlot] ?? []
@@ -167,10 +192,21 @@ export function KitStudio({ value, onChange, upload, clubLogoUrl, personalName, 
 
   return (
     <div className="space-y-4">
-      {/* Xem thử */}
+      {/* Dáng nhân vật để xem thử (cùng thiết kế lên mọi dáng) */}
+      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="radiogroup" aria-label="Nhân vật xem thử">
+        {(['male', 'female'] as Gender[]).flatMap((g) => bodiesFor(g)).map((b) => (
+          <button key={b} type="button" role="radio" aria-checked={body === b} onClick={() => setBody(b)} title={BODIES[b].label}
+            className={cn('relative h-16 w-12 shrink-0 overflow-hidden rounded-xl border-2 bg-[#c4c4ce]', body === b ? 'border-brand' : 'border-transparent')}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- ảnh tĩnh trong /public */}
+            <img src={baseUrl(b)} alt={BODIES[b].label} className="absolute inset-0 size-full object-cover object-top" loading="lazy" />
+          </button>
+        ))}
+      </div>
+
+      {tab !== 'design' && (
       <div className="relative h-[26rem] overflow-hidden rounded-2xl border border-border bg-[#c4c4ce]">
-        <PaperDoll gender={gender} items={kitItems(value)} personalName={personalName ?? 'Runner'} className="size-full" label="Xem thử bộ đồng phục" />
-        <SegmentedControl value={gender} onChange={setGender} options={GENDERS} className="absolute right-2 top-2 w-28 bg-bg/85" />
+        <PaperDoll gender={body} items={kitItems(value)} personalName={personalName ?? 'Runner'} className="size-full" label="Xem thử bộ đồng phục" />
+        <span className="absolute right-2 top-2 rounded-full bg-bg/85 px-3 py-1 text-xs font-semibold backdrop-blur">{BODIES[body].gender === 'male' ? 'Nam' : 'Nữ'} · {BODIES[body].label}</span>
         <div className="absolute bottom-2 left-2 flex gap-1 rounded-full bg-bg/85 p-1 backdrop-blur">
           {(['top', 'bottom', 'socks', 'shoes'] as PartSlot[]).map((s) => (
             <span key={s} title={PART_LABEL[s]} className={cn('size-5 rounded-full border border-border', !colorOf(s) && 'opacity-30')}
@@ -178,9 +214,10 @@ export function KitStudio({ value, onChange, upload, clubLogoUrl, personalName, 
           ))}
         </div>
       </div>
+      )}
 
-      <SegmentedControl value={tab} onChange={setTab} options={[
-        { value: 'colors', label: 'Màu CLB' }, { value: 'parts', label: 'Từng món' }, { value: 'print', label: 'In áo' },
+      <SegmentedControl value={tab} onChange={(t) => { setTab(t); if (t === 'design') { if (body === 'male') setBody('male_relax'); void toDesign() } }} options={[
+        { value: 'colors', label: 'Màu CLB' }, { value: 'parts', label: 'Từng món' }, { value: 'design', label: 'Thiết kế in' },
       ]} />
 
       {tab === 'colors' && (
@@ -302,20 +339,76 @@ export function KitStudio({ value, onChange, upload, clubLogoUrl, personalName, 
                   )}
                 </div>
               )}
+              <Fabric value={fabricOf(part)} onChange={(f) => setFabric(part, f)} upload={upload} />
               {part === 'shoes' && <p className="text-xs text-fg-muted">Giày chỉ đổi màu thân giày (đế và logo giữ nguyên).</p>}
             </>
           )}
         </div>
       )}
 
-      {tab === 'print' && (
+      {tab === 'design' && (
         <div className="space-y-3">
-          {clubLogoUrl && (
-            <Button variant="secondary" block onClick={() => void attachClubLogo()}><Sparkles className="size-4" aria-hidden />Dùng logo CLB làm logo ngực</Button>
-          )}
-          <PrintFields value={value.print} onChange={(p) => onChange({ ...value, print: { ...p, pattern: value.print.pattern ?? null } })} upload={upload} onUploading={onUploading} />
-          <p className="flex items-start gap-1.5 text-xs text-fg-muted"><Shirt className="mt-0.5 size-3.5 shrink-0" aria-hidden />Chữ và logo in trên áo; họa tiết chỉnh ở thẻ Từng món.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <SegmentedControl value={designSlot} onChange={setDesignSlot} className="w-48"
+              options={[{ value: 'top', label: 'In trên áo' }, ...(value.bottom ? [{ value: 'bottom' as const, label: 'In trên quần' }] : [])]} />
+            {clubLogoUrl && designSlot === 'top' && (
+              <Button size="sm" variant="secondary" onClick={() => void attachClubLogo()}><Sparkles className="size-4" aria-hidden />Logo CLB</Button>
+            )}
+          </div>
+          <GarmentDesigner key={`${designSlot}-${designKey}-${body}`} body={body} items={kitItems(value)} slot={designSlot}
+            layers={(designSlot === 'top' ? value.print.layers : value.bottom?.layers) ?? []}
+            onLayers={(ls) => (designSlot === 'top'
+              ? onChange({ ...value, print: { ...value.print, layers: ls } })
+              : value.bottom && onChange({ ...value, bottom: { ...value.bottom, layers: ls } }))}
+            upload={upload} personalName={personalName} colors={[primary, secondary, ...palette]} />
         </div>
+      )}
+    </div>
+  )
+}
+
+/** Chất liệu: độ đậm màu, sáng / tối, ảnh vải (ảnh áo thật / vân vải) phủ theo nếp vải */
+function Fabric({ value, onChange, upload }: {
+  value: { tone: ItemPrint['tone']; texture: ItemPrint['texture'] }
+  onChange: (v: { tone: ItemPrint['tone']; texture: ItemPrint['texture'] }) => void
+  upload: (file: File) => Promise<string>
+}) {
+  const [busy, setBusy] = useState(false)
+  const tone = value.tone ?? { strength: 1, light: 0 }
+  const pick = async (f: File | undefined) => {
+    if (!f) return
+    if (f.size > 2 * 1024 * 1024) { toast.error('Ảnh tối đa 2 MB.'); return }
+    setBusy(true)
+    try { onChange({ ...value, texture: { url: await upload(f), opacity: 0.55, scale: 1 } }) }
+    catch { toast.error('Không tải được ảnh. Hãy thử lại.') }
+    finally { setBusy(false) }
+  }
+  return (
+    <div className="space-y-3 rounded-2xl border border-border p-3">
+      <p className="flex items-center gap-2 text-sm font-semibold"><Layers className="size-4 text-brand" aria-hidden />Chất liệu</p>
+      <div className="grid grid-cols-2 gap-3">
+        <Slider label="Độ đậm màu" value={Math.round(tone.strength * 100)} min={20} max={100} unit="%" onChange={(v) => onChange({ ...value, tone: { ...tone, strength: v / 100 } })} />
+        <Slider label="Sáng / tối" value={Math.round(tone.light * 100)} min={-40} max={40} unit="" onChange={(v) => onChange({ ...value, tone: { ...tone, light: v / 100 } })} />
+      </div>
+      {value.texture ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element -- ảnh vải người dùng tải lên */}
+            <img src={value.texture.url} alt="Ảnh vải" className="size-12 rounded-lg border border-border object-cover" />
+            <span className="flex-1 text-xs text-fg-muted">Ảnh vải đang phủ lên món này</span>
+            <Button size="sm" variant="ghost" onClick={() => onChange({ ...value, texture: null })} aria-label="Bỏ ảnh vải"><Trash2 className="size-4" aria-hidden /></Button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Slider label="Độ phủ" value={Math.round(value.texture.opacity * 100)} min={5} max={100} unit="%" onChange={(v) => onChange({ ...value, texture: { ...value.texture!, opacity: v / 100 } })} />
+            <Slider label="Tỉ lệ" value={Math.round(value.texture.scale * 100)} min={30} max={300} unit="%" onChange={(v) => onChange({ ...value, texture: { ...value.texture!, scale: v / 100 } })} />
+          </div>
+        </div>
+      ) : (
+        <label className={cn('flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-border p-3 text-xs text-fg-muted hover:border-brand', busy && 'opacity-60')}>
+          <ImageUp className="size-4 shrink-0" aria-hidden />
+          <span>{busy ? 'Đang tải…' : 'Tải ảnh vải / ảnh áo thật để phủ lên (giữ nếp vải) — tuỳ chọn'}</span>
+          <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={busy} onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = '' }} />
+        </label>
       )}
     </div>
   )

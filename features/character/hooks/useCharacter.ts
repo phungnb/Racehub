@@ -44,7 +44,7 @@ export function useBuyBundle() {
 export function useSaveCharacter() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ look, equipped }: { look: { gender?: Gender }; equipped: Partial<Record<Slot, string | null>> }) =>
+    mutationFn: ({ look, equipped }: { look: { gender?: Gender; body?: string | null }; equipped: Partial<Record<Slot, string | null>> }) =>
       saveCharacter(look, equipped),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['character'] }),
   })

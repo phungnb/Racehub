@@ -1,8 +1,24 @@
 // Bộ đồng phục (migration 005900): áo + quần + tất + giày cùng thiết kế; hút màu từ ảnh áo thật / logo CLB; phối màu.
-import { hexToRgb, luma, type CharacterItem, type ItemPattern, type ItemPrint, type Slot } from './catalog'
+import { hexToRgb, luma, NAME_TOKEN, type CharacterItem, type ItemPattern, type ItemPrint, type Slot } from './catalog'
 
 export type KitPartSlot = 'bottom' | 'socks' | 'shoes'
-export interface KitPart { color: string; pattern: ItemPattern | null }
+export interface KitPart {
+  color: string
+  pattern: ItemPattern | null
+  /** Độ đậm / sáng tối, ảnh vải, lớp in tự do (quần) — migration 006000 */
+  tone?: ItemPrint['tone']
+  texture?: ItemPrint['texture']
+  layers?: ItemPrint['layers']
+}
+/** Thiết kế của quần / tất / giày gửi lên máy chủ (null = trơn) */
+export function partPrint(p: KitPart): ItemPrint | null {
+  const out: ItemPrint = {}
+  if (p.pattern) out.pattern = p.pattern
+  if (p.tone && (p.tone.strength < 1 || p.tone.light !== 0)) out.tone = p.tone
+  if (p.texture?.url) out.texture = p.texture
+  if (p.layers?.length) out.layers = p.layers
+  return Object.keys(out).length ? out : null
+}
 export interface KitDesign {
   /** Màu áo */
   top: string
@@ -120,17 +136,25 @@ export function pickPrimarySecondary(palette: string[]): [string, string] {
 export function applyScheme(kit: KitDesign, scheme: KitScheme, primary: string, secondary: string): KitDesign {
   const r = scheme.apply(primary, secondary)
   const pat = kit.print.pattern ? { ...kit.print.pattern, color: secondary } : { kind: 'sides' as const, color: secondary }
+  // chữ: dùng màu phụ nếu đủ tương phản với áo, không thì trắng / đen
+  const text = lumaGap(r.top, secondary) > 90 ? secondary : contrastText(r.top)
+  const keep = (next: KitPart | null, old: KitPart | null) => (old && next ? { ...old, color: next.color, pattern: next.pattern } : null)
   return {
     top: r.top,
-    // chữ: dùng màu phụ nếu đủ tương phản với áo, không thì trắng / đen
-    print: { ...kit.print, pattern: pat, text_color: lumaGap(r.top, secondary) > 90 ? secondary : contrastText(r.top) },
-    bottom: kit.bottom ? r.bottom : null, socks: kit.socks ? r.socks : null, shoes: kit.shoes ? r.shoes : null,
+    print: { ...kit.print, pattern: pat, text_color: text, layers: kit.print.layers?.map((l) => (l.type === 'text' ? { ...l, color: text } : l)) },
+    bottom: keep(r.bottom, kit.bottom), socks: keep(r.socks, kit.socks), shoes: keep(r.shoes, kit.shoes),
   }
 }
 
+/** Lớp in mặc định: tên CLB giữa ngực + tên runner bên dưới */
+export const defaultLayers = (clubName: string): NonNullable<ItemPrint['layers']> => [
+  ...(clubName.trim() ? [{ id: 'title', type: 'text' as const, text: clubName.toUpperCase().slice(0, 24), font: 'athletic', color: '#ffffff', x: 0.5, y: 0.68, w: 0.5, rot: 0, opacity: 1, spacing: 0.04 }] : []),
+  { id: 'name', type: 'text' as const, text: NAME_TOKEN, font: 'athletic', color: '#ffffff', x: 0.5, y: 0.8, w: 0.28, rot: 0, opacity: 1, spacing: 0.08 },
+]
+
 export const defaultKit = (clubName: string, accent?: string | null): KitDesign => {
   const p = accent && /^#[0-9a-f]{6}$/i.test(accent) ? accent : '#1d4ed8'
-  const base: KitDesign = { top: p, print: { title: clubName.toUpperCase().slice(0, 24), personal: 'NAME', text_color: '#ffffff', font: 'sport', pattern: null }, bottom: { color: dark, pattern: null }, socks: { color: white, pattern: null }, shoes: { color: dark, pattern: null } }
+  const base: KitDesign = { top: p, print: { pattern: null, layers: defaultLayers(clubName) }, bottom: { color: dark, pattern: null }, socks: { color: white, pattern: null }, shoes: { color: dark, pattern: null } }
   return applyScheme(base, KIT_SCHEMES[0], p, '#f8fafc')
 }
 
@@ -143,7 +167,7 @@ export function kitItems(kit: KitDesign, name = 'Đồng phục'): CharacterItem
   const items = [one('top', kit.top, kit.print)]
   for (const { slot } of KIT_PARTS) {
     const part = kit[slot]
-    if (part) items.push(one(slot, part.color, part.pattern ? { pattern: part.pattern } : null))
+    if (part) items.push(one(slot, part.color, partPrint(part)))
   }
   return items
 }
@@ -153,7 +177,7 @@ export function kitParts(kit: KitDesign) {
   const out: Partial<Record<KitPartSlot, { color: string; print: ItemPrint | null }>> = {}
   for (const { slot } of KIT_PARTS) {
     const part = kit[slot]
-    if (part) out[slot] = { color: part.color, print: part.pattern ? { pattern: part.pattern } : null }
+    if (part) out[slot] = { color: part.color, print: partPrint(part) }
   }
   return out
 }
@@ -162,7 +186,7 @@ export function kitParts(kit: KitDesign) {
 export function kitFromRequest(r: { color: string; print: ItemPrint; parts?: Partial<Record<KitPartSlot, { color: string; print?: ItemPrint | null }>> | null }): KitDesign {
   const part = (s: KitPartSlot): KitPart | null => {
     const p = r.parts?.[s]
-    return p ? { color: p.color, pattern: p.print?.pattern ?? null } : null
+    return p ? { color: p.color, pattern: p.print?.pattern ?? null, tone: p.print?.tone ?? null, texture: p.print?.texture ?? null, layers: p.print?.layers ?? null } : null
   }
   return { top: r.color, print: r.print, bottom: part('bottom'), socks: part('socks'), shoes: part('shoes') }
 }
