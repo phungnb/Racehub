@@ -2,6 +2,7 @@
 import { supabase } from '@/shared/lib/supabase'
 import { systemErrorMessage } from '@/shared/lib/errors'
 import type { CharacterItem, ItemPrint } from '../model/catalog'
+import type { KitPartSlot } from '../model/kit'
 
 export const UNIFORM_BUCKET = 'uniform-media'
 
@@ -21,11 +22,14 @@ export interface UniformRequest {
   review_note: string | null
   item_code: string | null
   item: (CharacterItem & { owners?: number }) | null
+  /** Quần / tất / giày của bộ (migration 005900) */
+  parts?: Partial<Record<KitPartSlot, { color: string; print?: ItemPrint | null }>> | null
+  kit_items?: CharacterItem[]
   created_at: string
   reviewed_at: string | null
 }
 
-export interface UniformInput { name: string; color: string; print: ItemPrint; note?: string | null }
+export interface UniformInput { name: string; color: string; print: ItemPrint; note?: string | null; parts?: UniformRequest['parts'] }
 
 export async function listClubUniforms(clubId: string): Promise<UniformRequest[]> {
   const { data, error } = await supabase.rpc('club_uniforms', { p_club_id: clubId })
@@ -55,6 +59,8 @@ export async function uploadPrintLogo(folder: string, file: File): Promise<strin
 
 const MESSAGES: Record<string, string> = {
   TOO_MANY_REQUESTS: 'CLB đang có 3 mẫu chờ duyệt. Chờ admin duyệt hoặc hủy bớt.',
+  INVALID_PATTERN: 'Họa tiết không hợp lệ cho món này.',
+  INVALID_PARTS: 'Bộ đồng phục chỉ gồm áo, quần, tất, giày.',
   INVALID_PRINT: 'Nội dung in chưa hợp lệ: cần ít nhất logo, chữ hoặc tên runner; logo phải tải lên từ đây.',
   INVALID_COLOR: 'Màu áo không hợp lệ.',
   INVALID_NAME: 'Tên mẫu áo cần từ 2 ký tự.',

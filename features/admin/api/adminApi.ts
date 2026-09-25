@@ -160,6 +160,8 @@ export interface ItemInput {
   available_to: string | null
   supply_limit: number | null
   print: ItemPrint | null
+  /** Mã bộ đồng phục (migration 005900) */
+  kit?: string | null
 }
 
 export const ITEM_STATUS: Record<ItemLifecycle, { label: string; hint: string; tone: string }> = {
@@ -224,7 +226,7 @@ export async function listUniformRequests(status: UniformStatus | 'ALL'): Promis
   return (data ?? []) as UniformRequest[]
 }
 
-export interface UniformApproval { price_xu: number; rarity: Rarity; name?: string; collection?: string | null; note?: string }
+export interface UniformApproval { price_xu: number; part_prices?: Record<string, number>; rarity: Rarity; name?: string; collection?: string | null; note?: string }
 export async function reviewUniformRequest(id: string, action: 'APPROVE' | 'REJECT', p: UniformApproval | { note: string }) {
   const { data, error } = await supabase.rpc('admin_review_uniform_request', { p_id: id, p_action: action, p })
   if (error) throw error
@@ -284,6 +286,10 @@ const MESSAGES: Record<string, string> = {
   REQUEST_NOT_FOUND: 'Không tìm thấy yêu cầu.',
   REQUEST_CLOSED: 'Yêu cầu đã được xử lý.',
   INVALID_ACTION: 'Thao tác không hợp lệ.',
+  INVALID_PATTERN: 'Họa tiết không hợp lệ cho món này.',
+  PATTERN_TINT_ONLY: 'Họa tiết chỉ dùng cho món đổi màu (không dùng cho lớp ảnh).',
+  INVALID_KIT: 'Mã bộ không hợp lệ.',
+  INVALID_PARTS: 'Bộ đồng phục chỉ gồm áo, quần, tất, giày.',
   TINT_SLOT_ONLY: 'Vật phẩm đổi màu chỉ dành cho áo, quần, tất, giày.',
   INVALID_COLOR: 'Mã màu không hợp lệ.',
   LAYER_REQUIRED: 'Cần ít nhất một ảnh lớp (Nam hoặc Nữ).',

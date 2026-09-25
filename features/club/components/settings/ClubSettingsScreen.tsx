@@ -31,7 +31,7 @@ export function ClubSettingsScreen({ clubId }: { clubId: string }) {
       <NotificationSection clubId={clubId} />
       {isStaff && <ProSection club={club} />}
       {isStaff && <ProfileSection club={club} />}
-      {isStaff && <UniformSection clubId={club.id} clubName={club.name} accent={accentOf(club)} />}
+      {isStaff && <UniformSection clubId={club.id} clubName={club.name} accent={accentOf(club)} logoUrl={club.avatar_url} />}
       {role === 'OWNER' && <PolicySection club={club} />}
       <DangerSection club={club} isOwner={role === 'OWNER'} />
     </div>

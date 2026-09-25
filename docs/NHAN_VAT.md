@@ -98,6 +98,16 @@ Màu chữ và kiểu chữ (Thể thao / Hiện đại / Cổ điển) chọn c
 
 > Áo thật chỉ bán qua **Shop đối tác ở Chợ Runner**. RaceHub không nhận tiền áo.
 
+## 3d. Bộ đồng phục — Kit Studio (migration 005900)
+
+Mở ở **Cài đặt CLB → Đồng phục CLB → Thiết kế bộ đồng phục** (ban quản trị CLB) hoặc **Quản trị → Vật phẩm → Thiết kế bộ đồ / Đồng phục → Thiết kế** (admin).
+
+1. **Màu CLB:** tải ảnh áo đấu thật (chụp thẳng, nền trơn) hoặc bấm *Màu từ logo CLB* → hệ thống hút màu chủ đạo (bỏ nền và màu pha ở mép), chọn màu chính / màu phụ, phối sẵn kiểu *Cổ điển*. Đổi kiểu: *Đồng bộ*, *Tương phản*, *Sáng*.
+2. **Từng món:** áo, quần, tất, giày — màu, họa tiết, bật / tắt món trong bộ (tắt thì thành viên giữ món đang mặc).
+3. **In áo:** logo ngực (hoặc *Dùng logo CLB*), chữ lớn, dòng phụ, tên runner.
+
+Họa tiết là "màu thứ hai" vẽ theo mặt nạ nên giữ nếp vải như màu nền; hình học ở `features/character/model/patterns.ts`. Các món cùng bộ có chung `kit`; Tủ đồ hiện thẻ bộ với **Mặc cả bộ** và **Mua phần còn thiếu**.
+
 ## 4. Đổi ảnh nhân vật / thêm tư thế
 
 1. Ảnh gốc (nền trơn, người đứng giữa) đặt tên `scripts/character/source/runner_<male|female>.png`. Thư mục này không bị deploy, chỉ dùng để sinh tài nguyên.

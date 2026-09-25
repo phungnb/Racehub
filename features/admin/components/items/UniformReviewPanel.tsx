@@ -1,14 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, Coins, Shirt, Users, X } from 'lucide-react'
+import { Check, Coins, Palette, Shirt, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, EmptyState, ErrorState, Field, Input, SegmentedControl, Sheet, Skeleton, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatRelative } from '@/shared/lib/format'
-import { PaperDoll, RARITY_META, uniformPreview, type Rarity, type UniformRequest, type UniformStatus } from '@/features/character'
+import { KIT_PARTS, kitFromRequest, kitItems, PaperDoll, RARITY_META, type Rarity, type UniformRequest, type UniformStatus } from '@/features/character'
 import { adminErrorMessage } from '../../api/adminApi'
 import { useAvatarCollections, useReviewUniform, useUniformRequests } from '../../hooks/useAdmin'
+import { KitSheet } from './KitSheet'
 
 const FILTERS: { value: UniformStatus | 'ALL'; label: string }[] = [
   { value: 'PENDING', label: 'Chờ duyệt' }, { value: 'APPROVED', label: 'Đã duyệt' }, { value: 'REJECTED', label: 'Từ chối' }, { value: 'ALL', label: 'Tất cả' },
@@ -21,10 +22,19 @@ export function UniformReviewPanel() {
   const q = useUniformRequests(status)
   const [approving, setApproving] = useState<UniformRequest | null>(null)
   const [rejecting, setRejecting] = useState<UniformRequest | null>(null)
+  const [designing, setDesigning] = useState(false)
   return (
     <div className="space-y-3">
+      <Card className="flex items-center gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand/15 text-brand"><Palette className="size-5" aria-hidden /></span>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">Thiết kế bộ đồng phục</p>
+          <p className="text-xs text-fg-muted">Admin tự thiết kế cho một CLB, hoặc duyệt mẫu CLB gửi (Cài đặt CLB › Đồng phục CLB)</p>
+        </div>
+        <Button onClick={() => setDesigning(true)} className="shrink-0"><Shirt className="size-4" aria-hidden />Thiết kế</Button>
+      </Card>
       <p className="rounded-xl bg-surface-2 p-3 text-xs text-fg-muted">
-        Đồng phục là vật phẩm áo thường, chỉ thành viên CLB mua / mặc. Giá do admin đặt; 0 Xu = phát miễn phí cho cả CLB.
+        Đồng phục là bộ vật phẩm thường (áo, quần, tất, giày), chỉ thành viên CLB mua / mặc. Giá do admin đặt; 0 Xu = phát miễn phí cho cả CLB.
         Áo thật do Shop đối tác bán ở Chợ Runner — RaceHub không nhận tiền.
       </p>
       <SegmentedControl value={status} onChange={setStatus} options={FILTERS} />
@@ -38,7 +48,7 @@ export function UniformReviewPanel() {
             <li key={r.id}>
               <Card className="flex gap-3 p-3">
                 <div className="h-44 w-32 shrink-0 overflow-hidden rounded-xl bg-[#c4c4ce]">
-                  <PaperDoll gender="male" items={[uniformPreview(r.name, r.color, r.print)]} personalName="Runner" className="size-full" label={`Mẫu ${r.name}`} />
+                  <PaperDoll gender="male" items={kitItems(kitFromRequest(r))} personalName="Runner" className="size-full" label={`Mẫu ${r.name}`} />
                 </div>
                 <div className="min-w-0 flex-1 space-y-1">
                   <p className="truncate text-sm font-semibold">{r.name}</p>
@@ -70,6 +80,7 @@ export function UniformReviewPanel() {
       )}
       {approving && <ApproveSheet r={approving} onClose={() => setApproving(null)} />}
       {rejecting && <RejectSheet r={rejecting} onClose={() => setRejecting(null)} />}
+      {designing && <KitSheet onClose={() => setDesigning(false)} />}
     </div>
   )
 }
@@ -77,15 +88,18 @@ export function UniformReviewPanel() {
 function ApproveSheet({ r, onClose }: { r: UniformRequest; onClose: () => void }) {
   const [name, setName] = useState(r.name)
   const [price, setPrice] = useState('0')
+  const parts = KIT_PARTS.filter((x) => r.parts?.[x.slot])
+  const [partPrice, setPartPrice] = useState<Record<string, string>>({})
   const [rarity, setRarity] = useState<Rarity>('rare')
   const [collection, setCollection] = useState('')
   const [note, setNote] = useState('')
   const collections = useAvatarCollections()
   const review = useReviewUniform()
   const priceNum = Number(price)
-  const ok = name.trim().length >= 2 && Number.isFinite(priceNum) && priceNum >= 0 && priceNum <= 100000
+  const priceOk = (v: number) => Number.isFinite(v) && v >= 0 && v <= 100000
+  const ok = name.trim().length >= 2 && priceOk(priceNum) && parts.every((x) => priceOk(Number(partPrice[x.slot] ?? 0)))
   const submit = () => review.mutate(
-    { id: r.id, action: 'APPROVE', p: { name: name.trim(), price_xu: priceNum, rarity, collection: collection || null, note: note.trim() || undefined } },
+    { id: r.id, action: 'APPROVE', p: { name: name.trim(), price_xu: priceNum, part_prices: Object.fromEntries(parts.map((x) => [x.slot, Number(partPrice[x.slot] ?? 0)])), rarity, collection: collection || null, note: note.trim() || undefined } },
     { onSuccess: () => { toast.success(`Đã duyệt ${name.trim()}`, { description: 'Thành viên CLB được báo có đồng phục mới.' }); onClose() },
       onError: (e) => toast.error(adminErrorMessage(e)) },
   )
@@ -94,9 +108,18 @@ function ApproveSheet({ r, onClose }: { r: UniformRequest; onClose: () => void }
       footer={<div className="flex gap-2"><Button variant="secondary" block onClick={onClose}>Hủy</Button><Button block onClick={submit} loading={review.isPending} disabled={!ok}>Duyệt & lên Tủ đồ</Button></div>}>
       <div className="space-y-4">
         <Field label="Tên vật phẩm" htmlFor="ua-name"><Input id="ua-name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} /></Field>
-        <Field label="Giá (Xu)" htmlFor="ua-price" hint="0 = phát miễn phí cho mọi thành viên CLB">
-          <Input id="ua-price" type="number" inputMode="decimal" min={0} value={price} onChange={(e) => setPrice(e.target.value)} />
-        </Field>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Áo (Xu)" htmlFor="ua-price">
+            <Input id="ua-price" type="number" inputMode="decimal" min={0} value={price} onChange={(e) => setPrice(e.target.value)} />
+          </Field>
+          {parts.map((x) => (
+            <Field key={x.slot} label={`${x.label} (Xu)`} htmlFor={`ua-${x.slot}`}>
+              <Input id={`ua-${x.slot}`} type="number" inputMode="decimal" min={0} value={partPrice[x.slot] ?? '0'}
+                onChange={(e) => setPartPrice((p) => ({ ...p, [x.slot]: e.target.value }))} />
+            </Field>
+          ))}
+        </div>
+        <p className="text-xs text-fg-muted">0 Xu = phát miễn phí cho mọi thành viên CLB. Mỗi món bán riêng, thành viên bấm “Mặc cả bộ” trong Tủ đồ.</p>
         <Field label="Độ hiếm">
           <div className="grid grid-cols-4 gap-1.5">
             {RARITIES.map((x) => (

@@ -41,6 +41,8 @@ export interface CharacterItem {
   left?: number | null
   available_from?: string | null
   available_to?: string | null
+  /** Mã bộ (áo + quần + tất + giày cùng thiết kế) — migration 005900 */
+  kit?: string | null
 }
 
 export type ItemLifecycle = 'DRAFT' | 'REVIEW' | 'PUBLISHED' | 'ARCHIVED' | 'RETIRED'
@@ -59,6 +61,21 @@ export interface ItemPrint {
   personal?: 'NONE' | 'NAME'
   text_color?: string
   font?: 'sport' | 'sans' | 'serif'
+  /** Họa tiết màu thứ hai theo nếp vải (áo, quần, tất) */
+  pattern?: ItemPattern | null
+}
+
+export type PatternKind = 'sides' | 'shoulders' | 'sash' | 'hoops' | 'stripes' | 'half' | 'gradient' | 'chevron' | 'hem' | 'band'
+export interface ItemPattern { kind: PatternKind; color: string }
+/** Họa tiết được phép theo ô — khớp private.pattern_kinds (migration 005900) */
+export const PATTERNS: Partial<Record<TintSlot, { kind: PatternKind; label: string }[]>> = {
+  top: [
+    { kind: 'sides', label: 'Viền sườn' }, { kind: 'shoulders', label: 'Vai' }, { kind: 'sash', label: 'Dải chéo' },
+    { kind: 'chevron', label: 'Chữ V' }, { kind: 'hoops', label: 'Sọc ngang' }, { kind: 'stripes', label: 'Sọc dọc' },
+    { kind: 'half', label: 'Nửa áo' }, { kind: 'gradient', label: 'Chuyển màu' },
+  ],
+  bottom: [{ kind: 'sides', label: 'Sọc sườn' }, { kind: 'hem', label: 'Viền gấu' }, { kind: 'gradient', label: 'Chuyển màu' }],
+  socks: [{ kind: 'band', label: 'Viền cổ' }, { kind: 'hoops', label: 'Sọc ngang' }],
 }
 
 /** Vùng in trên áo (tâm x, tâm y, rộng, cao — theo khung chuẩn 900×1350), đo trên ảnh nền từng giới tính */
