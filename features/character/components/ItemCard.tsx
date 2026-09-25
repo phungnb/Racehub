@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, Coins, Lock } from 'lucide-react'
+import { Check, Coins, Lock, Sparkles } from 'lucide-react'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin } from '@/shared/lib/format'
 import { LayerThumb } from './LayerThumb'
@@ -35,6 +35,7 @@ export function ItemCard({ item, gender, status, selected, onSelect }: {
         {status === 'EQUIPPED' ? <span className="text-brand">Đang mặc</span>
           : status === 'OWNED' ? <span className="text-fg-muted">Đã có</span>
           : status === 'LOCKED' ? <><Lock className="size-3" aria-hidden /><span>Cấp {item.unlock_level}</span></>
+          : item.acquire === 'shine' ? <span className="flex items-center gap-0.5 text-coin"><Sparkles className="size-3" aria-hidden />Tỏa sáng</span>
           : item.price_xu > 0 ? <span className="flex items-center gap-0.5 font-mono text-coin"><Coins className="size-3" aria-hidden />{formatCoin(item.price_xu)}</span>
           : <span className="text-brand">Miễn phí</span>}
       </span>

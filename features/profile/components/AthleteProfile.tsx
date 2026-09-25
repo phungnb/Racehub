@@ -9,7 +9,8 @@ import {
   paceOf,
   type AthleteProfileData,
 } from '../api/athleteApi'
-import { FormChip, GiftWall } from '@/features/game'
+import { FormChip, GiftWall, useGiftWall } from '@/features/game'
+import { ShineBadge } from '@/shared/ui'
 import ActivityHistory from './ActivityHistory'
 
 /* ────────────────────────────────────────────────────────────
@@ -74,6 +75,9 @@ export default function AthleteProfile({ userId, onClose }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [period, setPeriod] = useState<Period>('month')
+  // Bậc Tỏa sáng (khung ảnh đại diện) lấy từ tường quà
+  const wall = useGiftWall(userId)
+  const shine = wall.data?.tier ?? 0
 
   useEffect(() => {
     let cancelled = false
@@ -128,8 +132,11 @@ export default function AthleteProfile({ userId, onClose }: Props) {
               {/* Danh tính */}
               <div className="text-center space-y-2">
                 <div className="flex justify-center">
-                  <AthleteAvatar name={name} url={data.avatar_url} size={88} />
+                  {shine > 0
+                    ? <span className={`shine-frame shine-t${Math.min(4, shine)}`}><span className="shine-inner"><AthleteAvatar name={name} url={data.avatar_url} size={88} /></span></span>
+                    : <AthleteAvatar name={name} url={data.avatar_url} size={88} />}
                 </div>
+                {shine > 0 && <div className="flex justify-center"><ShineBadge tier={shine} /></div>}
                 <h3 className="text-lg font-black text-white">{name}</h3>
                 <FormChip userId={userId} className="mt-1" />
                 {data.can_view_profile && (

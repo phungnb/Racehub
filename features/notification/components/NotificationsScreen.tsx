@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { AtSign, Award, Bell, BellRing, CalendarDays, CheckCheck, Coins, Crown, Flag, Footprints, Gift, HandCoins, Heart, Medal, Megaphone, MessageCircle, ShieldAlert, Swords, Ticket, TrendingUp, Trophy, UserCheck, UserPlus, Vote, X, type LucideIcon } from 'lucide-react'
+import { AtSign, Award, Bell, BellRing, CalendarDays, CheckCheck, Coins, Crown, Flag, Footprints, Gift, HandCoins, Heart, Medal, Megaphone, MessageCircle, ShieldAlert, Sparkles, Swords, Ticket, TrendingUp, Trophy, UserCheck, UserPlus, Vote, X, type LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { routes } from '@/shared/config/routes'
 import { usePush } from '../hooks/usePush'
@@ -40,6 +40,8 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   GIFT: { icon: Gift, tone: 'text-coin' },
   REFERRAL: { icon: UserPlus, tone: 'text-brand' },
   PROMO: { icon: Gift, tone: 'text-coin' },
+  SHINE: { icon: Sparkles, tone: 'text-coin' },
+  THANKS: { icon: Heart, tone: 'text-danger' },
 }
 
 /** Gợi ý bật thông báo đẩy khi thiết bị hỗ trợ mà chưa bật (ẩn được trong phiên) */

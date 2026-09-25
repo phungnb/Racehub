@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { shineTier } from '@/shared/lib/shine'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
-import { BarChart3, ChevronRight, Copy, Crown, Gift, Pencil, Settings, Share2, Watch } from 'lucide-react'
+import { BarChart3, ChevronRight, Copy, Crown, Gift, Pencil, Settings, Share2, Sparkles, Watch } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, LevelBadge, ProgressBar, SegmentedControl, Skeleton } from '@/shared/ui'
 import { formatKm, formatNumber } from '@/shared/lib/format'
@@ -41,7 +42,7 @@ function Header({ profile }: { profile: Profile }) {
   return (
     <Card className="overflow-hidden p-0">
       <div className="flex items-center gap-4 bg-gradient-to-br from-brand/15 via-transparent to-transparent p-4">
-        <AvatarPicker userId={profile.id} avatarUrl={profile.avatar_url} name={profile.display_name} size="md" />
+        <AvatarPicker userId={profile.id} avatarUrl={profile.avatar_url} name={profile.display_name} size="md" shine={shineTier(Number(profile.shine_total ?? 0))} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">
             <h1 className="min-w-0 flex-1 truncate text-xl font-bold">{profile.display_name || 'Runner'}</h1>
@@ -149,7 +150,7 @@ export function MeScreen({ profile }: { profile: Profile }) {
       <Header profile={profile} />
       <SegmentedControl value={tab} onChange={setTab} options={TABS} />
 
-      {tab === 'badges' && <div className="space-y-4"><GiftWall userId={profile.id} /><BadgeGrid /></div>}
+      {tab === 'badges' && <div className="space-y-4"><GiftWall userId={profile.id} isMe /><BadgeGrid /></div>}
 
       {tab === 'overview' && (
         <div className="space-y-3">
@@ -158,6 +159,12 @@ export function MeScreen({ profile }: { profile: Profile }) {
               <span className="grid size-10 place-items-center rounded-xl bg-xp/15 text-xp"><BarChart3 className="size-5" aria-hidden /></span>
               <span className="min-w-0 flex-1"><span className="block font-semibold">Phân tích của tôi</span>
                 <span className="block text-xs text-fg-muted">Xu hướng, kỷ lục 1K → Marathon, phân bố pace, xuất báo cáo</span></span>
+              <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+            </Link>
+            <Link href={routes.shine} className="flex items-center gap-3 p-4">
+              <span className="grid size-10 place-items-center rounded-xl bg-coin/15 text-coin"><Sparkles className="size-5" aria-hidden /></span>
+              <span className="min-w-0 flex-1"><span className="block font-semibold">Ví Tỏa sáng</span>
+                <span className="block text-xs text-fg-muted">Đổi quà nhận được lấy lượt tạo thử thách, khiên, vật phẩm; cảm ơn người tặng</span></span>
               <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
             </Link>
             <Link href={routes.plan} className="flex items-center gap-3 p-4">

@@ -6,6 +6,7 @@ import { Avatar, Card, ErrorState, LevelBadge, ProgressBar, ProgressRing, Skelet
 import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { levelProgress } from '@/features/progression'
+import { shineTier } from '@/shared/lib/shine'
 import type { Profile } from '@/shared/types/profile'
 import { gameErrorMessage } from '../api/gameApi'
 import { FormChip } from './FormChip'
@@ -85,7 +86,7 @@ function TodayCard({ profile, s, onStreak }: { profile: Profile; s: GameState; o
   return (
     <Card className="space-y-4 overflow-hidden bg-gradient-to-br from-brand/10 via-surface to-surface">
       <div className="flex items-center gap-3">
-        <Avatar src={profile.avatar_url} name={profile.display_name} size="md" />
+        <Avatar src={profile.avatar_url} name={profile.display_name} size="md" shine={shineTier(Number(profile.shine_total ?? 0))} />
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2"><span className="truncate font-bold">{profile.display_name || 'Runner'}</span><LevelBadge level={lv.current.level} /></p>
           <FormChip showHint className="mt-1" />

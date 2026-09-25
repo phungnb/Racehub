@@ -20,6 +20,8 @@ export interface CharacterItem {
   color: string | null
   price_xu: number
   unlock_level: number
+  /** 'shine' = chỉ đổi bằng Tỏa sáng (không bán bằng Xu) — migration 004700 */
+  acquire?: 'xu' | 'shine'
   is_default: boolean
   owned?: boolean
 }

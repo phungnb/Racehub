@@ -110,3 +110,31 @@ export const runGrant = (p: { title: string; message: string; segment: Segment; 
   call<{ promotion_id: string; recipients: number }>('admin_run_grant', { p })
 export const savePromo = (p: Partial<Promotion> & { kind: 'CODE' | 'SALE' }) => call<string>('admin_save_promo', { p })
 export const listPromotions = async () => (await call<Promotion[]>('admin_list_promotions')) ?? []
+
+/* ---------------- Ví Tỏa sáng (migration 004700) ---------------- */
+export type ShineKind = 'PASS' | 'SHIELD' | 'COSMETIC'
+export interface ShineItem {
+  code: string; name: string; description: string | null; kind: ShineKind; cost: number; period_limit: number | null
+  limit_period: 'WEEK' | 'MONTH'; min_senders: number; is_active: boolean; sort: number
+  params: { max_slots?: number; days?: number; item_code?: string; xu_value?: number }
+  redeemed_30d?: number; item_name?: string | null
+}
+export interface ShineConfig { tiers: number[]; perSenderWeeklyCap: number; minSenderAgeDays: number; minSenderRuns: number; thanksPerDay: number }
+export interface ShineOverview {
+  config: ShineConfig; items: ShineItem[]; gifted_30d: number; countable_30d: number; spent_30d: number; xu_equiv_30d: number
+  tiers_count: { tier: number; users: number }[] | null
+}
+export async function getShineOverview(): Promise<ShineOverview> {
+  const r = await call<ShineOverview>('admin_shine_overview')
+  const num = (v: unknown) => Number(v ?? 0)
+  return {
+    ...r, gifted_30d: num(r.gifted_30d), countable_30d: num(r.countable_30d), spent_30d: num(r.spent_30d), xu_equiv_30d: num(r.xu_equiv_30d),
+    config: { ...r.config, tiers: (r.config.tiers ?? []).map(num), perSenderWeeklyCap: num(r.config.perSenderWeeklyCap),
+      minSenderAgeDays: num(r.config.minSenderAgeDays), minSenderRuns: num(r.config.minSenderRuns), thanksPerDay: num(r.config.thanksPerDay) },
+    items: (r.items ?? []).map((i) => ({ ...i, cost: num(i.cost), min_senders: num(i.min_senders), sort: num(i.sort), redeemed_30d: num(i.redeemed_30d),
+      period_limit: i.period_limit == null ? null : num(i.period_limit) })),
+    tiers_count: (r.tiers_count ?? []).map((t) => ({ tier: num(t.tier), users: num(t.users) })),
+  }
+}
+export const saveShineItem = (i: ShineItem) => call<string>('admin_save_shine_item', { p: i })
+export const setShineConfig = (p: Partial<ShineConfig>) => call<ShineConfig>('admin_set_shine_config', { p })
