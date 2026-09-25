@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Award, AtSign, Bell, BellRing, CalendarDays, CheckCheck, Coins, Crown, Flag, HandCoins, Heart, Medal, ShieldAlert, Swords, TrendingUp, Megaphone, MessageCircle, Ticket, Trophy, UserCheck, UserPlus, Vote, X, type LucideIcon } from 'lucide-react'
+import { AtSign, Award, Bell, BellRing, CalendarDays, CheckCheck, Coins, Crown, Flag, Gift, HandCoins, Heart, Medal, Megaphone, MessageCircle, ShieldAlert, Swords, Ticket, TrendingUp, Trophy, UserCheck, UserPlus, Vote, X, type LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { routes } from '@/shared/config/routes'
 import { usePush } from '../hooks/usePush'
@@ -29,11 +29,16 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   CLUB_POLL: { icon: Vote, tone: 'text-xp' },
   PUSH_TEST: { icon: BellRing, tone: 'text-brand' },
   CLUB_BATTLE: { icon: Swords, tone: 'text-live' },
+  CLUB_CUP: { icon: Swords, tone: 'text-coin' },
   RACE_FINISHED: { icon: Medal, tone: 'text-coin' },
   RACE_CANCELLED: { icon: Flag, tone: 'text-danger' },
   RUN_REVIEW: { icon: ShieldAlert, tone: 'text-warning' },
   CLUB_RUN_REVIEW: { icon: ShieldAlert, tone: 'text-warning' },
   CLUB_PRO: { icon: Crown, tone: 'text-coin' },
+  VIP: { icon: Crown, tone: 'text-coin' },
+  GIFT: { icon: Gift, tone: 'text-coin' },
+  REFERRAL: { icon: UserPlus, tone: 'text-brand' },
+  PROMO: { icon: Gift, tone: 'text-coin' },
 }
 
 /** Gợi ý bật thông báo đẩy khi thiết bị hỗ trợ mà chưa bật (ẩn được trong phiên) */

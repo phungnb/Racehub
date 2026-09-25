@@ -45,11 +45,7 @@ export function transferNote(club: string, due: string, payer: string) {
   return `${short(club, 14)} ${short(due, 16)} ${short(payer, 18)}`.replace(/\s+/g, ' ').trim().slice(0, 50)
 }
 
-/** Ảnh mã VietQR (chuẩn NAPAS 247) có sẵn số tiền + nội dung — mở app ngân hàng quét là chuyển */
-export function vietQrUrl(bank: { bin: string; account_no: string; account_name: string }, amount: number, note: string) {
-  const q = new URLSearchParams({ amount: String(Math.round(amount)), addInfo: note, accountName: bank.account_name })
-  return `https://img.vietqr.io/image/${bank.bin}-${encodeURIComponent(bank.account_no)}-compact2.png?${q.toString()}`
-}
+export { vietQrUrl } from '@/shared/lib/vietqr'
 
 /** Số tiền nhập kiểu "150.000" / "150k" / "1,5tr" → số */
 export function parseVnd(input: string): number {

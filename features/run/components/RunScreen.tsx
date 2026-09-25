@@ -73,7 +73,7 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
         {t.error && <p role="alert" className="mb-3 rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">{t.error}</p>}
         <Card className="space-y-2 text-sm text-fg-muted">
           <p className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-brand" /> Chạy ngoài trời. Đứng yên thì app tự dừng tính km.</p>
-          <p className="flex gap-2"><Smartphone className="mt-0.5 size-4 shrink-0 text-brand" /> Trình duyệt chỉ ghi GPS khi app đang mở: bấm <b className="text-fg">Khóa màn hình</b> rồi bỏ túi, màn hình tối lại và không bấm nhầm.</p>
+          <p className="flex gap-2"><Smartphone className="mt-0.5 size-4 shrink-0 text-brand" /><span>Trình duyệt chỉ ghi GPS khi app đang mở: bấm <b className="text-fg">Khóa màn hình</b> rồi bỏ túi, màn hình tối lại và không bấm nhầm.</span></p>
           <p className="flex gap-2"><Watch className="mt-0.5 size-4 shrink-0 text-brand" /> Chạy dài hoặc muốn tắt hẳn màn hình? Dùng đồng hồ Garmin / COROS / Apple Watch hoặc app Strava — bài chạy tự về RaceHub.</p>
         </Card>
       </div>

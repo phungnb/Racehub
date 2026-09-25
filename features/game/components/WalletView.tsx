@@ -1,6 +1,8 @@
 'use client'
 
-import { ArrowDownLeft, ArrowUpRight, Wallet as WalletIcon } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowDownLeft, ArrowUpRight, Crown, Plus, Wallet as WalletIcon } from 'lucide-react'
+import { routes } from '@/shared/config/routes'
 import { Button, Card, EmptyState, ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin } from '@/shared/lib/format'
@@ -8,6 +10,7 @@ import { xuToVnd } from '@/shared/lib/economy'
 import { gameErrorMessage } from '../api/gameApi'
 import { useWallet } from '../hooks/useGame'
 import { walletLabel, type WalletItem } from '../model/game'
+import { PromoCodeForm } from './PromoCodeForm'
 
 const dayLabel = (iso: string) => {
   const d = new Date(iso)
@@ -42,11 +45,20 @@ export function WalletView() {
           <div className="rounded-xl bg-bg/60 p-2.5"><p className="text-xs text-fg-subtle">Xu thưởng</p><p className="font-mono font-semibold">{formatCoin(head.bonus)}</p></div>
           <div className="rounded-xl bg-bg/60 p-2.5"><p className="text-xs text-fg-subtle">Xu nạp</p><p className="font-mono font-semibold">{formatCoin(head.paid)}</p></div>
         </div>
-        <p className="text-xs text-fg-subtle">Khi tiêu, Xu thưởng được dùng trước.</p>
+        <p className="text-xs text-fg-subtle">Khi tiêu, Xu thưởng được dùng trước. Xu không chuyển cho người khác được.</p>
+        <div className="grid grid-cols-2 gap-2">
+          <Link href={`${routes.plan}?tab=xu`} className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-coin font-semibold text-bg">
+            <Plus className="size-4" aria-hidden />Nạp Xu
+          </Link>
+          <Link href={routes.plan} className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-border font-semibold">
+            <Crown className="size-4 text-coin" aria-hidden />Gói VIP
+          </Link>
+        </div>
+        <PromoCodeForm />
       </Card>
 
       {!items.length ? (
-        <EmptyState icon={WalletIcon} title="Chưa có giao dịch" description="Chạy bộ, làm nhiệm vụ hoặc nhận cổ vũ để có Xu." />
+        <EmptyState icon={WalletIcon} title="Chưa có giao dịch" description="Chạy bộ (từ km thứ 3 mỗi ngày), điểm danh bằng bài chạy, giữ chuỗi tuần để có Xu." />
       ) : (
         <div className="space-y-4">
           {byDay.map(([day, list]) => (

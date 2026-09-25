@@ -10,7 +10,7 @@ import { Avatar, Button, Card, ErrorState, SectionTitle, Skeleton } from '@/shar
 import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatDuration, formatKm, formatNumber, formatPace, paceFrom } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
-import { CheerButton } from '@/features/game'
+import { GiftButton } from '@/features/game'
 import { activityErrorMessage, type ActivityDetail } from '../api/activities'
 import { useActivityDetail } from '../hooks/useActivityDetail'
 import { compareNotes, decodePolyline, fastestSplit, splitPace, splitsFromPoints, type LatLng, type Split } from '../model/route'
@@ -67,7 +67,7 @@ export function ActivityDetailScreen({ id }: { id: string }) {
         <div className="flex items-center gap-3">
           <Avatar src={a.owner.avatar_url} name={a.owner.display_name ?? 'Runner'} size="sm" />
           <span className="min-w-0 flex-1 truncate font-semibold">{a.owner.display_name ?? 'Runner'}</span>
-          <CheerButton toUser={a.owner.id} toName={a.owner.display_name ?? 'Runner'} toAvatar={a.owner.avatar_url} activityId={a.id} total={a.cheers.total} />
+          <GiftButton toUser={a.owner.id} toName={a.owner.display_name ?? 'Runner'} toAvatar={a.owner.avatar_url} activityId={a.id} total={a.cheers.total} />
         </div>
       )}
 

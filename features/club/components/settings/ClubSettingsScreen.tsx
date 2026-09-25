@@ -157,7 +157,7 @@ function InviteSection({ club, canRotate }: { club: Club; canRotate: boolean }) 
     <section>
       <SectionTitle>Mời vào CLB</SectionTitle>
       <Card className="space-y-4">
-        <InvitePanel code={club.invite_code} name={club.name} slug={proActive(club, now) ? club.slug : null} />
+        <InvitePanel clubId={club.id} name={club.name} slug={proActive(club, now) ? club.slug : null} />
         {canRotate && (
           <Button variant="ghost" block onClick={() => setAsk(true)}>
             <RefreshCw className="size-4" aria-hidden />Đổi mã mời (vô hiệu link và QR cũ)

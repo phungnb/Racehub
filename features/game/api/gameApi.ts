@@ -1,6 +1,6 @@
 // Lớp game: mọi thao tác qua RPC (migration 000800). Client chỉ đọc và hiển thị.
 import { supabase } from '@/shared/lib/supabase'
-import type { Achievement, GameEvent, GameState, LeagueRow, Wallet } from '../model/game'
+import type { Achievement, GameEvent, GameState, LeagueRow, Quest, Wallet } from '../model/game'
 
 const n = (v: unknown) => Number(v ?? 0)
 const toEvent = (e: GameEvent): GameEvent => ({ ...e, xu: n(e.xu), xp: n(e.xp), payload: e.payload ?? {} })
@@ -35,13 +35,49 @@ export async function buyShield(key: string) {
   return data as { shields: number; balance?: number; duplicate?: boolean }
 }
 
-export async function sendCheer(input: { toUser: string; amount: number; message?: string; postId?: string | null; activityId?: string | null; key: string }) {
-  const { data, error } = await supabase.rpc('send_cheer', {
-    p_to_user: input.toUser, p_amount: input.amount, p_message: input.message || null,
+/* ------------------------- Quà tặng (migration 003900) ------------------------- */
+// Quà đốt Xu của người tặng (người nhận không nhận Xu) → không có đường chuyển Xu P2P.
+
+export type GiftTier = 'CHEER' | 'BOOST' | 'HYPE' | 'LEGEND'
+export interface Gift {
+  code: string; name: string; emoji: string; price_xu: number; tier: GiftTier; description: string | null
+  vip_tier: number; seasonal: boolean; locked: boolean
+}
+export interface GiftCatalog { gifts: Gift[]; daily_cap: number; sent_today: number }
+export interface GiftWall {
+  shine: number; count: number
+  gifts: { code: string; name: string; emoji: string; tier: GiftTier; count: number }[]
+  top_supporters: { user_id: string; display_name: string | null; avatar_url: string | null; shine: number }[]
+}
+
+export async function getGiftCatalog(): Promise<GiftCatalog> {
+  const { data, error } = await supabase.rpc('gift_catalog')
+  if (error) throw error
+  const c = (data ?? {}) as GiftCatalog
+  return {
+    gifts: (c.gifts ?? []).map((g) => ({ ...g, price_xu: n(g.price_xu), vip_tier: n(g.vip_tier) })),
+    daily_cap: n(c.daily_cap), sent_today: n(c.sent_today),
+  }
+}
+
+export async function sendGift(input: { toUser: string; code: string; qty: number; message?: string; postId?: string | null; activityId?: string | null; key: string }) {
+  const { data, error } = await supabase.rpc('send_gift', {
+    p_to_user: input.toUser, p_gift_code: input.code, p_qty: input.qty, p_message: input.message || null,
     p_post_id: input.postId ?? null, p_activity_id: input.activityId ?? null, p_idempotency_key: input.key,
   })
   if (error) throw error
-  return data as { cheer_id: string; balance?: number; duplicate?: boolean }
+  return data as { gift_id: string; total_xu?: number; emoji?: string; tier?: GiftTier; qty?: number; balance?: number; duplicate?: boolean }
+}
+
+export async function getGiftWall(userId: string): Promise<GiftWall> {
+  const { data, error } = await supabase.rpc('gift_wall', { p_user: userId })
+  if (error) throw error
+  const w = (data ?? {}) as GiftWall
+  return {
+    shine: n(w.shine), count: n(w.count),
+    gifts: (w.gifts ?? []).map((g) => ({ ...g, count: n(g.count) })),
+    top_supporters: (w.top_supporters ?? []).map((t) => ({ ...t, shine: n(t.shine) })),
+  }
 }
 
 export async function getActivityRewards(activityId: string): Promise<GameEvent[]> {
@@ -78,8 +114,17 @@ export async function getWallet(before?: string | null): Promise<Wallet> {
 }
 
 const MESSAGES: Record<string, string> = {
-  CANNOT_CHEER_SELF: 'Không tự cổ vũ chính mình được.',
-  CHEER_DAILY_LIMIT: 'Bạn đã cổ vũ tối đa trong hôm nay. Mai tiếp nhé!',
+  PROMO_INVALID: 'Mã không đúng hoặc đã hết hạn.',
+  PROMO_USED_UP: 'Mã đã hết lượt sử dụng.',
+  PROMO_ALREADY_USED: 'Bạn đã dùng mã này rồi.',
+  PROMO_NOT_ELIGIBLE: 'Mã này không dành cho tài khoản của bạn.',
+  TOO_MANY_ATTEMPTS: 'Bạn nhập sai quá nhiều lần. Thử lại sau 1 giờ.',
+  CANNOT_GIFT_SELF: 'Không tự tặng quà cho chính mình được.',
+  GIFT_DAILY_LIMIT: 'Bạn đã tặng quà tối đa trong hôm nay. Mai tiếp nhé!',
+  GIFT_NOT_AVAILABLE: 'Quà này hiện không còn (hết mùa hoặc đã ngừng).',
+  VIP_REQUIRED: 'Quà này dành cho thành viên VIP.',
+  INVALID_QTY: 'Số lượng quà không hợp lệ.',
+  CHEER_REPLACED_BY_GIFTS: 'Tặng Xu trực tiếp đã được thay bằng Quà tặng. Hãy cập nhật ứng dụng.',
   INSUFFICIENT_BALANCE: 'Số Xu trong ví không đủ.',
   SHIELD_LIMIT: 'Bạn đã có số khiên tối đa.',
   INVALID_AMOUNT: 'Số Xu không hợp lệ (1–10).',
@@ -95,4 +140,30 @@ export function gameErrorMessage(e: unknown): string {
   const raw = err?.message ?? ''
   const key = Object.keys(MESSAGES).find((k) => raw.includes(k))
   return key ? MESSAGES[key] : 'Không thực hiện được. Hãy thử lại.'
+}
+
+/* ------------------------- Phong độ (migration 004200) ------------------------- */
+export type FormStatus = 'NEW' | 'RISING' | 'STEADY' | 'SLOWING' | 'RESTING' | 'LONG_BREAK'
+export interface RunnerForm { status: FormStatus; last_run_at: string | null; days_since: number | null; km_28d: number; km_prev_28d: number; runs_28d: number; comeback_xu: number; comeback_days: number }
+export async function getRunnerForm(userId?: string | null): Promise<RunnerForm> {
+  const { data, error } = await supabase.rpc('runner_form', { p_user: userId ?? null })
+  if (error) throw error
+  const f = (data ?? {}) as RunnerForm
+  return { ...f, km_28d: n(f.km_28d), km_prev_28d: n(f.km_prev_28d), runs_28d: n(f.runs_28d), comeback_xu: n(f.comeback_xu), comeback_days: n(f.comeback_days) }
+}
+
+/* ------------------------- Nhiệm vụ (migration 004300) ------------------------- */
+export async function getMyQuests(): Promise<Quest[]> {
+  const { data, error } = await supabase.rpc('my_quests')
+  if (error) throw error
+  return ((data ?? []) as Quest[]).map((q) => ({ ...q, target: n(q.target), progress: n(q.progress), reward_xu: n(q.reward_xu), reward_xp: 0 }))
+}
+
+/* ------------------------- Mã khuyến mãi (migration 004300) ------------------------- */
+export async function redeemPromoCode(code: string) {
+  const { data, error } = await supabase.rpc('redeem_promo_code', { p_code: code })
+  if (error) throw error
+  const r = data as { error?: string; title?: string; reward?: { xu?: number; passes?: { qty: number; max_slots: number }; plan?: { code: string; months: number } } }
+  if (r?.error) throw new Error(r.error)
+  return r
 }

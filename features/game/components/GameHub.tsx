@@ -2,14 +2,14 @@
 
 import { useState } from 'react'
 import { CalendarCheck, Check, ChevronRight, ChevronUp, Flame, Gift, ShieldCheck, Trophy } from 'lucide-react'
-import { toast } from 'sonner'
-import { Avatar, Button, Card, ErrorState, LevelBadge, ProgressBar, ProgressRing, Skeleton } from '@/shared/ui'
+import { Avatar, Card, ErrorState, LevelBadge, ProgressBar, ProgressRing, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { levelProgress } from '@/features/progression'
 import type { Profile } from '@/shared/types/profile'
 import { gameErrorMessage } from '../api/gameApi'
-import { useCheckIn, useGameState, useMarkSeen } from '../hooks/useGame'
+import { FormChip } from './FormChip'
+import { useGameState, useMarkSeen, useMyQuests } from '../hooks/useGame'
 import { leagueTier, timeLeft, type GameState } from '../model/game'
 import { LeagueSheet } from './LeagueSheet'
 import { QuestList } from './QuestList'
@@ -28,8 +28,11 @@ function Hub({ profile, s }: { profile: Profile; s: GameState }) {
   const [streakOpen, setStreakOpen] = useState(false)
   const [leagueOpen, setLeagueOpen] = useState(false)
   const [showWeekly, setShowWeekly] = useState(false)
-  const daily = s.quests.filter((x) => x.period === 'DAILY')
-  const weekly = s.quests.filter((x) => x.period === 'WEEKLY')
+  const mq = useMyQuests()
+  const quests = mq.data ?? s.quests
+  const events = quests.filter((x) => x.period === 'EVENT')
+  const daily = quests.filter((x) => x.period === 'DAILY')
+  const weekly = quests.filter((x) => x.period === 'WEEKLY' || x.period === 'MONTHLY')
   const dailyDone = daily.filter((x) => x.completed).length
   const weeklyDone = weekly.filter((x) => x.completed).length
 
@@ -37,6 +40,16 @@ function Hub({ profile, s }: { profile: Profile; s: GameState }) {
     <div className="space-y-3">
       <UnseenRewards events={s.unseen} />
       <TodayCard profile={profile} s={s} onStreak={() => setStreakOpen(true)} />
+
+      {events.length > 0 && (
+        <Card className="space-y-1 border-coin/40 bg-gradient-to-br from-coin/10 to-surface">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Sự kiện đang diễn ra</h2>
+            <span className="font-mono text-xs text-fg-muted">{events.filter((x) => x.completed).length}/{events.length}</span>
+          </div>
+          <QuestList quests={events} />
+        </Card>
+      )}
 
       <Card className="space-y-1">
         <div className="flex items-center justify-between">
@@ -46,7 +59,7 @@ function Hub({ profile, s }: { profile: Profile; s: GameState }) {
         <QuestList quests={daily} />
         <button onClick={() => setShowWeekly((v) => !v)} aria-expanded={showWeekly}
           className="-mx-1 mt-1 flex min-h-11 w-[calc(100%+0.5rem)] items-center justify-between rounded-xl px-1 text-sm font-semibold text-fg-muted hover:text-fg">
-          <span>Nhiệm vụ tuần <span className="font-mono text-xs">· {weeklyDone}/{weekly.length}</span></span>
+          <span>Nhiệm vụ tuần & tháng <span className="font-mono text-xs">· {weeklyDone}/{weekly.length}</span></span>
           <ChevronRight className={cn('size-4 transition-transform', showWeekly && 'rotate-90')} aria-hidden />
         </button>
         {showWeekly && <QuestList quests={weekly} />}
@@ -62,16 +75,11 @@ function Hub({ profile, s }: { profile: Profile; s: GameState }) {
 
 function TodayCard({ profile, s, onStreak }: { profile: Profile; s: GameState; onStreak: () => void }) {
   const lv = levelProgress(profile.xp, profile.level)
-  const checkIn = useCheckIn()
   const st = s.streak
   const left = Math.max(0, st.goal - st.week_days)
   const status = st.done_this_week ? 'Tuần này đã đạt mục tiêu'
     : st.alive || st.current === 0 ? `Chạy thêm ${left} ngày để ${st.current > 0 ? 'giữ' : 'bắt đầu'} chuỗi`
     : 'Chuỗi đã đứt — bắt đầu lại tuần này'
-  const doCheckIn = () => checkIn.mutate(undefined, {
-    onSuccess: () => toast.success('Đã điểm danh hôm nay'),
-    onError: (e) => toast.error(gameErrorMessage(e)),
-  })
 
   return (
     <Card className="space-y-4 overflow-hidden bg-gradient-to-br from-brand/10 via-surface to-surface">
@@ -79,6 +87,7 @@ function TodayCard({ profile, s, onStreak }: { profile: Profile; s: GameState; o
         <Avatar src={profile.avatar_url} name={profile.display_name} size="md" />
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2"><span className="truncate font-bold">{profile.display_name || 'Runner'}</span><LevelBadge level={lv.current.level} /></p>
+          <FormChip showHint className="mt-1" />
           <div className="mt-1 flex items-center gap-2">
             <ProgressBar value={lv.value} max={lv.span} tone="xp" className="h-1.5" />
             <span className="shrink-0 font-mono text-xs text-fg-subtle">{lv.next ? `${formatNumber(lv.remaining)} XP` : 'Tối đa'}</span>
@@ -114,13 +123,12 @@ function TodayCard({ profile, s, onStreak }: { profile: Profile; s: GameState; o
 
       {s.checked_in ? (
         <p className="flex h-11 items-center justify-center gap-2 rounded-xl bg-surface-2 text-sm font-semibold text-fg-muted">
-          <Check className="size-4 text-brand" aria-hidden />Đã điểm danh hôm nay
+          <Check className="size-4 text-brand" aria-hidden />Đã điểm danh hôm nay bằng bài chạy
         </p>
       ) : (
-        <Button block onClick={doCheckIn} loading={checkIn.isPending}>
-          <CalendarCheck className="size-4" aria-hidden />Điểm danh
-          {(() => { const c = s.quests.find((x) => x.metric === 'CHECKIN'); return c?.reward_xu ? <span className="font-mono">+{formatCoin(c.reward_xu)} Xu</span> : null })()}
-        </Button>
+        <p className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-dashed border-border px-3 text-center text-sm text-fg-muted">
+          <CalendarCheck className="size-4 shrink-0 text-brand" aria-hidden />Chạy từ 1 km hôm nay để tự điểm danh, nhận thêm Xu
+        </p>
       )}
     </Card>
   )

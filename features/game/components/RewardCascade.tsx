@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Award, Coins, Flame, Footprints, HandHeart, Sparkles, Target, TrendingUp, Trophy, X, type LucideIcon } from 'lucide-react'
+import { Award, CalendarCheck, Coins, Flame, Footprints, Gift, HandHeart, Sparkles, Target, TrendingUp, Trophy, UserPlus, X, type LucideIcon } from 'lucide-react'
 import { Button } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
@@ -16,6 +16,10 @@ const KIND: Record<GameEvent['kind'], { icon: LucideIcon; tone: string; label: s
   LEAGUE: { icon: Trophy, tone: 'bg-coin/15 text-coin', label: 'League tuần' },
   CHEER_IN: { icon: HandHeart, tone: 'bg-live/15 text-live', label: 'Cổ vũ' },
   LEVEL_UP: { icon: TrendingUp, tone: 'bg-brand text-brand-fg', label: 'Lên cấp' },
+  CHECKIN: { icon: CalendarCheck, tone: 'bg-brand/15 text-brand', label: 'Điểm danh' },
+  REFERRAL: { icon: UserPlus, tone: 'bg-brand/15 text-brand', label: 'Giới thiệu bạn bè' },
+  GIFT_IN: { icon: Gift, tone: 'bg-coin/15 text-coin', label: 'Quà tặng' },
+  COMEBACK: { icon: Sparkles, tone: 'bg-brand/15 text-brand', label: 'Chào mừng trở lại' },
 }
 
 function usePrefersReducedMotion() {

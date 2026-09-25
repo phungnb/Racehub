@@ -6,7 +6,7 @@ import { useInvalidateProfile } from '@/features/auth'
 import { supabase } from '@/shared/lib/supabase'
 import {
   buyShield, checkIn, getAchievements, getActivityRewards, getGameState, getLeagueStandings, getWallet, markEventsSeen,
-  sendCheer, setWeeklyGoal,
+  getGiftCatalog, getGiftWall, getMyQuests, getRunnerForm, redeemPromoCode, sendGift, setWeeklyGoal,
 } from '../api/gameApi'
 
 export const gameKeys = {
@@ -59,14 +59,22 @@ export function useBuyShield() {
   return useMutation({ mutationFn: buyShield, onSuccess: refresh })
 }
 
-export function useSendCheer() {
+export function useGiftCatalog(enabled = true) {
+  return useQuery({ queryKey: ['game', 'gifts'], queryFn: getGiftCatalog, enabled, staleTime: 60_000 })
+}
+
+export function useGiftWall(userId: string | null | undefined) {
+  return useQuery({ queryKey: ['game', 'gift-wall', userId], queryFn: () => getGiftWall(userId!), enabled: !!userId, staleTime: 60_000 })
+}
+
+export function useSendGift() {
   const qc = useQueryClient()
   const refresh = useRefreshAll()
   return useMutation({
-    mutationFn: sendCheer,
+    mutationFn: sendGift,
     onSuccess: () => {
-      refresh()
-      // Tổng Xu cổ vũ trên bài đăng CLB (chỉ làm mới bảng tin, không đụng chat)
+      refresh()   // gồm cả ['game', 'gifts'] và ['game', 'gift-wall']
+      // Tổng quà trên bài đăng CLB (chỉ làm mới bảng tin, không đụng chat)
       void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'club' && q.queryKey[2] === 'posts' })
     },
   })
@@ -92,4 +100,17 @@ export function useWallet() {
     initialPageParam: null as string | null,
     getNextPageParam: (last) => (last.items.length === 30 ? last.items[last.items.length - 1].created_at : undefined),
   })
+}
+
+export function useRunnerForm(userId?: string | null) {
+  return useQuery({ queryKey: ['game', 'form', userId ?? 'me'], queryFn: () => getRunnerForm(userId), staleTime: 5 * 60_000 })
+}
+
+export function useMyQuests() {
+  return useQuery({ queryKey: ['game', 'quests'], queryFn: getMyQuests })
+}
+
+export function useRedeemPromo() {
+  const refresh = useRefreshAll()
+  return useMutation({ mutationFn: redeemPromoCode, onSuccess: () => refresh() })
 }

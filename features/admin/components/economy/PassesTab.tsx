@@ -28,14 +28,14 @@ export function PassesTab({ policy }: { policy: EconomyPolicy }) {
   const grant = useGrantPass()
   const revoke = useRevokePass()
   const passes = usePasses()
-  const worth = creationFee(slots, policy.challengeFee) * qty
+  const worth = (creationFee(slots, policy.capacityTiers) ?? 0) * qty
 
   const submit = async () => {
     if (!target) return
     try {
       await grant.mutateAsync({ kind: target.kind, id: target.id, quantity: qty, maxSlots: slots,
         expiresAt: days ? new Date(Date.now() + days * 86_400_000).toISOString() : null, note: note.trim() })
-      toast.success(`Đã tặng ${qty} vé cho ${target.name}`)
+      toast.success(`Đã tặng ${qty} lượt tạo cho ${target.name}`)
       setNote('')
     } catch (e) {
       toast.error(adminErrorMessage(e))

@@ -17,8 +17,8 @@ export const adminKeys = {
 
 export const useEconomyOverview = () => useQuery({ queryKey: adminKeys.overview, queryFn: getOverview })
 
-export const useAccountSearch = (q: string) => useQuery({
-  queryKey: adminKeys.search(q), queryFn: () => searchAccounts(q), enabled: q.trim().length >= 2, placeholderData: keepPreviousData,
+export const useAccountSearch = (q: string, enabled = true) => useQuery({
+  queryKey: adminKeys.search(q), queryFn: () => searchAccounts(q), enabled, placeholderData: keepPreviousData, staleTime: 30_000,
 })
 
 export const usePasses = () => useQuery({ queryKey: adminKeys.passes, queryFn: listPasses })
@@ -31,7 +31,7 @@ export function useGrantXu() {
     mutationFn: grantXu,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['admin'] })
-      refreshProfile()               // admin tự cộng cho mình thì ví trên thanh trên cũng đổi
+      refreshProfile()
     },
   })
 }

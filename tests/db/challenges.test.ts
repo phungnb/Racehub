@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
-import { createDb, asUser } from './load-schema'
+import { createDb, asUser, ECON_V1 } from './load-schema'
 
 // Migration 000600: engine thử thách (cá nhân, 1-1, đội, cộng đồng, CLB), tiến độ, tất toán
 const A = '00000000-0000-0000-0000-0000000000f1'   // người tạo
@@ -51,7 +51,7 @@ describe('Engine thử thách (000600)', () => {
   let db: PGlite
 
   beforeAll(async () => {
-    db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed })
+    db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed, until: ECON_V1 })
     // Nạp Xu thử nghiệm cho A và B
     for (const [u, amt] of [[A, 5000], [B, 2000]] as const) {
       await db.query(`select private.ledger_post('TEST_SEED', 'seed:' || $1, 'seed', null,

@@ -21,3 +21,12 @@ describe('tìm kiếm tiếng Việt', () => {
     expect(filterSearch(['Tây Hồ Trail', 'CLB Hồ Tây', 'Hồ Tây Runners'], 'ho tay', (x) => [x])).toEqual(['Hồ Tây Runners', 'CLB Hồ Tây', 'Tây Hồ Trail'])
   })
 })
+
+describe('tô đậm phần khớp', () => {
+  it('khớp không dấu, gộp đoạn chồng nhau', async () => {
+    const { matchRanges } = await import('./search')
+    expect(matchRanges('Nguyễn Văn An', 'nguyen an')).toEqual([[0, 6], [11, 13]])
+    expect(matchRanges('Đặng', 'da')).toEqual([[0, 2]])
+    expect(matchRanges('abc', '')).toEqual([])
+  })
+})

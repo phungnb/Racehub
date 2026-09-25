@@ -135,7 +135,8 @@ function Podium({ rows, meId }: { rows: LeaderboardRow[]; meId?: string }) {
 function RankRow({ r, me, floating, ref }: { r: LeaderboardRow; me?: boolean; floating?: boolean; ref?: React.Ref<HTMLLIElement> }) {
   return (
     <li ref={ref} className={cn('flex list-none items-center gap-3 rounded-xl border px-3 py-2.5',
-      me ? 'border-brand/50 bg-brand/10' : 'border-border bg-surface', floating && 'shadow-lg shadow-black/40')}>
+      floating ? 'border-brand/60 bg-surface shadow-lg shadow-black/50 ring-1 ring-brand/30'   // nổi trên danh sách: nền đặc, không lộ dòng bên dưới
+        : me ? 'border-brand/50 bg-brand/10' : 'border-border bg-surface')}>
       <span className="w-7 text-center font-mono text-sm font-bold text-fg-muted">{r.rank}</span>
       <Avatar src={r.avatar_url} name={r.display_name} size="sm" />
       <span className="min-w-0 flex-1">

@@ -101,8 +101,8 @@ export async function revokePass(id: string, reason: string) {
 
 /** Lưu chính sách: giữ nguyên các khóa khác (pace hợp lệ, giới thiệu bạn bè...) đang có */
 export async function publishPolicy(current: Record<string, unknown>, next: EconomyPolicy) {
-  const value = { ...current, ...next, challengeFee: { ...next.challengeFee } }
-  delete (value as Record<string, unknown>).tiers
+  // Máy chủ ghép với mặc định v2 và kiểm tra lại; giữ các khóa khác admin đã đặt (nếu có)
+  const value = { ...current, ...next, econVersion: 2 }
   const { data, error } = await supabase.rpc('admin_publish_config', { p_config_key: 'economy_global_config', p_config_value: value })
   if (error) throw error
   return Number(data)
@@ -182,7 +182,8 @@ const MESSAGES: Record<string, string> = {
   USER_NOT_FOUND: 'Không tìm thấy người dùng.',
   CLUB_NOT_FOUND: 'Không tìm thấy CLB.',
   INVALID_MAX_SLOTS: 'Số người tối đa của vé phải từ 1 đến 10.000.',
-  INVALID_TIME_RANGE: 'Hạn dùng phải ở tương lai.',
+  INVALID_TIME_RANGE: 'Khoảng thời gian không hợp lệ (kết thúc sau bắt đầu, sự kiện cần đủ 2 mốc, tối đa 1 năm).',
+  INVALID_TITLE: 'Tên cần từ 2 ký tự.',
   PASS_NOT_FOUND: 'Không tìm thấy vé.',
   INVALID_CONFIG: 'Cấu hình không hợp lệ — kiểm tra lại các mốc và đơn giá.',
   INVALID_CODE: 'Mã vật phẩm chỉ gồm chữ thường không dấu, số và dấu _ (3–48 ký tự).',
@@ -199,6 +200,24 @@ const MESSAGES: Record<string, string> = {
   SLOT_LOCKED: 'Đã có người sở hữu món này, không đổi sang ô khác được. Hãy tạo mã mới.',
   ITEM_REQUIRED: 'Không ngừng bán được bản nguyên bản (bộ mặc định của mọi người).',
   ITEM_NOT_FOUND: 'Không tìm thấy vật phẩm.',
+  INVALID_REWARD: 'Phần thưởng không hợp lệ: cần ít nhất Xu, lượt tạo hoặc gói VIP (gói tặng phải là VIP1–3).',
+  SEGMENT_TOO_LARGE: 'Nhóm quá lớn (trên 50.000 người) — chia nhỏ theo điều kiện khác.',
+  INVALID_SALE: 'Đợt giảm giá cần % giảm hoặc % tặng thêm.',
+  INVALID_PERIOD: 'Kỳ nhiệm vụ không hợp lệ.',
+  INVALID_METRIC: 'Chỉ số không hợp với kỳ (km tuần / ngày chạy trong tuần chỉ dùng cho nhiệm vụ tuần).',
+  INVALID_TARGET: 'Mục tiêu phải lớn hơn 0.',
+  promotions_code_key: 'Mã khuyến mãi này đã tồn tại.',
+  promotions_code_check: 'Mã chỉ gồm chữ in hoa, số, - và _ (4–24 ký tự).',
+  ORDER_NOT_FOUND: 'Không tìm thấy đơn hàng.',
+  ORDER_NOT_PENDING: 'Đơn đã được xử lý hoặc đã hủy.',
+  INVALID_PLAN: 'Gói không hợp lệ cho loại tài khoản này (VIP cho cá nhân, CLB Pro cho CLB).',
+  INVALID_MONTHS: 'Kỳ hạn chỉ 1, 3, 6 hoặc 12 tháng.',
+  INVALID_BANK: 'Tài khoản nhận tiền không hợp lệ: mã BIN 6 số, số tài khoản 4–30 ký tự, tên chủ tài khoản ≥ 3 ký tự.',
+  INVALID_OWNER: 'Loại tài khoản không hợp lệ.',
+  gift_catalog: 'Quà không hợp lệ: mã 2–40 ký tự (a-z, 0-9, _), tên 2–40 ký tự, giá 1–1.000.000 Xu.',
+  xu_packages: 'Gói Xu không hợp lệ: giá ≥ 1.000đ, số Xu ≥ 1.',
+  plan_prices: 'Giá gói không hợp lệ.',
+  plan_credits: 'Lượt tạo không hợp lệ (quy mô 1–10.000, 1–100 lượt/tháng).',
   'Payload too large': 'File quá lớn (tối đa 1 MB).',
   'mime type': 'Chỉ nhận file PNG.',
 }
@@ -237,4 +256,29 @@ export async function adminListClubs(query: string): Promise<AdminClub[]> {
 export async function adminSetClubPlan(clubId: string, plan: 'FREE' | 'PRO', until: string | null, reason: string) {
   const { error } = await supabase.rpc('admin_set_club_plan', { p_club_id: clubId, p_plan: plan, p_until: until, p_reason: reason })
   if (error) throw error
+}
+
+/* ------------------------------ Kiểm tra hệ thống (migration 003500) ------------------------------ */
+export interface SystemCheck {
+  migrations: { file: string; label: string; ok: boolean }[]
+  buckets: { id: string; ok: boolean; limit_mb: number }[]
+  stats: {
+    pg_net: boolean; push_url: string | null; admins: number; users: number; clubs: number
+    push_stuck?: number; challenges_overdue?: number; battles_overdue?: number; pending_reviews?: number
+    cups_overdue?: number; cups_pending?: number
+  }
+  checked_at: string
+}
+export interface ServerCheckItem { key: string; label: string; status: 'ok' | 'warn' | 'fail'; detail: string }
+
+export async function getSystemCheck(): Promise<SystemCheck> {
+  const { data, error } = await supabase.rpc('admin_system_check')
+  if (error) throw error
+  return data as SystemCheck
+}
+
+export async function getServerCheck(): Promise<{ items: ServerCheckItem[]; origin: string }> {
+  const res = await fetch('/api/admin/system-check', { cache: 'no-store' })
+  if (!res.ok) throw new Error(`SERVER_CHECK_${res.status}`)
+  return res.json()
 }

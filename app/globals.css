@@ -44,6 +44,8 @@
   --animate-breath: breath 2.4s ease-in-out infinite;
   --animate-sheet-up: sheet-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-pop: pop 0.25s ease-out both;
+  --animate-gift-rise: gift-rise 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-gift-burst: gift-burst 2.2s ease-out both;
 
   @keyframes fade-in {
     from { opacity: 0; transform: translateY(4px); }
@@ -58,6 +60,18 @@
     40%  { transform: scale(1.25); }
     100% { transform: scale(1); }
   }
+  @keyframes gift-rise {
+    0%   { opacity: 0; transform: translateY(40px) scale(0.4); }
+    20%  { opacity: 1; transform: translateY(0) scale(1.15); }
+    70%  { opacity: 1; transform: translateY(-40px) scale(1); }
+    100% { opacity: 0; transform: translateY(-120px) scale(0.8); }
+  }
+  @keyframes gift-burst {
+    0%   { opacity: 0; transform: scale(0.2) rotate(-20deg); }
+    25%  { opacity: 1; transform: scale(1.4) rotate(0); }
+    75%  { opacity: 1; transform: scale(1.2); }
+    100% { opacity: 0; transform: scale(2.2); }
+  }
   @keyframes breath {
     0%, 100% { box-shadow: 0 0 0 0 rgb(182 255 59 / 0.45); }
     50%      { box-shadow: 0 0 0 10px rgb(182 255 59 / 0); }
@@ -66,6 +80,9 @@
 
 /* Tương thích class cũ `animate-fadeIn` đang dùng trong các component hiện có */
 .animate-fadeIn { animation: fade-in 0.25s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-gift-rise, .animate-gift-burst { animation-duration: 0.01s; }
+}
 
 html { color-scheme: dark; }
 

@@ -3,12 +3,15 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
-import { ArrowLeft, Flag, Plus, X } from 'lucide-react'
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
+import { ArrowLeft, Coins, Flag, Plus, Ticket, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, EmptyState, Field, Input, Skeleton, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
-import { createRace, raceErrorMessage, type NewRace } from '../api/raceApi'
+import { formatCoin, formatNumber } from '@/shared/lib/format'
+import { DEFAULT_POLICY, xuToVnd } from '@/shared/lib/economy'
+import { routes } from '@/shared/config/routes'
+import { createRace, quoteCapacity, raceErrorMessage, type NewRace } from '../api/raceApi'
 import { distanceLabel } from '../model/race'
 import { useOrganizer } from '../hooks/useOrganizer'
 
@@ -38,7 +41,13 @@ export function CreateRaceScreen() {
   const [audience, setAudience] = useState<'PUBLIC' | 'CLUB_ONLY'>('PUBLIC')
   const [max, setMax] = useState('')
   const [prefix, setPrefix] = useState('')
-  const club = clubId ?? (org.isAdmin ? null : org.staffClubs[0]?.club_id ?? null)
+  const club = clubId ?? (org.isAdmin || org.personal ? null : org.staffClubs[0]?.club_id ?? null)
+  const slots = max ? Number(max) : 0
+  const needCapacity = !org.isAdmin
+  const quote = useQuery({
+    queryKey: ['race', 'quote', slots, club], queryFn: () => quoteCapacity(slots, club),
+    enabled: needCapacity && slots >= 2 && org.canCreate, placeholderData: keepPreviousData,
+  })
 
   const create = useMutation({
     mutationFn: () => {
@@ -60,8 +69,11 @@ export function CreateRaceScreen() {
   }
 
   if (org.isLoading) return <Skeleton className="h-96" />
-  if (!org.canCreate) return <EmptyState icon={Flag} title="Chỉ ban tổ chức được tạo giải" description="Chủ nhiệm / quản trị viên CLB có thể tạo giải chạy ảo cho CLB mình." />
+  if (!org.canCreate) return <EmptyState icon={Flag} title="Cần được cấp quyền tổ chức giải" description="Giải chạy ảo dành cho CLB hoặc cá nhân được RaceHub cấp quyền. Liên hệ admin để đăng ký làm ban tổ chức." />
+  const q = quote.data
+  const short = !!q && !q.pass && q.fee > q.payer_balance
   const valid = title.trim().length >= 3 && distances.length > 0 && start && end && Date.parse(fromLocal(end)) > Date.parse(fromLocal(start))
+    && (!needCapacity || (slots >= 2 && !!q && !q.custom && !short))
 
   return (
     <div className="space-y-5 pb-6">
@@ -70,9 +82,11 @@ export function CreateRaceScreen() {
 
       <Field label="Đơn vị tổ chức">
         <div className="grid gap-2">
-          {org.isAdmin && (
+          {(org.isAdmin || org.personal) && (
             <button type="button" aria-pressed={club === null} onClick={() => setClubId(null)}
-              className={cn('rounded-xl border p-3 text-left text-sm font-semibold', club === null ? 'border-brand bg-brand/10' : 'border-border')}>RaceHub (giải công khai)</button>
+              className={cn('rounded-xl border p-3 text-left text-sm font-semibold', club === null ? 'border-brand bg-brand/10' : 'border-border')}>
+              {org.isAdmin ? 'RaceHub (giải công khai)' : 'Cá nhân tôi (phí trừ ví của bạn)'}
+            </button>
           )}
           {org.staffClubs.map((c) => (
             <button key={c.club_id} type="button" aria-pressed={club === c.club_id} onClick={() => setClubId(c.club_id)}
@@ -123,8 +137,35 @@ export function CreateRaceScreen() {
           </div>
         </Field>
       )}
+      {needCapacity && (
+        <Card className="space-y-3">
+          <p className="text-sm font-semibold">Quy mô giải (phí thu một lần)</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Quy mô">
+            {DEFAULT_POLICY.capacityTiers.filter((t) => t.max >= 2).map((t) => (
+              <button key={t.max} type="button" role="radio" aria-checked={slots === t.max} onClick={() => setMax(String(t.max))}
+                className={cn('rounded-xl border px-3 py-2 text-left text-sm font-semibold', slots === t.max ? 'border-brand bg-brand/10' : 'border-border')}>
+                ≤ {formatNumber(t.max)} VĐV
+              </button>
+            ))}
+          </div>
+          {q && slots >= 2 && (
+            <p className="flex flex-wrap items-center gap-1.5 text-sm">
+              {q.custom ? <span className="font-semibold text-danger">Trên mức lớn nhất: liên hệ admin để được cấp riêng</span>
+                : q.pass ? <><Ticket className="size-4 text-brand" aria-hidden /><span className="font-semibold text-brand">Dùng 1 lượt tạo miễn phí</span>
+                    <span className="text-fg-subtle line-through">{formatCoin(q.fee)} Xu</span></>
+                : <><Coins className="size-4 text-coin" aria-hidden /><span className="text-fg-muted">Phí tạo:</span>
+                    <span className={cn('font-semibold', q.fee ? 'text-coin' : 'text-brand')}>{q.fee ? `${formatCoin(q.fee)} Xu (${xuToVnd(q.fee)})` : 'Miễn phí'}</span>
+                    {q.fee > 0 && <span className={cn('text-xs', short ? 'text-danger' : 'text-fg-subtle')}>
+                      · {q.payer === 'CLUB' ? 'quỹ CLB' : 'ví'} có {formatCoin(q.payer_balance)} Xu{short ? ' — không đủ' : ''}</span>}</>}
+            </p>
+          )}
+          {short && q?.payer === 'USER' && (
+            <p className="text-xs text-fg-muted"><Link href={routes.plan} className="font-semibold text-brand">Nạp Xu hoặc mua gói VIP</Link> để có lượt tạo miễn phí mỗi tháng.</p>
+          )}
+        </Card>
+      )}
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Số VĐV tối đa" htmlFor="r-max" hint="Để trống = không giới hạn">
+        <Field label="Số VĐV tối đa" htmlFor="r-max" hint={needCapacity ? 'Bắt buộc — quyết định phí' : 'Để trống = không giới hạn'}>
           <Input id="r-max" inputMode="numeric" value={max} onChange={(e) => setMax(e.target.value.replace(/\D/g, '').slice(0, 6))} />
         </Field>
         <Field label="Tiền tố BIB" htmlFor="r-bib" hint={`VD: ${(prefix || 'RH').toUpperCase()}-0001`}>

@@ -1,4 +1,5 @@
 // Giải chạy ảo (migration 002700)
+import { prepareImage } from '@/shared/lib/image'
 import { supabase } from '@/shared/lib/supabase'
 import type { BibDesign, StoredDesign } from '../model/bib'
 
@@ -92,6 +93,19 @@ export const getRace = (id: string) => call<Race>('race_detail', { p_race_id: id
 export const getRaceResults = (id: string, km: number) => call<RaceResult[]>('race_results', { p_race_id: id, p_distance_km: km })
 export const getRaceDashboard = (id: string) => call<DashboardRow[]>('race_dashboard', { p_race_id: id })
 export const createRace = (p: NewRace) => call<string>('create_virtual_race', { p })
+export interface OrganizerRights { admin: boolean; personal: boolean; clubs: string[] }
+export const getOrganizerRights = () => call<OrganizerRights>('can_organize_race')
+
+/** Báo phí theo quy mô (như thử thách): lượt tạo miễn phí dùng trước, rồi trừ Xu ví cá nhân / quỹ CLB */
+export interface CapacityQuote {
+  slots: number; fee: number; custom: boolean; tier: { max: number; xu: number } | null
+  payer: 'USER' | 'CLUB'; payer_balance: number; pass: { id: string; max_slots: number; remaining: number; note: string | null } | null
+}
+export async function quoteCapacity(slots: number, clubId: string | null): Promise<CapacityQuote> {
+  const q = await call<CapacityQuote>('quote_capacity', { p_slots: slots, p_club_id: clubId })
+  return { ...q, fee: Number(q.fee ?? 0), payer_balance: Number(q.payer_balance ?? 0), custom: Boolean(q.custom) }
+}
+
 export const registerRace = (id: string, km: number) => call<Race>('register_race', { p_race_id: id, p_distance_km: km })
 export const withdrawRace = (id: string) => call<Race>('withdraw_race', { p_race_id: id })
 export const cancelRace = (id: string, reason: string) => call<void>('cancel_virtual_race', { p_race_id: id, p_reason: reason })
@@ -103,19 +117,22 @@ export const lookupBib = (id: string, bib: string) => call<BibCheck | null>('rac
 
 /** Ảnh cho BIB (logo, nền, nhà tài trợ): kho race-media/<race_id>/<user_id>/… — chỉ BTC giải đó tải lên được */
 export async function uploadRaceImage(raceId: string, file: File): Promise<string> {
-  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('INVALID_IMAGE_TYPE')
-  if (file.size > 3 * 1024 * 1024) throw new Error('IMAGE_TOO_LARGE')
+  const blob = await prepareImage(file)                     // nén / đổi định dạng nếu cần (ảnh Canva lớn, HEIC…)
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('AUTH_REQUIRED')
-  const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
+  const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg'
   const path = `${raceId}/${user.id}/${Date.now()}.${ext}`
-  const { error } = await supabase.storage.from('race-media').upload(path, file, { contentType: file.type, upsert: false })
+  const { error } = await supabase.storage.from('race-media').upload(path, blob, { contentType: blob.type, upsert: false })
   if (error) throw error
   return supabase.storage.from('race-media').getPublicUrl(path).data.publicUrl
 }
 
 const MESSAGES: Record<string, string> = {
   FORBIDDEN: 'Bạn không có quyền làm việc này.',
+  RACE_ORGANIZER_REQUIRED: 'Chỉ CLB hoặc cá nhân được RaceHub cấp quyền mới tạo được giải chạy ảo. Liên hệ admin để đăng ký.',
+  CAPACITY_REQUIRED: 'Chọn quy mô (số VĐV tối đa) — phí tạo giải tính theo quy mô.',
+  INSUFFICIENT_BALANCE: 'Ví của bạn không đủ Xu trả phí tạo giải.',
+  INSUFFICIENT_TREASURY: 'Quỹ CLB không đủ Xu trả phí tạo giải.',
   RACE_NOT_FOUND: 'Không tìm thấy giải (hoặc giải chỉ dành cho thành viên CLB).',
   RACE_CANCELLED: 'Giải đã bị hủy.',
   REGISTRATION_CLOSED: 'Đã hết hạn đăng ký.',
@@ -134,11 +151,24 @@ const MESSAGES: Record<string, string> = {
   INVALID_BIB_DESIGN: 'Thiết kế BIB không hợp lệ.',
   INVALID_BIB_IMAGE: 'Ảnh phải được tải lên từ trình thiết kế BIB của giải này.',
   INVALID_IMAGE_TYPE: 'Chỉ nhận ảnh PNG, JPG hoặc WebP.',
-  IMAGE_TOO_LARGE: 'Ảnh tối đa 3 MB.',
+  IMAGE_TOO_LARGE: 'Ảnh quá lớn, không nén được. Thử ảnh nhỏ hơn.',
+  AUTH_REQUIRED: 'Phiên đăng nhập đã hết, vui lòng đăng nhập lại.',
 }
+
+// Lỗi từ kho ảnh Supabase Storage (tiếng Anh) → lời dễ hiểu, kèm cách xử lý
+const STORAGE_MESSAGES: [RegExp, string][] = [
+  [/bucket not found/i, 'Chưa có kho ảnh race-media — cần chạy migration 20261001002900 (và 003300) trong SQL Editor.'],
+  [/row-level security|unauthorized|403/i, 'Bạn không có quyền tải ảnh cho giải này (chỉ người tạo giải, ban quản trị CLB hoặc admin).'],
+  [/maximum allowed size|too large|413/i, 'Ảnh vượt giới hạn của kho ảnh. Chạy migration 003300 để nâng lên 10 MB.'],
+  [/mime type|not supported/i, 'Định dạng ảnh không được hỗ trợ. Dùng PNG, JPG hoặc WebP.'],
+  [/failed to fetch|network/i, 'Mất kết nối mạng, thử lại.'],
+]
 
 export function raceErrorMessage(e: unknown): string {
   const msg = (e as { message?: string } | null)?.message ?? ''
   const code = Object.keys(MESSAGES).find((k) => msg.includes(k))
-  return code ? MESSAGES[code] : 'Có lỗi xảy ra, thử lại sau.'
+  if (code) return MESSAGES[code]
+  const storage = STORAGE_MESSAGES.find(([re]) => re.test(msg))
+  if (storage) return storage[1]
+  return msg ? `Có lỗi xảy ra: ${msg}` : 'Có lỗi xảy ra, thử lại sau.'
 }

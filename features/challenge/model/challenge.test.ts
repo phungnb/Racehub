@@ -3,6 +3,7 @@ import * as m from './challenge'
 import {
   challengePhase, defaultDraft, draftToPayload, formatScore, planStatus, rewardSummary, settlementDue, timeLabel, timeProgress,
   validateDraft,
+  draftFromTemplate,
 } from './challenge'
 
 const now = new Date('2026-10-10T00:00:00Z')
@@ -108,5 +109,24 @@ describe('mục tiêu tự đăng ký', () => {
     expect(m.cappedKm(50, 30, 20)).toBe(36)
     expect(m.cappedKm(50, 30, null)).toBe(50)
     expect(m.cappedKm(20, 30, 20)).toBe(20)
+  })
+})
+
+describe('nhân bản thử thách cũ (VIP2)', () => {
+  const t = {
+    title: 'Tuần 50 km', description: null, format: 'TEAM', objective: 'DISTANCE', game_mode: 'TEAM_SUM', target_value: '50', min_km: '2',
+    min_pace: '3', max_pace: '12', daily_cap_km: null, require_hr: true, max_slots: 20, audience: 'CLUB_ONLY', club_id: 'c1', team_size: 5,
+    reward_xu: '300', reward_split: 'TOP3', days: 14, team_names: ['Xanh', 'Đỏ'],
+    pledge: { enabled: false, options: [], min_km: null, max_km: null, cap_pct: null, team_size: null },
+  }
+  it('giữ luật, dời thời gian từ giờ tới đúng số ngày; CLB chỉ giữ khi mình còn là ban quản trị', () => {
+    const now = new Date('2026-09-24T10:20:00Z')
+    const d = draftFromTemplate(t, ['c1'], now)
+    expect(d).toMatchObject({ format: 'TEAM', targetValue: 50, minKm: 2, maxPace: 12, requireHr: true, maxSlots: 20, teamSize: 5,
+      audience: 'CLUB_ONLY', clubId: 'c1', rewardXu: 300, rewardSource: 'CLUB', rewardSplit: 'TOP3', teamNames: ['Xanh', 'Đỏ'] })
+    expect((Date.parse(d.end) - Date.parse(d.start)) / 86_400_000).toBe(14)
+    expect(Date.parse(d.start)).toBeGreaterThan(now.getTime())
+    const lost = draftFromTemplate(t, [], now)
+    expect(lost).toMatchObject({ audience: 'PUBLIC', clubId: null, rewardXu: 0, rewardSource: 'NONE' })
   })
 })

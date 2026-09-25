@@ -177,6 +177,7 @@ Bảy tính năng **chỉ RaceHub có**. Đây là thứ để quảng bá, nên
 |---|---|
 | SS-01 | Migration `000900_seasons`: `seasons`, vật phẩm giới hạn, BXH mùa |
 | ✅ SS-02 | **Xếp hạng CLB** (migration 002600): tuần / tháng theo km trung bình mỗi thành viên, hạng Đồng → Kim cương. *Lên / xuống hạng theo mùa: chờ SS-01 (chưa làm mùa giải)* |
+| ✅ SS-06 | **Thách đấu CLB** (migration 003600): nhiều CLB cùng tranh tài theo tổng km / km TB mỗi thành viên; BQT CLB hoặc admin tạo là mở ngay, người dùng thường tạo phải chờ admin duyệt; chỉ ban quản trị CLB đăng ký CLB; chống đếm trùng người ở nhiều CLB; tự chốt kết quả + báo hạng |
 | ✅ SS-03 | **CLB đấu CLB** (migration 002600): lời thách đấu, nhận / từ chối, tổng km hoặc km TB / thành viên, bảng hai phía + top 5 mỗi bên, tất toán + thông báo |
 | ◐ SS-04 | **Cửa hàng** (MH19) + **Tủ đồ** (MH26): ✅ nhân vật 2D từ ảnh thật, đổi màu áo/quần/tất/giày giữ nếp vải, Nam/Nữ, 35 bộ màu, thử trước khi mua, quà lên cấp (migration 000900 + 001000, ADR-017). Có trang Quản trị → Vật phẩm (tải lớp PNG, xem thử, ẩn/bán; migration 001200), công cụ tách lớp từ ảnh AI + bộ prompt (`docs/vat-pham/`). Đã có 16 món đồ đội đầu (mũ chạy, visor, băng đô; migration 001300, `scripts/character/items/headwear.py`). Còn: kính, áo CLB, vật phẩm theo mùa |
 | ✅ SS-05 | **Poster chia sẻ** (MH18): ảnh bài chạy / huy hiệu / kết quả thử thách, xuất ảnh cho Story |

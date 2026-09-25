@@ -344,7 +344,7 @@ function ImagePick({ label, url, busy, onPick, onClear }: { label: string; url: 
         </button>
         {url && <button type="button" onClick={onClear} aria-label={`Bỏ ${label}`} className="absolute right-1 top-1 grid size-6 place-items-center rounded-full bg-bg/80"><X className="size-3.5" aria-hidden /></button>}
       </div>
-      <input ref={input} type="file" hidden accept="image/png,image/jpeg,image/webp" onChange={(e) => { onPick(e.target.files?.[0]); e.target.value = '' }} />
+      <input ref={input} type="file" hidden accept="image/*" onChange={(e) => { onPick(e.target.files?.[0]); e.target.value = '' }} />
     </div>
   )
 }
@@ -358,7 +358,7 @@ function SponsorLogo({ url, busy, onPick }: { url: string | null; busy: boolean;
         {/* eslint-disable-next-line @next/next/no-img-element -- ảnh vừa tải lên kho race-media */}
         {url ? <img src={url} alt="" className="h-full w-full object-contain" /> : <ImagePlus className="size-4 text-fg-subtle" aria-hidden />}
       </button>
-      <input ref={input} type="file" hidden accept="image/png,image/jpeg,image/webp" onChange={(e) => { onPick(e.target.files?.[0]); e.target.value = '' }} />
+      <input ref={input} type="file" hidden accept="image/*" onChange={(e) => { onPick(e.target.files?.[0]); e.target.value = '' }} />
     </>
   )
 }

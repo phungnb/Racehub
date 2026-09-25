@@ -4,14 +4,14 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
-import { Copy, Gift, Pencil, Settings, Share2, Watch } from 'lucide-react'
+import { BarChart3, ChevronRight, Copy, Crown, Gift, Pencil, Settings, Share2, Watch } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, LevelBadge, ProgressBar, SegmentedControl, Skeleton } from '@/shared/ui'
 import { formatKm, formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import { levelProgress } from '@/features/progression'
 import { CharacterHub } from '@/features/character'
-import { BadgeGrid } from '@/features/game'
+import { BadgeGrid, GiftWall } from '@/features/game'
 import { getAthleteProfile } from '../api/athleteApi'
 import { AvatarPicker } from './AvatarPicker'
 import type { Profile } from '@/shared/types/profile'
@@ -149,10 +149,24 @@ export function MeScreen({ profile }: { profile: Profile }) {
       <Header profile={profile} />
       <SegmentedControl value={tab} onChange={setTab} options={TABS} />
 
-      {tab === 'badges' && <BadgeGrid />}
+      {tab === 'badges' && <div className="space-y-4"><GiftWall userId={profile.id} /><BadgeGrid /></div>}
 
       {tab === 'overview' && (
         <div className="space-y-3">
+          <Card className="divide-y divide-border p-0">
+            <Link href={routes.insights} className="flex items-center gap-3 p-4">
+              <span className="grid size-10 place-items-center rounded-xl bg-xp/15 text-xp"><BarChart3 className="size-5" aria-hidden /></span>
+              <span className="min-w-0 flex-1"><span className="block font-semibold">Phân tích của tôi</span>
+                <span className="block text-xs text-fg-muted">Xu hướng, kỷ lục 1K → Marathon, phân bố pace, xuất báo cáo</span></span>
+              <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+            </Link>
+            <Link href={routes.plan} className="flex items-center gap-3 p-4">
+              <span className="grid size-10 place-items-center rounded-xl bg-coin/15 text-coin"><Crown className="size-5" aria-hidden /></span>
+              <span className="min-w-0 flex-1"><span className="block font-semibold">Gói VIP & Nạp Xu</span>
+                <span className="block text-xs text-fg-muted">Lượt tạo thử thách miễn phí mỗi tháng, đơn hàng của tôi</span></span>
+              <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+            </Link>
+          </Card>
           <Card><Invite profile={profile} /></Card>
           <Card className="space-y-1">
             <Row icon={Watch}>Thiết bị & nguồn dữ liệu</Row>

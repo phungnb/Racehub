@@ -33,7 +33,10 @@ const run = (db: PGlite, uid: string, km: number, paceS: number, status = 'APPRO
 describe('giải chạy ảo (002700)', () => {
   let db: PGlite
   let race = ''
-  beforeAll(async () => { db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed }) }, 240_000)
+  beforeAll(async () => {
+    db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed })
+    await db.query(`insert into public.race_organizer_grants (owner_type, owner_id) values ('CLUB', $1) on conflict do nothing`, [CLUB])   // 003800: CLB được admin cấp quyền tổ chức
+  }, 240_000)
 
   it('chỉ ban quản trị CLB / admin tạo giải; kiểm tra dữ liệu', async () => {
     const p = { title: 'NBNR Virtual Run 2026', club_id: CLUB, audience: 'CLUB_ONLY', distances: [21.1, 5, 10, 10], bib_prefix: 'nbnr',
@@ -95,8 +98,9 @@ describe('BIB điện tử do BTC thiết kế (002900)', () => {
   const url = (rid: string, file = 'logo.png') => `https://x.supabase.co/storage/v1/object/public/race-media/${rid}/${ORG}/${file}`
   beforeAll(async () => {
     db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed })
+    await db.query(`insert into public.race_organizer_grants (owner_type, owner_id) values ('CLUB', $1) on conflict do nothing`, [CLUB])   // 003800: CLB được admin cấp quyền tổ chức
     race = await rpc<string>(db, ORG, `select public.create_virtual_race($1::jsonb) as r`, [JSON.stringify({ title: 'Giải có BIB đẹp', club_id: CLUB,
-      distances: [10], bib_prefix: 'NB', start_at: new Date(Date.now() + 3600_000).toISOString(), end_at: new Date(Date.now() + 5 * 86400_000).toISOString() })])
+      distances: [10], bib_prefix: 'NB', max_participants: 5, start_at: new Date(Date.now() + 3600_000).toISOString(), end_at: new Date(Date.now() + 5 * 86400_000).toISOString() })])
   }, 240_000)
 
   it('BTC lưu thiết kế: làm sạch trường, chặn ảnh ngoài kho của giải, VĐV thấy trong chi tiết giải', async () => {
@@ -136,6 +140,16 @@ describe('BIB điện tử do BTC thiết kế (002900)', () => {
     expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, boxes: { number: { font: 'comic' } } })]))).toContain('INVALID_BIB_DESIGN')
     expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, boxes: { org: 'x' } })]))).toContain('INVALID_BIB_DESIGN')
     expect(await fails(rpc(db, ORG, q, [race, JSON.stringify({ ...base, qr_pos: 'top' })]))).toContain('INVALID_BIB_DESIGN')
+  })
+
+  it('kho ảnh race-media: BTC tải lên được, người ngoài bị chặn; không làm hỏng upload của kho khác', async () => {
+    // giống Supabase: storage.objects bật RLS, authenticated có quyền ghi bảng
+    await db.exec(`alter table storage.objects enable row level security; grant select, insert on storage.objects to authenticated;`)
+    const put = (uid: string, bucket: string, name: string) => asUser(db, uid, '/storage/v1/object', `insert into storage.objects (bucket_id, name) values ($1, $2)`, [bucket, name])
+    await put(ORG, 'race-media', `${race}/${ORG}/bib.png`)
+    expect(await fails(put(R1, 'race-media', `${race}/${R1}/bib.png`))).toMatch(/row-level security/)
+    expect(await fails(put(ORG, 'race-media', `khong-phai-uuid/${ORG}/bib.png`))).toMatch(/row-level security/)   // 003300: không lỗi ép kiểu uuid
+    await put(R1, 'avatars', `${R1}/a.png`)                                   // kho khác vẫn tải bình thường
   })
 
   it('quét QR trên BIB: xác thực VĐV theo số BIB', async () => {
