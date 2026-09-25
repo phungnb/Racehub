@@ -108,6 +108,20 @@ Mở ở **Cài đặt CLB → Đồng phục CLB → Thiết kế bộ đồng 
 
 Họa tiết là "màu thứ hai" vẽ theo mặt nạ nên giữ nếp vải như màu nền; hình học ở `features/character/model/patterns.ts`. Các món cùng bộ có chung `kit`; Tủ đồ hiện thẻ bộ với **Mặc cả bộ** và **Mua phần còn thiếu**.
 
+## 3e. Bộ sưu tập nhân vật + trình thiết kế in (migration 006000)
+
+**Dáng nhân vật:** `male` (khoanh tay), `male_relax` (thư thái), `male_run` (đang chạy), `female` (chống hông), `female_tee` (áo thun), `female_run` (đang chạy). Người chơi chọn ở **Tủ đồ** (lưu `user_avatar.body`). Mọi món **đổi màu** (áo, quần, tất, giày, họa tiết, lớp in) tự lên mọi dáng; món **lớp ảnh** (mũ, kính…) cần bản vẽ riêng cho từng dáng (`layer_urls.<mã dáng>`), chưa có thì không hiện ở dáng đó.
+
+**Thêm dáng mới:** ảnh 2:3 (nhân vật mặc áo xanh, quần đen, tất trắng, nền xám trơn) đặt ở `scripts/character/source/runner_<mã>.webp`, thêm cấu hình (khoảng cao áo / quần, đa giác tất / giày) trong `scripts/character/segment_bodies.py`, chạy `python3 scripts/character/segment_bodies.py <mã>`, rồi khai báo mã trong `BODIES`, `PRINT_ZONES`, `PORTRAIT` (client) và `private.character_bodies()` (SQL).
+
+**Thiết kế in (Kit Studio → Thiết kế in):**
+- *Chữ*, *Logo / ảnh*, *Tên runner* → lớp mới; kéo để di chuyển, kéo ô vuông ở góc để phóng to / thu nhỏ, kéo nút tròn để xoay (hít 0° / 45°), 2 ngón tay để vừa phóng vừa xoay, đường hồng khi căn giữa.
+- Chữ: 40 font (nhóm Đậm, Chữ hẹp, Thể thao, Có chân, Viết tay), màu, viền, giãn chữ, đậm / thường; `{TEN}` = tên gọi của người mặc.
+- Lớp: cỡ, xoay, độ mờ, căn giữa, lên / xuống, nhân đôi, xóa; hoàn tác / làm lại (Ctrl+Z), phím mũi tên để dịch từng chút, Delete để xóa.
+- In được trên áo và quần; vị trí lưu theo hộp bao vùng nên cùng thiết kế lên đúng mọi dáng. Tối đa 12 lớp.
+
+**Chất liệu (Kit Studio → Từng món):** *Độ đậm màu* (20–100 %), *Sáng / tối*, *Ảnh vải / ảnh áo thật* (độ phủ, tỉ lệ) — ảnh được nhân theo nếp vải nên vẫn thấy nếp gấp, bóng đổ.
+
 ## 4. Đổi ảnh nhân vật / thêm tư thế
 
 1. Ảnh gốc (nền trơn, người đứng giữa) đặt tên `scripts/character/source/runner_<male|female>.png`. Thư mục này không bị deploy, chỉ dùng để sinh tài nguyên.

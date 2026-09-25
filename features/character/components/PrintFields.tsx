@@ -12,7 +12,7 @@ const FONTS: { value: NonNullable<ItemPrint['font']>; label: string }[] = [
 
 /** In không rỗng: có logo, chữ hoặc tên runner */
 export const hasPrint = (p: ItemPrint | null | undefined) =>
-  !!p && (!!p.logo_url || !!p.title?.trim() || !!p.subtitle?.trim() || p.personal === 'NAME')
+  !!p && (!!p.logo_url || !!p.title?.trim() || !!p.subtitle?.trim() || p.personal === 'NAME' || (p.layers?.length ?? 0) > 0)
 
 /** Chỉnh nội dung in lên áo: logo ngực, tên (CLB), dòng phụ, tên runner, màu + kiểu chữ */
 export function PrintFields({ value, onChange, upload, onUploading }: {

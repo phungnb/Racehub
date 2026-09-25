@@ -32,13 +32,13 @@ describe('Bộ đồng phục', () => {
   it('phối màu giữ nội dung in, chữ luôn đọc được, giữ món đã tắt', () => {
     const k = { ...defaultKit('Hà Nội Runners', '#dc2626'), shoes: null }
     const out = applyScheme(k, KIT_SCHEMES[2], '#fef08a', '#1e3a8a')
-    expect(out.print.title).toBe('HÀ NỘI RUNNERS')
-    expect(out.print.text_color).toBe('#1e3a8a')                // phụ đủ tương phản trên áo vàng nhạt
+    expect(out.print.layers?.[0]).toMatchObject({ text: 'HÀ NỘI RUNNERS', color: '#1e3a8a' })   // phụ đủ tương phản trên áo vàng nhạt
+    expect(out.print.layers?.[1].text).toBe('{TEN}')
     expect(out.shoes).toBeNull()
     expect(contrastText('#fef08a')).toBe('#111111')
     expect(kitItems(out).map((i) => i.slot)).toEqual(['top', 'bottom', 'socks'])
     const parts = kitParts(out)
     expect(Object.keys(parts)).toEqual(['bottom', 'socks'])
-    expect(kitFromRequest({ color: out.top, print: out.print, parts }).bottom).toEqual(out.bottom)
+    expect(kitFromRequest({ color: out.top, print: out.print, parts }).bottom).toMatchObject(out.bottom!)
   })
 })

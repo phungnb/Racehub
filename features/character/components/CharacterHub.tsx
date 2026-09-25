@@ -6,7 +6,7 @@ import { Button, Card, ErrorState, Skeleton } from '@/shared/ui'
 import { routes } from '@/shared/config/routes'
 import { characterErrorMessage } from '../api/characterApi'
 import { useCharacterState } from '../hooks/useCharacter'
-import { resolveOutfit } from '../model/catalog'
+import { bodyOf, resolveOutfit } from '../model/catalog'
 import { PaperDoll } from './PaperDoll'
 import { GenderNudge } from './Wardrobe'
 
@@ -23,7 +23,7 @@ export function CharacterHub() {
       {s.gender_set === false && <GenderNudge />}
       <Card className="overflow-hidden p-0">
         <div className="relative h-96 bg-[#c4c4ce]">
-          <PaperDoll gender={s.gender} items={resolveOutfit(s.items, s.equipped)} personalName={s.display_name} className="size-full" label="Nhân vật của bạn" />
+          <PaperDoll gender={bodyOf(s.gender, s.body)} items={resolveOutfit(s.items, s.equipped)} personalName={s.display_name} className="size-full" label="Nhân vật của bạn" />
         </div>
         <div className="space-y-3 p-4">
           <p className="text-sm text-fg-muted">Tủ đồ có <b className="font-mono text-fg">{owned}</b>/{s.items.length} vật phẩm</p>

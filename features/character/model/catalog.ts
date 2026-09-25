@@ -3,6 +3,24 @@
 import { Footprints, Gem, Glasses, HardHat, Scissors, Shirt, Sparkles, Watch, type LucideIcon } from 'lucide-react'
 
 export type Gender = 'male' | 'female'
+/**
+ * Nhân vật (dáng / tư thế) trong bộ sưu tập nhân vật. 'male' / 'female' là bộ gốc; các dáng khác nằm ở /character/bodies/<mã>/
+ * (sinh bằng scripts/character/segment_bodies.py). Mỗi dáng có ảnh nền + 4 mặt nạ riêng, cùng khung chuẩn.
+ */
+export type Body = Gender | 'male_relax' | 'male_run' | 'female_tee' | 'female_run'
+export const BODIES: Record<Body, { gender: Gender; label: string }> = {
+  male: { gender: 'male', label: 'Khoanh tay' },
+  male_relax: { gender: 'male', label: 'Thư thái' },
+  male_run: { gender: 'male', label: 'Đang chạy' },
+  female: { gender: 'female', label: 'Chống hông' },
+  female_tee: { gender: 'female', label: 'Áo thun' },
+  female_run: { gender: 'female', label: 'Đang chạy' },
+}
+export const isBody = (v: unknown): v is Body => typeof v === 'string' && v in BODIES
+export const genderOf = (b: Body): Gender => BODIES[b].gender
+/** Dáng hợp lệ cho giới tính (dáng khác giới hoặc không rõ → bộ gốc) */
+export const bodyOf = (gender: Gender, body?: string | null): Body => (isBody(body) && BODIES[body].gender === gender ? body : gender)
+export const bodiesFor = (gender: Gender) => (Object.keys(BODIES) as Body[]).filter((b) => BODIES[b].gender === gender)
 export type Slot = 'hair' | 'top' | 'bottom' | 'socks' | 'shoes' | 'hat' | 'glasses' | 'watch' | 'accessory' | 'effect'
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary'
 export type RenderKind = 'TINT' | 'LAYER'
@@ -63,7 +81,36 @@ export interface ItemPrint {
   font?: 'sport' | 'sans' | 'serif'
   /** Họa tiết màu thứ hai theo nếp vải (áo, quần, tất) */
   pattern?: ItemPattern | null
+  /** Lớp in tự do (chữ / ảnh) — áo và quần (migration 006000) */
+  layers?: PrintLayer[] | null
+  /** Độ đậm màu (0.2..1) và sáng / tối (-0.4..0.4) của màu nền */
+  tone?: { strength: number; light: number } | null
+  /** Ảnh vải / ảnh áo thật phủ lên vùng */
+  texture?: { url: string; opacity: number; scale: number } | null
 }
+
+/**
+ * Lớp in đặt theo HỘP BAO vùng áo / quần (x, y: tâm 0..1; w: bề rộng theo tỉ lệ bề rộng hộp) → cùng thiết kế lên được mọi dáng nhân vật.
+ * Chữ "{TEN}" = tên gọi của người mặc.
+ */
+export interface PrintLayer {
+  id: string
+  type: 'text' | 'image'
+  x: number
+  y: number
+  w: number
+  rot: number
+  opacity: number
+  text?: string
+  font?: string
+  color?: string
+  stroke?: string
+  stroke_w?: number
+  spacing?: number
+  bold?: boolean
+  url?: string
+}
+export const NAME_TOKEN = '{TEN}'
 
 export type PatternKind = 'sides' | 'shoulders' | 'sash' | 'hoops' | 'stripes' | 'half' | 'gradient' | 'chevron' | 'hem' | 'band'
 export interface ItemPattern { kind: PatternKind; color: string }
@@ -80,7 +127,7 @@ export const PATTERNS: Partial<Record<TintSlot, { kind: PatternKind; label: stri
 
 /** Vùng in trên áo (tâm x, tâm y, rộng, cao — theo khung chuẩn 900×1350), đo trên ảnh nền từng giới tính */
 export type PrintZone = { cx: number; cy: number; w: number; h: number }
-export const PRINT_ZONES: Record<Gender, Record<'logo' | 'title' | 'subtitle' | 'personal', PrintZone>> = {
+export const PRINT_ZONES: Record<Body, Record<'logo' | 'title' | 'subtitle' | 'personal', PrintZone>> = {
   male: {
     logo: { cx: 528, cy: 320, w: 56, h: 48 }, title: { cx: 456, cy: 522, w: 172, h: 42 },
     subtitle: { cx: 456, cy: 558, w: 156, h: 22 }, personal: { cx: 456, cy: 590, w: 124, h: 24 },
@@ -89,6 +136,22 @@ export const PRINT_ZONES: Record<Gender, Record<'logo' | 'title' | 'subtitle' | 
     logo: { cx: 468, cy: 380, w: 30, h: 28 }, title: { cx: 428, cy: 432, w: 112, h: 28 },
     subtitle: { cx: 428, cy: 458, w: 100, h: 16 }, personal: { cx: 428, cy: 478, w: 76, h: 14 },
   },
+  male_relax: {
+    logo: { cx: 522, cy: 330, w: 50, h: 44 }, title: { cx: 440, cy: 470, w: 168, h: 38 },
+    subtitle: { cx: 440, cy: 505, w: 150, h: 20 }, personal: { cx: 440, cy: 535, w: 112, h: 22 },
+  },
+  male_run: {
+    logo: { cx: 530, cy: 300, w: 48, h: 42 }, title: { cx: 452, cy: 492, w: 176, h: 40 },
+    subtitle: { cx: 452, cy: 528, w: 156, h: 20 }, personal: { cx: 452, cy: 558, w: 116, h: 22 },
+  },
+  female_tee: {
+    logo: { cx: 480, cy: 328, w: 38, h: 34 }, title: { cx: 440, cy: 392, w: 150, h: 30 },
+    subtitle: { cx: 440, cy: 422, w: 130, h: 18 }, personal: { cx: 440, cy: 450, w: 100, h: 18 },
+  },
+  female_run: {
+    logo: { cx: 548, cy: 362, w: 34, h: 30 }, title: { cx: 500, cy: 418, w: 128, h: 26 },
+    subtitle: { cx: 500, cy: 446, w: 110, h: 16 }, personal: { cx: 500, cy: 472, w: 88, h: 16 },
+  }
 }
 /** Tên in trên áo: tên gọi (từ cuối của họ tên Việt), viết hoa */
 export const jerseyName = (displayName: string | null | undefined) => (displayName ?? '').trim().split(/\s+/).pop()?.toUpperCase() ?? ''
@@ -135,6 +198,8 @@ export const canTry = (item: Pick<CharacterItem, 'offer' | 'owned' | 'trial_unti
 
 export interface Look {
   gender: Gender
+  /** Dáng nhân vật đã chọn (migration 006000); null / khác giới = bộ gốc */
+  body?: string | null
   equipped: Partial<Record<Slot, string>>
   /** Chi tiết các món đang mặc (get_character trả kèm để vẽ được mà không cần cả danh mục) */
   items?: CharacterItem[]
@@ -160,8 +225,9 @@ export const CHARACTER_BASE = '/character'
 export const TINT_SLOTS = ['top', 'bottom', 'socks', 'shoes'] as const satisfies readonly Slot[]
 export type TintSlot = (typeof TINT_SLOTS)[number]
 
-export const baseUrl = (g: Gender) => `${CHARACTER_BASE}/${g}/base.webp`
-export const maskUrl = (g: Gender, slot: TintSlot) => `${CHARACTER_BASE}/${g}/${slot}.png`
+const bodyDir = (b: Body) => (b === 'male' || b === 'female' ? `${CHARACTER_BASE}/${b}` : `${CHARACTER_BASE}/bodies/${b}`)
+export const baseUrl = (b: Body) => `${bodyDir(b)}/base.webp`
+export const maskUrl = (b: Body, slot: TintSlot) => `${bodyDir(b)}/${slot}.png`
 export const isTintSlot = (s: Slot): s is TintSlot => (TINT_SLOTS as readonly Slot[]).includes(s)
 
 /** Thứ tự ô trong tủ đồ */
@@ -215,9 +281,12 @@ export function tintPixel(r: number, g: number, b: number, alpha: number, target
 }
 
 /** Ảnh lớp của vật phẩm theo giới tính (không có bản riêng thì dùng bản của giới còn lại) */
-export function layerUrl(item: Pick<CharacterItem, 'render_kind' | 'layer_urls'>, gender: Gender): string | null {
+export function layerUrl(item: Pick<CharacterItem, 'render_kind' | 'layer_urls'>, body: Body): string | null {
   if (item.render_kind !== 'LAYER' || !item.layer_urls) return null
-  return item.layer_urls[gender] ?? item.layer_urls[gender === 'male' ? 'female' : 'male'] ?? null
+  const urls = item.layer_urls as Partial<Record<Body, string>>
+  // Lớp ảnh vẽ theo đúng ảnh nền: dáng bổ sung chỉ dùng bản vẽ riêng cho dáng đó
+  if (body !== 'male' && body !== 'female') return urls[body] ?? null
+  return urls[body] ?? urls[body === 'male' ? 'female' : 'male'] ?? null
 }
 
 /** Thứ tự xếp lớp ảnh (sau đè trước): quần → tất → giày → áo (vạt áo, áo khoác nằm trên quần) → phụ kiện → ... */

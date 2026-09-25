@@ -144,7 +144,7 @@ function UniformDesigner({ clubId, clubName, accent, logoUrl, from, onClose }: {
           <Input id="uni-name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
         </Field>
         <KitStudio value={kit} onChange={setKit} upload={(f) => uploadPrintLogo(clubId, f)} clubLogoUrl={logoUrl}
-          personalName={profile?.display_name} onUploading={setUploading} />
+          personalName={profile?.display_name} onUploading={setUploading} gender={profile?.gender === 'female' ? 'female' : 'male'} />
         {!hasPrint(kit.print) && <p className="text-xs text-danger">Áo cần ít nhất logo, chữ hoặc tên runner (thẻ In áo).</p>}
         <Field label="Ghi chú cho admin (không bắt buộc)" htmlFor="uni-note" hint={`${note.length}/500`}>
           <Textarea id="uni-note" value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} placeholder="Muốn bán giá mềm cho thành viên mới…" />

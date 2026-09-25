@@ -5,7 +5,7 @@ import { Download, Loader2, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, SegmentedControl, Sheet, SwitchRow, useImageSaver } from '@/shared/ui'
 import { useMyProfile } from '@/features/auth'
-import { renderCharacter, resolveOutfit, useCharacterState } from '@/features/character'
+import { bodyOf, renderCharacter, resolveOutfit, useCharacterState } from '@/features/character'
 import { paceFrom } from '@/shared/lib/format'
 import type { ActivityDetail } from '../api/activities'
 import type { LatLng } from '../model/route'
@@ -25,7 +25,7 @@ export function ShareActivitySheet({ activity: a, route, onClose }: { activity: 
   useEffect(() => {
     let alive = true
     const c = character.data
-    if (showChar && c && !charCanvas.current) charCanvas.current = renderCharacter(c.gender, resolveOutfit(c.items, c.equipped), c.display_name).catch(() => null)
+    if (showChar && c && !charCanvas.current) charCanvas.current = renderCharacter(bodyOf(c.gender, c.body), resolveOutfit(c.items, c.equipped), c.display_name).catch(() => null)
     ;(async () => {
       setBusy(true)
       const canvas = document.createElement('canvas')

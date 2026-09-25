@@ -6,7 +6,7 @@ import { Camera, ImageUp, Trash2, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Sheet } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
-import { renderPortrait, resolveOutfit, useCharacterState } from '@/features/character'
+import { bodyOf, renderPortrait, resolveOutfit, useCharacterState } from '@/features/character'
 import { profileErrorMessage, setAvatarUrl, uploadAvatar } from '../api/profileApi'
 import { centerSquare } from '../model/profileForm'
 import { useRefreshProfile } from '../hooks/useRefreshProfile'
@@ -72,7 +72,7 @@ export function AvatarPicker({ userId, avatarUrl, name, size = 'lg', shine = 0, 
     setMaking(true)
     try {
       const s = character.data
-      const blob = await renderPortrait(s.gender, resolveOutfit(s.items, s.equipped), 512, s.display_name)
+      const blob = await renderPortrait(bodyOf(s.gender, s.body), resolveOutfit(s.items, s.equipped), 512, s.display_name)
       setPreview({ blob, url: URL.createObjectURL(blob) })
     } catch {
       toast.error('Không tạo được ảnh từ nhân vật. Thử lại sau.')
