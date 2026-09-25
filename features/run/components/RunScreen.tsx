@@ -4,12 +4,15 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { AlertTriangle, CheckCircle2, Clock3, CloudUpload, Gift, History, Gauge, Loader2, Lock, MapPin, Pause, Play, Satellite, Smartphone, Square, Timer, Unlock, Volume2, VolumeX, Watch, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Card, CoinAmount, HoldButton, XpAmount } from '@/shared/ui'
+import { Button, Card, CoinAmount, ConfirmSheet, HoldButton, XpAmount } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatDuration, formatKm, formatPace } from '@/shared/lib/format'
 import { RewardCascade, useActivityRewards, useMarkSeen } from '@/features/game'
 import { useRunTracker, type GpsState } from '../hooks/useRunTracker'
 import { usePendingRunCount } from '../hooks/usePendingRuns'
+import { openLocationSettings } from '../model/location'
+
+const DISCLOSED_KEY = 'rh-location-disclosed'
 
 const GPS_LABEL: Record<GpsState, { text: string; tone: string }> = {
   OFF: { text: 'GPS tắt', tone: 'text-fg-subtle' },
@@ -45,6 +48,14 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
   const pending = usePendingRunCount()
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [locked, setLocked] = useState(false)
+  const [disclose, setDisclose] = useState(false)
+  // App cài: lần đầu giải thích rõ vì sao cần vị trí khi tắt màn hình, rồi mới để hệ điều hành hỏi quyền
+  const begin = () => {
+    let seen = true
+    try { seen = !t.background || localStorage.getItem(DISCLOSED_KEY) === '1' } catch { /* bỏ qua */ }
+    if (seen) t.start()
+    else setDisclose(true)
+  }
   const avgPace = t.avgPace
   const live = t.phase === 'RUNNING' || t.phase === 'PAUSED' || t.phase === 'LOCATING'
 
@@ -65,14 +76,29 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
             <p className="font-mono tabular text-7xl font-black leading-none">0,00</p>
             <p className="mt-1 text-sm font-semibold uppercase tracking-widest text-fg-subtle">Kilômét</p>
           </div>
-          <button onClick={t.start} aria-label="Bắt đầu chạy"
+          <button onClick={begin} aria-label="Bắt đầu chạy"
             className="grid size-36 place-items-center rounded-full bg-brand text-brand-fg shadow-[0_0_60px_-10px] shadow-brand/60 transition-transform active:scale-95 animate-breath">
             <span className="flex flex-col items-center font-black"><Play className="size-10 fill-current" />BẮT ĐẦU</span>
           </button>
           <GpsBadge gps={t.gps} />
         </div>
 
-        {t.error && <p role="alert" className="mb-3 rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">{t.error}</p>}
+        <ConfirmSheet open={disclose} onClose={() => setDisclose(false)} danger={false} confirmLabel="Tiếp tục"
+          title="RaceHub cần dùng vị trí của bạn"
+          onConfirm={() => { try { localStorage.setItem(DISCLOSED_KEY, '1') } catch { /* bỏ qua */ } setDisclose(false); t.start() }}>
+          <div className="space-y-2 text-sm text-fg-muted">
+            <p>Để ghi quãng đường, pace và bản đồ, RaceHub dùng vị trí <b className="text-fg">trong suốt buổi chạy — kể cả khi bạn tắt màn hình hoặc bỏ điện thoại vào túi</b>.</p>
+            <p>RaceHub chỉ lấy vị trí từ lúc bấm Bắt đầu đến lúc Kết thúc. Trong thời gian đó điện thoại hiện thông báo “RaceHub đang ghi bài chạy”.</p>
+            <p>Bước tiếp theo, điện thoại sẽ hỏi quyền vị trí — hãy chọn <b className="text-fg">Cho phép</b>.</p>
+          </div>
+        </ConfirmSheet>
+
+        {t.error && (
+          <div role="alert" className="mb-3 space-y-2 rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">
+            <p>{t.error}</p>
+            {t.background && t.gps === 'DENIED' && <Button size="sm" variant="secondary" onClick={openLocationSettings}>Mở cài đặt quyền vị trí</Button>}
+          </div>
+        )}
         {t.recovery && (
           <Card className="mb-3 space-y-3 border-coin/40 bg-coin/10">
             <p className="flex gap-2 text-sm">
@@ -97,8 +123,14 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
         )}
         <Card className="space-y-2 text-sm text-fg-muted">
           <p className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-brand" /> Chạy ngoài trời. Đứng yên thì app tự dừng tính km.</p>
-          <p className="flex gap-2"><Smartphone className="mt-0.5 size-4 shrink-0 text-brand" /><span>Trình duyệt chỉ ghi GPS khi màn hình còn bật: bấm <b className="text-fg">Khóa màn hình</b> rồi bỏ túi — màn hình đen, ít tốn pin, chạm nhầm không sao. <b className="text-fg">Đừng bấm nút nguồn</b>, GPS sẽ dừng.</span></p>
-          <p className="flex gap-2"><Watch className="mt-0.5 size-4 shrink-0 text-brand" /> Chạy dài hoặc muốn tắt hẳn màn hình? Dùng đồng hồ Garmin / COROS / Apple Watch hoặc app Strava — bài chạy tự về RaceHub.</p>
+          {t.background ? (
+            <p className="flex gap-2"><Smartphone className="mt-0.5 size-4 shrink-0 text-brand" /><span>Bấm Bắt đầu rồi <b className="text-fg">cứ tắt màn hình, bỏ túi</b> — app vẫn ghi GPS. Lần đầu, hãy cho phép RaceHub dùng vị trí (iPhone: chọn <b className="text-fg">Luôn luôn</b> nếu được hỏi).</span></p>
+          ) : (
+            <>
+              <p className="flex gap-2"><Smartphone className="mt-0.5 size-4 shrink-0 text-brand" /><span>Trình duyệt chỉ ghi GPS khi màn hình còn bật: bấm <b className="text-fg">Khóa màn hình</b> rồi bỏ túi — màn hình đen, ít tốn pin, chạm nhầm không sao. <b className="text-fg">Đừng bấm nút nguồn</b>, GPS sẽ dừng. Muốn tắt hẳn màn hình: cài app RaceHub.</span></p>
+              <p className="flex gap-2"><Watch className="mt-0.5 size-4 shrink-0 text-brand" /> Hoặc dùng đồng hồ Garmin / COROS / Apple Watch, app Strava — bài chạy tự về RaceHub.</p>
+            </>
+          )}
         </Card>
       </div>
     )

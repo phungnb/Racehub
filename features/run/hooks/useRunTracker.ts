@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { describeError } from '@/shared/lib/errors'
+import { canTrackLocation, tracksInBackground, watchLocation, type LocationError, type LocationFix } from '../model/location'
 import { buildPayload, clearSnapshot, enqueue, loadSnapshot, saveSnapshot, type RunSnapshot } from '../model/recovery'
 import { GPS, evaluatePoint, isStationary, nextSplit, rollingPace, segmentMovingS, smoothPoint, splitAnnouncement, type Split, type TrackPoint } from '../model/tracker'
 
@@ -50,7 +51,7 @@ export function useRunTracker() {
   const movingRef = useRef(0)
   const splitsRef = useRef<Split[]>([])
   const phaseRef = useRef<RunPhase>('IDLE')
-  const watchId = useRef<number | null>(null)
+  const stopLocation = useRef<(() => void) | null>(null)
   const wakeLock = useRef<WakeLockSentinelLike | null>(null)
   const voiceRef = useRef(true)
   const elapsedRef = useRef(0)
@@ -82,6 +83,7 @@ export function useRunTracker() {
   }, [])
 
   const acquireWakeLock = useCallback(async () => {
+    if (tracksInBackground()) return   // app cài: GPS chạy nền, để màn hình tắt cho đỡ pin
     try {
       const wl = (navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<WakeLockSentinelLike> } }).wakeLock
       if (wl) wakeLock.current = await wl.request('screen')
@@ -93,15 +95,15 @@ export function useRunTracker() {
   }, [])
 
   const stopWatch = useCallback(() => {
-    if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current)
-    watchId.current = null
+    stopLocation.current?.()
+    stopLocation.current = null
   }, [])
 
-  const onPosition = useCallback((pos: GeolocationPosition) => {
-    const { latitude, longitude, accuracy, altitude, speed } = pos.coords
+  const onPosition = useCallback((fix: LocationFix) => {
+    const { latitude, longitude, accuracy, altitude, speed } = fix
     const p: TrackPoint = {
       latitude, longitude, accuracy, altitude: altitude ?? 0, speed: speed ?? null,
-      recorded_at: new Date(pos.timestamp || Date.now()).toISOString(),
+      recorded_at: new Date(fix.time).toISOString(),
     }
     setGps(accuracy <= GPS.MAX_ACCURACY_M ? 'GOOD' : 'WEAK')
 
@@ -153,9 +155,9 @@ export function useRunTracker() {
     persist()
   }, [speak, persist])
 
-  const onPositionError = useCallback((err: GeolocationPositionError) => {
-    setGps(err.code === err.PERMISSION_DENIED ? 'DENIED' : 'WEAK')
-    if (err.code === err.PERMISSION_DENIED) {
+  const onPositionError = useCallback((err: LocationError) => {
+    setGps(err.denied ? 'DENIED' : 'WEAK')
+    if (err.denied) {
       stopWatch()
       setPhase('IDLE')
       setError('Bạn cần cho phép truy cập vị trí để ghi bài chạy.')
@@ -184,7 +186,7 @@ export function useRunTracker() {
   }, [phase, persist])
 
   const start = useCallback(() => {
-    if (!('geolocation' in navigator)) { setGps('UNSUPPORTED'); return }
+    if (!canTrackLocation()) { setGps('UNSUPPORTED'); return }
     setError(null)
     setResult(null)
     points.current = []
@@ -204,8 +206,8 @@ export function useRunTracker() {
     setPhase('LOCATING')
     phaseRef.current = 'LOCATING'
     void acquireWakeLock()
-    watchId.current = navigator.geolocation.watchPosition(onPosition, onPositionError,
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 })
+    stopLocation.current?.()
+    stopLocation.current = watchLocation(onPosition, onPositionError)
   }, [acquireWakeLock, onPosition, onPositionError])
 
   /** Bắt đầu dù tín hiệu GPS còn yếu */
@@ -269,8 +271,9 @@ export function useRunTracker() {
     phaseRef.current = 'PAUSED'
     setGps('SEARCHING')
     void acquireWakeLock()
-    if ('geolocation' in navigator) {
-      watchId.current = navigator.geolocation.watchPosition(onPosition, onPositionError, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 })
+    if (canTrackLocation()) {
+      stopLocation.current?.()
+      stopLocation.current = watchLocation(onPosition, onPositionError)
     }
   }, [recovery, acquireWakeLock, onPosition, onPositionError])
 
@@ -312,15 +315,17 @@ export function useRunTracker() {
 
   // Tắt màn hình / chuyển app: trình duyệt dừng GPS và nhả chế độ giữ sáng màn hình.
   // Quay lại → xin lại cả hai; đoạn bị mất được nối bằng đường thẳng và báo cho người chạy.
+  // Trong app cài: GPS vẫn chạy nền nên chỉ lưu tạm, không có "đoạn bị mất".
   useEffect(() => {
     const onVis = () => {
       const active = phaseRef.current === 'RUNNING' || phaseRef.current === 'PAUSED' || phaseRef.current === 'LOCATING'
       if (!active) return
       if (document.visibilityState === 'hidden') { hiddenAt.current = Date.now(); persist(true); return }
+      if (tracksInBackground()) { hiddenAt.current = null; return }
       void acquireWakeLock()
-      if (watchId.current !== null) {
-        navigator.geolocation.clearWatch(watchId.current)
-        watchId.current = navigator.geolocation.watchPosition(onPosition, onPositionError, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 })
+      if (stopLocation.current) {
+        stopLocation.current()
+        stopLocation.current = watchLocation(onPosition, onPositionError)
       }
       raw.current = []
       if (hiddenAt.current && phaseRef.current === 'RUNNING') {
@@ -337,6 +342,7 @@ export function useRunTracker() {
   useEffect(() => () => { stopWatch(); releaseWakeLock() }, [releaseWakeLock, stopWatch])
 
   return {
+    background: tracksInBackground(),
     phase, gps, distanceM, elapsedS, movingS, currentPace, avgPace, autoPaused, splits, voiceOn, result, error, gapS, recovery,
     setVoiceOn, start, startAnyway, pause, resume, finish, discard, save, restore, dismissRecovery,
   }

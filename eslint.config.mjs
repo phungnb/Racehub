@@ -44,6 +44,10 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "docs/**",
+    // Dự án native của app cài (Capacitor) — tệp sinh tự động
+    "android/**",
+    "ios/**",
+    "mobile/**",
   ]),
 ]);
 

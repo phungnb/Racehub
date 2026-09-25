@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { isNativeApp } from '@/shared/lib/native'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BellRing, Download, Moon, Send, Swords, Trophy, Users, Heart, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
@@ -83,7 +84,9 @@ function DeviceRow({ configured }: { configured: boolean }) {
         onChange={(v) => void toggle(v)} />
       {push.support === 'ios-install' && note('Trên iPhone/iPad, hãy cài RaceHub lên màn hình chính rồi mở từ biểu tượng đó để bật thông báo (iOS 16.4 trở lên). ',
         <button type="button" className="font-semibold text-brand underline" onClick={() => void install()}>Xem cách cài</button>)}
-      {push.support === 'unsupported' && note('Trình duyệt này không hỗ trợ thông báo đẩy. Hãy dùng Chrome, Edge, Firefox hoặc Safari mới.')}
+      {push.support === 'unsupported' && note(isNativeApp()
+        ? 'Thông báo đẩy trong app RaceHub sẽ có ở bản cập nhật tới. Trong lúc chờ, thông báo vẫn hiện trong chuông khi bạn mở app.'
+        : 'Trình duyệt này không hỗ trợ thông báo đẩy. Hãy dùng Chrome, Edge, Firefox hoặc Safari mới.')}
       {push.support === 'no-key' && note('Máy chủ chưa bật thông báo đẩy (thiếu khóa VAPID). Báo quản trị viên.')}
       {push.support === 'dev' && note('Thông báo đẩy chỉ hoạt động ở bản đã deploy (không chạy với next dev).')}
       {push.support === 'ok' && push.permission === 'denied' && note('Bạn đã chặn thông báo cho RaceHub. Mở cài đặt trang của trình duyệt → Thông báo → Cho phép, rồi quay lại đây.')}
