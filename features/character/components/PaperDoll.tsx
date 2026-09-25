@@ -322,7 +322,14 @@ export async function renderPortrait(gender: Body, items: CharacterItem[], size 
   const out = document.createElement('canvas')
   out.width = size
   out.height = size
-  out.getContext('2d')!.drawImage(full, cx - side / 2, cy - side / 2, side, side, 0, 0, size, size)
+  const o = out.getContext('2d')!
+  // JPEG không có trong suốt: nền xám nhạt chuyển màu phía sau nhân vật
+  const g = o.createLinearGradient(0, 0, 0, size)
+  g.addColorStop(0, '#d9dbe3')
+  g.addColorStop(1, '#b8bac6')
+  o.fillStyle = g
+  o.fillRect(0, 0, size, size)
+  o.drawImage(full, cx - side / 2, cy - side / 2, side, side, 0, 0, size, size)
   return new Promise((resolve, reject) => out.toBlob((b) => (b ? resolve(b) : reject(new Error('Không tạo được ảnh'))), 'image/jpeg', 0.9))
 }
 
@@ -351,10 +358,7 @@ export function PaperDoll({ gender, items, className, label = 'Nhân vật', fit
         tmp.height = H + TOP
         const ctx = tmp.getContext('2d')!
         if (!(await compose(ctx, gender, JSON.parse(spec) as DrawSpec, SIDE, TOP, () => cancelled)) || cancelled) return
-        // Nền mở rộng: kéo dãn hàng/cột mép ảnh (nền xám trơn) để khung nào cũng liền màu
-        ctx.drawImage(tmp, SIDE, TOP, W, 1, SIDE, 0, W, TOP)
-        ctx.drawImage(tmp, SIDE, 0, 1, H + TOP, 0, 0, SIDE, H + TOP)
-        ctx.drawImage(tmp, SIDE + W - 1, 0, 1, H + TOP, SIDE + W, 0, SIDE, H + TOP)
+        // Ảnh nhân vật đã tách nền (trong suốt): nền do khung chứa quyết định
         cv.width = tmp.width
         cv.height = tmp.height
         cv.getContext('2d')!.drawImage(tmp, 0, 0)
