@@ -19,7 +19,7 @@ export function FormChip({ userId, showHint = false, className }: { userId?: str
   const q = useRunnerForm(userId)
   if (!q.data) return null
   const f = q.data
-  const m = FORM_META[f.status]
+  const m = FORM_META[f.status] ?? FORM_META.NEW
   const resting = f.status === 'RESTING' || f.status === 'LONG_BREAK'
   return (
     <div className={cn('space-y-1', className)}>

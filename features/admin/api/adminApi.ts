@@ -76,7 +76,7 @@ export async function grantXu(input: { kind: AccountKind; id: string; amount: nu
     p_reason: input.reason, p_idempotency_key: input.key,
   })
   if (error) throw error
-  return data as { transaction_id?: string; balance?: number; duplicate?: boolean; pending?: boolean; approval_id?: string }
+  return data as { transaction_id: string; balance: number; duplicate?: boolean }
 }
 
 export async function listPasses(): Promise<Pass[]> {
@@ -91,7 +91,7 @@ export async function grantPass(input: { kind: AccountKind; id: string; quantity
     p_expires_at: input.expiresAt, p_note: input.note || null,
   })
   if (error) throw error
-  return data as string | null        // null = vượt ngưỡng, đã thành yêu cầu chờ admin khác duyệt
+  return data as string
 }
 
 export async function revokePass(id: string, reason: string) {
@@ -182,7 +182,8 @@ const MESSAGES: Record<string, string> = {
   USER_NOT_FOUND: 'Không tìm thấy người dùng.',
   CLUB_NOT_FOUND: 'Không tìm thấy CLB.',
   INVALID_MAX_SLOTS: 'Số người tối đa của vé phải từ 1 đến 10.000.',
-  INVALID_TIME_RANGE: 'Hạn dùng phải ở tương lai.',
+  INVALID_TIME_RANGE: 'Khoảng thời gian không hợp lệ (kết thúc sau bắt đầu, sự kiện cần đủ 2 mốc, tối đa 1 năm).',
+  INVALID_TITLE: 'Tên cần từ 2 ký tự.',
   PASS_NOT_FOUND: 'Không tìm thấy vé.',
   INVALID_CONFIG: 'Cấu hình không hợp lệ — kiểm tra lại các mốc và đơn giá.',
   INVALID_CODE: 'Mã vật phẩm chỉ gồm chữ thường không dấu, số và dấu _ (3–48 ký tự).',
@@ -199,11 +200,14 @@ const MESSAGES: Record<string, string> = {
   SLOT_LOCKED: 'Đã có người sở hữu món này, không đổi sang ô khác được. Hãy tạo mã mới.',
   ITEM_REQUIRED: 'Không ngừng bán được bản nguyên bản (bộ mặc định của mọi người).',
   ITEM_NOT_FOUND: 'Không tìm thấy vật phẩm.',
-  SELF_ACTION_FORBIDDEN: 'Không thể tự cấp cho chính mình hoặc CLB mình là thành viên — nhờ một admin khác thực hiện.',
-  SAME_ADMIN: 'Người yêu cầu không tự duyệt được — cần một admin khác.',
-  APPROVAL_DONE: 'Yêu cầu này đã được xử lý.',
-  APPROVAL_EXPIRED: 'Yêu cầu đã quá 7 ngày và hết hạn — tạo lại nếu vẫn cần.',
-  APPROVAL_NOT_FOUND: 'Không tìm thấy yêu cầu.',
+  INVALID_REWARD: 'Phần thưởng không hợp lệ: cần ít nhất Xu, lượt tạo hoặc gói VIP (gói tặng phải là VIP1–3).',
+  SEGMENT_TOO_LARGE: 'Nhóm quá lớn (trên 50.000 người) — chia nhỏ theo điều kiện khác.',
+  INVALID_SALE: 'Đợt giảm giá cần % giảm hoặc % tặng thêm.',
+  INVALID_PERIOD: 'Kỳ nhiệm vụ không hợp lệ.',
+  INVALID_METRIC: 'Chỉ số không hợp với kỳ (km tuần / ngày chạy trong tuần chỉ dùng cho nhiệm vụ tuần).',
+  INVALID_TARGET: 'Mục tiêu phải lớn hơn 0.',
+  promotions_code_key: 'Mã khuyến mãi này đã tồn tại.',
+  promotions_code_check: 'Mã chỉ gồm chữ in hoa, số, - và _ (4–24 ký tự).',
   ORDER_NOT_FOUND: 'Không tìm thấy đơn hàng.',
   ORDER_NOT_PENDING: 'Đơn đã được xử lý hoặc đã hủy.',
   INVALID_PLAN: 'Gói không hợp lệ cho loại tài khoản này (VIP cho cá nhân, CLB Pro cho CLB).',

@@ -51,11 +51,30 @@ export async function getEconomyMetrics(months: number): Promise<EconomyMetrics>
   return { months: (r.months ?? []).map((m) => num(m) as unknown as MetricsMonth), snapshot: num(r.snapshot ?? {}) as unknown as EconomyMetrics['snapshot'] }
 }
 
-export interface Approval {
-  id: string; action: 'GRANT_XU' | 'GRANT_PASS' | 'GRANT_PLAN'; summary: string; payload: Record<string, unknown>
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED'; requested_by: string; requester: string | null; decider: string | null
-  decided_at: string | null; note: string | null; created_at: string; mine: boolean
+/* ---------------- Nhiệm vụ do admin tạo (migration 004300) ---------------- */
+export type QuestPeriod = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'EVENT'
+export type QuestMetric = 'TOTAL_KM' | 'RUN_COUNT' | 'RUN_KM' | 'CHECKIN' | 'WEEK_KM' | 'WEEK_RUN_DAYS' | 'CHALLENGE_JOINS'
+export interface AdminQuest {
+  id?: string; code?: string; title: string; description: string | null; period: QuestPeriod; metric: QuestMetric; target: number
+  reward_xu: number; icon?: string; sort?: number; is_active: boolean; starts_at: string | null; ends_at: string | null; min_vip_tier: number
+  completions?: number; xu_paid?: number
 }
-export const listApprovals = async (status: Approval['status'] | 'ALL') => (await call<Approval[]>('admin_list_approvals', { p_status: status })) ?? []
-export const decideApproval = (id: string, approve: boolean, note: string) =>
-  call<{ status: string }>('admin_decide_approval', { p_id: id, p_approve: approve, p_note: note || null })
+export const listQuests = async () => ((await call<AdminQuest[]>('admin_list_quests')) ?? []).map((q) => ({
+  ...q, target: Number(q.target), reward_xu: Number(q.reward_xu), completions: Number(q.completions ?? 0), xu_paid: Number(q.xu_paid ?? 0),
+}))
+export const saveQuest = (q: AdminQuest) => call<string>('admin_save_quest', { p: q })
+
+/* ---------------- Khuyến mãi (migration 004300) ---------------- */
+export type SegmentType = 'ALL' | 'ACTIVE' | 'INACTIVE' | 'NEW' | 'VIP' | 'FREE' | 'CLUB' | 'LEVEL' | 'USERS'
+export interface Segment { type: SegmentType; days?: number; min_tier?: number; min_level?: number; club_id?: string; ids?: string[] }
+export interface Reward { xu?: number; passes?: { qty: number; max_slots: number; days: number } | null; plan?: { code: string; months: number } | null }
+export interface Promotion {
+  id: string; kind: 'GRANT' | 'CODE' | 'SALE'; title: string; message: string | null; reward: Reward; segment: Segment | null; code: string | null
+  max_uses: number | null; discount_pct: number; bonus_pct: number; applies_to: 'ALL' | 'PLAN' | 'XU'; plan_code: string | null
+  starts_at: string; ends_at: string | null; is_active: boolean; recipients: number; created_at: string; creator: string | null; orders: number
+}
+export const previewSegment = (seg: Segment) => call<{ count: number; sample: string[] }>('admin_preview_segment', { p_segment: seg })
+export const runGrant = (p: { title: string; message: string; segment: Segment; reward: Reward }) =>
+  call<{ promotion_id: string; recipients: number }>('admin_run_grant', { p })
+export const savePromo = (p: Partial<Promotion> & { kind: 'CODE' | 'SALE' }) => call<string>('admin_save_promo', { p })
+export const listPromotions = async () => (await call<Promotion[]>('admin_list_promotions')) ?? []

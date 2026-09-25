@@ -33,9 +33,9 @@ export function PassesTab({ policy }: { policy: EconomyPolicy }) {
   const submit = async () => {
     if (!target) return
     try {
-      const id = await grant.mutateAsync({ kind: target.kind, id: target.id, quantity: qty, maxSlots: slots,
+      await grant.mutateAsync({ kind: target.kind, id: target.id, quantity: qty, maxSlots: slots,
         expiresAt: days ? new Date(Date.now() + days * 86_400_000).toISOString() : null, note: note.trim() })
-      toast.success(id ? `Đã tặng ${qty} lượt tạo cho ${target.name}` : 'Vượt ngưỡng tự duyệt — đã gửi yêu cầu, chờ một admin khác duyệt ở tab Phê duyệt.')
+      toast.success(`Đã tặng ${qty} lượt tạo cho ${target.name}`)
       setNote('')
     } catch (e) {
       toast.error(adminErrorMessage(e))

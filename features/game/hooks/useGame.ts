@@ -6,7 +6,7 @@ import { useInvalidateProfile } from '@/features/auth'
 import { supabase } from '@/shared/lib/supabase'
 import {
   buyShield, checkIn, getAchievements, getActivityRewards, getGameState, getLeagueStandings, getWallet, markEventsSeen,
-  getGiftCatalog, getGiftWall, getRunnerForm, sendGift, setWeeklyGoal,
+  getGiftCatalog, getGiftWall, getMyQuests, getRunnerForm, redeemPromoCode, sendGift, setWeeklyGoal,
 } from '../api/gameApi'
 
 export const gameKeys = {
@@ -104,4 +104,13 @@ export function useWallet() {
 
 export function useRunnerForm(userId?: string | null) {
   return useQuery({ queryKey: ['game', 'form', userId ?? 'me'], queryFn: () => getRunnerForm(userId), staleTime: 5 * 60_000 })
+}
+
+export function useMyQuests() {
+  return useQuery({ queryKey: ['game', 'quests'], queryFn: getMyQuests })
+}
+
+export function useRedeemPromo() {
+  const refresh = useRefreshAll()
+  return useMutation({ mutationFn: redeemPromoCode, onSuccess: () => refresh() })
 }

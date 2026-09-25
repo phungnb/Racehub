@@ -1,6 +1,6 @@
 // Lớp game: mọi thao tác qua RPC (migration 000800). Client chỉ đọc và hiển thị.
 import { supabase } from '@/shared/lib/supabase'
-import type { Achievement, GameEvent, GameState, LeagueRow, Wallet } from '../model/game'
+import type { Achievement, GameEvent, GameState, LeagueRow, Quest, Wallet } from '../model/game'
 
 const n = (v: unknown) => Number(v ?? 0)
 const toEvent = (e: GameEvent): GameEvent => ({ ...e, xu: n(e.xu), xp: n(e.xp), payload: e.payload ?? {} })
@@ -114,6 +114,11 @@ export async function getWallet(before?: string | null): Promise<Wallet> {
 }
 
 const MESSAGES: Record<string, string> = {
+  PROMO_INVALID: 'Mã không đúng hoặc đã hết hạn.',
+  PROMO_USED_UP: 'Mã đã hết lượt sử dụng.',
+  PROMO_ALREADY_USED: 'Bạn đã dùng mã này rồi.',
+  PROMO_NOT_ELIGIBLE: 'Mã này không dành cho tài khoản của bạn.',
+  TOO_MANY_ATTEMPTS: 'Bạn nhập sai quá nhiều lần. Thử lại sau 1 giờ.',
   CANNOT_GIFT_SELF: 'Không tự tặng quà cho chính mình được.',
   GIFT_DAILY_LIMIT: 'Bạn đã tặng quà tối đa trong hôm nay. Mai tiếp nhé!',
   GIFT_NOT_AVAILABLE: 'Quà này hiện không còn (hết mùa hoặc đã ngừng).',
@@ -145,4 +150,20 @@ export async function getRunnerForm(userId?: string | null): Promise<RunnerForm>
   if (error) throw error
   const f = (data ?? {}) as RunnerForm
   return { ...f, km_28d: n(f.km_28d), km_prev_28d: n(f.km_prev_28d), runs_28d: n(f.runs_28d), comeback_xu: n(f.comeback_xu), comeback_days: n(f.comeback_days) }
+}
+
+/* ------------------------- Nhiệm vụ (migration 004300) ------------------------- */
+export async function getMyQuests(): Promise<Quest[]> {
+  const { data, error } = await supabase.rpc('my_quests')
+  if (error) throw error
+  return ((data ?? []) as Quest[]).map((q) => ({ ...q, target: n(q.target), progress: n(q.progress), reward_xu: n(q.reward_xu), reward_xp: 0 }))
+}
+
+/* ------------------------- Mã khuyến mãi (migration 004300) ------------------------- */
+export async function redeemPromoCode(code: string) {
+  const { data, error } = await supabase.rpc('redeem_promo_code', { p_code: code })
+  if (error) throw error
+  const r = data as { error?: string; title?: string; reward?: { xu?: number; passes?: { qty: number; max_slots: number }; plan?: { code: string; months: number } } }
+  if (r?.error) throw new Error(r.error)
+  return r
 }

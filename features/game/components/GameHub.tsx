@@ -9,7 +9,7 @@ import { levelProgress } from '@/features/progression'
 import type { Profile } from '@/shared/types/profile'
 import { gameErrorMessage } from '../api/gameApi'
 import { FormChip } from './FormChip'
-import { useGameState, useMarkSeen } from '../hooks/useGame'
+import { useGameState, useMarkSeen, useMyQuests } from '../hooks/useGame'
 import { leagueTier, timeLeft, type GameState } from '../model/game'
 import { LeagueSheet } from './LeagueSheet'
 import { QuestList } from './QuestList'
@@ -28,8 +28,11 @@ function Hub({ profile, s }: { profile: Profile; s: GameState }) {
   const [streakOpen, setStreakOpen] = useState(false)
   const [leagueOpen, setLeagueOpen] = useState(false)
   const [showWeekly, setShowWeekly] = useState(false)
-  const daily = s.quests.filter((x) => x.period === 'DAILY')
-  const weekly = s.quests.filter((x) => x.period === 'WEEKLY')
+  const mq = useMyQuests()
+  const quests = mq.data ?? s.quests
+  const events = quests.filter((x) => x.period === 'EVENT')
+  const daily = quests.filter((x) => x.period === 'DAILY')
+  const weekly = quests.filter((x) => x.period === 'WEEKLY' || x.period === 'MONTHLY')
   const dailyDone = daily.filter((x) => x.completed).length
   const weeklyDone = weekly.filter((x) => x.completed).length
 
@@ -37,6 +40,16 @@ function Hub({ profile, s }: { profile: Profile; s: GameState }) {
     <div className="space-y-3">
       <UnseenRewards events={s.unseen} />
       <TodayCard profile={profile} s={s} onStreak={() => setStreakOpen(true)} />
+
+      {events.length > 0 && (
+        <Card className="space-y-1 border-coin/40 bg-gradient-to-br from-coin/10 to-surface">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Sự kiện đang diễn ra</h2>
+            <span className="font-mono text-xs text-fg-muted">{events.filter((x) => x.completed).length}/{events.length}</span>
+          </div>
+          <QuestList quests={events} />
+        </Card>
+      )}
 
       <Card className="space-y-1">
         <div className="flex items-center justify-between">
@@ -46,7 +59,7 @@ function Hub({ profile, s }: { profile: Profile; s: GameState }) {
         <QuestList quests={daily} />
         <button onClick={() => setShowWeekly((v) => !v)} aria-expanded={showWeekly}
           className="-mx-1 mt-1 flex min-h-11 w-[calc(100%+0.5rem)] items-center justify-between rounded-xl px-1 text-sm font-semibold text-fg-muted hover:text-fg">
-          <span>Nhiệm vụ tuần <span className="font-mono text-xs">· {weeklyDone}/{weekly.length}</span></span>
+          <span>Nhiệm vụ tuần & tháng <span className="font-mono text-xs">· {weeklyDone}/{weekly.length}</span></span>
           <ChevronRight className={cn('size-4 transition-transform', showWeekly && 'rotate-90')} aria-hidden />
         </button>
         {showWeekly && <QuestList quests={weekly} />}

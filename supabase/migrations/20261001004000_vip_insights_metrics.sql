@@ -143,7 +143,7 @@ begin
                sum(e.amount) filter (where e.account_id <> v_sys and (t.type like 'GAME\_%' escape '\')) as earn_game,
                sum(e.amount) filter (where e.account_id <> v_sys and t.type in ('REFERRAL_INVITER', 'REFERRAL_REFEREE')) as earn_ref,
                sum(e.amount) filter (where e.account_id <> v_sys and t.type = 'LEVEL_UP_XU') as earn_level,
-               sum(e.amount) filter (where e.account_id <> v_sys and t.type in ('ADMIN_ADJUST', 'ADMIN_GRANT', 'ADMIN_DEDUCT')) as admin_net,
+               sum(e.amount) filter (where e.account_id <> v_sys and t.type in ('ADMIN_ADJUST', 'ADMIN_GRANT', 'ADMIN_DEDUCT', 'PROMO')) as admin_net,
                sum(e.amount) filter (where e.account_id <> v_sys and t.type in ('XU_PURCHASE', 'XU_PURCHASE_BONUS', 'IAP_TOPUP_VND')) as purchased,
                sum(e.amount) filter (where e.account_id = v_sys and t.type in ('CHALLENGE_CREATION_FEE', 'RACE_FEE')) as burn_fee,
                sum(e.amount) filter (where e.account_id = v_sys and t.type in ('GIFT', 'CHEER')) as burn_gift,

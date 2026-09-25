@@ -1,6 +1,7 @@
 // Gói VIP / CLB Pro / Nạp Xu (migration 003800). Chưa có cổng thanh toán: tạo đơn → chuyển khoản VietQR → admin xác nhận.
 import { supabase } from '@/shared/lib/supabase'
 import type { CapacityTier } from '@/shared/lib/economy'
+import type { Sale } from '../model/sale'
 
 export interface PlanPrice { months: number; price_vnd: number; active: boolean }
 export interface PlanCredit { capacity: number; per_month: number }
@@ -16,7 +17,7 @@ export type OrderStatus = 'PENDING' | 'PAID' | 'CANCELLED'
 export interface Order {
   id: string; code: string; buyer_id: string; kind: 'PLAN' | 'XU'; plan_code: string | null; months: number | null
   package_id: string | null; owner_type: 'USER' | 'CLUB'; owner_id: string; amount_vnd: number; xu: number; bonus_xu: number
-  status: OrderStatus; note: string | null; created_at: string; expires_at: string; paid_at: string | null
+  status: OrderStatus; note: string | null; list_price_vnd?: number | null; promotion_id?: string | null; created_at: string; expires_at: string; paid_at: string | null
   plan_name: string | null; owner_name: string | null; buyer_name: string | null; payment: PaymentAccount
 }
 export interface ActivePlan { plan_code: string; name: string; tier: number; ends_at: string }
@@ -43,6 +44,12 @@ export async function getPricing(): Promise<Pricing> {
     xu_vnd: n(p.xu_vnd) || 100,
     capacity_tiers: (p.capacity_tiers ?? []).map((t) => ({ max: n(t.max), xu: n(t.xu) })),
   }
+}
+
+export async function getActiveSales(): Promise<Sale[]> {
+  const { data, error } = await supabase.rpc('active_sales')
+  if (error) throw error
+  return ((data ?? []) as Sale[]).map((x) => ({ ...x, discount_pct: n(x.discount_pct), bonus_pct: n(x.bonus_pct) }))
 }
 
 export async function getMyPlan(): Promise<MyPlan> {

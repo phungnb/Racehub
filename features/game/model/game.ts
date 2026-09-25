@@ -4,7 +4,7 @@ import {
   Repeat, Route, Shield, Sparkles, Star, Sunrise, Target, Trophy, Users, type LucideIcon,
 } from 'lucide-react'
 
-export type QuestPeriod = 'DAILY' | 'WEEKLY'
+export type QuestPeriod = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'EVENT'
 export type GameEventKind = 'RUN' | 'QUEST' | 'BADGE' | 'STREAK' | 'LEVEL_UP' | 'LEAGUE' | 'CHEER_IN' | 'CHECKIN' | 'REFERRAL' | 'GIFT_IN' | 'COMEBACK'
 export type BadgeTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'LEGEND'
 export type LeagueZone = 'UP' | 'STAY' | 'DOWN'
@@ -22,6 +22,11 @@ export interface Quest {
   completed: boolean
   reward_xu: number
   reward_xp: number
+  /** Nhiệm vụ do admin tạo (migration 004300) */
+  starts_at?: string | null
+  ends_at?: string | null
+  min_vip_tier?: number
+  locked?: boolean
 }
 
 export interface GameEvent {
@@ -148,7 +153,7 @@ export const ratio = (progress: number, target: number) => (target > 0 ? Math.mi
 
 /** Hiển thị tiến độ nhiệm vụ: km có số lẻ, còn lại số nguyên */
 export function questProgressLabel(q: Pick<Quest, 'metric' | 'progress' | 'target'>) {
-  const km = q.metric === 'RUN_KM' || q.metric === 'WEEK_KM'
+  const km = q.metric === 'RUN_KM' || q.metric === 'WEEK_KM' || q.metric === 'TOTAL_KM'
   const f = (n: number) => (km ? n.toLocaleString('vi-VN', { maximumFractionDigits: 1 }) : String(Math.floor(n)))
   return `${f(q.progress)}/${f(q.target)}${km ? ' km' : ''}`
 }
@@ -186,7 +191,7 @@ export const WALLET_LABEL: Record<string, string> = {
   CLUB_FUND_TOPUP: 'Nạp quỹ CLB', IAP_TOPUP_VND: 'Nạp Xu',
   REFERRAL_INVITER: 'Thưởng giới thiệu', REFERRAL_REFEREE: 'Thưởng được mời', OPENING_BALANCE: 'Số dư đầu kỳ',
   GIFT: 'Tặng quà', XU_PURCHASE: 'Nạp Xu', XU_PURCHASE_BONUS: 'Tặng thêm khi nạp', RATE_CONVERSION: 'Đổi quy ước 1 Xu = 100đ',
-  GAME_COMEBACK: 'Chào mừng trở lại', RACE_FEE: 'Phí tạo giải chạy ảo', LEVEL_UP_XU: 'Thưởng lên cấp', CHECKIN: 'Điểm danh',
+  GAME_COMEBACK: 'Chào mừng trở lại', PROMO: 'Khuyến mãi', RACE_FEE: 'Phí tạo giải chạy ảo', LEVEL_UP_XU: 'Thưởng lên cấp', CHECKIN: 'Điểm danh',
 }
 export const walletLabel = (type: string) => WALLET_LABEL[type] ?? 'Giao dịch'
 

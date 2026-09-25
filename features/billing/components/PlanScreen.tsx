@@ -11,7 +11,8 @@ import { formatVnd } from '@/shared/lib/economy'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import { billingErrorMessage, MONTH_LABEL, type Credit, type Order, type OrderInput, type Plan } from '../api/billingApi'
-import { useCreateOrder, useMyPlan, usePricing } from '../hooks/useBilling'
+import { useActiveSales, useCreateOrder, useMyPlan, usePricing } from '../hooks/useBilling'
+import { bestSale, saleBonusXu, salePrice, type Sale } from '../model/sale'
 import { OrderSheet, orderTitle, STATUS_META } from './OrderSheet'
 
 type Tab = 'vip' | 'xu'
@@ -32,10 +33,12 @@ export function CreditList({ credits, empty }: { credits: Credit[]; empty: strin
   )
 }
 
-function PlanCard({ plan, months, current, onBuy, busy }: {
-  plan: Plan; months: number; current: boolean; onBuy: () => void; busy: boolean
+function PlanCard({ plan, months, current, onBuy, busy, sales }: {
+  plan: Plan; months: number; current: boolean; onBuy: () => void; busy: boolean; sales: Sale[]
 }) {
   const price = plan.prices.find((p) => p.months === months && p.active)
+  const sale = bestSale(sales, 'PLAN', plan.code)
+  const final = price ? salePrice(price.price_vnd, sale) : 0
   const monthly = plan.prices.find((p) => p.months === 1 && p.active)
   const save = price && monthly && months > 1 ? Math.round((1 - price.price_vnd / (monthly.price_vnd * months)) * 100) : 0
   return (
@@ -49,8 +52,10 @@ function PlanCard({ plan, months, current, onBuy, busy }: {
         {current && <span className="rounded-full bg-coin/20 px-2 py-0.5 text-[11px] font-bold text-coin">Đang dùng</span>}
       </div>
       {price ? (
-        <p><span className="font-mono text-2xl font-bold">{formatVnd(price.price_vnd)}</span>
+        <p><span className="font-mono text-2xl font-bold">{formatVnd(final)}</span>
+          {final < price.price_vnd && <span className="ml-1.5 font-mono text-sm text-fg-subtle line-through">{formatVnd(price.price_vnd)}</span>}
           <span className="text-sm text-fg-muted"> / {MONTH_LABEL[months]}</span>
+          {sale?.discount_pct ? <span className="ml-2 rounded-full bg-danger/15 px-2 py-0.5 text-xs font-bold text-danger">−{sale.discount_pct}%</span> : null}
           {save > 0 && <span className="ml-2 rounded-full bg-brand/15 px-2 py-0.5 text-xs font-semibold text-brand">tiết kiệm {save}%</span>}</p>
       ) : <p className="text-sm text-fg-muted">Không bán kỳ hạn này</p>}
       <ul className="space-y-1.5">
@@ -70,6 +75,7 @@ export function PlanScreen() {
   const tab: Tab = params.get('tab') === 'xu' ? 'xu' : 'vip'
   const setTab = (t: Tab) => router.replace(t === 'vip' ? routes.plan : `${routes.plan}?tab=xu`, { scroll: false })
   const pricing = usePricing()
+  const sales = useActiveSales()
   const mine = useMyPlan()
   const create = useCreateOrder()
   const [months, setMonths] = useState(1)
@@ -85,6 +91,7 @@ export function PlanScreen() {
   if (pricing.isPending) return <Skeleton className="h-96" />
   if (pricing.isError) return <ErrorState message={billingErrorMessage(pricing.error)} onRetry={() => void pricing.refetch()} />
   const vip = pricing.data.plans.filter((p) => p.owner_type === 'USER')
+  const xuSale = bestSale(sales.data ?? [], 'XU')
   const periods = Array.from(new Set(vip.flatMap((p) => p.prices.filter((x) => x.active).map((x) => x.months)))).sort((a, b) => a - b)
   const plan = mine.data?.plan ?? null
   const orders = mine.data?.orders ?? []
@@ -113,6 +120,17 @@ export function PlanScreen() {
         </Link>
       )}
 
+      {(sales.data ?? []).map((x) => (
+        <Card key={x.id} className="border-danger/40 bg-gradient-to-br from-danger/10 to-surface py-3">
+          <p className="font-semibold">{x.title}</p>
+          <p className="text-xs text-fg-muted">
+            {[x.discount_pct ? `Giảm ${x.discount_pct}% ${x.applies_to === 'XU' ? 'gói nạp Xu' : x.applies_to === 'PLAN' ? (x.plan_code ? `gói ${x.plan_code}` : 'gói VIP / CLB Pro') : 'mọi gói'}` : null,
+              x.bonus_pct ? `tặng thêm ${x.bonus_pct}% Xu khi nạp` : null].filter(Boolean).join(' · ')}
+            {x.ends_at ? ` · đến ${new Date(x.ends_at).toLocaleDateString('vi-VN')}` : ''}{x.message ? ` · ${x.message}` : ''}
+          </p>
+        </Card>
+      ))}
+
       <SegmentedControl value={tab} onChange={setTab} options={[{ value: 'vip', label: 'Gói VIP' }, { value: 'xu', label: 'Nạp Xu' }]} />
 
       {tab === 'vip' ? (
@@ -128,7 +146,7 @@ export function PlanScreen() {
             </div>
           )}
           {vip.map((p) => (
-            <PlanCard key={p.code} plan={p} months={months} current={plan?.plan_code === p.code} busy={pendingKey === p.code}
+            <PlanCard key={p.code} plan={p} months={months} sales={sales.data ?? []} current={plan?.plan_code === p.code} busy={pendingKey === p.code}
               onBuy={() => void buy({ kind: 'PLAN', plan_code: p.code, months }, p.code)} />
           ))}
           <p className="text-xs text-fg-subtle">Gia hạn khi còn hạn sẽ cộng nối tiếp. Lượt tạo cấp đầu mỗi tháng, không cộng dồn sang tháng sau.</p>
@@ -139,9 +157,10 @@ export function PlanScreen() {
             {pricing.data.packages.filter((x) => x.active).map((x) => (
               <button key={x.id} onClick={() => void buy({ kind: 'XU', package_id: x.id }, x.id)} disabled={!!pendingKey}
                 className="relative rounded-2xl border border-border bg-surface p-3 text-left transition-colors hover:border-coin/60 disabled:opacity-60">
-                {x.bonus_xu > 0 && <span className="absolute right-2 top-2 rounded-full bg-brand/15 px-1.5 text-[11px] font-bold text-brand">+{formatCoin(x.bonus_xu)}</span>}
+                {(() => { const b = saleBonusXu(x.xu, x.bonus_xu, xuSale); return b > 0 && <span className="absolute right-2 top-2 rounded-full bg-brand/15 px-1.5 text-[11px] font-bold text-brand">+{formatCoin(b)}</span> })()}
                 <p className="flex items-center gap-1.5 font-mono text-xl font-bold text-coin"><Coins className="size-5" aria-hidden />{formatCoin(x.xu)}</p>
-                <p className="text-sm font-semibold">{formatVnd(x.price_vnd)}</p>
+                <p className="text-sm font-semibold">{formatVnd(salePrice(x.price_vnd, xuSale))}
+                  {salePrice(x.price_vnd, xuSale) < x.price_vnd && <span className="ml-1 text-xs font-normal text-fg-subtle line-through">{formatVnd(x.price_vnd)}</span>}</p>
                 {pendingKey === x.id && <p className="text-xs text-fg-subtle">Đang tạo đơn…</p>}
               </button>
             ))}

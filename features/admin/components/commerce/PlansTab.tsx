@@ -186,12 +186,7 @@ function GrantPlanForm({ plans }: { plans: Plan[] }) {
   const code = options.find((p) => p.code === plan)?.code ?? options[0]?.code ?? ''
   const grant = useMutation({
     mutationFn: () => grantPlan({ kind: target!.kind, id: target!.id, plan: code, months, reason: reason.trim() }),
-    onSuccess: (r) => {
-      toast.success((r as { pending?: boolean } | null)?.pending
-        ? 'Gói dài hạn cần một admin khác duyệt — đã gửi yêu cầu ở tab Phê duyệt.'
-        : `Đã cấp ${code} ${MONTH_LABEL[months]} cho ${target?.name}`)
-      setReason(''); refresh()
-    },
+    onSuccess: () => { toast.success(`Đã cấp ${code} ${MONTH_LABEL[months]} cho ${target?.name}`); setReason(''); refresh() },
     onError: (e) => toast.error(adminErrorMessage(e)),
   })
   return (

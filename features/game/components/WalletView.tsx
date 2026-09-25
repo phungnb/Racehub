@@ -10,6 +10,7 @@ import { xuToVnd } from '@/shared/lib/economy'
 import { gameErrorMessage } from '../api/gameApi'
 import { useWallet } from '../hooks/useGame'
 import { walletLabel, type WalletItem } from '../model/game'
+import { PromoCodeForm } from './PromoCodeForm'
 
 const dayLabel = (iso: string) => {
   const d = new Date(iso)
@@ -53,6 +54,7 @@ export function WalletView() {
             <Crown className="size-4 text-coin" aria-hidden />Gói VIP
           </Link>
         </div>
+        <PromoCodeForm />
       </Card>
 
       {!items.length ? (

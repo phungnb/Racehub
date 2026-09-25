@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Activity, BarChart3, ShieldCheck, CheckCircle2, Flag, Gift, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Tags, Ticket, type LucideIcon } from 'lucide-react'
+import { Activity, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Tags, Ticket, type LucideIcon } from 'lucide-react'
 import { ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { adminErrorMessage } from '../api/adminApi'
@@ -18,15 +18,17 @@ import { OrdersTab } from './commerce/OrdersTab'
 import { PlansTab } from './commerce/PlansTab'
 import { GiftsTab, OrganizersTab } from './commerce/GiftsTab'
 import { MetricsTab } from './commerce/MetricsTab'
-import { ApprovalsTab } from './commerce/ApprovalsTab'
+import { QuestsTab } from './commerce/QuestsTab'
+import { PromotionsTab } from './commerce/PromotionsTab'
 import { CupReviewList } from '@/features/cup'
 
-type Tab = 'overview' | 'metrics' | 'approvals' | 'orders' | 'plans' | 'grant' | 'passes' | 'policy' | 'gifts' | 'organizers' | 'items' | 'review' | 'clubs' | 'cups' | 'system'
+type Tab = 'overview' | 'metrics' | 'orders' | 'promos' | 'quests' | 'plans' | 'grant' | 'passes' | 'policy' | 'gifts' | 'organizers' | 'items' | 'review' | 'clubs' | 'cups' | 'system'
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
   { id: 'metrics', label: 'Chỉ số', icon: BarChart3 },
-  { id: 'approvals', label: 'Phê duyệt', icon: ShieldCheck },
   { id: 'orders', label: 'Đơn hàng', icon: Receipt },
+  { id: 'promos', label: 'Khuyến mãi', icon: Megaphone },
+  { id: 'quests', label: 'Nhiệm vụ', icon: Target },
   { id: 'plans', label: 'Gói & giá', icon: Tags },
   { id: 'grant', label: 'Cộng/Trừ Xu', icon: Coins },
   { id: 'passes', label: 'Lượt tạo', icon: Ticket },
@@ -63,8 +65,9 @@ export function AdminConsole() {
 
       {tab === 'system' ? <SystemTab />
         : tab === 'metrics' ? <MetricsTab />
-        : tab === 'approvals' ? <ApprovalsTab />
         : tab === 'orders' ? <OrdersTab />
+        : tab === 'promos' ? <PromotionsTab />
+        : tab === 'quests' ? <QuestsTab />
         : tab === 'plans' ? <PlansTab />
         : tab === 'gifts' ? <GiftsTab />
         : tab === 'organizers' ? <OrganizersTab />

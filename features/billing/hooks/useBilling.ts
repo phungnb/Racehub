@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { cancelOrder, createOrder, getClubPlanStatus, getMyPlan, getPricing } from '../api/billingApi'
+import { cancelOrder, createOrder, getActiveSales, getClubPlanStatus, getMyPlan, getPricing } from '../api/billingApi'
 
 export const billingKeys = {
   pricing: ['billing', 'pricing'] as const,
@@ -22,3 +22,5 @@ export function useCancelOrder() {
   const qc = useQueryClient()
   return useMutation({ mutationFn: cancelOrder, onSuccess: () => void qc.invalidateQueries({ queryKey: billingKeys.mine }) })
 }
+
+export const useActiveSales = () => useQuery({ queryKey: ['billing', 'sales'], queryFn: getActiveSales, staleTime: 60_000 })

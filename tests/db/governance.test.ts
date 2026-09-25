@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import { createDb, asUser } from './load-schema'
 
-// Migration 004100: vá bảo mật + cơ chế quản trị (không tự phục vụ, hai người duyệt, nhật ký chỉ-thêm) + sửa chốt thử thách
+// Migration 004100: vá bảo mật + nhật ký chỉ-thêm (admin vẫn toàn quyền) + sửa chốt thử thách
 const [ADM1, ADM2, U, M1, M2, M3] = ['00000000-0000-0000-0000-0000000041a1', '00000000-0000-0000-0000-0000000041a2', '00000000-0000-0000-0000-0000000041a3',
   '00000000-0000-0000-0000-0000000041b1', '00000000-0000-0000-0000-0000000041b2', '00000000-0000-0000-0000-0000000041b3']
 const CLUB = '00000000-0000-0000-0000-0000000041c1'
@@ -26,7 +26,7 @@ let k = 0
 const grant = (db: PGlite, admin: string, type: string, id: string, amount: number) =>
   rpc<Row>(db, admin, `select public.admin_grant_xu($1, $2, $3, 'BONUS', 'Thưởng sự kiện', $4) as r`, [type, id, amount, `gov-key-${++k}-xxxx`])
 
-describe('Bảo mật + quản trị (004100)', () => {
+describe('Bảo mật + lưu vết (004100)', () => {
   let db: PGlite
   beforeAll(async () => {
     db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed })
@@ -45,55 +45,14 @@ describe('Bảo mật + quản trị (004100)', () => {
     expect(noRls.rows).toEqual([])
   })
 
-  it('admin không tự phục vụ mình hay CLB mình là thành viên', async () => {
-    expect(await fails(grant(db, ADM1, 'USER', ADM1, 100))).toContain('SELF_ACTION_FORBIDDEN')
-    expect(await fails(grant(db, ADM1, 'CLUB', CLUB, 100))).toContain('SELF_ACTION_FORBIDDEN')
-    expect(await fails(rpc(db, ADM1, `select public.admin_grant_plan('USER', $1, 'VIP3', 1, 'tự cấp') as r`, [ADM1]))).toContain('SELF_ACTION_FORBIDDEN')
-    expect(await fails(rpc(db, ADM1, `select public.admin_set_club_plan($1, 'PRO', null, 'tự bật') as r`, [CLUB]))).toContain('SELF_ACTION_FORBIDDEN')
-    expect(await fails(rpc(db, ADM1, `select public.admin_set_race_organizer('USER', $1, true, null) as r`, [ADM1]))).toContain('SELF_ACTION_FORBIDDEN')
-    const pkg = (await db.query<{ id: string }>(`select id from public.xu_packages where xu = 5000`)).rows[0].id
-    const o = await rpc<Row>(db, ADM1, `select public.create_order($1::jsonb) as r`, [JSON.stringify({ kind: 'XU', package_id: pkg })])
-    expect(await fails(rpc(db, ADM1, `select public.admin_confirm_order($1, null) as r`, [o.id]))).toContain('SELF_ACTION_FORBIDDEN')
-    expect(await fails(rpc(db, ADM2, `select public.admin_confirm_order($1, 'VCB') as r`, [o.id]))).toBe('OK')   // admin khác xác nhận được
-    // ADM2 không thuộc CLB → bật Pro cho CLB được
-    expect(await fails(rpc(db, ADM2, `select public.admin_set_club_plan($1, 'PRO', null, 'đối tác') as r`, [CLUB]))).toBe('OK')
-  })
-
-  it('lệnh nhỏ chạy ngay; lệnh lớn thành yêu cầu, chỉ admin KHÁC duyệt được; sổ cái ghi người duyệt', async () => {
-    const small = await grant(db, ADM1, 'USER', U, 1000)
-    expect(small.transaction_id).toBeTruthy()
-    expect(await xu(db, U)).toBe(1000)
-    const big = await grant(db, ADM1, 'USER', U, 8000)
-    expect(big).toMatchObject({ pending: true })
-    expect(await xu(db, U)).toBe(1000)
-    expect(await fails(rpc(db, ADM1, `select public.admin_decide_approval($1, true, null) as r`, [big.approval_id]))).toContain('SAME_ADMIN')
-    expect((await db.query(`select 1 from public.notifications where user_id = $1 and kind = 'ADMIN_APPROVAL'`, [ADM2])).rows.length).toBeGreaterThan(0)
-    const list = await rpc<Row[]>(db, ADM2, `select public.admin_list_approvals('PENDING') as r`)
-    expect(list.map((a) => a.id)).toContain(big.approval_id)
-    const d = await rpc<Row>(db, ADM2, `select public.admin_decide_approval($1, true, 'Đã xem hồ sơ') as r`, [big.approval_id])
-    expect(d.status).toBe('APPROVED')
-    expect(await xu(db, U)).toBe(9000)
-    const tx = (await db.query<{ a: string }>(`select approved_by as a from public.ledger_transactions where id = $1`, [d.result.transaction_id])).rows[0].a
-    expect(tx).toBe(ADM2)
-    expect(await fails(rpc(db, ADM2, `select public.admin_decide_approval($1, true, null) as r`, [big.approval_id]))).toContain('APPROVAL_DONE')
-  })
-
-  it('trần ngày mỗi admin: cộng dồn vượt 20.000 Xu → phải duyệt; chủ hệ thống duyệt được bằng SQL Editor', async () => {
-    for (let i = 0; i < 4; i++) expect((await grant(db, ADM2, 'USER', M1, 4500)).transaction_id).toBeTruthy()   // 18.000
-    const over = await grant(db, ADM2, 'USER', M1, 4500)
-    expect(over.pending).toBe(true)
-    const r = (await db.query<{ r: Row }>(`select private.approve_as_owner($1) as r`, [over.approval_id])).rows[0].r
-    expect(r.status).toBe('APPROVED')
-    expect(await xu(db, M1)).toBe(22500)
-  })
-
-  it('lượt tạo nhiều và gói dài cũng phải duyệt', async () => {
-    const pass = await rpc(db, ADM1, `select public.admin_grant_challenge_pass('USER', $1, 20, 100, null, 'Tài trợ') as r`, [U])
-    expect(pass).toBeNull()
-    const plan = await rpc<Row>(db, ADM1, `select public.admin_grant_plan('USER', $1, 'VIP2', 6, 'Đại sứ thương hiệu') as r`, [U])
-    expect(plan.pending).toBe(true)
-    const pending = (await db.query<{ n: number }>(`select count(*)::int as n from public.admin_approvals where status = 'PENDING' and action in ('GRANT_PASS', 'GRANT_PLAN')`)).rows[0].n
-    expect(pending).toBe(2)
+  it('admin toàn quyền: cộng Xu lớn, cấp gói dài, tặng nhiều lượt cho bất kỳ ai (kể cả mình) chạy ngay, có ghi nhật ký', async () => {
+    expect((await grant(db, ADM1, 'USER', U, 50000)).transaction_id).toBeTruthy()
+    expect(await xu(db, U)).toBe(50000)
+    expect((await grant(db, ADM1, 'USER', ADM1, 100)).transaction_id).toBeTruthy()
+    expect(await fails(rpc(db, ADM1, `select public.admin_grant_plan('USER', $1, 'VIP3', 12, 'Đại sứ') as r`, [U]))).toBe('OK')
+    expect(await rpc(db, ADM1, `select public.admin_grant_challenge_pass('USER', $1, 50, 1000, null, 'Tài trợ') as r`, [U])).toBeTruthy()
+    const n = (await db.query<{ n: number }>(`select count(*)::int as n from public.admin_audit_log where actor_id = $1`, [ADM1])).rows[0].n
+    expect(n).toBeGreaterThanOrEqual(4)
   })
 
   it('nhật ký quản trị và sổ cái không sửa / xóa được', async () => {
