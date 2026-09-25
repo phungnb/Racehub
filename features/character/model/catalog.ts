@@ -28,7 +28,53 @@ export interface CharacterItem {
   trial_until?: string | null
   /** Chương trình khuyến mãi đang áp (migration 005100) */
   offer?: ItemOffer | null
+  /** In lên áo: logo, tên CLB, dòng phụ, tên runner (migration 005800) */
+  print?: ItemPrint | null
+  status?: ItemLifecycle
+  /** Đồng phục: chỉ thành viên CLB này mua / mặc được */
+  club_id?: string | null
+  club_name?: string | null
+  /** Lý do chưa mua / nhận được (null = được) */
+  lock?: ItemLock | null
+  collection?: { code: string; name: string; kind: string } | null
+  /** Còn bao nhiêu (giới hạn số lượng) */
+  left?: number | null
+  available_from?: string | null
+  available_to?: string | null
 }
+
+export type ItemLifecycle = 'DRAFT' | 'REVIEW' | 'PUBLISHED' | 'ARCHIVED' | 'RETIRED'
+export type ItemLock = 'NOT_FOR_SALE' | 'CLUB_ONLY' | 'LEVEL' | 'BADGE' | 'CHALLENGE' | 'NOT_YET' | 'ENDED' | 'SOLD_OUT'
+export const LOCK_LABEL: Record<ItemLock, string> = {
+  NOT_FOR_SALE: 'Ngừng bán', CLUB_ONLY: 'Chỉ thành viên CLB', LEVEL: 'Chưa đủ cấp', BADGE: 'Cần huy hiệu',
+  CHALLENGE: 'Hoàn thành thử thách để nhận', NOT_YET: 'Sắp mở bán', ENDED: 'Hết thời gian', SOLD_OUT: 'Hết hàng',
+}
+
+/** Nội dung in lên áo */
+export interface ItemPrint {
+  logo_url?: string | null
+  title?: string | null
+  subtitle?: string | null
+  /** In tên runner (lấy từ hồ sơ người mặc) */
+  personal?: 'NONE' | 'NAME'
+  text_color?: string
+  font?: 'sport' | 'sans' | 'serif'
+}
+
+/** Vùng in trên áo (tâm x, tâm y, rộng, cao — theo khung chuẩn 900×1350), đo trên ảnh nền từng giới tính */
+export type PrintZone = { cx: number; cy: number; w: number; h: number }
+export const PRINT_ZONES: Record<Gender, Record<'logo' | 'title' | 'subtitle' | 'personal', PrintZone>> = {
+  male: {
+    logo: { cx: 528, cy: 320, w: 56, h: 48 }, title: { cx: 456, cy: 522, w: 172, h: 42 },
+    subtitle: { cx: 456, cy: 558, w: 156, h: 22 }, personal: { cx: 456, cy: 590, w: 124, h: 24 },
+  },
+  female: {
+    logo: { cx: 468, cy: 380, w: 30, h: 28 }, title: { cx: 428, cy: 432, w: 112, h: 28 },
+    subtitle: { cx: 428, cy: 458, w: 100, h: 16 }, personal: { cx: 428, cy: 478, w: 76, h: 14 },
+  },
+}
+/** Tên in trên áo: tên gọi (từ cuối của họ tên Việt), viết hoa */
+export const jerseyName = (displayName: string | null | undefined) => (displayName ?? '').trim().split(/\s+/).pop()?.toUpperCase() ?? ''
 
 /** Chương trình khuyến mãi của một vật phẩm với người đang xem */
 export interface ItemOffer {
@@ -84,6 +130,10 @@ export interface CharacterState extends Look {
   balance: number
   items: CharacterItem[]
   bundles?: ItemBundle[]
+  /** Tên người mặc (in lên áo có vùng tên runner) */
+  display_name?: string | null
+  /** Bộ sưu tập đang mở */
+  collections?: { code: string; name: string; kind: string; ends_at: string | null }[]
 }
 
 /** Khung chuẩn: mọi ảnh nền, mặt nạ và lớp vật phẩm đều đúng kích thước này */
@@ -173,7 +223,7 @@ export type ItemStatus = 'EQUIPPED' | 'OWNED' | 'BUY' | 'LOCKED'
 export function itemStatus(item: CharacterItem, level: number, equipped: Partial<Record<Slot, string>>): ItemStatus {
   if (equipped[item.slot] === item.code) return 'EQUIPPED'
   if (item.owned || (item.trial_until && Date.parse(item.trial_until) > Date.now())) return 'OWNED'
-  if (level < item.unlock_level) return 'LOCKED'
+  if (level < item.unlock_level || item.lock) return 'LOCKED'
   return 'BUY'
 }
 

@@ -72,7 +72,7 @@ export function AvatarPicker({ userId, avatarUrl, name, size = 'lg', shine = 0, 
     setMaking(true)
     try {
       const s = character.data
-      const blob = await renderPortrait(s.gender, resolveOutfit(s.items, s.equipped))
+      const blob = await renderPortrait(s.gender, resolveOutfit(s.items, s.equipped), 512, s.display_name)
       setPreview({ blob, url: URL.createObjectURL(blob) })
     } catch {
       toast.error('Không tạo được ảnh từ nhân vật. Thử lại sau.')

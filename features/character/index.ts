@@ -5,3 +5,6 @@ export { PaperDoll, renderPortrait, renderCharacter } from './components/PaperDo
 export { LayerThumb } from './components/LayerThumb'
 export { useCharacterOf, useCharacterState, characterKeys } from './hooks/useCharacter'
 export * from './model/catalog'
+export { UniformSection, uniformPreview } from './components/UniformStudio'
+export { PrintFields, hasPrint } from './components/PrintFields'
+export * from './api/uniformApi'

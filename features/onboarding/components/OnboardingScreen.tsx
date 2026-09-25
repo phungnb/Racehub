@@ -341,7 +341,7 @@ function DoneStep() {
     <div className="flex flex-1 flex-col items-center text-center">
       <div className="flex w-full flex-1 items-center justify-center pt-4">
         <div className="w-full max-w-[240px] overflow-hidden rounded-3xl border border-border shadow-[0_0_60px_-10px] shadow-brand/30">
-          {c ? <PaperDoll gender={c.gender} items={resolveOutfit(c.items, c.equipped)} className="aspect-[2/3] w-full" />
+          {c ? <PaperDoll gender={c.gender} items={resolveOutfit(c.items, c.equipped)} personalName={c.display_name} className="aspect-[2/3] w-full" />
             : <div className="grid aspect-[2/3] w-full place-items-center bg-surface-2"><Loader2 className="size-6 animate-spin text-brand" aria-label="Đang tải" /></div>}
         </div>
       </div>

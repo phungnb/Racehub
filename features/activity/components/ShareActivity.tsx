@@ -25,7 +25,7 @@ export function ShareActivitySheet({ activity: a, route, onClose }: { activity: 
   useEffect(() => {
     let alive = true
     const c = character.data
-    if (showChar && c && !charCanvas.current) charCanvas.current = renderCharacter(c.gender, resolveOutfit(c.items, c.equipped)).catch(() => null)
+    if (showChar && c && !charCanvas.current) charCanvas.current = renderCharacter(c.gender, resolveOutfit(c.items, c.equipped), c.display_name).catch(() => null)
     ;(async () => {
       setBusy(true)
       const canvas = document.createElement('canvas')

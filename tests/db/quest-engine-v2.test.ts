@@ -18,6 +18,13 @@ type Row = Record<string, any>
 const rpc = async <T = Row>(db: PGlite, uid: string, sql: string, params: unknown[] = []) => (await asUser<{ r: T }>(db, uid, '/rpc', sql, params)).rows[0]?.r
 const fails = async (p: Promise<unknown>) => { try { await p } catch (e) { return (e as Error).message } return 'OK' }
 const DAY = 86_400_000
+/** "m phút trước" nhưng luôn trong ngày VN hôm nay (chạy test ngay sau 0h giờ VN không bị rơi sang hôm qua); giữ đúng thứ tự */
+const ago = (m: number) => {
+  const now = Date.now()
+  const vnMidnight = Math.floor((now + 7 * 3600_000) / DAY) * DAY - 7 * 3600_000
+  const base = Math.max(now - 60 * 60_000, vnMidnight + 1000)
+  return new Date(base + ((60 - m) / 60) * (now - base))
+}
 /** Bài chạy hợp lệ bắt đầu lúc `at` */
 const runAt = async (db: PGlite, uid: string, km: number, at: Date) => {
   const id = (await db.query<{ id: string }>(`
@@ -46,17 +53,17 @@ describe('Nhiệm vụ v2 (004600)', () => {
     const id = await save(db, { title: 'Xỏ giày hôm nay', period: 'DAILY', metric: 'RUN_KM', tiers: [{ target: 3, xu: 1 }, { target: 5, xu: 1 }, { target: 10, xu: 2 }] })
     const q = (await rpc<Row[]>(db, ADMIN, `select public.admin_list_quests() as r`)).find((x) => x.id === id)!
     expect(q).toMatchObject({ target: 10, reward_xu: 4 })
-    await runAt(db, A, 4, new Date(Date.now() - 60_000 * 30))
+    await runAt(db, A, 4, ago(30))
     expect((await questXu(db, A, id)).map((e) => Number(e.xu))).toEqual([1])
     expect(await mine(db, A, id)).toMatchObject({ tier_paid: 1, completed: false })
-    await runAt(db, A, 11, new Date(Date.now() - 60_000 * 10))
+    await runAt(db, A, 11, ago(10))
     const ev = await questXu(db, A, id)
     expect(ev.map((e) => Number(e.xu))).toEqual([1, 3])            // bậc 2 + 3 trả gộp một lần
     expect(await mine(db, A, id)).toMatchObject({ tier_paid: 3, completed: true })
 
     // Nhiệm vụ ngày thứ hai thưởng 5 Xu: đã nhận 4 Xu hôm nay → chỉ trả 1 (trần ngày 5)
     const id2 = await save(db, { title: 'Hai bài hôm nay', period: 'DAILY', metric: 'RUN_COUNT', target: 2, reward_xu: 5 })
-    await runAt(db, A, 3, new Date(Date.now() - 60_000 * 5))
+    await runAt(db, A, 3, ago(5))
     expect((await questXu(db, A, id2)).map((e) => Number(e.xu))).toEqual([1])
   })
 
@@ -68,7 +75,7 @@ describe('Nhiệm vụ v2 (004600)', () => {
     await runAt(db, B, 5, new Date(`${vnYesterday}T05:30:00+07:00`))
     expect(await mine(db, B, days)).toMatchObject({ progress: 1, completed: false })
     expect(await mine(db, B, early)).toMatchObject({ completed: true })
-    await runAt(db, B, 5, new Date(Date.now() - 60_000))
+    await runAt(db, B, 5, ago(1))
     expect(await mine(db, B, days)).toMatchObject({ progress: 2, completed: true })
 
     await rpc(db, ADMIN, `select public.admin_set_quest_limits($1::jsonb) as r`, [JSON.stringify({ maxEvent: 2 })])
@@ -80,12 +87,12 @@ describe('Nhiệm vụ v2 (004600)', () => {
   it('km cộng đồng: đạt mục tiêu thì ai góp ≥ min_km đều nhận, người góp ít hơn không', async () => {
     const id = await save(db, { title: 'Cả RaceHub 40 km', metric: 'COMMUNITY_KM', target: 40, reward_xu: 7, params: { min_km: 2 }, ...event(1) })
     // Bài trong 1 ngày qua: A (4 + 11 + 3 = 18 km), B (5 km) đã có ở trên
-    await runAt(db, C, 1, new Date(Date.now() - 60_000 * 3))
+    await runAt(db, C, 1, ago(3))
     expect(await mine(db, C, id)).toMatchObject({ completed: false })
-    await runAt(db, C, 1.5, new Date(Date.now() - 60_000 * 2))        // C chỉ góp 2,5 km… vẫn chưa đủ tổng
+    await runAt(db, C, 1.5, ago(2))        // C chỉ góp 2,5 km… vẫn chưa đủ tổng
     const q = await mine(db, C, id)
     expect(Number(q.progress)).toBeLessThan(40)
-    await runAt(db, B, 20, new Date(Date.now() - 60_000))               // tổng vượt 40
+    await runAt(db, B, 20, ago(1))               // tổng vượt 40
     const done = (await db.query<{ user_id: string }>(`select user_id from public.user_quest_progress where quest_id = $1 and completed_at is not null order by user_id`, [id])).rows.map((r) => r.user_id)
     expect(done).toEqual([A, B, C].sort())
     expect(await mine(db, C, id)).toMatchObject({ completed: true, mine: 2.5 })

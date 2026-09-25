@@ -1,7 +1,7 @@
 // Công cụ admin: mọi thao tác đi qua RPC kiểm tra quyền is_system_admin (migration 000700).
 import { supabase } from '@/shared/lib/supabase'
 import { toPolicy, type EconomyPolicy } from '@/shared/lib/economy'
-import type { CharacterItem, Gender, RenderKind, Rarity, Slot } from '@/features/character'
+import type { CharacterItem, Gender, ItemLifecycle, ItemPrint, RenderKind, Rarity, Slot, UniformRequest, UniformStatus } from '@/features/character'
 import type { PendingRun } from '@/features/activity'
 import { systemErrorMessage } from '@/shared/lib/errors'
 
@@ -125,10 +125,17 @@ export async function reviewActivity(id: string, status: 'APPROVED' | 'REJECTED'
 // ---------------------------------------------------------------------
 // Vật phẩm nhân vật (migration 001200)
 // ---------------------------------------------------------------------
-export interface AdminItem extends CharacterItem {
+export interface AdminItem extends Omit<CharacterItem, 'collection'> {
   is_active: boolean
   sort: number
   owners: number
+  status: ItemLifecycle
+  /** Mã bộ sưu tập */
+  collection: string | null
+  required_badge: string | null
+  required_challenge: string | null
+  challenge_title?: string | null
+  supply_limit: number | null
 }
 
 export interface ItemInput {
@@ -143,7 +150,24 @@ export interface ItemInput {
   price_xu: number
   unlock_level: number
   sort: number
-  is_active: boolean
+  /** Vòng đời (migration 005800); thay is_active */
+  status: ItemLifecycle
+  collection: string | null
+  club_id: string | null
+  required_badge: string | null
+  required_challenge: string | null
+  available_from: string | null
+  available_to: string | null
+  supply_limit: number | null
+  print: ItemPrint | null
+}
+
+export const ITEM_STATUS: Record<ItemLifecycle, { label: string; hint: string; tone: string }> = {
+  DRAFT: { label: 'Nháp', hint: 'Chỉ admin thấy', tone: 'bg-surface-2 text-fg-muted' },
+  REVIEW: { label: 'Chờ duyệt', hint: 'Chờ người thứ hai xem lại', tone: 'bg-coin/15 text-coin' },
+  PUBLISHED: { label: 'Đang bán', hint: 'Hiện trong Tủ đồ', tone: 'bg-brand/15 text-brand' },
+  ARCHIVED: { label: 'Ngừng bán', hint: 'Người đã có vẫn mặc được', tone: 'bg-xp/15 text-xp' },
+  RETIRED: { label: 'Gỡ hẳn', hint: 'Ẩn cả với người đã có (theo chính sách hoàn Xu)', tone: 'bg-danger/15 text-danger' },
 }
 
 export const LAYER_BUCKET = 'character-layers'
@@ -158,6 +182,53 @@ export async function saveAvatarItem(item: ItemInput) {
   const { data, error } = await supabase.rpc('admin_save_avatar_item', { p_item: item })
   if (error) throw error
   return data as AdminItem
+}
+
+export async function setAvatarItemStatus(code: string, status: ItemLifecycle) {
+  const { error } = await supabase.rpc('admin_set_avatar_item_status', { p_code: code, p_status: status })
+  if (error) throw error
+}
+
+export type CollectionKind = 'CORE' | 'LEVEL' | 'SEASON' | 'EVENT' | 'CLUB' | 'SPONSOR'
+export const COLLECTION_KIND: Record<CollectionKind, string> = {
+  CORE: 'Cơ bản', LEVEL: 'Theo cấp', SEASON: 'Mùa', EVENT: 'Sự kiện', CLUB: 'CLB', SPONSOR: 'Nhà tài trợ',
+}
+export interface AvatarCollection {
+  id?: string
+  code: string
+  name: string
+  description: string | null
+  kind: CollectionKind
+  starts_at: string | null
+  ends_at: string | null
+  sort: number
+  is_active: boolean
+  items?: number
+}
+
+export async function listAvatarCollections(): Promise<AvatarCollection[]> {
+  const { data, error } = await supabase.rpc('admin_list_avatar_collections')
+  if (error) throw error
+  return ((data ?? []) as AvatarCollection[]).map((c) => ({ ...c, items: Number(c.items ?? 0) }))
+}
+
+export async function saveAvatarCollection(c: AvatarCollection) {
+  const { data, error } = await supabase.rpc('admin_save_avatar_collection', { p: c })
+  if (error) throw error
+  return data as AvatarCollection
+}
+
+export async function listUniformRequests(status: UniformStatus | 'ALL'): Promise<UniformRequest[]> {
+  const { data, error } = await supabase.rpc('admin_list_uniform_requests', { p_status: status })
+  if (error) throw error
+  return (data ?? []) as UniformRequest[]
+}
+
+export interface UniformApproval { price_xu: number; rarity: Rarity; name?: string; collection?: string | null; note?: string }
+export async function reviewUniformRequest(id: string, action: 'APPROVE' | 'REJECT', p: UniformApproval | { note: string }) {
+  const { data, error } = await supabase.rpc('admin_review_uniform_request', { p_id: id, p_action: action, p })
+  if (error) throw error
+  return data as UniformRequest
 }
 
 export async function setAvatarItemActive(code: string, active: boolean) {
@@ -201,7 +272,18 @@ const MESSAGES: Record<string, string> = {
   INVALID_SLOT: 'Ô trang phục không hợp lệ.',
   INVALID_RARITY: 'Độ hiếm không hợp lệ.',
   INVALID_PRICE: 'Giá phải từ 0 đến 100.000 Xu.',
-  INVALID_LEVEL: 'Cấp mở khóa phải từ 1 đến 5.',
+  INVALID_LEVEL: 'Cấp mở khóa phải từ 1 đến 8.',
+  INVALID_STATUS: 'Trạng thái không hợp lệ.',
+  COLLECTION_NOT_FOUND: 'Không tìm thấy bộ sưu tập.',
+  BADGE_NOT_FOUND: 'Không tìm thấy huy hiệu với mã này.',
+  CHALLENGE_NOT_FOUND: 'Không tìm thấy thử thách.',
+  PRINT_TOP_ONLY: 'Chỉ áo mới có vùng in.',
+  INVALID_PRINT: 'Nội dung in chưa hợp lệ (logo PNG/WebP/JPG, màu chữ dạng #rrggbb).',
+  ITEM_HAS_OWNERS: 'Đã có người sở hữu: không đưa về Nháp / Chờ duyệt được. Dùng Ngừng bán.',
+  INVALID_SUPPLY: 'Số lượng giới hạn phải từ 1 trở lên.',
+  REQUEST_NOT_FOUND: 'Không tìm thấy yêu cầu.',
+  REQUEST_CLOSED: 'Yêu cầu đã được xử lý.',
+  INVALID_ACTION: 'Thao tác không hợp lệ.',
   TINT_SLOT_ONLY: 'Vật phẩm đổi màu chỉ dành cho áo, quần, tất, giày.',
   INVALID_COLOR: 'Mã màu không hợp lệ.',
   LAYER_REQUIRED: 'Cần ít nhất một ảnh lớp (Nam hoặc Nữ).',

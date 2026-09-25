@@ -3,14 +3,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ImageUp, Palette, Layers } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Field, Input, SegmentedControl, Sheet } from '@/shared/ui'
+import { Button, Field, Input, SegmentedControl, Sheet, SwitchRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import {
-  FRAME, PaperDoll, RARITY_META, SLOTS, isTintSlot,
-  type CharacterItem, type Gender, type Rarity, type RenderKind, type Slot,
+  FRAME, PaperDoll, PrintFields, RARITY_META, SLOTS, hasPrint, isTintSlot, uploadPrintLogo,
+  type CharacterItem, type Gender, type ItemLifecycle, type ItemPrint, type Rarity, type RenderKind, type Slot,
 } from '@/features/character'
-import { adminErrorMessage, uploadLayer, type AdminItem } from '../../api/adminApi'
-import { useSaveAvatarItem } from '../../hooks/useAdmin'
+import { useMyProfile } from '@/features/auth'
+import { useAchievements } from '@/features/game'
+import { adminErrorMessage, ITEM_STATUS, uploadLayer, type AdminItem } from '../../api/adminApi'
+import { useAvatarCollections, useSaveAvatarItem } from '../../hooks/useAdmin'
+import { ChallengePick, ClubPick, fromLocalInput, toLocalInput, type Picked } from './ItemRules'
 import { checkLayer, CODE_PATTERN, suggestCode, type LayerStats } from '../../model/itemLayer'
 
 const GENDERS: { value: Gender; label: string }[] = [{ value: 'male', label: 'Nam' }, { value: 'female', label: 'Nữ' }]
@@ -55,7 +58,19 @@ export function ItemEditor({ item, onClose }: { item: AdminItem | null; onClose:
   const [color, setColor] = useState<string | null>(item ? item.color : '#e11d48')
   const [price, setPrice] = useState(item ? String(item.price_xu) : '30')
   const [level, setLevel] = useState(item?.unlock_level ?? 1)
-  const [active, setActive] = useState(item?.is_active ?? true)
+  const [status, setStatus] = useState<ItemLifecycle>(item?.status ?? 'DRAFT')
+  const [collection, setCollection] = useState(item?.collection ?? '')
+  const [club, setClub] = useState<Picked | null>(item?.club_id ? { id: item.club_id, name: item.club_name ?? 'CLB' } : null)
+  const [badge, setBadge] = useState(item?.required_badge ?? '')
+  const [challenge, setChallenge] = useState<Picked | null>(item?.required_challenge ? { id: item.required_challenge, name: item.challenge_title ?? 'Thử thách' } : null)
+  const [from, setFrom] = useState(toLocalInput(item?.available_from))
+  const [to, setTo] = useState(toLocalInput(item?.available_to))
+  const [supply, setSupply] = useState(item?.supply_limit ? String(item.supply_limit) : '')
+  const [print, setPrint] = useState<ItemPrint | null>(item?.print ?? null)
+  const [uploading, setUploading] = useState(false)
+  const collections = useAvatarCollections()
+  const badges = useAchievements()
+  const { profile } = useMyProfile()
   const [layers, setLayers] = useState<Partial<Record<Gender, LayerDraft>>>(() => {
     const out: Partial<Record<Gender, LayerDraft>> = {}
     for (const g of ['male', 'female'] as const) {
@@ -92,7 +107,8 @@ export function ItemEditor({ item, onClose }: { item: AdminItem | null; onClose:
     code: finalCode || 'preview', name, description: null, slot, rarity, render_kind: kind, price_xu: 0, unlock_level: 1, is_default: false,
     color: kind === 'TINT' ? color : null,
     layer_urls: kind === 'LAYER' ? Object.fromEntries(Object.entries(layers).map(([g, l]) => [g, l!.url])) : null,
-  }), [finalCode, name, slot, rarity, kind, color, layers])
+    print: slot === 'top' ? print : null,
+  }), [finalCode, name, slot, rarity, kind, color, layers, print])
 
   const problems: string[] = []
   if (!CODE_PATTERN.test(finalCode)) problems.push('Mã chỉ gồm chữ thường không dấu, số, dấu _ (3–48 ký tự).')
@@ -102,6 +118,9 @@ export function ItemEditor({ item, onClose }: { item: AdminItem | null; onClose:
     if (!layers.male && !layers.female) problems.push('Tải lên ít nhất một ảnh lớp.')
     if (Object.values(layers).some((l) => l && l.errors.length)) problems.push('Ảnh lớp còn lỗi, xem bên dưới.')
   }
+  if (from && to && to <= from) problems.push('Ngày kết thúc bán phải sau ngày mở bán.')
+  if (supply && !(Number.isInteger(Number(supply)) && Number(supply) >= 1)) problems.push('Số lượng giới hạn phải là số nguyên ≥ 1.')
+  if (slot === 'top' && print && !hasPrint(print)) problems.push('Vùng in đang trống: thêm logo / chữ hoặc tắt In lên áo.')
   const missing = kind === 'LAYER' && (layers.male ? !layers.female : !!layers.female)
 
   const submit = async () => {
@@ -116,7 +135,10 @@ export function ItemEditor({ item, onClose }: { item: AdminItem | null; onClose:
       await save.mutateAsync({
         code: finalCode, name: name.trim(), description: description.trim() || null, slot, rarity, render_kind: kind,
         color: kind === 'TINT' ? color : null, layer_urls: kind === 'LAYER' ? urls : null,
-        price_xu: priceNum, unlock_level: level, sort: item?.sort ?? 100, is_active: active,
+        price_xu: priceNum, unlock_level: level, sort: item?.sort ?? 100, status,
+        collection: collection || null, club_id: club?.id ?? null, required_badge: badge || null, required_challenge: challenge?.id ?? null,
+        available_from: fromLocalInput(from), available_to: fromLocalInput(to), supply_limit: supply ? Number(supply) : null,
+        print: slot === 'top' && print && hasPrint(print) ? print : null,
       })
       toast.success(isNew ? `Đã thêm ${name.trim()}` : 'Đã lưu vật phẩm')
       onClose()
@@ -133,13 +155,13 @@ export function ItemEditor({ item, onClose }: { item: AdminItem | null; onClose:
       footer={
         <div className="flex gap-2">
           <Button variant="secondary" block onClick={onClose} disabled={busy}>Hủy</Button>
-          <Button block onClick={submit} loading={busy} disabled={problems.length > 0}>{isNew ? 'Thêm vào shop' : 'Lưu'}</Button>
+          <Button block onClick={submit} loading={busy} disabled={problems.length > 0 || uploading}>{isNew ? 'Tạo vật phẩm' : 'Lưu'}</Button>
         </div>
       }>
       <div className="space-y-4">
         {/* Xem thử */}
         <div className="relative h-80 overflow-hidden rounded-2xl border border-border bg-[#c4c4ce]">
-          <PaperDoll gender={gender} items={[preview]} className="size-full" fit="contain" label="Xem thử vật phẩm" />
+          <PaperDoll gender={gender} items={[preview]} personalName={profile?.display_name ?? 'Runner'} className="size-full" fit="contain" label="Xem thử vật phẩm" />
           <SegmentedControl value={gender} onChange={setGender} options={GENDERS} className="absolute right-2 top-2 w-28 bg-bg/85" />
         </div>
 
@@ -218,7 +240,7 @@ export function ItemEditor({ item, onClose }: { item: AdminItem | null; onClose:
           <Field label="Mở ở cấp" htmlFor="item-level">
             <select id="item-level" value={level} onChange={(e) => setLevel(Number(e.target.value))}
               className="h-11 w-full rounded-xl border border-border bg-bg px-3 text-[15px]">
-              {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>Cấp {n}</option>)}
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>Cấp {n}</option>)}
             </select>
           </Field>
         </div>
@@ -235,10 +257,57 @@ export function ItemEditor({ item, onClose }: { item: AdminItem | null; onClose:
           </div>
         </Field>
 
-        <label className="flex items-center justify-between rounded-xl border border-border px-3.5 py-3 text-sm font-semibold">
-          Đang bán trong shop
-          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="size-5 accent-[var(--color-brand)]" />
-        </label>
+        {slot === 'top' && (
+          <div className="space-y-3 rounded-2xl border border-border p-3">
+            <SwitchRow checked={!!print} onChange={(on) => setPrint(on ? (item?.print ?? { personal: 'NONE', text_color: '#ffffff', font: 'sport' }) : null)}
+              label="In lên áo" description="Logo ngực, chữ lớn, dòng phụ, tên runner — vẽ theo nếp vải của áo" />
+            {print && <PrintFields value={print} onChange={setPrint} upload={(f) => uploadPrintLogo(`items/${finalCode || 'moi'}`, f)} onUploading={setUploading} />}
+          </div>
+        )}
+
+        <div className="space-y-3 rounded-2xl border border-border p-3">
+          <p className="text-sm font-semibold">Điều kiện mở khóa & bán</p>
+          <Field label="Bộ sưu tập" htmlFor="item-col">
+            <select id="item-col" value={collection} onChange={(e) => setCollection(e.target.value)}
+              className="h-11 w-full rounded-xl border border-border bg-bg px-3 text-[15px]">
+              <option value="">Không thuộc bộ nào</option>
+              {(collections.data ?? []).map((c) => <option key={c.code} value={c.code}>{c.name}{c.is_active ? '' : ' (đã tắt)'}</option>)}
+            </select>
+          </Field>
+          <Field label="Chỉ thành viên CLB" hint="Đồng phục: chỉ thành viên mua / mặc; rời CLB tự tháo ra">
+            <ClubPick value={club} onChange={setClub} />
+          </Field>
+          <Field label="Cần huy hiệu" htmlFor="item-badge">
+            <select id="item-badge" value={badge} onChange={(e) => setBadge(e.target.value)}
+              className="h-11 w-full rounded-xl border border-border bg-bg px-3 text-[15px]">
+              <option value="">Không cần</option>
+              {badge && !(badges.data ?? []).some((b) => b.code === badge) && <option value={badge}>{badge}</option>}
+              {(badges.data ?? []).map((b) => <option key={b.code} value={b.code}>{b.title}</option>)}
+            </select>
+          </Field>
+          <Field label="Hoàn thành thử thách" hint="Giá 0 Xu + có điều kiện = tự phát khi đủ điều kiện">
+            <ChallengePick value={challenge} onChange={setChallenge} />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Mở bán từ" htmlFor="item-from"><Input id="item-from" type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
+            <Field label="Bán đến" htmlFor="item-to"><Input id="item-to" type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+          </div>
+          <Field label="Giới hạn số lượng" htmlFor="item-supply" hint="Để trống = không giới hạn">
+            <Input id="item-supply" type="number" inputMode="numeric" min={1} value={supply} onChange={(e) => setSupply(e.target.value)} placeholder="Không giới hạn" />
+          </Field>
+        </div>
+
+        <Field label="Trạng thái">
+          <div className="grid grid-cols-3 gap-1.5">
+            {(Object.keys(ITEM_STATUS) as ItemLifecycle[]).map((st) => (
+              <button key={st} type="button" onClick={() => setStatus(st)} aria-pressed={status === st} title={ITEM_STATUS[st].hint}
+                className={cn('h-10 rounded-xl border text-xs font-semibold', status === st ? 'border-brand bg-brand/10 text-fg' : 'border-border text-fg-muted')}>
+                {ITEM_STATUS[st].label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-xs text-fg-muted">{ITEM_STATUS[status].hint}</p>
+        </Field>
 
         {problems.length > 0 && (
           <ul className="space-y-1 rounded-xl bg-surface-2 p-3 text-xs text-fg-muted">

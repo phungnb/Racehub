@@ -23,7 +23,7 @@ export function CharacterHub() {
       {s.gender_set === false && <GenderNudge />}
       <Card className="overflow-hidden p-0">
         <div className="relative h-96 bg-[#c4c4ce]">
-          <PaperDoll gender={s.gender} items={resolveOutfit(s.items, s.equipped)} className="size-full" label="Nhân vật của bạn" />
+          <PaperDoll gender={s.gender} items={resolveOutfit(s.items, s.equipped)} personalName={s.display_name} className="size-full" label="Nhân vật của bạn" />
         </div>
         <div className="space-y-3 p-4">
           <p className="text-sm text-fg-muted">Tủ đồ có <b className="font-mono text-fg">{owned}</b>/{s.items.length} vật phẩm</p>
