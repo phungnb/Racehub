@@ -19,6 +19,7 @@ export default function PrivacyPage() {
           <li><strong>Hoạt động trong ứng dụng:</strong> CLB tham gia, thử thách, giải chạy, quà tặng, Xu, nhiệm vụ, bình luận, tin nhắn CLB.</li>
           <li><strong>Thanh toán:</strong> thông tin đơn hàng (gói, số tiền, mã đơn). Chúng tôi <strong>không lưu</strong> thông tin thẻ hay tài khoản ngân hàng của bạn;
             chuyển khoản thực hiện qua ứng dụng ngân hàng của bạn.</li>
+          <li><strong>Đọc bài Kiến thức Runner:</strong> bài đã xem / đã lưu / tiến độ đọc và góp ý của bạn — để bạn đọc tiếp, nhận huy hiệu chuỗi bài; ban biên tập chỉ xem số liệu tổng hợp.</li>
           <li><strong>Thiết bị:</strong> đăng ký nhận thông báo đẩy (nếu bạn bật), mã lỗi kỹ thuật ẩn danh để sửa lỗi.</li>
         </ul>
       </section>

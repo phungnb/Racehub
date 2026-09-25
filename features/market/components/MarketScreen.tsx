@@ -14,7 +14,11 @@ type KindTab = 'ALL' | PartnerKind
 
 /** Chợ Runner: HLV / cửa hàng / dịch vụ đã được RaceHub xác minh. Liên hệ và thanh toán trực tiếp với đối tác. */
 export function MarketScreen() {
-  const [kind, setKind] = useState<KindTab>('ALL')
+  // ?kind=COACH|SHOP|SERVICE (từ bài Knowledge) → mở sẵn đúng nhóm
+  const [kind, setKind] = useState<KindTab>(() => {
+    const k = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('kind') : null
+    return k === 'COACH' || k === 'SHOP' || k === 'SERVICE' ? k : 'ALL'
+  })
   const [area, setArea] = useState('')
   const [text, setText] = useState('')
   const query = useDeferredValue(text.trim())

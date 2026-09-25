@@ -1,7 +1,7 @@
 // Trang Quản trị toàn diện (migration 005600): việc cần xử lý, người dùng, thử thách, nhật ký quản trị
 import { supabase } from '@/shared/lib/supabase'
 
-export interface AdminInbox { orders: number; reviews: number; partners: number; cups: number; errors: number; reports?: number; new_users_7d: number; active_7d: number; banned: number }
+export interface AdminInbox { orders: number; reviews: number; partners: number; cups: number; errors: number; reports?: number; content?: number; new_users_7d: number; active_7d: number; banned: number }
 export interface AdminUserDetail {
   id: string; display_name: string; avatar_url: string | null; role: string; level: number | null; xp: number | null; balance: number
   created_at: string; email: string | null; last_sign_in_at: string | null; banned_until: string | null; banned_at: string | null; banned_reason: string | null
@@ -60,7 +60,7 @@ export function consoleErrorMessage(e: unknown, fallback = 'Không thực hiện
 
 /** Nhãn tiếng Việt cho mã hành động trong nhật ký quản trị */
 export const AUDIT_LABEL: Record<string, string> = {
-  USER_BAN: 'Khóa tài khoản', USER_REPORT_DISMISS: 'Bỏ qua báo cáo', USER_REPORT_SUSPEND: 'Khóa Quanh đây', USER_UNBAN: 'Mở khóa tài khoản', USER_ROLE: 'Đổi quyền admin', CHALLENGE_CANCEL: 'Hủy thử thách',
+  USER_BAN: 'Khóa tài khoản', USER_REPORT_DISMISS: 'Bỏ qua báo cáo', USER_REPORT_SUSPEND: 'Khóa Quanh đây', CONTENT_PUBLISHED: 'Đăng bài Knowledge', CONTENT_SCHEDULED: 'Hẹn giờ bài', CONTENT_ARCHIVED: 'Lưu trữ bài', CONTENT_DRAFT: 'Trả bài về nháp', CONTENT_REVIEW: 'Gửi duyệt bài', CONTENT_EXPERT_APPROVE: 'Duyệt chuyên môn', CONTENT_EXPERT_REJECT: 'Góp ý chuyên môn', CONTENT_STAFF: 'Đổi ban nội dung', USER_UNBAN: 'Mở khóa tài khoản', USER_ROLE: 'Đổi quyền admin', CHALLENGE_CANCEL: 'Hủy thử thách',
   ADMIN_GRANT_XU: 'Cộng / trừ Xu', ADJUST_USER_XU: 'Điều chỉnh Xu', TOPUP_USER_XU: 'Nạp Xu cho người dùng', TOPUP_CLUB_FUND: 'Nạp quỹ CLB',
   PARTNER_APPROVE: 'Xác minh đối tác', PARTNER_REJECT: 'Từ chối đối tác', PARTNER_HIDE: 'Ẩn đối tác',
   CLUB_TRANSFER_OWNER: 'Trao quyền chủ nhiệm', CLUB_SET_BANK: 'Đổi tài khoản quỹ CLB', CLUB_SET_BANK_QR: 'Đổi QR quỹ CLB', SET_CLUB_PLAN: 'Đổi gói CLB',

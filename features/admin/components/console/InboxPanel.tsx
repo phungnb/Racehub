@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, ShieldAlert, CheckCircle2, Receipt, Store, Swords, UserPlus, Users, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, BookOpen, ShieldAlert, CheckCircle2, Receipt, Store, Swords, UserPlus, Users, type LucideIcon } from 'lucide-react'
 import { Card, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { adminInbox, type AdminInbox } from '../../api/consoleApi'
@@ -20,6 +20,7 @@ export function InboxPanel({ onGo }: { onGo: (tab: string) => void }) {
     { key: 'reviews', tab: 'review', label: 'Bài chạy chờ duyệt', icon: CheckCircle2, urgent: true },
     { key: 'partners', tab: 'partners', label: 'Hồ sơ đối tác', icon: Store, urgent: true },
     { key: 'cups', tab: 'cups', label: 'Thách đấu chờ duyệt', icon: Swords, urgent: true },
+    { key: 'content', tab: 'content', label: 'Bài chờ duyệt', icon: BookOpen, urgent: false },
     { key: 'reports', tab: 'reports', label: 'Báo cáo người dùng', icon: ShieldAlert, urgent: true },
     { key: 'errors', tab: 'system', label: 'Lỗi 24 giờ qua', icon: AlertTriangle, urgent: true },
   ]

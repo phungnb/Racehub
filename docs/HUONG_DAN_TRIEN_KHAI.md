@@ -33,7 +33,7 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
 > ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
-> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 006100** + chạy lại 003500),
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 006200** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
 > File gộp tạo bằng `npm run db:bundle` (hoặc `node scripts/db-bundle.mjs <mốc>` để gộp từ mốc khác); test tự động bảo đảm file luôn khớp migration.
@@ -103,6 +103,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001005900_outfit_kits.sql` | **Bộ đồng phục (Kit Studio)**: thiết kế cả bộ **áo + quần + tất + giày**; **hút màu từ ảnh áo thật / logo CLB**, phối màu một chạm (Cổ điển, Đồng bộ, Tương phản, Sáng); **họa tiết** theo nếp vải (áo: viền sườn, vai, dải chéo, chữ V, sọc ngang / dọc, nửa áo, chuyển màu; quần: sọc sườn, viền gấu; tất: viền cổ, sọc). Duyệt đồng phục tạo cả bộ, giá từng món; Tủ đồ có **Mặc cả bộ / Mua phần còn thiếu** | Cần 5800; chạy lại 3500 |
 | `20261001006000_character_designer.sql` | **Bộ sưu tập nhân vật**: 6 dáng (nam khoanh tay / thư thái / đang chạy; nữ chống hông / áo thun / đang chạy) — chọn ở **Tủ đồ**. **Trình thiết kế in chuyên nghiệp**: kéo thả chữ / logo trực tiếp trên áo, quần (40 font, cỡ, xoay, độ mờ, viền, giãn chữ, tên runner, hoàn tác), **độ đậm màu / sáng tối**, **ảnh vải / ảnh áo thật** phủ theo nếp vải | Cần 5900; chạy lại 3500 |
 | `20261001006100_runner_nearby.sql` | **Quanh đây (Runner Nearby)**: tìm runner gần bạn hợp pace / giờ / mục tiêu (chỉ lưu ô ~1 km, tự hết hạn, km có nhiễu chống dò), kết nối 2 chiều, **Rủ chạy**, chặn / báo cáo (tab Quản trị → Báo cáo), buổi chạy **công khai** của CLB + khu vực CLB | Cần 1500; chạy lại 3500 |
+| `20261001006200_knowledge.sql` | **RaceHub Knowledge**: 8 chuyên mục kiến thức + tin tức, trang đọc (mục lục, lưu, chia sẻ, đã đọc, nguồn, bài liên quan, *Tiếp tục hành trình* dẫn tới tính năng), khu *Kiến thức Runner* trên Trang chủ; **CMS** trong Quản trị → Cộng đồng → Nội dung (và `/learn/studio` cho ban nội dung): nháp → chờ duyệt → hẹn giờ → đăng → lưu trữ, **duyệt chuyên môn** bắt buộc cho bài sức khoẻ / dinh dưỡng / chấn thương / giáo án, tác giả, thống kê. Kho ảnh `content-media` | Cần 3100, 5300; chạy lại 3500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 
