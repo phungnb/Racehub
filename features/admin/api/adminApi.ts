@@ -174,6 +174,14 @@ export async function uploadLayer(code: string, gender: Gender, file: File): Pro
 }
 
 const MESSAGES: Record<string, string> = {
+  PROMO_OVERLAP: 'Vật phẩm này đang có chương trình khác trong cùng thời gian. Mỗi vật phẩm chỉ một chương trình.',
+  INVALID_DISCOUNT: 'Mức giảm từ 5% đến 90%. Muốn tặng miễn phí hãy dùng loại "Miễn phí".',
+  FLASH_TOO_LONG: 'Flash sale cần giờ kết thúc, tối đa 72 giờ.',
+  FREE_NEEDS_LIMIT: 'Quà miễn phí phải giới hạn số lượt mỗi người (chống farm).',
+  TRIAL_AVATAR_ONLY: 'Dùng thử chỉ áp cho đồ nhân vật.',
+  INVALID_BUNDLE: 'Gói cần 2–12 món đồ nhân vật đang bán và giá gói.',
+  INVALID_PROMO_TITLE: 'Nhập tên chương trình.',
+  INVALID_PROMO: 'Chương trình không hợp lệ.',
   FORBIDDEN: 'Chỉ quản trị viên hệ thống mới làm được việc này.',
   REASON_REQUIRED: 'Hãy ghi lý do (ít nhất 5 ký tự) để lưu nhật ký.',
   INVALID_AMOUNT: 'Số lượng không hợp lệ.',

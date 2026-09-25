@@ -24,7 +24,51 @@ export interface CharacterItem {
   acquire?: 'xu' | 'shine'
   is_default: boolean
   owned?: boolean
+  /** Đang dùng thử tới lúc này (migration 005100) */
+  trial_until?: string | null
+  /** Chương trình khuyến mãi đang áp (migration 005100) */
+  offer?: ItemOffer | null
 }
+
+/** Chương trình khuyến mãi của một vật phẩm với người đang xem */
+export interface ItemOffer {
+  promo_id: string
+  kind: 'FREE' | 'TRIAL' | 'SALE' | 'FLASH' | 'EVENT' | 'FIRST_PURCHASE' | 'COMEBACK'
+  title: string
+  badge: string
+  base: number
+  price: number
+  discount_pct: number
+  ends_at: string | null
+  left: number | null
+  sold: number
+  limit: number | null
+  per_user_limit: number | null
+  used: number
+  trial_days: number | null
+  eligible: boolean
+}
+
+export interface ItemBundle {
+  id: string
+  title: string
+  badge: string | null
+  price: number
+  base: number
+  items: string[]
+  ends_at: string | null
+  bought: boolean
+  left: number | null
+}
+
+/** Giá phải trả (Xu) khi mua: giá khuyến mãi nếu được hưởng (trừ dùng thử), không thì giá gốc */
+export function buyPrice(item: Pick<CharacterItem, 'price_xu' | 'offer'>): number {
+  const o = item.offer
+  return o && o.eligible && o.kind !== 'TRIAL' ? Number(o.price) : Number(item.price_xu)
+}
+/** Còn được dùng thử (có chương trình, còn lượt, chưa sở hữu) */
+export const canTry = (item: Pick<CharacterItem, 'offer' | 'owned' | 'trial_until'>) =>
+  !!item.offer && item.offer.kind === 'TRIAL' && item.offer.eligible && !item.owned && !item.trial_until
 
 export interface Look {
   gender: Gender
@@ -39,6 +83,7 @@ export interface CharacterState extends Look {
   level: number
   balance: number
   items: CharacterItem[]
+  bundles?: ItemBundle[]
 }
 
 /** Khung chuẩn: mọi ảnh nền, mặt nạ và lớp vật phẩm đều đúng kích thước này */
@@ -127,7 +172,7 @@ export function resolveOutfit(items: CharacterItem[] | undefined, equipped: Part
 export type ItemStatus = 'EQUIPPED' | 'OWNED' | 'BUY' | 'LOCKED'
 export function itemStatus(item: CharacterItem, level: number, equipped: Partial<Record<Slot, string>>): ItemStatus {
   if (equipped[item.slot] === item.code) return 'EQUIPPED'
-  if (item.owned) return 'OWNED'
+  if (item.owned || (item.trial_until && Date.parse(item.trial_until) > Date.now())) return 'OWNED'
   if (level < item.unlock_level) return 'LOCKED'
   return 'BUY'
 }

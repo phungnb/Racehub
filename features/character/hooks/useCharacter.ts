@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useInvalidateProfile } from '@/features/auth'
-import { buyItem, getCharacter, getCharacterState, saveCharacter } from '../api/characterApi'
+import { buyBundle, buyItem, getCharacter, getCharacterState, saveCharacter, tryItem } from '../api/characterApi'
 import type { Gender, Slot } from '../model/catalog'
 
 export const characterKeys = {
@@ -24,6 +24,20 @@ export function useBuyItem() {
       void qc.invalidateQueries({ queryKey: ['game', 'wallet'] })
       refreshProfile()
     },
+  })
+}
+
+export function useTryItem() {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: (code: string) => tryItem(code), onSuccess: () => void qc.invalidateQueries({ queryKey: characterKeys.state }) })
+}
+
+export function useBuyBundle() {
+  const qc = useQueryClient()
+  const refreshProfile = useInvalidateProfile()
+  return useMutation({
+    mutationFn: ({ id, key }: { id: string; key: string }) => buyBundle(id, key),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: characterKeys.state }); void qc.invalidateQueries({ queryKey: ['game', 'wallet'] }); refreshProfile() },
   })
 }
 
