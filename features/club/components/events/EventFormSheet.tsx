@@ -5,6 +5,7 @@ import { LocateFixed } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Field, Input, Sheet, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
+import { EventVisibilityToggle, nearbyErrorMessage, setEventVisibility, type EventVisibility } from '@/features/nearby'
 import { createEvent, eventsErrorMessage, updateEvent, type ClubEvent, type EventInput } from '../../api/eventsApi'
 import { useClubMutation } from '../../hooks/useEvents'
 import { fromVnLocalInput, parseLatLng, toVnLocalInput } from '../../model/events'
@@ -29,6 +30,7 @@ export function EventFormSheet({ clubId, event, open, onClose, onSaved }: {
   const [capacity, setCapacity] = useState(event?.capacity ? String(event.capacity) : '')
   const [desc, setDesc] = useState(event?.description ?? '')
   const [locating, setLocating] = useState(false)
+  const [visibility, setVisibility] = useState<EventVisibility>(event?.visibility ?? 'CLUB')
 
   const ll = coords.trim() ? parseLatLng(coords) : null
   const startIso = fromVnLocalInput(start)
@@ -36,6 +38,7 @@ export function EventFormSheet({ clubId, event, open, onClose, onSaved }: {
   if (title.trim().length < 3) problems.push('title')
   if (!startIso) problems.push('start')
   if (coords.trim() && !ll) problems.push('coords')
+  if (visibility === 'PUBLIC' && !ll) problems.push('public')
 
   const save = useClubMutation(clubId, (input: EventInput) => (event ? updateEvent(event.id, input) : createEvent(clubId, input)))
   const submit = async () => {
@@ -46,8 +49,11 @@ export function EventFormSheet({ clubId, event, open, onClose, onSaved }: {
         lat: ll?.lat ?? null, lng: ll?.lng ?? null, distance_km: distance ? Number(distance.replace(',', '.')) : null,
         pace_text: pace.trim() || null, capacity: capacity ? Number(capacity) : null, description: desc.trim() || null,
       })
-      toast.success(event ? 'Đã lưu sự kiện' : 'Đã tạo sự kiện và báo cho thành viên')
-      onSaved?.(saved)
+      if (visibility !== (event?.visibility ?? 'CLUB')) {
+        try { await setEventVisibility(saved.id, visibility) } catch (e) { toast.error(nearbyErrorMessage(e)) }
+      }
+      toast.success(event ? 'Đã lưu sự kiện' : visibility === 'PUBLIC' ? 'Đã tạo buổi chạy công khai' : 'Đã tạo sự kiện và báo cho thành viên')
+      onSaved?.({ ...saved, visibility })
       onClose()
     } catch (e) {
       toast.error(eventsErrorMessage(e))
@@ -95,6 +101,7 @@ export function EventFormSheet({ clubId, event, open, onClose, onSaved }: {
             </Button>
           </div>
         </Field>
+        <EventVisibilityToggle value={visibility} onChange={setVisibility} hasCoords={!!ll} />
         <div className="grid grid-cols-3 gap-2">
           <Field label="Cự ly (km)" htmlFor="ev-km">
             <Input id="ev-km" inputMode="decimal" value={distance} onChange={(e) => setDistance(e.target.value.replace(/[^\d.,]/g, '').slice(0, 5))} placeholder="10" />

@@ -29,6 +29,9 @@ export const routes = {
   privacy: '/privacy',
   terms: '/terms',
   activity: (id: string) => `/activities/${encodeURIComponent(id)}`,
+  nearby: '/nearby',
+  nearbyConnections: '/nearby/connections',
+  nearbyEvent: (id: string) => `/nearby/events/${encodeURIComponent(id)}`,
   races: '/races',
   race: (id: string) => `/races/${encodeURIComponent(id)}`,
 } as const

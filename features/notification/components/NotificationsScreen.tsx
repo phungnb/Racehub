@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { AtSign, Award, Bell, BellRing, CalendarDays, CheckCheck, Coins, Crown, Flag, Footprints, Gift, HandCoins, Heart, Medal, Megaphone, MessageCircle, ShieldAlert, Shirt, Sparkles, Store, Swords, Ticket, TrendingUp, Trophy, UserCheck, UserPlus, Vote, X, type LucideIcon } from 'lucide-react'
+import { AtSign, Award, Bell, BellRing, CalendarDays, CheckCheck, Coins, Crown, Flag, Footprints, Gift, HandCoins, Heart, Medal, Megaphone, MessageCircle, Radar, ShieldAlert, Shirt, Sparkles, Store, Swords, Ticket, TrendingUp, Trophy, UserCheck, UserPlus, Vote, X, type LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { routes } from '@/shared/config/routes'
 import { usePush } from '../hooks/usePush'
@@ -25,6 +25,9 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   LEAGUE: { icon: Trophy, tone: 'text-coin' },
   CHEER: { icon: HandCoins, tone: 'text-coin' },
   CLUB_EVENT: { icon: CalendarDays, tone: 'text-brand' },
+  RUNNER_CONNECT: { icon: UserPlus, tone: 'text-live' },
+  RUNNER_CONNECTED: { icon: UserCheck, tone: 'text-live' },
+  RUNNER_INVITE: { icon: Radar, tone: 'text-live' },
   CLUB_DUE: { icon: HandCoins, tone: 'text-coin' },
   CLUB_POLL: { icon: Vote, tone: 'text-xp' },
   PUSH_TEST: { icon: BellRing, tone: 'text-brand' },

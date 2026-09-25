@@ -53,6 +53,23 @@ export default function PrivacyPage() {
         </ul>
       </section>
       <section>
+        <h2>4b. Quanh đây (Runner Nearby) — vị trí gần đúng</h2>
+        <ul>
+          <li>Tính năng <strong>tắt theo mặc định</strong>. Chỉ bật khi bạn đồng ý rõ ràng; bạn rút lại đồng ý bằng cách tắt Quanh đây trong ứng dụng.</li>
+          <li>Chúng tôi chỉ lưu <strong>ô lưới khoảng 1 km</strong> bạn chọn (vị trí điện thoại lấy <strong>một lần</strong> ở độ chính xác thấp, hoặc điểm bạn chạm trên
+            bản đồ) — <strong>không lưu toạ độ chính xác</strong>, không lấy từ GPS bài chạy, không theo dõi liên tục hay khi ứng dụng chạy nền.</li>
+          <li>Vị trí <strong>tự hết hạn</strong> sau 24 giờ, 7 hoặc 30 ngày (bạn chọn) và bị xoá ngay khi bạn bấm “Ẩn tôi ngay” hoặc tắt tính năng.
+            Mỗi ngày chỉ đổi vị trí tối đa 3 lần, số lần tìm kiếm bị giới hạn để không ai dò được vị trí của người khác.</li>
+          <li>Người khác chỉ thấy <strong>tên gọi và chữ cái đầu của họ</strong>, ảnh đại diện, cấp độ, <strong>khoảng cách ước chừng</strong> (đã làm tròn và cộng sai số cố định),
+            tên khu vực bạn tự đặt và các sở thích chạy bạn chọn chia sẻ (pace điển hình, mục tiêu, khung giờ, giới thiệu ngắn).</li>
+          <li>Bạn chọn <strong>ai thấy mình</strong> (runner đã xác minh / chỉ cùng giới / chỉ thành viên CLB chung). Chỉ tài khoản có ít nhất 3 bài chạy hợp lệ mới
+            dùng được tính năng. Hai người chỉ thấy nhau khi cài đặt của <strong>cả hai</strong> đều cho phép.</li>
+          <li>Bạn có thể chặn hoặc báo cáo bất kỳ ai; người bị báo cáo không biết ai báo cáo. Báo cáo được quản trị viên xem xét; tài khoản nhận nhiều báo cáo
+            bị tạm ẩn khỏi Quanh đây trong lúc chờ xử lý.</li>
+          <li>Phiên bản đầu <strong>không có nhắn tin riêng</strong>: sau khi kết nối, hai bên chỉ rủ nhau vào buổi chạy nhóm công khai hoặc CLB.</li>
+        </ul>
+      </section>
+      <section>
         <h2>5. Lưu trữ và bảo mật</h2>
         <p>
           Dữ liệu được mã hóa khi truyền, phân quyền truy cập chặt chẽ; token Strava lưu ở vùng máy chủ riêng, không lộ ra trình duyệt.
@@ -63,7 +80,7 @@ export default function PrivacyPage() {
         <h2>6. Quyền của bạn</h2>
         <ul>
           <li>Xem, sửa hồ sơ và cài đặt quyền riêng tư trong ứng dụng.</li>
-          <li>Ngắt kết nối Strava, tắt thông báo bất cứ lúc nào.</li>
+          <li>Ngắt kết nối Strava, tắt thông báo, tắt Quanh đây (xoá vị trí ngay) bất cứ lúc nào.</li>
           <li>Yêu cầu <strong>xóa tài khoản và dữ liệu</strong>: liên hệ qua <Contact />. Chúng tôi xử lý trong tối đa 30 ngày.</li>
         </ul>
       </section>

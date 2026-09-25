@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, BellOff, BellRing, Camera, Check, Crown, LogOut, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { UniformSection } from '@/features/character'
+import { ClubPlaceSection } from '@/features/nearby'
 import { getClubNotificationLevel, setClubNotificationLevel, type NotificationLevel } from '@/features/notification'
 import { Avatar, Button, Card, ConfirmSheet, Field, Input, SectionTitle, Sheet, Skeleton, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -31,6 +32,7 @@ export function ClubSettingsScreen({ clubId }: { clubId: string }) {
       <NotificationSection clubId={clubId} />
       {isStaff && <ProSection club={club} />}
       {isStaff && <ProfileSection club={club} />}
+      {isStaff && <ClubPlaceSection clubId={club.id} />}
       {isStaff && <UniformSection clubId={club.id} clubName={club.name} accent={accentOf(club)} logoUrl={club.avatar_url} />}
       {role === 'OWNER' && <PolicySection club={club} />}
       <DangerSection club={club} isOwner={role === 'OWNER'} />

@@ -136,10 +136,18 @@ RPC chính: `set_discovery(p)`, `set_presence(lat, lng | area)`, `nearby_runners
 
 ---
 
-## 10. Cần chốt trước khi làm
+## 10. Đã chốt & đã làm (V1 — migration 006100)
 
-1. **Phạm vi V1**: đồng ý bỏ nhắn tin riêng ở V1, thay bằng *Rủ chạy* + buổi chạy CLB?
-2. **Ai thấy tôi** mặc định: *mọi người đã xác minh* hay *chỉ cùng giới*?
-3. **Điều kiện bật**: ≥ 18 tuổi + ≥ 3 bài chạy hợp lệ — đồng ý? (cần thêm năm sinh vào hồ sơ nếu chưa có)
-4. **Nguồn vị trí**: cho cả "vị trí điện thoại một lần" và "chọn khu vực", hay chỉ chọn khu vực (an toàn nhất, không cần quyền GPS)?
-5. **Hiển thị khoảng cách**: đồng ý chỉ hiện bậc (dưới 2 / 2–5 / 5–10 / 10–20 km) thay cho số km cụ thể?
+| Câu hỏi | Quyết định | Cách làm |
+|---|---|---|
+| Phạm vi V1 | Không nhắn tin riêng; *Rủ chạy* + buổi chạy CLB | `invite_to_run` gửi thông báo kèm link buổi chạy công khai / sự kiện CLB / CLB |
+| Ai thấy tôi (mặc định) | **Runner đã xác minh** | `visible_to` = VERIFIED / SAME_GENDER / CLUBS; kiểm tra **cả hai chiều** (`private.nearby_visible`) |
+| Điều kiện bật | **≥ 3 bài chạy hợp lệ** (không yêu cầu 18+) | `private.nearby_eligible`: 3 bài APPROVED, tài khoản không bị khoá |
+| Nguồn vị trí | **Cả hai**: vị trí điện thoại một lần (độ chính xác thấp) + chạm trên bản đồ | Máy chủ làm tròn về ô ~1 km (`round(x, 2)`), hết hạn 24 giờ / 7 / 30 ngày, đổi ≤ 3 lần / 24 giờ |
+| Khoảng cách | **Hiện km cụ thể**, có chống dò | Km nguyên giữa tâm 2 ô + nhiễu cố định ±0,5 km theo từng cặp người (`private.shown_km`) → gọi lại nhiều lần vẫn ra cùng số, không tam giác hoá được; tìm ≤ 60 lần / giờ |
+
+**Màn hình:** `/nearby` (bật 3 bước: cam kết + đồng ý → tuỳ chọn → khu vực; tab Runner / Buổi chạy / CLB; lọc bán kính, pace, mục đích, mục tiêu, khung giờ; "Ẩn tôi ngay"; cài đặt / tắt),
+`/nearby/connections` (lời mời đến, bạn chạy, đã gửi, đã chặn), `/nearby/events/[id]` (buổi chạy công khai cho người ngoài CLB).
+**CLB:** Cài đặt CLB → *Khu vực hoạt động*; form sự kiện → *Ai thấy buổi chạy: Chỉ thành viên / Công khai* (cần toạ độ).
+**Quản trị:** Người dùng → *Báo cáo* (không vi phạm / khoá Quanh đây); 3 người báo cáo → tự tạm ẩn. Nhật ký: `USER_REPORT_*`.
+**Pháp lý:** Chính sách quyền riêng tư mục 4b.

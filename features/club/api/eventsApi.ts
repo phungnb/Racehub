@@ -27,6 +27,8 @@ export interface ClubEvent {
   checked_in_count: number
   my_status: RsvpStatus | null
   my_checked_in_at: string | null
+  /** CLB = chỉ thành viên; PUBLIC = hiện ở Quanh đây (migration 006100) */
+  visibility?: 'CLUB' | 'PUBLIC'
 }
 
 export interface EventAttendee {

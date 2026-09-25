@@ -88,7 +88,9 @@ begin
     jsonb_build_object('file', '20261001005900', 'label', 'Bộ đồng phục: áo + quần + tất + giày, họa tiết, mặc cả bộ',
       'ok', to_regprocedure('private.clean_design(jsonb, text)') is not null),
     jsonb_build_object('file', '20261001006000', 'label', 'Bộ sưu tập nhân vật (dáng) + thiết kế in kéo thả, độ đậm màu, ảnh vải',
-      'ok', to_regprocedure('private.character_bodies()') is not null));
+      'ok', to_regprocedure('private.character_bodies()') is not null),
+    jsonb_build_object('file', '20261001006100', 'label', 'Quanh đây: runner gần bạn (ô ~1 km), kết nối, rủ chạy, buổi chạy công khai, chặn / báo cáo',
+      'ok', to_regprocedure('public.nearby_runners(jsonb)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
