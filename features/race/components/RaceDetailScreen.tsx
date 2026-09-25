@@ -1,10 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Award, BadgeCheck, CalendarDays, Clock, Download, Flag, Maximize2, Medal, Palette, Timer, Users, XCircle } from 'lucide-react'
+import { ArrowLeft, Award, BadgeCheck, CalendarDays, Clock, Download, Flag, Maximize2, Medal, Palette, ScrollText, Timer, Users, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Input, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -13,10 +13,12 @@ import {
   cancelRace, getRace, getRaceDashboard, getRaceResults, lookupBib, raceErrorMessage, registerRace, withdrawRace,
   type Race,
 } from '../api/raceApi'
-import { CERT_SIZE, drawCertificate } from '../model/certificate'
+import { CERT_FORMATS, drawCertificate, resolveCert } from '../model/certificate'
 import { canRegister, dashboardCsv, distanceLabel, racePace, racePhase, raceTime } from '../model/race'
 import { fmtDate, PHASE } from './RaceCard'
 import { BibDesigner } from './BibDesigner'
+import { CertDesigner } from './CertDesigner'
+import { raceLinks } from './studio/useRaceAssets'
 import { downloadCanvas, EBib } from './EBib'
 
 const fmtDateTime = (iso: string) => new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
@@ -217,7 +219,8 @@ function Organizer({ r }: { r: Race }) {
   const refresh = useRefresh(r.id)
   const dash = useQuery({ queryKey: ['race', r.id, 'dashboard'], queryFn: () => getRaceDashboard(r.id) })
   const [cancelOpen, setCancelOpen] = useState(false)
-  const [design, setDesign] = useState(false)
+  const [design, setDesign] = useState<'bib' | 'cert' | null>(null)
+  const closeDesign = useCallback(() => setDesign(null), [])
   const [reason, setReason] = useState('')
   const cancel = useMutation({
     mutationFn: () => cancelRace(r.id, reason),
@@ -261,7 +264,10 @@ function Organizer({ r }: { r: Race }) {
             ))}
           </ul>
         )}
-        <Button block onClick={() => setDesign(true)}><Palette className="size-4" aria-hidden />Thiết kế BIB</Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Button onClick={() => setDesign('bib')}><Palette className="size-4" aria-hidden />Thiết kế BIB</Button>
+          <Button variant="secondary" onClick={() => setDesign('cert')}><ScrollText className="size-4" aria-hidden />Chứng nhận</Button>
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <Button variant="secondary" onClick={exportCsv} disabled={!dash.data?.length}><Download className="size-4" aria-hidden />Xuất CSV</Button>
           {r.status === 'PUBLISHED' && <Button variant="danger" onClick={() => setCancelOpen(true)}><XCircle className="size-4" aria-hidden />Hủy giải</Button>}
@@ -271,7 +277,8 @@ function Organizer({ r }: { r: Race }) {
         title="Hủy giải?" description="Mọi VĐV đã đăng ký sẽ nhận thông báo. Không thể hoàn tác." confirmLabel="Hủy giải">
         <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Lý do (không bắt buộc)" aria-label="Lý do hủy" />
       </ConfirmSheet>
-      {design && <BibDesigner r={r} onClose={() => setDesign(false)} />}
+      {design === 'bib' && <BibDesigner r={r} onClose={closeDesign} />}
+      {design === 'cert' && <CertDesigner r={r} onClose={closeDesign} />}
     </section>
   )
 }
@@ -280,13 +287,15 @@ function CertificateSheet({ r, onClose }: { r: Race; onClose: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const me = r.me!
   const finishers = r.per_distance?.find((p) => Number(p.distance_km) === Number(me.distance_km))?.finished ?? r.finished
+  const size = CERT_FORMATS[resolveCert(r.cert_design).format]
   useEffect(() => {
     if (!ref.current) return
-    drawCertificate(ref.current, {
+    const links = raceLinks(r, me.bib)
+    void drawCertificate(ref.current, r.cert_design, {
       race: r.title, organizer: r.club?.name ?? r.organizer?.display_name ?? 'RaceHub', name: me.display_name ?? 'Runner', bib: me.bib,
       distanceKm: Number(me.distance_km), timeS: me.finish_time_s ?? 0, rank: me.rank, finishers,
       date: me.finished_at ? new Date(me.finished_at).toLocaleDateString('vi-VN', { day: '2-digit', month: 'long', year: 'numeric' }) : '',
-      site: typeof window === 'undefined' ? 'racehub' : window.location.host,
+      verifyUrl: links.verify, raceUrl: links.race, clubUrl: links.club,
     })
   }, [r, me, finishers])
   const download = () => {
@@ -297,7 +306,8 @@ function CertificateSheet({ r, onClose }: { r: Race; onClose: () => void }) {
   }
   return (
     <Sheet open onClose={onClose} title="Giấy chứng nhận hoàn thành" footer={<Button block onClick={download}><Download className="size-4" aria-hidden />Tải ảnh</Button>}>
-      <canvas ref={ref} width={CERT_SIZE.w} height={CERT_SIZE.h} className="mx-auto w-full max-w-xs rounded-xl" aria-label="Giấy chứng nhận" />
+      <canvas ref={ref} width={size.w} height={size.h} style={{ aspectRatio: `${size.w} / ${size.h}` }}
+        className={cn('mx-auto w-full rounded-xl', size.h > size.w && 'max-w-xs')} aria-label="Giấy chứng nhận" />
     </Sheet>
   )
 }
@@ -305,7 +315,7 @@ function CertificateSheet({ r, onClose }: { r: Race; onClose: () => void }) {
 function bibData(r: Race, bib: string, name: string | null, km: number) {
   return {
     race: r.title, bib, name, org: r.club?.name ?? r.organizer?.display_name ?? null, distanceKm: km, dates: `${fmtDate(r.start_at)} – ${fmtDate(r.end_at)}`,
-    qrUrl: typeof window === 'undefined' ? null : `${window.location.origin}/races/${r.id}?bib=${encodeURIComponent(bib)}`,
+    qr: raceLinks(r, bib),
   }
 }
 
