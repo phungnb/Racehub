@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Activity, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Tags, Ticket, type LucideIcon } from 'lucide-react'
+import { Activity, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, type LucideIcon } from 'lucide-react'
 import { ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { adminErrorMessage } from '../api/adminApi'
@@ -14,6 +14,7 @@ import { ItemsTab } from './items/ItemsTab'
 import { ReviewTab } from './ReviewTab'
 import { ClubsProTab } from './ClubsProTab'
 import { SystemTab } from './SystemTab'
+import { PartnersTab } from './PartnersTab'
 import { OrdersTab } from './commerce/OrdersTab'
 import { PlansTab } from './commerce/PlansTab'
 import { GiftsTab, OrganizersTab } from './commerce/GiftsTab'
@@ -22,7 +23,7 @@ import { QuestsTab } from './commerce/QuestsTab'
 import { PromotionsTab } from './commerce/PromotionsTab'
 import { CupReviewList } from '@/features/cup'
 
-type Tab = 'overview' | 'metrics' | 'orders' | 'promos' | 'quests' | 'plans' | 'grant' | 'passes' | 'policy' | 'gifts' | 'organizers' | 'items' | 'review' | 'clubs' | 'cups' | 'system'
+type Tab = 'overview' | 'metrics' | 'orders' | 'promos' | 'quests' | 'plans' | 'grant' | 'passes' | 'policy' | 'gifts' | 'organizers' | 'items' | 'review' | 'clubs' | 'cups' | 'partners' | 'system'
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
   { id: 'metrics', label: 'Chỉ số', icon: BarChart3 },
@@ -39,6 +40,7 @@ const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'review', label: 'Duyệt bài', icon: CheckCircle2 },
   { id: 'clubs', label: 'CLB Pro', icon: Crown },
   { id: 'cups', label: 'Thách đấu', icon: Swords },
+  { id: 'partners', label: 'Đối tác', icon: Store },
   { id: 'system', label: 'Hệ thống', icon: Activity },
 ]
 
@@ -72,6 +74,7 @@ export function AdminConsole() {
         : tab === 'gifts' ? <GiftsTab />
         : tab === 'organizers' ? <OrganizersTab />
         : tab === 'cups' ? <CupReviewList />
+        : tab === 'partners' ? <PartnersTab />
         : tab === 'review' ? <ReviewTab />
         : tab === 'clubs' ? <ClubsProTab />
         : tab === 'items' ? <ItemsTab />
