@@ -2,7 +2,9 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { captureInstallPrompt } from '../model/pwa'
+import { shouldRefreshOnResume } from '../model/resume'
 
 let booted = false
 
@@ -12,6 +14,29 @@ let booted = false
  */
 export function PwaBoot() {
   const router = useRouter()
+  const qc = useQueryClient()
+
+  // Quay lại app sau ≥ 20 giây, hoặc vừa có mạng lại → tải lại dữ liệu đang hiện (bài chạy mới, Xu, thông báo…)
+  useEffect(() => {
+    let hiddenAt: number | null = null
+    const refresh = () => void qc.invalidateQueries({ refetchType: 'active' })
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return }
+      if (shouldRefreshOnResume(hiddenAt, Date.now())) refresh()
+      hiddenAt = null
+    }
+    // iOS: mở lại PWA từ bộ nhớ đệm trang (bfcache) không phát visibilitychange
+    const onShow = (e: PageTransitionEvent) => { if (e.persisted) refresh() }
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('pageshow', onShow)
+    window.addEventListener('online', refresh)
+    return () => {
+      document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('pageshow', onShow)
+      window.removeEventListener('online', refresh)
+    }
+  }, [qc])
+
   useEffect(() => {
     if (!booted) {
       booted = true

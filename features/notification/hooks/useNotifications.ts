@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/shared/lib/supabase'
@@ -31,6 +32,7 @@ export function useMarkNotificationsRead() {
 /** Lắng nghe thông báo mới (realtime) cho người đang đăng nhập; hiện toast ngắn. Gắn một lần trong khung app. */
 export function useNotificationStream(userId: string | undefined) {
   const qc = useQueryClient()
+  const router = useRouter()
   useEffect(() => {
     if (!userId) return
     const channel = supabase
@@ -46,9 +48,14 @@ export function useNotificationStream(userId: string | undefined) {
           }
           // Không làm phiền khi đang ở đúng màn hình mà thông báo trỏ tới
           if (n.link && window.location.pathname === n.link.split('?')[0]) return
-          toast(n.title, { description: n.body ?? undefined })
+          const link = n.link
+          toast(n.title, {
+            description: n.body ?? undefined,
+            duration: n.kind === 'RUN_SYNCED' ? 10_000 : undefined,
+            action: link ? { label: n.kind === 'RUN_SYNCED' ? 'Nhận thưởng' : 'Xem', onClick: () => router.push(link) } : undefined,
+          })
         })
       .subscribe()
     return () => { void supabase.removeChannel(channel) }
-  }, [userId, qc])
+  }, [userId, qc, router])
 }

@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/shared/lib/supabase'
+import { describeError } from '@/shared/lib/errors'
+import { buildPayload, clearSnapshot, enqueue, loadSnapshot, saveSnapshot, type RunSnapshot } from '../model/recovery'
 import { GPS, evaluatePoint, isStationary, nextSplit, rollingPace, segmentMovingS, smoothPoint, splitAnnouncement, type Split, type TrackPoint } from '../model/tracker'
 
-export type RunPhase = 'IDLE' | 'LOCATING' | 'RUNNING' | 'PAUSED' | 'FINISHED' | 'SAVING' | 'SAVED'
+export type RunPhase = 'IDLE' | 'LOCATING' | 'RUNNING' | 'PAUSED' | 'FINISHED' | 'SAVING' | 'SAVED' | 'QUEUED'
 export type GpsState = 'OFF' | 'SEARCHING' | 'GOOD' | 'WEAK' | 'DENIED' | 'UNSUPPORTED'
 
 export interface SaveResult {
@@ -51,6 +53,10 @@ export function useRunTracker() {
   const watchId = useRef<number | null>(null)
   const wakeLock = useRef<WakeLockSentinelLike | null>(null)
   const voiceRef = useRef(true)
+  const elapsedRef = useRef(0)
+  const lastPersist = useRef(0)
+  /** Bài dở dang lưu trên máy từ lần trước (app bị đóng giữa chừng) — hỏi người chạy có khôi phục không */
+  const [recovery, setRecovery] = useState<RunSnapshot | null>(() => (typeof window === 'undefined' ? null : loadSnapshot()))
 
   useEffect(() => { phaseRef.current = phase }, [phase])
   useEffect(() => { voiceRef.current = voiceOn }, [voiceOn])
@@ -60,6 +66,19 @@ export function useRunTracker() {
     const u = new SpeechSynthesisUtterance(text)
     u.lang = 'vi-VN'
     window.speechSynthesis.speak(u)
+  }, [])
+
+  /** Lưu tạm bài đang chạy trên máy (tối đa 5 giây một lần, trừ khi `force`) */
+  const persist = useCallback((force = false) => {
+    const ph = phaseRef.current
+    if ((ph !== 'RUNNING' && ph !== 'PAUSED' && ph !== 'FINISHED') || !startedAt.current) return
+    const now = Date.now()
+    if (!force && now - lastPersist.current < 5000) return
+    lastPersist.current = now
+    saveSnapshot({
+      v: 1, phase: ph, startedAt: startedAt.current, savedAt: now, elapsedS: elapsedRef.current, movingS: movingRef.current,
+      distanceM: distanceRef.current, points: points.current, splits: splitsRef.current,
+    })
   }, [])
 
   const acquireWakeLock = useCallback(async () => {
@@ -131,7 +150,8 @@ export function useRunTracker() {
       setSplits(splitsRef.current)
       speak(splitAnnouncement(split, movingRef.current))
     }
-  }, [speak])
+    persist()
+  }, [speak, persist])
 
   const onPositionError = useCallback((err: GeolocationPositionError) => {
     setGps(err.code === err.PERMISSION_DENIED ? 'DENIED' : 'WEAK')
@@ -151,15 +171,17 @@ export function useRunTracker() {
       lastTick.current = now
       const idle = (now - lastMoveAt.current) / 1000 > GPS.AUTO_PAUSE_AFTER_S
       setAutoPaused(idle)
-      setElapsedS((s) => s + dt)
+      elapsedRef.current += dt
+      setElapsedS(elapsedRef.current)
       // Đồng hồ chạy mượt giữa hai điểm GPS; con số chính xác được chốt mỗi khi nhận điểm mới
       const live = idle || !lastAcceptAt.current ? 0 : Math.min((now - lastAcceptAt.current) / 1000, GPS.SEGMENT_MAX_S)
       setMovingS(movingRef.current + live)
       if (idle) setCurrentPace(0)
       else setCurrentPace(rollingPace(points.current, 30, now))
+      persist()
     }, 1000)
     return () => clearInterval(id)
-  }, [phase])
+  }, [phase, persist])
 
   const start = useCallback(() => {
     if (!('geolocation' in navigator)) { setGps('UNSUPPORTED'); return }
@@ -172,6 +194,9 @@ export function useRunTracker() {
     splitsRef.current = []
     raw.current = []
     setGapS(0)
+    elapsedRef.current = 0
+    clearSnapshot()
+    setRecovery(null)
     setDistanceM(0); setElapsedS(0); setMovingS(0); setCurrentPace(0); setAvgPace(0); setSplits([]); setAutoPaused(false)
     recentSpeed.current = 2.8
     lastAcceptAt.current = 0
@@ -192,7 +217,9 @@ export function useRunTracker() {
     phaseRef.current = 'RUNNING'
   }, [])
 
-  const pause = useCallback(() => { setPhase('PAUSED'); lastTick.current = null; speak('Tạm dừng') }, [speak])
+  const pause = useCallback(() => {
+    setPhase('PAUSED'); phaseRef.current = 'PAUSED'; lastTick.current = null; speak('Tạm dừng'); persist(true)
+  }, [speak, persist])
   const resume = useCallback(() => {
     lastTick.current = Date.now()
     lastMoveAt.current = Date.now()
@@ -200,50 +227,88 @@ export function useRunTracker() {
     lastAcceptAt.current = 0
     raw.current = []
     setPhase('RUNNING')
+    phaseRef.current = 'RUNNING'
     speak('Tiếp tục')
-  }, [speak])
+    persist(true)
+  }, [speak, persist])
 
   const finish = useCallback(() => {
     stopWatch()
     releaseWakeLock()
     setPhase('FINISHED')
+    phaseRef.current = 'FINISHED'
     speak('Kết thúc bài chạy')
-  }, [releaseWakeLock, speak, stopWatch])
+    persist(true)
+  }, [releaseWakeLock, speak, stopWatch, persist])
 
   const discard = useCallback(() => {
     stopWatch()
     releaseWakeLock()
+    clearSnapshot()
     setPhase('IDLE')
     setGps('OFF')
   }, [releaseWakeLock, stopWatch])
 
+  /** Khôi phục bài dở dang: đang chạy → về trạng thái tạm dừng (bấm Tiếp tục để chạy tiếp); đã kết thúc → màn lưu */
+  const restore = useCallback(() => {
+    const s = recovery
+    if (!s) return
+    startedAt.current = s.startedAt
+    elapsedRef.current = s.elapsedS
+    movingRef.current = s.movingS
+    distanceRef.current = s.distanceM
+    points.current = s.points
+    splitsRef.current = s.splits
+    lastAccepted.current = null
+    raw.current = []
+    setElapsedS(s.elapsedS); setMovingS(s.movingS); setDistanceM(s.distanceM); setSplits(s.splits)
+    setAvgPace(s.distanceM >= 50 ? s.movingS / (s.distanceM / 1000) : 0)
+    setRecovery(null)
+    if (s.phase === 'FINISHED') { setPhase('FINISHED'); phaseRef.current = 'FINISHED'; return }
+    setPhase('PAUSED')
+    phaseRef.current = 'PAUSED'
+    setGps('SEARCHING')
+    void acquireWakeLock()
+    if ('geolocation' in navigator) {
+      watchId.current = navigator.geolocation.watchPosition(onPosition, onPositionError, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 })
+    }
+  }, [recovery, acquireWakeLock, onPosition, onPositionError])
+
+  const dismissRecovery = useCallback(() => { clearSnapshot(); setRecovery(null) }, [])
+
   const save = useCallback(async () => {
     setPhase('SAVING')
     setError(null)
-    const km = distanceRef.current / 1000
-    const moving = Math.round(movingRef.current)
-    const { data, error: rpcError } = await supabase.rpc('submit_and_process_activity', {
-      p_title: `Buổi chạy ${new Date(startedAt.current ?? Date.now()).toLocaleDateString('vi-VN')}`,
-      p_source: 'DIRECT_GPS',
-      p_started_at: new Date(startedAt.current ?? Date.now()).toISOString(),
-      p_ended_at: new Date().toISOString(),
-      p_elapsed_s: Math.round(elapsedS),
-      p_moving_s: moving,
-      p_distance_m: Math.round(distanceRef.current),
-      p_avg_pace_s: km > 0 ? Math.round(moving / km) : 0,
-      p_track_points: points.current,
+    const payload = buildPayload({
+      startedAt: startedAt.current ?? Date.now(), endedAt: Date.now(), elapsedS: elapsedRef.current,
+      movingS: movingRef.current, distanceM: distanceRef.current, points: points.current,
     })
+    const { data, error: rpcError } = await supabase.rpc('submit_and_process_activity', payload)
     if (rpcError) {
-      setError(rpcError.message.includes('ACTIVITY_DUPLICATE')
-        ? 'Bài chạy này đã được lưu trước đó.'
-        : 'Không lưu được bài chạy. Kiểm tra kết nối mạng rồi thử lại.')
+      if (rpcError.message.includes('ACTIVITY_DUPLICATE')) {
+        clearSnapshot()
+        setError('Bài chạy này đã được lưu trước đó.')
+        setPhase('FINISHED')
+        return null
+      }
+      // Mất mạng / máy chủ lỗi: giữ bài trên máy, tự gửi khi có mạng — người chạy không mất bài
+      const kind = describeError(rpcError).kind
+      if (kind === 'OFFLINE' || kind === 'NETWORK' || kind === 'TIMEOUT' || kind === 'SERVER') {
+        enqueue(payload)
+        clearSnapshot()
+        setPhase('QUEUED')
+        window.dispatchEvent(new Event('rh-run-queued'))
+        return null
+      }
+      setError('Không lưu được bài chạy. Thử lại sau ít phút.')
       setPhase('FINISHED')
       return null
     }
+    clearSnapshot()
     setResult(data as SaveResult)
     setPhase('SAVED')
     return data as SaveResult
-  }, [elapsedS])
+  }, [])
 
   // Tắt màn hình / chuyển app: trình duyệt dừng GPS và nhả chế độ giữ sáng màn hình.
   // Quay lại → xin lại cả hai; đoạn bị mất được nối bằng đường thẳng và báo cho người chạy.
@@ -251,7 +316,7 @@ export function useRunTracker() {
     const onVis = () => {
       const active = phaseRef.current === 'RUNNING' || phaseRef.current === 'PAUSED' || phaseRef.current === 'LOCATING'
       if (!active) return
-      if (document.visibilityState === 'hidden') { hiddenAt.current = Date.now(); return }
+      if (document.visibilityState === 'hidden') { hiddenAt.current = Date.now(); persist(true); return }
       void acquireWakeLock()
       if (watchId.current !== null) {
         navigator.geolocation.clearWatch(watchId.current)
@@ -266,13 +331,13 @@ export function useRunTracker() {
     }
     document.addEventListener('visibilitychange', onVis)
     return () => document.removeEventListener('visibilitychange', onVis)
-  }, [acquireWakeLock, onPosition, onPositionError])
+  }, [acquireWakeLock, onPosition, onPositionError, persist])
 
   // Rời màn hình khi đang chạy: dọn GPS + wake lock
   useEffect(() => () => { stopWatch(); releaseWakeLock() }, [releaseWakeLock, stopWatch])
 
   return {
-    phase, gps, distanceM, elapsedS, movingS, currentPace, avgPace, autoPaused, splits, voiceOn, result, error, gapS,
-    setVoiceOn, start, startAnyway, pause, resume, finish, discard, save,
+    phase, gps, distanceM, elapsedS, movingS, currentPace, avgPace, autoPaused, splits, voiceOn, result, error, gapS, recovery,
+    setVoiceOn, start, startAnyway, pause, resume, finish, discard, save, restore, dismissRecovery,
   }
 }

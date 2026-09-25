@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { AtSign, Award, Bell, BellRing, CalendarDays, CheckCheck, Coins, Crown, Flag, Gift, HandCoins, Heart, Medal, Megaphone, MessageCircle, ShieldAlert, Swords, Ticket, TrendingUp, Trophy, UserCheck, UserPlus, Vote, X, type LucideIcon } from 'lucide-react'
+import { AtSign, Award, Bell, BellRing, CalendarDays, CheckCheck, Coins, Crown, Flag, Footprints, Gift, HandCoins, Heart, Medal, Megaphone, MessageCircle, ShieldAlert, Swords, Ticket, TrendingUp, Trophy, UserCheck, UserPlus, Vote, X, type LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { routes } from '@/shared/config/routes'
 import { usePush } from '../hooks/usePush'
@@ -33,6 +33,7 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   RACE_FINISHED: { icon: Medal, tone: 'text-coin' },
   RACE_CANCELLED: { icon: Flag, tone: 'text-danger' },
   RUN_REVIEW: { icon: ShieldAlert, tone: 'text-warning' },
+  RUN_SYNCED: { icon: Footprints, tone: 'text-brand' },
   CLUB_RUN_REVIEW: { icon: ShieldAlert, tone: 'text-warning' },
   CLUB_PRO: { icon: Crown, tone: 'text-coin' },
   VIP: { icon: Crown, tone: 'text-coin' },
