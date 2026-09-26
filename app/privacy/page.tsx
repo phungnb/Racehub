@@ -82,7 +82,7 @@ export default function PrivacyPage() {
         <ul>
           <li>Xem, sửa hồ sơ và cài đặt quyền riêng tư trong ứng dụng.</li>
           <li>Ngắt kết nối Strava, tắt thông báo, tắt Quanh đây (xoá vị trí ngay) bất cứ lúc nào.</li>
-          <li>Yêu cầu <strong>xóa tài khoản và dữ liệu</strong>: liên hệ qua <Contact />. Chúng tôi xử lý trong tối đa 30 ngày.</li>
+          <li><strong>Xóa tài khoản và dữ liệu</strong>: tự xoá ngay trong app (Tôi → Cài đặt → Xoá tài khoản) — tuyến GPS, hồ sơ, ảnh, kết nối Strava bị xoá, phần còn lại ẩn danh; hoá đơn giao dịch được giữ ẩn danh theo quy định kế toán. Hoặc liên hệ qua <Contact />, chúng tôi xử lý trong tối đa 30 ngày.</li>
         </ul>
       </section>
       <section>

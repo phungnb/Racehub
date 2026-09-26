@@ -42,6 +42,8 @@ export interface ActivityDetail {
   is_mine: boolean
   owner: { id: string; display_name: string | null; avatar_url: string | null; level: number | null }
   map_allowed: boolean
+  /** Bài từ Strava của người khác: chỉ có số tổng (quy định API Strava) */
+  strava_limited?: boolean
   polyline: string | null
   points: TrackPoint[] | null
   splits: Split[] | null

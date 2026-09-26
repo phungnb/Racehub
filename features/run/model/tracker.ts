@@ -8,6 +8,8 @@ export interface TrackPoint {
   /** Vận tốc máy báo (m/s); null = máy không báo */
   speed: number | null
   recorded_at: string
+  /** Quãng đường tích luỹ (m) app đo tới điểm này — máy chủ dùng (kẹp theo tuyến) thay vì cộng khoảng cách điểm-điểm có nhiễu */
+  distance_m?: number
 }
 
 export interface Split {
@@ -144,6 +146,28 @@ export function splitAnnouncement(split: Split, totalMovingS: number) {
 // Bộ máy ghi GPS (v2): lọc Kalman vận tốc-hằng theo sai số từng điểm + phát hiện mất tín hiệu.
 // Dùng chung cho app cài (plugin nền) và trình duyệt. Hàm thuần — test bằng mô phỏng trong tracker.test.ts.
 // ============================================================================================
+
+/** Làm tròn điểm trước khi lưu / gửi: 7 chữ số thập phân ≈ 1 cm — mỗi điểm gọn ~20 % khi lưu tạm trên máy */
+export function compactPoint(p: TrackPoint): TrackPoint {
+  const r = (x: number, k: number) => Math.round(x * k) / k
+  return {
+    latitude: r(p.latitude, 1e7), longitude: r(p.longitude, 1e7), accuracy: r(p.accuracy, 10), altitude: r(p.altitude, 10),
+    speed: p.speed === null ? null : r(p.speed, 100), recorded_at: p.recorded_at,
+    ...(p.distance_m === undefined ? {} : { distance_m: r(p.distance_m, 10) }),
+  }
+}
+
+/**
+ * Có đủ tín hiệu để bắt đầu tính giờ chưa (như Strava/Garmin chờ "GPS sẵn sàng"):
+ * một điểm rất tốt (≤ 10 m) hoặc 3 điểm tốt (≤ 20 m) liên tiếp — tránh bắt đầu bằng một điểm Wi-Fi/ô mạng "may mắn".
+ * Điểm cũ (vị trí lưu từ trước, trễ > 10 giây) không tính.
+ */
+export function gpsReady(recent: { accuracy: number; time: number }[], now: number): boolean {
+  const fresh = recent.filter((f) => now - f.time <= 10_000)
+  if (fresh.some((f) => f.accuracy <= 10)) return true
+  const tail = fresh.slice(-3)
+  return tail.length === 3 && tail.every((f) => f.accuracy <= ENGINE.GOOD_ACCURACY_M)
+}
 
 export const ENGINE = {
   MAX_ACCURACY_M: 35,     // điểm sai số > 35 m bỏ (trong nhà / hầm); 20–35 m vẫn dùng nhưng bộ lọc tin ít hơn

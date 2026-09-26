@@ -210,3 +210,21 @@ describe('bộ máy GPS v2 (Kalman + mất tín hiệu)', () => {
     expect(e.push({ latitude: 21.001, longitude: 105.85, accuracy: 60, altitude: 0, speed: null, recorded_at: new Date(2000).toISOString() }).reason).toBe('INACCURATE')
   })
 })
+
+import { compactPoint, gpsReady } from './tracker'
+
+describe('GPS sẵn sàng + làm gọn điểm', () => {
+  it('chờ 3 điểm tốt liên tiếp hoặc 1 điểm rất tốt; điểm cũ không tính', () => {
+    const now = 100_000
+    expect(gpsReady([{ accuracy: 15, time: now - 2000 }], now)).toBe(false)
+    expect(gpsReady([{ accuracy: 15, time: now - 3000 }, { accuracy: 18, time: now - 2000 }, { accuracy: 12, time: now - 1000 }], now)).toBe(true)
+    expect(gpsReady([{ accuracy: 15, time: now - 3000 }, { accuracy: 40, time: now - 2000 }, { accuracy: 12, time: now - 1000 }], now)).toBe(false)
+    expect(gpsReady([{ accuracy: 8, time: now - 500 }], now)).toBe(true)
+    expect(gpsReady([{ accuracy: 8, time: now - 60_000 }], now)).toBe(false)
+  })
+  it('làm tròn toạ độ 1 cm, giữ quãng đường tích luỹ', () => {
+    const p = compactPoint({ latitude: 21.012345678912, longitude: 105.851234567891, accuracy: 7.345, altitude: 12.3456, speed: 3.14159, recorded_at: 'x', distance_m: 1234.5678 })
+    expect(p).toEqual({ latitude: 21.0123457, longitude: 105.8512346, accuracy: 7.3, altitude: 12.3, speed: 3.14, recorded_at: 'x', distance_m: 1234.6 })
+    expect(JSON.stringify(p).length).toBeLessThan(140)
+  })
+})

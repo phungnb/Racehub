@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import { createDb, asUser } from './load-schema'
 
-// Migration 001900: chi tiết bài chạy — quyền riêng tư bài / bản đồ, dữ liệu Strava, so sánh với bài trước
+// Migration 001900 (+006700 quy định Strava): chi tiết bài chạy — quyền riêng tư bài / bản đồ, dữ liệu Strava, so sánh với bài trước
 const ME = '00000000-0000-0000-0000-0000000000f1'
 const OTHER = '00000000-0000-0000-0000-0000000000f2'
 const STRAVA_RUN = '00000000-0000-0000-0000-00000000a001'
@@ -64,10 +64,15 @@ describe('Chi tiết bài chạy (001900)', () => {
   it('người khác: bản đồ mặc định riêng tư; bài riêng tư thì không thấy', async () => {
     const d = await detail(db, OTHER, STRAVA_RUN)
     expect(d).toMatchObject({ is_mine: false, map_allowed: false, polyline: null, validation_reason: null, needs_detail: false })
-    expect(d.splits).toHaveLength(1)                      // số liệu từng km vẫn xem được (không lộ vị trí)
+    // 006700 (quy định API Strava): bài Strava của người khác chỉ có số tổng — không từng km, nhịp tim
+    expect(d).toMatchObject({ strava_limited: true, splits: null, max_heartrate: null, distance_m: 10000 })
     await db.query(`insert into public.profile_settings (user_id, activity_visibility, map_visibility) values ($1, 'PUBLIC', 'PUBLIC')
                     on conflict (user_id) do update set activity_visibility = 'PUBLIC', map_visibility = 'PUBLIC'`, [ME])
-    expect((await detail(db, OTHER, STRAVA_RUN)).polyline).toBe('full_line')
+    expect((await detail(db, OTHER, STRAVA_RUN)).polyline).toBeNull()          // kể cả khi bản đồ công khai
+    const g = await detail(db, OTHER, GPS_RUN)                                     // bài ghi bằng app: xem bình thường
+    expect(g).toMatchObject({ strava_limited: false, map_allowed: true })
+    expect(g.points!.length).toBeGreaterThan(500)
+    expect((await detail(db, ME, STRAVA_RUN))).toMatchObject({ strava_limited: false, polyline: 'full_line', max_heartrate: 172 })
     await db.query(`update public.profile_settings set activity_visibility = 'PRIVATE' where user_id = $1`, [ME])
     expect(await fails(db, OTHER, `select public.activity_detail($1)`, [STRAVA_RUN])).toContain('ACTIVITY_NOT_FOUND')
     expect(await fails(db, OTHER, `select public.activity_detail($1)`, [OTHER])).toContain('ACTIVITY_NOT_FOUND')

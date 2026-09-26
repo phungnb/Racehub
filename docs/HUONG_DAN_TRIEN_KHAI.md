@@ -33,7 +33,7 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
 > ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
-> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 006500** + chạy lại 003500),
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 006800** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
 > File gộp tạo bằng `npm run db:bundle` (hoặc `node scripts/db-bundle.mjs <mốc>` để gộp từ mốc khác); test tự động bảo đảm file luôn khớp migration.
@@ -107,6 +107,9 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001006300_club_news_albums.sql` | **Quản lý CLB**: nút **Đăng tin CLB** cho ban chủ nhiệm (chuyên mục thông báo / sự kiện / giải chạy / kết quả / tập luyện, link kèm, ảnh, ghim, báo cả CLB), bộ lọc **Tin CLB** trên bảng tin; tab **Ảnh** — kho link album (Google Photos, Drive, Facebook…) theo sự kiện / giải, tìm không dấu, lọc loại / năm, thành viên gửi link → ban chủ nhiệm duyệt; album hiện luôn trong trang sự kiện | Cần 0500, 1500, 3100; chạy lại 3500 |
 | `20261001006400_bib_market.sql` | **Chợ BIB** trong Chợ Runner: runner đã xác minh (≥ 3 bài hợp lệ) đăng tin nhượng / cần mua BIB giải thật; **giá nhượng ≤ giá gốc**, ưu tiên đổi tên qua BTC, liên hệ ẩn tới khi bấm "Xem liên hệ" (≤ 30 / ngày), tối đa 5 tin mở, tự hết hạn sau ngày giải; báo cáo 3 lần → tạm ẩn; Quản trị → Cộng đồng → **Chợ BIB** để ẩn / hiện tin | Cần 6100 (báo cáo); chạy lại 3500 |
 | `20261001006500_gps_gap_check.sql` | **Chấm bài GPS**: phát hiện đoạn **mất tín hiệu** (> 60 giây, > 150 m giữa hai điểm — thường do tắt màn hình khi ghi bằng trình duyệt). Tổng đoạn nối thẳng > 25 % quãng đường → bài chờ xác minh (cờ `GPS_GAP`), không còn duyệt bài có tuyến "đường thẳng" | Cần 2400; chạy lại 3500 |
+| `20261001006600_gps_track_distance.sql` | **Quãng đường đúng như app đo**: mỗi điểm tuyến mang quãng đường tích luỹ (`distance_m`) đã hiệu chỉnh bằng vận tốc Doppler; máy chủ dùng số này nhưng **kẹp theo tuyến** (≤ 1,1 × đoạn thẳng + 3 m, tổng ≤ tổng đoạn thẳng — không khai khống được). Trước đây cộng điểm-điểm nên dư 2–11 %. Kèm **từng km** tính trên máy chủ | Cần 6500; chạy lại 3500 |
+| `20261001006700_strava_display_compliance.sql` | **Tuân thủ Thoả thuận API Strava (11/2024)**: bài đồng bộ từ Strava của người khác chỉ hiện số tổng — ẩn bản đồ, từng km, nhịp tim, nhịp bước, calo, thiết bị. Chủ bài xem đủ; bài ghi bằng app không ảnh hưởng | Cần 1900; chạy lại 3500 |
+| `20261001006800_account_deletion.sql` | **Xoá tài khoản trong app** (bắt buộc với App Store / Google Play; quyền xoá dữ liệu theo Luật BVDLCN 2025): xoá tuyến GPS, dữ liệu cá nhân, vị trí, kết nối; ẩn bài chạy; ẩn danh hồ sơ; giữ giao dịch ẩn danh. Route `/api/account/delete` thu hồi Strava, xoá ảnh, xoá mềm tài khoản đăng nhập | Cần 6400; chạy lại 3500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

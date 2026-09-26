@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { AlertTriangle, CheckCircle2, Clock3, CloudUpload, Gift, History, Gauge, Loader2, Lock, MapPin, Pause, Play, Satellite, Smartphone, Square, Timer, Unlock, Volume2, VolumeX, Watch, XCircle } from 'lucide-react'
+import { AlertTriangle, BatteryWarning, CheckCircle2, Clock3, CloudUpload, Gift, History, Gauge, Loader2, Lock, MapPin, Pause, Play, Satellite, Smartphone, Square, Timer, Unlock, Volume2, VolumeX, Watch, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, CoinAmount, ConfirmSheet, HoldButton, XpAmount } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -11,6 +11,8 @@ import { RewardCascade, useActivityRewards, useMarkSeen } from '@/features/game'
 import { useRunTracker, type GpsState } from '../hooks/useRunTracker'
 import { usePendingRunCount } from '../hooks/usePendingRuns'
 import { openLocationSettings } from '../model/location'
+import { BRAND_STEPS, androidBrand } from '../model/battery'
+import { nativePlatform } from '@/shared/lib/native'
 
 const DISCLOSED_KEY = 'rh-location-disclosed'
 
@@ -133,6 +135,7 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
             </>
           )}
         </Card>
+        <BatteryTip />
       </div>
     )
   }
@@ -322,6 +325,36 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
         <Link href="/feed" className="flex-1"><Button block>Về trang chủ</Button></Link>
       </div>
     </div>
+  )
+}
+
+const BATTERY_KEY = 'rh-battery-tip-done'
+
+/** App Android: hướng dẫn tắt tối ưu pin theo hãng máy — nguyên nhân số 1 làm đứt GPS khi tắt màn hình */
+function BatteryTip() {
+  const [done, setDone] = useState(() => {
+    if (nativePlatform() !== 'android') return true
+    try { return localStorage.getItem(BATTERY_KEY) === '1' } catch { return false }
+  })
+  const [open, setOpen] = useState(false)
+  if (done) return null
+  const b = BRAND_STEPS[androidBrand(navigator.userAgent)]
+  return (
+    <Card className="mt-3 space-y-2 border-warning/40 bg-warning/5 text-sm">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-start gap-2 text-left">
+        <BatteryWarning className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+        <span className="min-w-0 flex-1"><b>Máy {b.name}: làm 1 lần để GPS không bị ngắt</b><span className="block text-xs text-fg-muted">Máy tự tắt app chạy nền để tiết kiệm pin → bài chạy bị đứt đoạn. Bấm để xem cách chỉnh.</span></span>
+      </button>
+      {open && (
+        <>
+          <ol className="list-decimal space-y-1 pl-6 text-fg-muted">{b.steps.map((x) => <li key={x}>{x}</li>)}</ol>
+          <div className="flex gap-2">
+            <a href={b.link} target="_blank" rel="noopener noreferrer" className="flex h-10 flex-1 items-center justify-center rounded-xl border border-border bg-surface-2 text-xs font-semibold">Hướng dẫn có ảnh</a>
+            <Button size="sm" className="flex-1" onClick={() => { try { localStorage.setItem(BATTERY_KEY, '1') } catch { /* bỏ qua */ } setDone(true) }}>Đã chỉnh xong</Button>
+          </div>
+        </>
+      )}
+    </Card>
   )
 }
 

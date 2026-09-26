@@ -1,7 +1,7 @@
--- RaceHub: gộp 30 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 33 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -8964,6 +8964,404 @@ end $$;
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001006600_gps_track_distance.sql
+-- ===================================================================
+-- 006600: Quãng đường bài chạy trong app = đúng con số app đo (GPS-3).
+-- Trước đây máy chủ cộng khoảng cách giữa các điểm tuyến. Điểm GPS luôn có nhiễu (rung ±5–15 m) nên cách cộng này
+-- DƯ 2–11 % (mô phỏng: phố cao tầng +10,7 %), trong khi app đã hiệu chỉnh bằng vận tốc Doppler (lệch < 2 %).
+-- Nay: mỗi điểm mang quãng đường tích luỹ app đo (distance_m). Máy chủ nhận từng đoạn nhưng KẸP theo hình học tuyến:
+--   đoạn app báo ≤ 1,1 × khoảng cách thẳng giữa hai điểm + 3 m, và tổng ≤ tổng khoảng cách thẳng
+--   → không thể khai khống quá tuyến GPS thật; app cũ (không gửi distance_m) dùng cách cũ.
+-- Kèm: lưu quãng đường tích luỹ từng điểm + tính TỪNG KM ngay trên máy chủ (activity_details.splits).
+-- Chạy lại nhiều lần vẫn an toàn.
+
+alter table public.activity_track_points add column if not exists distance_m numeric;
+
+create or replace function public.submit_and_process_activity(
+  p_title text, p_source text, p_started_at timestamptz, p_ended_at timestamptz,
+  p_elapsed_s integer, p_moving_s integer, p_distance_m numeric, p_avg_pace_s integer, p_track_points jsonb
+) returns json
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  v_uid uuid := private.require_uid();
+  cfg jsonb := private.economy_config();
+  v_points jsonb := coalesce(p_track_points, '[]'::jsonb);
+  v_n integer;
+  v_gps_m numeric := 0;
+  -- Quãng đường theo app (đã kẹp) + từng km
+  v_trk_m numeric := 0;
+  v_cd numeric;
+  v_cd_prev numeric;
+  v_step numeric;
+  v_seg_t numeric;
+  v_sd numeric := 0;
+  v_st numeric := 0;
+  v_over numeric;
+  v_over_t numeric;
+  v_alt0 numeric;
+  v_splits jsonb := '[]'::jsonb;
+  v_spikes integer := 0;
+  v_prev jsonb;
+  v_p jsonb;
+  v_seg numeric;
+  v_dt numeric;
+  v_distance numeric;
+  v_moving integer;
+  v_pace integer;
+  v_status text := 'APPROVED';
+  v_reason text := 'Hoạt động hợp lệ qua kiểm tra tự động.';
+  v_activity uuid;
+  v_seq integer := 0;
+  v_reward jsonb;
+  -- Tốc độ duy trì (quãng đường trong cửa sổ 30 s) — cùng luật với features/activity/model/fraud.ts
+  v_t numeric[] := '{}';
+  v_c numeric[] := '{}';
+  v_t0 timestamptz;
+  v_i integer; v_j integer := 1; v_w numeric; v_sp numeric;
+  v_run_sev numeric; v_run_nor numeric; v_run_veh numeric;
+  v_sev numeric := 0; v_nor numeric := 0; v_veh numeric := 0;
+  v_flags jsonb := '[]'::jsonb;
+  -- Mất tín hiệu GPS: đoạn > 60 giây và > 150 m giữa hai điểm liên tiếp (tắt màn hình, hầm…) = tuyến bị nối thẳng
+  v_gaps integer := 0;
+  v_gap_s numeric := 0;
+  v_gap_m numeric := 0;
+  v_score integer := 0;
+begin
+  -- Kiểm tra đầu vào cơ bản
+  if p_started_at is null or p_ended_at is null or p_ended_at <= p_started_at then raise exception 'INVALID_TIME_RANGE'; end if;
+  if p_started_at > now() + interval '5 minutes' then raise exception 'INVALID_TIME_RANGE'; end if;
+  if p_ended_at - p_started_at > interval '24 hours' then raise exception 'ACTIVITY_TOO_LONG'; end if;
+  if jsonb_typeof(v_points) <> 'array' then raise exception 'INVALID_TRACK_POINTS'; end if;
+  v_n := jsonb_array_length(v_points);
+  if v_n > 20000 then raise exception 'TOO_MANY_TRACK_POINTS'; end if;
+
+  -- Chống gửi trùng / chồng thời gian với bài chạy khác
+  if exists (select 1 from public.activities
+              where user_id = v_uid and started_at < p_ended_at and ended_at > p_started_at) then
+    raise exception 'ACTIVITY_DUPLICATE';
+  end if;
+  if (select count(*) from public.activities where user_id = v_uid and created_at > now() - interval '1 day') >= 20 then
+    raise exception 'RATE_LIMITED';
+  end if;
+
+  -- Tính lại quãng đường từ GPS (không tin số client gửi)
+  for v_p in select value from jsonb_array_elements(v_points) loop
+    v_cd := case when jsonb_typeof(v_p->'distance_m') = 'number' then (v_p->>'distance_m')::numeric end;
+    if v_prev is null then v_alt0 := case when jsonb_typeof(v_p->'altitude') = 'number' then (v_p->>'altitude')::numeric end; end if;
+    if v_prev is not null then
+      v_seg := private.haversine_m((v_prev->>'latitude')::numeric, (v_prev->>'longitude')::numeric,
+                                   (v_p->>'latitude')::numeric, (v_p->>'longitude')::numeric);
+      v_dt := extract(epoch from ((v_p->>'recorded_at')::timestamptz - (v_prev->>'recorded_at')::timestamptz));
+      if v_dt > 0 and v_seg / v_dt > 12 then v_spikes := v_spikes + 1; end if;   -- > 43 km/h
+      if v_dt > 60 and v_seg > 150 then v_gaps := v_gaps + 1; v_gap_s := v_gap_s + v_dt; v_gap_m := v_gap_m + v_seg; end if;
+      v_gps_m := v_gps_m + coalesce(v_seg, 0);
+      -- Đoạn theo app: có distance_m ở cả hai điểm → dùng, kẹp [0, 1,1 × đoạn thẳng + 3 m]; thiếu → đoạn thẳng
+      v_step := case when v_cd is not null and v_cd_prev is not null
+                     then least(greatest(v_cd - v_cd_prev, 0), 1.1 * coalesce(v_seg, 0) + 3)
+                     else coalesce(v_seg, 0) end;
+      v_trk_m := v_trk_m + v_step;
+      -- Từng km: đoạn ≤ 30 s tính đủ giờ; dài hơn (đứng chờ / mất tín hiệu) chỉ tính phần di chuyển ước lượng ≥ 1,5 m/s
+      if v_dt > 0 then
+        v_seg_t := case when v_dt <= 30 then v_dt else least(v_dt, v_step / 1.5) end;
+        v_sd := v_sd + v_step; v_st := v_st + v_seg_t;
+        while v_sd >= 1000 loop
+          v_over := v_sd - 1000;
+          v_over_t := case when v_step > 0 then v_seg_t * v_over / v_step else 0 end;
+          v_splits := v_splits || jsonb_build_object('distance_m', 1000, 'moving_s', greatest(0, round(v_st - v_over_t)),
+            'elev_m', case when v_alt0 is not null and jsonb_typeof(v_p->'altitude') = 'number' then round(((v_p->>'altitude')::numeric - v_alt0) * 10) / 10 end,
+            'hr', null);
+          v_sd := v_over; v_st := v_over_t;
+          v_alt0 := case when jsonb_typeof(v_p->'altitude') = 'number' then (v_p->>'altitude')::numeric end;
+        end loop;
+      end if;
+    end if;
+    v_cd_prev := v_cd;
+    v_t0 := coalesce(v_t0, (v_p->>'recorded_at')::timestamptz, p_started_at);
+    v_t := v_t || extract(epoch from (coalesce((v_p->>'recorded_at')::timestamptz, v_t0) - v_t0));
+    v_c := v_c || v_trk_m;
+    v_prev := v_p;
+  end loop;
+
+  -- Đoạn liên tục dài nhất có tốc độ ≥ 20 km/h, ≥ 17 km/h, ≥ 25 km/h
+  for v_i in 2 .. coalesce(array_length(v_t, 1), 0) loop
+    while v_j < v_i and v_t[v_i] - v_t[v_j] > 30 loop v_j := v_j + 1; end loop;
+    v_w := v_t[v_i] - v_t[v_j];
+    if v_w < 15 then continue; end if;
+    v_sp := (v_c[v_i] - v_c[v_j]) / v_w;
+    if v_sp >= 20 / 3.6 then v_run_sev := coalesce(v_run_sev, v_t[v_j]); v_sev := greatest(v_sev, v_t[v_i] - v_run_sev); else v_run_sev := null; end if;
+    if v_sp >= 17 / 3.6 then v_run_nor := coalesce(v_run_nor, v_t[v_j]); v_nor := greatest(v_nor, v_t[v_i] - v_run_nor); else v_run_nor := null; end if;
+    if v_sp >= 25 / 3.6 then v_run_veh := coalesce(v_run_veh, v_t[v_j]); v_veh := greatest(v_veh, v_t[v_i] - v_run_veh); else v_run_veh := null; end if;
+  end loop;
+  if v_veh >= 30 then
+    v_flags := v_flags || jsonb_build_object('code', 'VEHICLE_BURST', 'severity', 'SEVERE', 'durationS', round(v_veh));
+    v_score := v_score + 35;
+  end if;
+  if v_sev >= 120 then
+    v_flags := v_flags || jsonb_build_object('code', 'SUSTAINED_SPEED', 'severity', 'SEVERE', 'durationS', round(v_sev));
+    v_score := v_score + 35;
+  elsif v_nor >= 180 then
+    v_flags := v_flags || jsonb_build_object('code', 'SUSTAINED_SPEED', 'severity', 'HIGH', 'durationS', round(v_nor));
+    v_score := v_score + 28;
+  end if;
+  if v_spikes > 3 then
+    v_flags := v_flags || jsonb_build_object('code', 'GPS_TELEPORT', 'severity', 'HIGH', 'count', v_spikes);
+    v_score := v_score + 20;
+  end if;
+
+  if v_gaps > 0 then
+    v_flags := v_flags || jsonb_build_object('code', 'GPS_GAP', 'severity', case when v_gap_m > greatest(500, 0.25 * v_gps_m) then 'HIGH' else 'INFO' end,
+      'count', v_gaps, 'durationS', round(v_gap_s), 'meters', round(v_gap_m));
+  end if;
+  v_moving := least(greatest(coalesce(p_moving_s, 0), 0), extract(epoch from (p_ended_at - p_started_at))::integer);
+  v_distance := case when v_n >= 2 then round(least(v_trk_m, v_gps_m)) else greatest(coalesce(p_distance_m, 0), 0) end;
+  v_pace := case when v_distance > 0 then round(v_moving / (v_distance / 1000.0)) else 0 end;
+
+  -- Luật xác thực (xem ADR-007)
+  if v_distance < 200 then
+    v_status := 'REJECTED'; v_reason := 'Quá ngắn (< 200 m), không đủ điều kiện ghi nhận.';
+  elsif v_n < 2 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 40);
+    v_reason := 'Bài không có dữ liệu GPS — không đối chiếu được quãng đường.';
+  elsif v_pace < (cfg->>'minValidPace')::numeric * 60 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 75);
+    v_reason := 'Pace trung bình nhanh hơn 3:00/km — vượt khả năng chạy bộ.';
+  elsif v_veh >= 30 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 85);
+    v_reason := 'Di chuyển ≥ 25 km/h liên tục ' || round(v_veh) || ' giây — giống đi xe.';
+  elsif v_sev >= 120 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 70);
+    v_reason := 'Giữ tốc độ ≥ 20 km/h (pace 3:00) liên tục ' || round(v_sev) || ' giây.';
+  elsif v_nor >= 180 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 65);
+    v_reason := 'Giữ tốc độ ≥ 17 km/h (pace 3:32) liên tục ' || round(v_nor) || ' giây.';
+  elsif v_spikes > 3 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 50);
+    v_reason := 'Vị trí GPS nhảy xa bất thường ' || v_spikes || ' lần (> 43 km/h).';
+  elsif v_gap_m > greatest(500, 0.25 * v_gps_m) then
+    v_status := 'PENDING'; v_score := greatest(v_score, 40);
+    v_reason := 'Mất tín hiệu GPS ' || greatest(1, round(v_gap_s / 60)) || ' phút — ' || round(v_gap_m / 1000.0, 2)
+                || ' km được nối thẳng, không đối chiếu được tuyến (thường do tắt màn hình khi ghi bằng trình duyệt).';
+  elsif p_distance_m > 0 and abs(p_distance_m - v_distance) > greatest(0.15 * v_distance, 100) then
+    v_status := 'PENDING'; v_score := greatest(v_score, 45);
+    v_reason := 'Quãng đường app gửi lên lệch nhiều so với tuyến GPS.';
+  end if;
+  if v_status = 'PENDING' then
+    v_reason := left('Mức nghi vấn: ' || private.risk_label(private.risk_level(v_score)) || '. ' || v_reason
+                     || ' Bài được tính sau khi ban quản trị CLB hoặc admin xác minh.', 500);
+  end if;
+
+  v_activity := gen_random_uuid();
+  insert into public.activities (
+    id, user_id, title, source, started_at, ended_at, elapsed_time_s, moving_time_s,
+    distance_m, moving_distance_m, avg_pace_s, status, validation_status, validation_reason,
+    risk_score, risk_level, risk_flags)
+  values (
+    v_activity, v_uid, left(coalesce(nullif(trim(p_title), ''), 'Buổi chạy'), 120),
+    case when p_source in ('DIRECT_GPS', 'STRAVA', 'GARMIN') then p_source else 'DIRECT_GPS' end,
+    p_started_at, p_ended_at, greatest(coalesce(p_elapsed_s, 0), v_moving), v_moving,
+    v_distance, v_distance, v_pace,
+    case v_status when 'APPROVED' then 'READY' when 'PENDING' then 'PROCESSING' else 'REJECTED' end,
+    v_status, v_reason,
+    least(v_score, 100), private.risk_level(v_score),
+    case when jsonb_array_length(v_flags) > 0 then v_flags end);
+
+  for v_p in select value from jsonb_array_elements(v_points) loop
+    v_seq := v_seq + 1;
+    insert into public.activity_track_points (activity_id, sequence, latitude, longitude, accuracy, altitude, speed, recorded_at, distance_m)
+    values (v_activity, v_seq, (v_p->>'latitude')::numeric, (v_p->>'longitude')::numeric,
+            (v_p->>'accuracy')::numeric, (v_p->>'altitude')::numeric, (v_p->>'speed')::numeric,
+            coalesce((v_p->>'recorded_at')::timestamptz, p_started_at), round(v_c[v_seq], 1));
+  end loop;
+
+  -- Từng km (km lẻ cuối ≥ 100 m) — màn chi tiết bài chạy đọc thẳng, khớp quãng đường đã lưu
+  if v_n >= 2 then
+    if v_sd >= 100 and v_st > 0 then
+      v_splits := v_splits || jsonb_build_object('distance_m', round(v_sd), 'moving_s', round(v_st), 'elev_m', null, 'hr', null);
+    end if;
+    insert into public.activity_details (activity_id, splits, start_lat, start_lng, detailed)
+    values (v_activity, v_splits, (v_points->0->>'latitude')::numeric, (v_points->0->>'longitude')::numeric, true)
+    on conflict (activity_id) do update set splits = excluded.splits;
+  end if;
+
+  if v_status = 'APPROVED' then
+    v_reward := (select jsonb_build_object('earned_xu', x.earned_xu, 'earned_xp', x.earned_xp)
+                   from public.activities x where x.id = v_activity);         -- trigger trg_auto_reward đã thưởng
+  end if;
+
+  return json_build_object(
+    'success', true, 'activity_id', v_activity,
+    'validation_status', v_status, 'validation_reason', v_reason,
+    'distance_m', v_distance,
+    'earned_xp', coalesce((v_reward->>'earned_xp')::integer, 0),
+    'earned_xu', coalesce((v_reward->>'earned_xu')::numeric, 0));
+end $$;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001006700_strava_display_compliance.sql
+-- ===================================================================
+-- 006700: Tuân thủ Thoả thuận API Strava (hiệu lực 11/11/2024): dữ liệu Strava của một người chỉ được hiển thị cho
+-- CHÍNH người đó trong app bên thứ ba. Bài đồng bộ từ Strava: người khác chỉ thấy số tổng (quãng đường, thời gian, pace)
+-- — ẩn bản đồ tuyến, từng km, nhịp tim, nhịp bước, calo, thiết bị. Chủ bài vẫn xem đầy đủ.
+-- Bài ghi bằng app RaceHub / nhập tay không bị ảnh hưởng. Chạy lại nhiều lần vẫn an toàn.
+-- Còn lại cần chủ sản phẩm quyết định (xem docs/RUI_RO_VA_PHONG_NGUA.md): quãng đường Strava trên BXH / bảng tin CLB.
+
+create or replace function public.activity_detail(p_activity_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  a public.activities := (select x from public.activities x where x.id = p_activity_id);
+  d public.activity_details := (select x from public.activity_details x where x.activity_id = p_activity_id);
+  v_mine boolean;
+  v_map boolean;
+  -- Bài đồng bộ từ Strava, người xem không phải chủ bài → chỉ số tổng, không chi tiết (API Agreement Strava 11/2024)
+  v_strava_other boolean;
+begin
+  if a.id is null or coalesce(a.status, '') = 'DELETED' then raise exception 'ACTIVITY_NOT_FOUND'; end if;
+  v_mine := a.user_id = v_uid;
+  if not v_mine and not (public.can_view_activities(a.user_id) and public.activity_is_countable(a.status, a.validation_status)) then
+    raise exception 'ACTIVITY_NOT_FOUND';
+  end if;
+  v_strava_other := not v_mine and a.source = 'STRAVA';
+  v_map := v_mine or (not v_strava_other and public.can_view_map(a.user_id));
+
+  return jsonb_build_object(
+    'id', a.id, 'title', a.title, 'source', a.source, 'sport_type', a.sport_type, 'device_name', case when not v_strava_other then a.device_name end,
+    'started_at', a.started_at, 'distance_m', coalesce(a.moving_distance_m, a.distance_m, 0),
+    'moving_s', coalesce(a.moving_time_s, a.elapsed_time_s, 0), 'elapsed_s', coalesce(a.elapsed_time_s, 0),
+    'avg_pace_s', a.avg_pace_s, 'elevation_gain_m', coalesce(a.elevation_gain_m, 0),
+    'avg_heartrate', case when not v_strava_other then a.avg_heartrate end,
+    'max_heartrate', case when not v_strava_other then d.max_heartrate end,
+    'avg_cadence', case when not v_strava_other then d.avg_cadence end,
+    'calories', case when not v_strava_other then d.calories end,
+    'strava_limited', v_strava_other,
+    'validation_status', a.validation_status,
+    'validation_reason', case when v_mine then a.validation_reason end,
+    'earned_xu', a.earned_xu, 'earned_xp', a.earned_xp,
+    'is_mine', v_mine,
+    'owner', (select jsonb_build_object('id', p.id, 'display_name', p.display_name, 'avatar_url', p.avatar_url, 'level', p.level)
+                from public.profiles p where p.id = a.user_id),
+    'map_allowed', v_map,
+    'polyline', case when v_map then d.polyline end,
+    -- Bài GPS trong app: điểm GPS rút gọn ≤ ~1000 điểm [lat, lng, giây kể từ lúc bắt đầu, độ cao]
+    'points', case when v_map and d.polyline is null then (
+        select jsonb_agg(jsonb_build_array(s.latitude, s.longitude,
+                 round(extract(epoch from (s.recorded_at - a.started_at))), s.altitude) order by s.sequence)
+          from (select t.latitude, t.longitude, t.recorded_at, t.altitude, t.sequence,
+                       row_number() over (order by t.sequence) as rn, count(*) over () as cnt
+                  from public.activity_track_points t where t.activity_id = a.id) s
+         where s.rn % greatest(ceil(s.cnt / 1000.0)::int, 1) = 0 or s.rn = s.cnt) end,
+    'splits', case when not v_strava_other then d.splits end,
+    'needs_detail', v_mine and a.source = 'STRAVA' and not coalesce(d.detailed, false),
+    'challenges', case when v_mine then (
+        select coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'title', c.title, 'counted_m', e.counted_m) order by e.created_at), '[]'::jsonb)
+          from public.challenge_progress_events e join public.challenges c on c.id = e.challenge_id
+         where e.activity_id = a.id) else '[]'::jsonb end,
+    'cheers', (select jsonb_build_object('count', count(*), 'total', coalesce(sum(ch.amount), 0))
+                 from public.cheers ch where ch.activity_id = a.id),
+    -- So với 10 bài trước đó của chính người chạy (để hiện "dài hơn / nhanh hơn thường lệ")
+    'compare', (select jsonb_build_object(
+          'runs', count(*),
+          'avg_distance_m', round(avg(coalesce(x.moving_distance_m, x.distance_m))),
+          'avg_pace_s', round(avg(x.avg_pace_s) filter (where x.avg_pace_s > 0)),
+          'longest_30d', coalesce(a.distance_m >= (select max(y.distance_m) from public.activities y
+                              where y.user_id = a.user_id and y.id <> a.id and public.activity_is_countable(y.status, y.validation_status)
+                                and y.started_at > a.started_at - interval '30 days' and y.started_at <= a.started_at), true))
+        from (select z.*, row_number() over (order by z.started_at desc) as rn
+                from public.activities z
+               where z.user_id = a.user_id and z.id <> a.id and z.started_at < a.started_at
+                 and public.activity_is_countable(z.status, z.validation_status)) x
+       where x.rn <= 10)
+  );
+end $$;
+
+revoke all on function public.activity_detail(uuid) from public, anon;
+grant execute on function public.activity_detail(uuid) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001006800_account_deletion.sql
+-- ===================================================================
+-- 006800: Xoá tài khoản ngay trong app.
+-- Bắt buộc với app có đăng ký tài khoản trên App Store (Apple, mục 5.1.1(v)) và Google Play; đồng thời đáp ứng quyền
+-- yêu cầu xoá dữ liệu của Luật Bảo vệ dữ liệu cá nhân 2025 (hiệu lực 01/01/2026; dữ liệu vị trí là dữ liệu nhạy cảm).
+--
+-- Cách xoá: XOÁ dữ liệu cá nhân + ẨN DANH phần còn lại, giữ bản ghi giao dịch (đơn hàng, sổ Xu) ở dạng ẩn danh
+-- vì nghĩa vụ kế toán / đối soát. Sau RPC này, route /api/account/delete xoá mềm tài khoản đăng nhập (auth)
+-- — email được làm rối, người dùng đăng ký lại được bằng chính email đó như tài khoản mới.
+--
+-- Chặn: quản trị viên (phải được gỡ quyền trước) và chủ nhiệm CLB còn thành viên khác (chuyển quyền trước).
+-- Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT. Chạy lại nhiều lần vẫn an toàn.
+
+alter table public.profiles add column if not exists deleted_at timestamptz;
+
+create or replace function public.delete_my_account(p_confirm text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_p public.profiles := (select x from public.profiles x where x.id = v_uid);
+  v_runs integer;
+begin
+  if coalesce(upper(trim(p_confirm)), '') not in ('XOÁ', 'XÓA', 'XOA') then raise exception 'CONFIRM_REQUIRED'; end if;
+  if v_p.id is null then raise exception 'PROFILE_NOT_FOUND'; end if;
+  if v_p.deleted_at is not null then return jsonb_build_object('ok', true, 'already', true); end if;
+  if coalesce(v_p.is_admin, false) or coalesce(v_p.role, '') in ('ADMIN', 'SUPER_ADMIN') then raise exception 'ADMIN_CANNOT_DELETE'; end if;
+  if exists (select 1 from public.clubs c where c.owner_id = v_uid
+               and exists (select 1 from public.club_members m where m.club_id = c.id and m.user_id <> v_uid and m.status = 'ACTIVE')) then
+    raise exception 'TRANSFER_CLUB_FIRST';
+  end if;
+
+  -- 1. Bài chạy: xoá tuyến GPS + chi tiết (dữ liệu vị trí), ẩn bài (không còn hiện ở đâu)
+  delete from public.activity_track_points t using public.activities a where t.activity_id = a.id and a.user_id = v_uid;
+  delete from public.activity_details d using public.activities a where d.activity_id = a.id and a.user_id = v_uid;
+  update public.activities set status = 'DELETED', title = 'Buổi chạy', device_name = null where user_id = v_uid;
+  v_runs := (select count(*) from public.activities where user_id = v_uid);
+
+  -- 2. Dữ liệu cá nhân / thiết bị / vị trí
+  delete from public.profile_details where user_id = v_uid;
+  delete from public.push_subscriptions where user_id = v_uid;
+  delete from public.push_settings where user_id = v_uid;
+  delete from public.notification_settings where user_id = v_uid;
+  delete from public.notifications where user_id = v_uid;
+  delete from public.runner_discovery_settings where user_id = v_uid;
+  delete from public.runner_location_presence where user_id = v_uid;
+  delete from public.runner_nearby_searches where user_id = v_uid;
+  delete from public.connected_accounts where user_id = v_uid;
+  delete from public.content_bookmarks where user_id = v_uid;
+  delete from public.content_read_history where user_id = v_uid;
+  delete from public.content_user_events where user_id = v_uid;
+  delete from public.club_message_reads where user_id = v_uid;
+  delete from public.bib_listings where user_id = v_uid;
+  delete from public.bib_contact_reveals where user_id = v_uid;
+  delete from public.content_staff where user_id = v_uid;
+  update public.content_authors set user_id = null where user_id = v_uid;
+  update public.partners set status = 'HIDDEN', contacts = '{}'::jsonb, address = null where owner_id = v_uid;
+  update public.challenge_honor_prefs set photo_url = null, hidden = true where user_id = v_uid;
+
+  -- 3. Rời mọi CLB (CLB chỉ còn mình mình thì CLB giữ nguyên, không còn thành viên)
+  delete from public.club_members where user_id = v_uid;
+
+  -- 4. Hồ sơ: ẩn danh (bài viết / tin nhắn cũ trong CLB hiện "Người dùng đã xoá")
+  update public.profiles set
+    display_name = 'Người dùng đã xoá', avatar_url = null, bio = null, gender = null,
+    strava_connected = false, strava_access_token = null, strava_refresh_token = null,
+    strava_token_expires_at = null, strava_athlete_id = null,
+    gift_wall_public = false, referral_code = null,
+    banned_at = coalesce(banned_at, now()), banned_reason = 'ACCOUNT_DELETED',
+    deleted_at = now(), updated_at = now()
+  where id = v_uid;
+
+  return jsonb_build_object('ok', true, 'activities_hidden', v_runs);
+end $$;
+
+revoke all on function public.delete_my_account(text) from public, anon;
+grant execute on function public.delete_my_account(text) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -9066,7 +9464,13 @@ begin
     jsonb_build_object('file', '20261001006400', 'label', 'Chợ BIB: nhượng / tìm mua BIB (không cao hơn giá gốc, liên hệ ẩn, báo cáo, admin ẩn tin)',
       'ok', to_regprocedure('public.bib_listings(jsonb)') is not null),
     jsonb_build_object('file', '20261001006500', 'label', 'Chấm bài GPS: phát hiện mất tín hiệu (tắt màn hình) — tuyến nối thẳng phải xác minh',
-      'ok', exists (select 1 from pg_proc where proname = 'submit_and_process_activity' and prosrc like '%GPS_GAP%')));
+      'ok', exists (select 1 from pg_proc where proname = 'submit_and_process_activity' and prosrc like '%GPS_GAP%')),
+    jsonb_build_object('file', '20261001006600', 'label', 'Quãng đường bài GPS = số app đo (kẹp theo tuyến) + từng km trên máy chủ',
+      'ok', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'activity_track_points' and column_name = 'distance_m')),
+    jsonb_build_object('file', '20261001006700', 'label', 'Quy định API Strava: bài Strava của người khác chỉ hiện số tổng (ẩn bản đồ, từng km, nhịp tim)',
+      'ok', exists (select 1 from pg_proc where proname = 'activity_detail' and prosrc like '%strava_limited%')),
+    jsonb_build_object('file', '20261001006800', 'label', 'Xoá tài khoản trong app (Apple 5.1.1(v), Luật BVDLCN 2025): xoá dữ liệu cá nhân + ẩn danh',
+      'ok', to_regprocedure('public.delete_my_account(text)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

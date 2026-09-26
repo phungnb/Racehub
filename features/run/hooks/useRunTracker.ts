@@ -5,7 +5,7 @@ import { supabase } from '@/shared/lib/supabase'
 import { describeError } from '@/shared/lib/errors'
 import { canTrackLocation, tracksInBackground, watchLocation, type LocationError, type LocationFix } from '../model/location'
 import { buildPayload, clearSnapshot, enqueue, loadSnapshot, saveSnapshot, type RunSnapshot } from '../model/recovery'
-import { ENGINE, GPS, TrackEngine, nextSplit, rollingPace, splitAnnouncement, type GpsGap, type Split, type TrackPoint } from '../model/tracker'
+import { ENGINE, GPS, TrackEngine, compactPoint, gpsReady, nextSplit, rollingPace, splitAnnouncement, type GpsGap, type Split, type TrackPoint } from '../model/tracker'
 import { keepAwake, reacquireAwake, releaseAwake } from '@/shared/lib/keepAwake'
 
 export type RunPhase = 'IDLE' | 'LOCATING' | 'RUNNING' | 'PAUSED' | 'FINISHED' | 'SAVING' | 'SAVED' | 'QUEUED'
@@ -32,6 +32,8 @@ export function useRunTracker() {
   const lastAcceptAt = useRef(0)
   /** Lần cuối nhận được điểm GPS (bất kể chất lượng) — quá 15 giây → "Mất GPS" */
   const lastFixAt = useRef(0)
+  /** Các điểm lúc chờ GPS (chỉ sai số + thời gian) — đủ ổn định mới bắt đầu tính giờ */
+  const warmup = useRef<{ accuracy: number; time: number }[]>([])
   const engine = useRef(new TrackEngine())
   const [gaps, setGaps] = useState<GpsGap[]>([])
   const [autoPaused, setAutoPaused] = useState(false)
@@ -99,7 +101,10 @@ export function useRunTracker() {
     lastFixAt.current = Date.now()
     setGps(accuracy <= ENGINE.GOOD_ACCURACY_M ? 'GOOD' : 'WEAK')
 
-    if (phaseRef.current === 'LOCATING' && accuracy <= ENGINE.GOOD_ACCURACY_M) {
+    if (phaseRef.current === 'LOCATING') {
+      warmup.current = [...warmup.current.slice(-4), { accuracy, time: Date.now() }]   // giờ nhận (giờ GPS một số máy lệch)
+    }
+    if (phaseRef.current === 'LOCATING' && gpsReady(warmup.current, Date.now())) {
       // Có tín hiệu tốt → bắt đầu tính giờ
       startedAt.current = Date.now()
       lastTick.current = Date.now()
@@ -116,7 +121,8 @@ export function useRunTracker() {
       setGapS((g) => g + r.gap!.seconds)
     }
     if (!r.point) return
-    points.current.push(r.point)
+    // Mỗi điểm mang quãng đường tích luỹ app đo (máy chủ dùng số này, kẹp theo tuyến — xem migration 006600)
+    points.current.push(compactPoint({ ...r.point, distance_m: distanceRef.current + r.distance }))
     if (r.distance === 0 && !r.gap) return      // điểm đầu đoạn
     movingRef.current += r.moving
     lastAcceptAt.current = Date.now()
@@ -184,6 +190,7 @@ export function useRunTracker() {
     engine.current = new TrackEngine()
     setGaps([])
     lastFixAt.current = 0
+    warmup.current = []
     distanceRef.current = 0
     movingRef.current = 0
     splitsRef.current = []
