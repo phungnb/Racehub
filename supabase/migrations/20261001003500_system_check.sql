@@ -110,7 +110,9 @@ begin
     jsonb_build_object('file', '20261001007000', 'label', 'Bài Strava chỉ hiện cho người khác khi runner đồng ý (hướng B+) + công tắc chính sách của admin',
       'ok', to_regprocedure('public.set_strava_sharing(boolean)') is not null),
     jsonb_build_object('file', '20261001007100', 'label', 'Admin hệ thống toàn quyền trong mọi CLB (duyệt, sửa, đăng tin, trao quyền, giải tán)',
-      'ok', exists (select 1 from pg_proc where proname = 'club_is_staff' and prosrc like '%is_system_admin%')));
+      'ok', exists (select 1 from pg_proc where proname = 'club_is_staff' and prosrc like '%is_system_admin%')),
+    jsonb_build_object('file', '20261001007200', 'label', 'Hàm gán gói CLB Pro đúng bản chuẩn (sửa lỗi "chỉ quản trị viên…" khi gán Pro)',
+      'ok', exists (select 1 from pg_proc where proname = 'admin_set_club_plan' and prosrc like '%log_notify_error(''club_plan''%')));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

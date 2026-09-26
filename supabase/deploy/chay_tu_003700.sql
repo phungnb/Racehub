@@ -1,7 +1,7 @@
--- RaceHub: gộp 36 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 37 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -10313,6 +10313,65 @@ end $$;
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001007200_restore_admin_set_club_plan.sql
+-- ===================================================================
+-- 007200: Khôi phục hàm gán gói CLB Pro về bản chuẩn.
+-- Sự cố (09/2026): gán Pro cho NO BEER NO RUN báo "Chỉ quản trị viên hệ thống…" dù admin đúng quyền. Chạy thử trên
+-- production cho thấy public.admin_set_club_plan ở đó KHÔNG phải bản trong mã nguồn (gọi private.require_admin() ngay
+-- ở phần khai báo — không migration nào có bản này, có thể do sửa tay trong SQL Editor). Migration này:
+--   1. Viết lại is_system_admin / require_admin đúng bản chuẩn (000300).
+--   2. Xoá hẳn admin_set_club_plan đang có rồi tạo lại bản chuẩn (002800), phòng khi bản lạ khác kiểu trả về.
+--   3. Bước báo cho ban quản trị CLB được bọc lỗi: thông báo hỏng không bao giờ làm hỏng việc gán gói.
+-- Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT. Chạy lại nhiều lần vẫn an toàn.
+
+create or replace function public.is_system_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles
+                  where id = auth.uid() and (role = 'SYSTEM_ADMIN' or is_admin is true))
+$$;
+
+create or replace function private.require_admin() returns uuid
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform private.require_uid();
+  if not public.is_system_admin() then raise exception 'FORBIDDEN'; end if;
+  return auth.uid();
+end $$;
+
+drop function if exists public.admin_set_club_plan(uuid, text, timestamptz, text);
+
+create function public.admin_set_club_plan(p_club_id uuid, p_plan text, p_until timestamptz, p_reason text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_plan text := upper(coalesce(p_plan, ''));
+  c public.clubs := (select x from public.clubs x where x.id = p_club_id);
+begin
+  if not public.is_system_admin() then raise exception 'FORBIDDEN'; end if;
+  if c.id is null then raise exception 'CLUB_NOT_FOUND'; end if;
+  if v_plan not in ('FREE', 'PRO') then raise exception 'INVALID_PLAN'; end if;
+  if length(trim(coalesce(p_reason, ''))) < 3 then raise exception 'REASON_REQUIRED'; end if;
+  update public.clubs set plan = v_plan, pro_until = case when v_plan = 'PRO' then p_until end where id = c.id;
+  insert into public.admin_audit_log (actor_id, action, target, new_value)
+  values (v_uid, 'SET_CLUB_PLAN', c.id::text, jsonb_build_object('plan', v_plan, 'until', p_until, 'reason', trim(p_reason), 'old_plan', c.plan));
+  begin
+    perform private.notify_club(c.id, true, 'CLUB_PRO',
+      case when v_plan = 'PRO' then c.name || ' đã lên gói CLB Pro' else c.name || ' trở về gói miễn phí' end,
+      case when v_plan = 'PRO' then 'Mở khóa: không giới hạn quản trị viên, link mời riêng, báo cáo chuyên cần.'
+           else 'Các tính năng Pro tạm khóa. Dữ liệu vẫn được giữ nguyên.' end,
+      '/clubs/' || c.id || '/settings', v_uid);
+  exception when others then
+    perform private.log_notify_error('club_plan', 'CLUB_PRO', v_uid, sqlstate, sqlerrm);
+  end;
+  return jsonb_build_object('plan', v_plan, 'pro_until', case when v_plan = 'PRO' then p_until end);
+end $$;
+
+revoke all on function public.admin_set_club_plan(uuid, text, timestamptz, text) from public, anon;
+grant execute on function public.admin_set_club_plan(uuid, text, timestamptz, text) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -10427,7 +10486,9 @@ begin
     jsonb_build_object('file', '20261001007000', 'label', 'Bài Strava chỉ hiện cho người khác khi runner đồng ý (hướng B+) + công tắc chính sách của admin',
       'ok', to_regprocedure('public.set_strava_sharing(boolean)') is not null),
     jsonb_build_object('file', '20261001007100', 'label', 'Admin hệ thống toàn quyền trong mọi CLB (duyệt, sửa, đăng tin, trao quyền, giải tán)',
-      'ok', exists (select 1 from pg_proc where proname = 'club_is_staff' and prosrc like '%is_system_admin%')));
+      'ok', exists (select 1 from pg_proc where proname = 'club_is_staff' and prosrc like '%is_system_admin%')),
+    jsonb_build_object('file', '20261001007200', 'label', 'Hàm gán gói CLB Pro đúng bản chuẩn (sửa lỗi "chỉ quản trị viên…" khi gán Pro)',
+      'ok', exists (select 1 from pg_proc where proname = 'admin_set_club_plan' and prosrc like '%log_notify_error(''club_plan''%')));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

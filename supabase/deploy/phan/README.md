@@ -13,5 +13,5 @@ Không nhớ đã chạy tới đâu: xem **Quản trị → Hệ thống → Ki
 | [phan_06.sql](phan_06.sql) | 005900, 006000, 006100 | 82 KB |
 | [phan_07.sql](phan_07.sql) | 006200, 006300 | 83 KB |
 | [phan_08.sql](phan_08.sql) | 006400, 006500, 006600, 006700, 006800, 006900 | 58 KB |
-| [phan_09.sql](phan_09.sql) | 007000, 007100 | 48 KB |
+| [phan_09.sql](phan_09.sql) | 007000, 007100, 007200 | 52 KB |
 | [phan_10.sql](phan_10.sql) | 003500 | 17 KB |
