@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
+import { CloseButton } from './CloseButton'
 
 export const LEGAL_UPDATED = '25/09/2026'
 /** Email hỗ trợ (đặt NEXT_PUBLIC_SUPPORT_EMAIL trên Vercel); chưa đặt thì hướng dẫn liên hệ trong app */
@@ -21,6 +22,7 @@ export function LegalPage({ title, children }: { title: string; children: ReactN
           <Link href="/help" className="hover:text-fg">Hướng dẫn</Link>
           <Link href="/privacy" className="hover:text-fg">Quyền riêng tư</Link>
           <Link href="/terms" className="hover:text-fg">Điều khoản</Link>
+          <CloseButton className="-my-2 size-9" />
         </span>
       </nav>
       <h1 className="text-2xl font-bold">{title}</h1>

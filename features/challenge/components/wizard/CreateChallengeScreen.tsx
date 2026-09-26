@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { ArrowLeft, CalendarRange, Check, ChevronRight, Coins, Flag, Lock, Minus, Plus, Scale, Shield, Swords, Ticket, Users, X } from 'lucide-react'
+import { ArrowLeft, CalendarRange, Check, CheckCircle2, ChevronRight, Coins, Flag, Lock, Minus, Plus, Scale, Shield, Swords, Ticket, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useMyProfile } from '@/features/auth'
 import { isStaff, useClubInbox } from '@/features/club'
@@ -133,7 +133,7 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
       {step === 0 && <StepType d={d} set={set} errors={errors} staffClubs={staffClubs} />}
       {step === 1 && <StepRules d={d} set={set} errors={errors} />}
       {step === 2 && <StepTime d={d} set={set} errors={errors} balance={balance} quote={quote.data} />}
-      {step === 3 && <StepReview d={d} quote={quote.data} bill={bill} loading={quote.isPending} failed={quote.isError}
+      {step === 3 && <StepReview d={d} quote={quote.data} bill={bill} loading={quote.isPending} failed={quote.isError} quoteError={quote.error}
         onRetry={() => void quote.refetch()} clubName={staffClubs.find((c) => c.club_id === d.clubId)?.name}
         onEdit={(to, patch) => { if (patch) set(patch); setStep(to) }} />}
 
@@ -488,6 +488,9 @@ function StepTime({ d, set, errors, balance, quote }: StepProps & { balance: num
   const maxTier = tiers.at(-1)?.max ?? 1000
   const slots = effectiveSlots(d)
   const fee = creationFee(slots, tiers)
+  // Gói VIP / CLB Pro còn lượt: mức quy mô nằm trong lượt thì không nhắc tới giá
+  const covered = (max: number) => !!quote && quote.bestPassSlots >= max
+  const planName = quote?.plan?.name
   return (
     <div className="space-y-5">
       <section className="space-y-3">
@@ -507,7 +510,7 @@ function StepTime({ d, set, errors, balance, quote }: StepProps & { balance: num
 
       {d.format !== 'DUEL' && (d.format !== 'SOLO_GOAL' || d.pledge.enabled) && (
         <section className="space-y-2">
-          <p className="text-sm font-medium text-fg-muted">Quy mô (phí thu một lần, không phụ thuộc thời gian)</p>
+          <p className="text-sm font-medium text-fg-muted">{quote?.bestPassSlots ? `Quy mô · ${planName ?? 'gói của bạn'} miễn phí tới ${formatNumber(quote.bestPassSlots)} người` : 'Quy mô (phí thu một lần, không phụ thuộc thời gian)'}</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Chọn quy mô">
             {tiers.filter((t) => t.max >= 2).map((t) => {
               const on = slots <= t.max && (capacityTier(slots, tiers)?.max === t.max)
@@ -515,25 +518,35 @@ function StepTime({ d, set, errors, balance, quote }: StepProps & { balance: num
                 <button key={t.max} type="button" role="radio" aria-checked={on} onClick={() => set({ maxSlots: t.max })}
                   className={cn('rounded-xl border px-3 py-2 text-left', on ? 'border-brand bg-brand/10' : 'border-border bg-surface')}>
                   <span className="block text-sm font-semibold">≤ {formatNumber(t.max)} người</span>
-                  <span className={cn('block text-xs font-semibold', t.xu ? 'text-coin' : 'text-brand')}>{t.xu ? `${formatCoin(t.xu)} Xu` : 'Miễn phí'}</span>
+                  {covered(t.max) ? <span className="block text-xs font-semibold text-brand">Trong gói</span>
+                    : <span className={cn('block text-xs font-semibold', t.xu ? 'text-coin' : 'text-brand')}>{t.xu ? `${formatCoin(t.xu)} Xu` : 'Miễn phí'}</span>}
                 </button>
               )
             })}
           </div>
           <NumberField id="c-slots" label="Số người tối đa" value={d.maxSlots} step={1} min={2} max={maxTier} onChange={(v) => set({ maxSlots: v })}
             error={errors.maxSlots ?? (slots > maxTier ? `Trên ${formatNumber(maxTier)} người: liên hệ admin để được cấp riêng` : undefined)} unit="người" />
-          <p className="flex flex-wrap items-center gap-1.5 text-sm">
-            <Coins className="size-4 text-coin" aria-hidden />
-            <span className="text-fg-muted">Phí tạo:</span>
-            {fee === null ? <span className="font-semibold text-danger">Liên hệ admin</span>
-              : quote?.pass && fee > 0
-              ? <span className="font-semibold text-brand">dùng 1 lượt tạo miễn phí <span className="font-normal text-fg-subtle line-through">{formatCoin(fee)} Xu</span></span>
-              : <span className={cn('font-semibold', fee ? 'text-coin' : 'text-brand')}>{fee ? `${formatCoin(fee)} Xu (${xuToVnd(fee, policy)})` : 'Miễn phí'}</span>}
-            {fee !== null && fee > 0 && !quote?.pass && <span className="text-fg-subtle">· {clubPays ? 'trừ quỹ CLB' : 'trừ ví của bạn'}</span>}
-          </p>
-          {!quote?.pass && fee !== null && fee > 0 && (
+          {quote?.pass && fee !== null && fee > 0 ? (
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-brand">
+              <Ticket className="size-4" aria-hidden />Miễn phí với {planName ?? 'gói của bạn'} · còn {quote.pass.remaining} lượt tháng này
+            </p>
+          ) : (
+            <p className="flex flex-wrap items-center gap-1.5 text-sm">
+              <Coins className="size-4 text-coin" aria-hidden />
+              <span className="text-fg-muted">Phí tạo:</span>
+              {fee === null ? <span className="font-semibold text-danger">Liên hệ admin</span>
+                : <span className={cn('font-semibold', fee ? 'text-coin' : 'text-brand')}>{fee ? `${formatCoin(fee)} Xu (${xuToVnd(fee, policy)})` : 'Miễn phí'}</span>}
+              {fee !== null && fee > 0 && <span className="text-fg-subtle">· {clubPays ? 'trừ quỹ CLB' : 'trừ ví của bạn'}</span>}
+            </p>
+          )}
+          {!quote?.pass && !quote?.plan && fee !== null && fee > 0 && (
             <p className="text-xs text-fg-subtle">
               Gói VIP / CLB Pro có lượt tạo miễn phí mỗi tháng. <Link href={routes.plan} className="font-semibold text-brand">Xem gói</Link>
+            </p>
+          )}
+          {!quote?.pass && quote?.plan && fee !== null && fee > 0 && (
+            <p className="text-xs text-fg-subtle">
+              {quote.bestPassSlots ? `Lượt ${quote.plan.name} chỉ bao tới ${formatNumber(quote.bestPassSlots)} người — giảm quy mô để miễn phí.` : `Đã dùng hết lượt ${quote.plan.name} tháng này.`}
             </p>
           )}
         </section>
@@ -565,8 +578,8 @@ function StepTime({ d, set, errors, balance, quote }: StepProps & { balance: num
   )
 }
 
-function StepReview({ d, quote, bill, loading, failed, onRetry, clubName, onEdit }: {
-  d: ChallengeDraft; quote?: ChallengeQuote; bill: Bill | null; loading: boolean; failed: boolean; onRetry: () => void; clubName?: string
+function StepReview({ d, quote, bill, loading, failed, quoteError, onRetry, clubName, onEdit }: {
+  d: ChallengeDraft; quote?: ChallengeQuote; bill: Bill | null; loading: boolean; failed: boolean; quoteError?: unknown; onRetry: () => void; clubName?: string
   onEdit: (step: number, patch?: Partial<ChallengeDraft>) => void
 }) {
   const router = useRouter()
@@ -606,7 +619,7 @@ function StepReview({ d, quote, bill, loading, failed, onRetry, clubName, onEdit
 
       {failed && !quote ? (
         <Card className="flex items-center justify-between gap-3 border-danger/30 bg-danger/5">
-          <p className="text-sm text-fg-muted">Không tính được phí. Kiểm tra mạng rồi thử lại.</p>
+          <p className="text-sm text-fg-muted">Không tính được phí: {challengeErrorMessage(quoteError)}</p>
           <Button size="sm" variant="secondary" onClick={onRetry}>Thử lại</Button>
         </Card>
       ) : loading || !quote || !bill ? (
@@ -644,7 +657,7 @@ function StepReview({ d, quote, bill, loading, failed, onRetry, clubName, onEdit
               return out
             })()}
             <p className="text-sm text-fg-muted">
-              Hoặc <Link href={routes.plan} className="font-semibold text-brand">nạp Xu / mua gói</Link>, hay chạy thêm để kiếm Xu ({runPolicyText(quote.policy.run)}).
+              Hoặc <Link href={routes.plan} className="font-semibold text-brand">{quote.plan ? 'nạp Xu' : 'nạp Xu / mua gói'}</Link>, hay chạy thêm để kiếm Xu ({runPolicyText(quote.policy.run)}).
             </p>
           </div>
         </Card>
@@ -657,21 +670,36 @@ function StepReview({ d, quote, bill, loading, failed, onRetry, clubName, onEdit
 function CostCard({ d, q, bill, clubName }: { d: ChallengeDraft; q: ChallengeQuote; bill: Bill; clubName?: string }) {
   const slots = effectiveSlots(d)
   const clubReward = d.rewardXu > 0 && d.audience === 'CLUB_ONLY' ? d.rewardXu : 0
+  // Được gói bao / nhóm nhỏ / mục tiêu cá nhân, không treo thưởng: không bày bảng phí, ví, quỹ
+  if (bill.fromWallet === 0 && bill.fromClub === 0) {
+    return (
+      <Card className="flex items-start gap-3 border-brand/30 bg-brand/5">
+        <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-brand" aria-hidden />
+        <div className="min-w-0 text-sm">
+          <p className="font-semibold">Tạo miễn phí</p>
+          <p className="text-fg-muted">
+            {q.pass && q.fee > 0
+              ? `Dùng 1 lượt ${q.plan?.name ?? 'miễn phí'}${q.payer === 'CLUB' ? ` của ${clubName ?? 'CLB'}` : ''} · còn ${q.pass.remaining} lượt tháng này`
+              : d.format === 'SOLO_GOAL' ? 'Mục tiêu cá nhân luôn miễn phí.' : `Quy mô ≤ ${formatNumber(q.tier?.max ?? slots)} người không mất phí.`}
+          </p>
+        </div>
+      </Card>
+    )
+  }
   return (
     <Card className="space-y-2">
-      <Row label={`Phí tạo (quy mô ≤ ${formatNumber(q.tier?.max ?? slots)} người)`} value={q.fee ? `${formatCoin(q.fee)} Xu` : 'Miễn phí'} />
+      {!(q.pass && q.fee > 0) && <Row label={`Phí tạo (quy mô ≤ ${formatNumber(q.tier?.max ?? slots)} người)`} value={q.fee ? `${formatCoin(q.fee)} Xu` : 'Miễn phí'} />}
       {q.fee > 0 && !q.pass && <p className="-mt-1 text-right text-xs text-fg-subtle">{xuToVnd(q.fee, q.policy)}</p>}
       {q.pass && q.fee > 0 && (
         <div className="flex items-start gap-2 rounded-xl border border-brand/40 bg-brand/10 p-2.5 text-sm">
           <Ticket className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
           <span className="min-w-0 flex-1">
-            <span className="block font-semibold">Dùng 1 lượt tạo miễn phí{q.pass.note ? ` · ${q.pass.note}` : ''}</span>
+            <span className="block font-semibold">Tạo miễn phí · dùng 1 lượt {q.plan?.name ?? 'tạo miễn phí'}</span>
             <span className="block text-xs text-fg-muted">
               {q.payer === 'CLUB' ? 'Lượt của CLB' : 'Lượt của bạn'} · còn {q.pass.remaining} lượt · cho thử thách tối đa {formatNumber(q.pass.max_slots)} người
               {q.pass.expires_at ? ` · hạn ${new Date(q.pass.expires_at).toLocaleDateString('vi-VN')}` : ''}
             </span>
           </span>
-          <span className="font-mono font-semibold text-brand">−{formatCoin(q.fee)}</span>
         </div>
       )}
       {clubReward > 0 && <Row label="Treo thưởng từ quỹ CLB" value={`${formatCoin(clubReward)} Xu`} />}
