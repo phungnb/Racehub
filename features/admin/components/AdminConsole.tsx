@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Activity, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, type LucideIcon } from 'lucide-react'
+import { Activity, BookOpen, ShieldAlert, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, type LucideIcon } from 'lucide-react'
 import { ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { adminErrorMessage } from '../api/adminApi'
@@ -27,18 +27,23 @@ import { InboxPanel, useAdminInbox } from './console/InboxPanel'
 import { UsersTab } from './console/UsersTab'
 import { ChallengesTab } from './console/ChallengesTab'
 import { AuditTab } from './console/AuditTab'
+import { ReportsTab } from './console/ReportsTab'
+import { BibTab } from './console/BibTab'
+import { CmsScreen } from '@/features/knowledge'
 
-type Tab = 'overview' | 'metrics' | 'users' | 'review' | 'challenges' | 'clubs' | 'cups' | 'partners' | 'organizers'
+type Tab = 'overview' | 'metrics' | 'users' | 'review' | 'reports' | 'challenges' | 'clubs' | 'cups' | 'partners' | 'organizers' | 'content' | 'bib'
   | 'orders' | 'plans' | 'promos' | 'quests' | 'gifts' | 'items' | 'grant' | 'passes' | 'policy' | 'system' | 'audit'
 type Badge = keyof AdminInbox
 const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; label: string; icon: LucideIcon; badge?: Badge }[] }[] = [
   { id: 'home', label: 'Tổng quan', icon: LayoutDashboard, tabs: [
     { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard }, { id: 'metrics', label: 'Chỉ số', icon: BarChart3 }] },
   { id: 'people', label: 'Người dùng', icon: Users, tabs: [
-    { id: 'users', label: 'Người dùng', icon: Users }, { id: 'review', label: 'Duyệt bài chạy', icon: CheckCircle2, badge: 'reviews' }] },
+    { id: 'users', label: 'Người dùng', icon: Users }, { id: 'review', label: 'Duyệt bài chạy', icon: CheckCircle2, badge: 'reviews' },
+    { id: 'reports', label: 'Báo cáo', icon: ShieldAlert, badge: 'reports' }] },
   { id: 'community', label: 'Cộng đồng', icon: Trophy, tabs: [
     { id: 'challenges', label: 'Thử thách', icon: Trophy }, { id: 'clubs', label: 'CLB Pro', icon: Crown }, { id: 'cups', label: 'Thách đấu CLB', icon: Swords, badge: 'cups' },
-    { id: 'partners', label: 'Đối tác', icon: Store, badge: 'partners' }, { id: 'organizers', label: 'Tổ chức giải', icon: Flag }] },
+    { id: 'partners', label: 'Đối tác', icon: Store, badge: 'partners' }, { id: 'bib', label: 'Chợ BIB', icon: Ticket }, { id: 'organizers', label: 'Tổ chức giải', icon: Flag },
+    { id: 'content', label: 'Nội dung', icon: BookOpen, badge: 'content' }] },
   { id: 'sales', label: 'Kinh doanh', icon: Receipt, tabs: [
     { id: 'orders', label: 'Đơn hàng', icon: Receipt, badge: 'orders' }, { id: 'plans', label: 'Gói & giá', icon: Tags }, { id: 'promos', label: 'Khuyến mãi', icon: Megaphone },
     { id: 'quests', label: 'Nhiệm vụ', icon: Target }, { id: 'gifts', label: 'Quà tặng', icon: Gift }, { id: 'items', label: 'Vật phẩm', icon: Shirt }] },
@@ -64,7 +69,7 @@ export function AdminConsole() {
   }
   const o = useEconomyOverview()
   const inbox = useAdminInbox().data
-  const count = (b?: Badge) => (b && inbox ? Number(inbox[b]) : 0)
+  const count = (b?: Badge) => (b && inbox ? Number(inbox[b] ?? 0) : 0)
   const group = groupOf(tab)
 
   return (
@@ -106,6 +111,9 @@ export function AdminConsole() {
         : tab === 'users' ? <UsersTab />
         : tab === 'challenges' ? <ChallengesTab />
         : tab === 'audit' ? <AuditTab />
+        : tab === 'reports' ? <ReportsTab />
+        : tab === 'content' ? <CmsScreen />
+        : tab === 'bib' ? <BibTab />
         : tab === 'metrics' ? <MetricsTab />
         : tab === 'orders' ? <OrdersTab />
         : tab === 'promos' ? <PromotionsTab />

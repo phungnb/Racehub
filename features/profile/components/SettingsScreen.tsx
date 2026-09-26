@@ -1,12 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { ArrowLeft, LogOut, Mail, PersonStanding, Ruler, Weight } from 'lucide-react'
+import { ArrowLeft, LogOut, Mail, PersonStanding, Ruler, Trash2, Weight } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/shared/lib/supabase'
-import { Button, Card, ErrorState, Field, Input, Skeleton, Textarea } from '@/shared/ui'
+import { Button, Card, ConfirmSheet, ErrorState, Field, Input, Skeleton, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import { useSession } from '@/features/auth'
@@ -171,10 +172,60 @@ function AccountCard() {
       ) : (
         <Button variant="secondary" block onClick={() => setConfirm(true)}><LogOut className="size-4" aria-hidden />Đăng xuất</Button>
       )}
+      <DeleteAccount />
       <p className="flex justify-center gap-4 pt-1 text-xs text-fg-muted">
         <a href="/privacy" className="underline hover:text-fg">Chính sách quyền riêng tư</a>
         <a href="/terms" className="underline hover:text-fg">Điều khoản sử dụng</a>
       </p>
     </Card>
+  )
+}
+
+const DELETE_ERRORS: Record<string, string> = {
+  CONFIRM_REQUIRED: 'Gõ đúng chữ XOÁ để xác nhận.',
+  ADMIN_CANNOT_DELETE: 'Tài khoản quản trị viên cần được gỡ quyền quản trị trước khi xoá.',
+  TRANSFER_CLUB_FIRST: 'Bạn đang là chủ nhiệm CLB còn thành viên — hãy chuyển quyền chủ nhiệm cho người khác trước.',
+}
+
+/** Xoá tài khoản (bắt buộc theo App Store / Google Play và Luật Bảo vệ dữ liệu cá nhân) */
+function DeleteAccount() {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [text, setText] = useState('')
+  const del = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/account/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirm: text }) })
+      const j = await res.json().catch(() => ({})) as { error?: string }
+      if (!res.ok) throw new Error(j.error ?? 'SERVER_ERROR')
+    },
+    onSuccess: async () => {
+      await unsubscribeThisDevice().catch(() => undefined)
+      try { localStorage.clear() } catch { /* bỏ qua */ }
+      await supabase.auth.signOut().catch(() => undefined)
+      toast.success('Đã xoá tài khoản. Cảm ơn bạn đã chạy cùng RaceHub.')
+      router.replace('/')
+    },
+    onError: (e) => toast.error(DELETE_ERRORS[(e as Error).message] ?? 'Không xoá được tài khoản. Thử lại sau ít phút.'),
+  })
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="flex w-full items-center justify-center gap-1.5 pt-1 text-xs font-semibold text-danger hover:underline">
+        <Trash2 className="size-3.5" aria-hidden />Xoá tài khoản
+      </button>
+      <ConfirmSheet open={open} onClose={() => { setOpen(false); setText('') }} title="Xoá tài khoản RaceHub?" confirmLabel="Xoá vĩnh viễn"
+        loading={del.isPending} onConfirm={() => del.mutate()}>
+        <div className="space-y-3 text-sm text-fg-muted">
+          <ul className="list-disc space-y-1 pl-5">
+            <li>Xoá hồ sơ, ảnh, tuyến GPS, cài đặt, kết nối Strava; bạn rời mọi CLB.</li>
+            <li>Bài chạy bị ẩn; tên bạn trong tin nhắn / bảng xếp hạng cũ hiện “Người dùng đã xoá”.</li>
+            <li>Xu, vật phẩm, gói VIP <b className="text-fg">mất vĩnh viễn, không hoàn tiền</b>. Hoá đơn giao dịch được giữ ẩn danh theo quy định kế toán.</li>
+            <li>Không khôi phục được. Bạn vẫn có thể đăng ký lại bằng email này như người mới.</li>
+          </ul>
+          <Field label="Gõ XOÁ để xác nhận">
+            <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="XOÁ" autoComplete="off" />
+          </Field>
+        </div>
+      </ConfirmSheet>
+    </>
   )
 }

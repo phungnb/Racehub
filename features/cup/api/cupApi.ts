@@ -1,6 +1,6 @@
 // Thách đấu CLB — nhiều CLB cùng tranh tài (migration 003600)
 import { supabase } from '@/shared/lib/supabase'
-import { systemErrorMessage } from '@/shared/lib/errors'
+import { systemErrorMessage, must } from '@/shared/lib/errors'
 
 export type CupMetric = 'TOTAL_KM' | 'AVG_KM'
 export type CupStatus = 'PENDING_REVIEW' | 'OPEN' | 'REJECTED' | 'CANCELLED' | 'FINISHED'
@@ -51,8 +51,8 @@ async function call<T>(fn: string, args: Record<string, unknown>): Promise<T> {
   return data as T
 }
 
-export const listCups = (scope: CupScope) => call<Cup[]>('list_club_cups', { p_scope: scope })
-export const getCup = (id: string) => call<Cup>('club_cup', { p_cup_id: id })
+export const listCups = (scope: CupScope) => call<Cup[]>('list_club_cups', { p_scope: scope }).then((x) => x ?? [])
+export const getCup = (id: string) => call<Cup>('club_cup', { p_cup_id: id }).then(must<Cup>('CUP_NOT_FOUND'))
 export const createCup = (p: NewCup) => call<Cup>('create_club_cup', { p })
 export const reviewCup = (id: string, approve: boolean, note?: string) => call<Cup>('review_club_cup', { p_cup_id: id, p_approve: approve, p_note: note ?? null })
 export const cancelCup = (id: string) => call<Cup>('cancel_club_cup', { p_cup_id: id })

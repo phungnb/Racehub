@@ -26,7 +26,8 @@ export function GameHub({ profile }: { profile: Profile }) {
 }
 
 function Hub({ profile, s }: { profile: Profile; s: GameState }) {
-  const [streakOpen, setStreakOpen] = useState(false)
+  // ?goal=1 (từ bài Knowledge "Đặt mục tiêu tuần") → mở ngay sheet chuỗi ngày & mục tiêu
+  const [streakOpen, setStreakOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('goal'))
   const [leagueOpen, setLeagueOpen] = useState(false)
   const [showWeekly, setShowWeekly] = useState(false)
   const mq = useMyQuests()

@@ -7,6 +7,7 @@ import { GameHub } from '@/features/game'
 import { ActivityList } from '@/features/activity'
 import { StravaSyncCard } from '@/features/integrations'
 import { InstallCard } from '@/features/pwa'
+import { KnowledgeHomeSection } from '@/features/knowledge'
 import { EmptyState, SectionTitle, Skeleton } from '@/shared/ui'
 
 export default function FeedPage() {
@@ -26,6 +27,7 @@ export default function FeedPage() {
       <InstallCard />
       <GameHub profile={profile} />
       <ExploreShortcuts />
+      <KnowledgeHomeSection />
       {profile.strava_connected ? <StravaSyncCard /> : <ConnectDeviceCard />}
 
       <section>

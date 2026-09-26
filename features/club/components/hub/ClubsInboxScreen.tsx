@@ -113,12 +113,12 @@ function Discover({ exclude }: { exclude: Set<string> }) {
           {list.map((c) => (
             <li key={c.id}>
               <Link href={routes.club(c.id)} className="group flex flex-col items-center gap-1.5 text-center"
-                title={`${c.name} · ${formatNumber(c.member_count)} thành viên · ${JOIN_POLICY_LABEL[c.join_policy].title}`}>
+                title={`${c.name} · ${formatNumber(c.member_count)} thành viên · ${(JOIN_POLICY_LABEL[c.join_policy] ?? JOIN_POLICY_LABEL.OPEN).title}`}>
                 <span className="relative">
                   <ClubAvatar club={c} className="size-14 rounded-2xl transition-transform group-hover:scale-105 group-active:scale-95" />
                   {c.join_policy !== 'OPEN' && (
                     <span className="absolute -bottom-1 -right-1 grid size-5 place-items-center rounded-full border-2 border-bg bg-surface-2 text-fg-muted"
-                      aria-label={JOIN_POLICY_LABEL[c.join_policy].title}>
+                      aria-label={(JOIN_POLICY_LABEL[c.join_policy] ?? JOIN_POLICY_LABEL.OPEN).title}>
                       {c.join_policy === 'INVITE_ONLY' ? <Lock className="size-2.5" aria-hidden /> : <Clock className="size-2.5" aria-hidden />}
                     </span>
                   )}

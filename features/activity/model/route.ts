@@ -37,7 +37,11 @@ export function haversine(a: LatLng, b: LatLng): number {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)))
 }
 
-/** Tính từng km từ điểm GPS trong app (bỏ đoạn dừng: thời gian giữa 2 điểm > 30 s coi như nghỉ) */
+/**
+ * Tính từng km từ điểm GPS trong app.
+ * - Đoạn ≤ 30 giây: tính đủ thời gian. Đoạn dài hơn (đứng chờ, mất tín hiệu): chỉ tính phần di chuyển ước lượng (≥ 1,5 m/s).
+ * - Một đoạn dài (qua chỗ mất tín hiệu) có thể vượt nhiều mốc km → chia đều theo tỉ lệ, không bỏ sót km nào.
+ */
 export function splitsFromPoints(points: TrackPoint[], minLast = 100): Split[] {
   const out: Split[] = []
   let dist = 0, time = 0, startAlt: number | null = points[0]?.[3] ?? null
@@ -46,13 +50,14 @@ export function splitsFromPoints(points: TrackPoint[], minLast = 100): Split[] {
     const d = haversine([p[0], p[1]], [q[0], q[1]])
     const dt = q[2] - p[2]
     if (dt <= 0) continue
+    const segT = dt <= 30 ? dt : Math.min(dt, d / 1.5)
     dist += d
-    if (dt <= 30) time += dt
-    if (dist >= 1000) {
-      // Phần vượt 1 km chuyển sang km sau theo tỉ lệ
+    time += segT
+    while (dist >= 1000) {
+      // Phần vượt 1 km chuyển sang km sau theo tỉ lệ quãng đường trong đoạn
       const over = dist - 1000
-      const overT = dt <= 30 && d > 0 ? (dt * over) / d : 0
-      out.push({ distance_m: 1000, moving_s: Math.round(time - overT), elev_m: elev(startAlt, q[3]), hr: null })
+      const overT = d > 0 ? (segT * over) / d : 0
+      out.push({ distance_m: 1000, moving_s: Math.max(0, Math.round(time - overT)), elev_m: elev(startAlt, q[3]), hr: null })
       dist = over
       time = overT
       startAlt = q[3]

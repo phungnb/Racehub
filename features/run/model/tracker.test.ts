@@ -112,3 +112,119 @@ describe('pace & split', () => {
     expect(haversineM(21, 105, 21.001, 105)).toBeCloseTo(111.2, 0)
   })
 })
+
+// ---------------------------------------------------------------------------------------------
+// Bộ máy GPS v2: mô phỏng chạy thật (vòng sân 400 m, đường phố có góc cua), nhiễu GPS, đứng chờ, mất tín hiệu
+// ---------------------------------------------------------------------------------------------
+import { TrackEngine } from './tracker'
+
+function noise(seed: number) {
+  let s = seed
+  const u = () => ((s = (s * 16807) % 2147483647) / 2147483647)
+  return () => { const a = Math.max(u(), 1e-9), b = u(); return Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * b) }
+}
+/** Chạy theo đường (danh sách toạ độ mét), tốc độ v m/s, GPS mỗi giây, nhiễu sigma m, trôi chậm (multipath) */
+function simulate(path: [number, number][], v: number, sigma: number, acc: number, opts: { stopAt?: number; stopS?: number; stopT?: number; gapAt?: number; gapS?: number; harsh?: boolean; noSpeed?: boolean } = {}) {
+  const g = noise(11)
+  const eng = new TrackEngine()
+  const seg: number[] = [0]
+  for (let i = 1; i < path.length; i++) seg.push(seg[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]))
+  const total = seg[seg.length - 1]
+  const at = (s: number): [number, number] => {
+    let i = 1
+    while (i < seg.length - 1 && seg[i] < s) i++
+    const f = (s - seg[i - 1]) / (seg[i] - seg[i - 1] || 1)
+    return [path[i - 1][0] + f * (path[i][0] - path[i - 1][0]), path[i - 1][1] + f * (path[i][1] - path[i - 1][1])]
+  }
+  let s = 0, t = 0, dist = 0, moving = 0, driftX = 0, driftY = 0
+  const pts = []
+  while (s < total) {
+    t++
+    const stopping = opts.stopAt !== undefined && s >= opts.stopAt && t < (opts.stopT ??= t) + (opts.stopS ?? 0)
+    if (!stopping) s = Math.min(total, s + v)
+    const devSpeed = opts.noSpeed ? null : Math.max(0, (stopping ? 0 : v) + g() * 0.2)
+    if (opts.gapAt !== undefined && s >= opts.gapAt && s < opts.gapAt + v * (opts.gapS ?? 0)) continue
+    // Sai số GPS điện thoại: phần trôi chậm (tương quan ~50 giây) + rung nhỏ; 'harsh' = phố cao tầng (trôi nhanh, rung lớn)
+    const k = opts.harsh ? 0.9 : 0.98, inn = sigma * 0.7 * Math.sqrt(1 - k * k)
+    driftX = k * driftX + g() * inn; driftY = k * driftY + g() * inn
+    const [x, y] = at(s)
+    const w = opts.harsh ? 0.5 : 0.3
+    const lat = 21 + (y + driftY + g() * sigma * w) / 111320
+    const lng = 105.85 + (x + driftX + g() * sigma * w) / (111320 * Math.cos((21 * Math.PI) / 180))
+    const r = eng.push({ latitude: lat, longitude: lng, accuracy: acc, altitude: 0, speed: devSpeed, recorded_at: new Date(t * 1000).toISOString() })
+    dist += r.distance; moving += r.moving
+    if (r.point) pts.push(r.point)
+  }
+  return { dist, moving, total, t, gaps: eng.gaps, pts }
+}
+const track400 = (): [number, number][] => {
+  // vòng sân 400 m: 2 cạnh thẳng 84,4 m + 2 bán nguyệt bán kính 36,8 m
+  const out: [number, number][] = []
+  const R = 36.8, L = 84.39
+  for (let i = 0; i <= 20; i++) out.push([(i / 20) * L, 0])
+  for (let i = 1; i <= 30; i++) { const a = -Math.PI / 2 + (i / 30) * Math.PI; out.push([L + R * Math.cos(a), R + R * Math.sin(a)]) }
+  for (let i = 1; i <= 20; i++) out.push([L - (i / 20) * L, 2 * R])
+  for (let i = 1; i <= 30; i++) { const a = Math.PI / 2 + (i / 30) * Math.PI; out.push([R * Math.cos(a), R + R * Math.sin(a)]) }
+  return out
+}
+const laps = (n: number) => Array.from({ length: n }, () => track400()).flat() as [number, number][]
+const street = (): [number, number][] => [[0, 0], [600, 0], [600, 400], [1100, 400], [1100, 1300], [300, 1300], [300, 2000]]
+
+describe('bộ máy GPS v2 (Kalman + mất tín hiệu)', () => {
+  it('chạy 5 vòng sân 400 m, GPS tốt (±4 m): sai lệch < 2%', () => {
+    const r = simulate(laps(5), 3.2, 4, 6)
+    expect(Math.abs(r.dist - r.total) / r.total).toBeLessThan(0.02)
+    expect(Math.abs(r.moving - r.total / 3.2) / (r.total / 3.2)).toBeLessThan(0.05)
+  })
+  it('đường phố có góc cua, GPS trung bình (±10 m) và kém (±15 m), phố cao tầng: sai lệch < 2%', () => {
+    for (const [sig, acc, harsh] of [[10, 12, false], [15, 18, false], [10, 15, true]] as const) {
+      const r = simulate(street(), 3, sig, acc, { harsh })
+      expect(Math.abs(r.dist - r.total) / r.total).toBeLessThan(0.02)
+    }
+  })
+  it('đi bộ chậm 1,6 m/s: vẫn đủ quãng đường (không bị coi là đứng yên)', () => {
+    const r = simulate(street(), 1.6, 8, 10)
+    expect(Math.abs(r.dist - r.total) / r.total).toBeLessThan(0.03)
+  })
+  it('máy không báo vận tốc (một số trình duyệt): vẫn trong 5% khi GPS ±10 m', () => {
+    const r = simulate(street(), 3, 10, 12, { noSpeed: true })
+    expect(Math.abs(r.dist - r.total) / r.total).toBeLessThan(0.05)
+  })
+  it('đứng chờ đèn đỏ 90 giây: không cộng thêm quãng đường, không tính giờ di chuyển', () => {
+    const base = simulate(street(), 3, 6, 8)
+    const r = simulate(street(), 3, 6, 8, { stopAt: 1000, stopS: 90 })
+    expect(Math.abs(r.dist - base.dist)).toBeLessThan(30)
+    expect(r.moving - base.moving).toBeLessThan(15)
+  })
+  it('mất tín hiệu 2 phút trên đường thẳng: được ghi lại, đoạn nối hợp lý nên vẫn tính', () => {
+    const r = simulate([[0, 0], [4000, 0]], 3, 5, 6, { gapAt: 1500, gapS: 120 })
+    expect(r.gaps).toHaveLength(1)
+    expect(r.gaps[0]).toMatchObject({ counted: true })
+    expect(r.gaps[0].seconds).toBeGreaterThanOrEqual(120)
+    expect(Math.abs(r.dist - 4000) / 4000).toBeLessThan(0.04)
+  })
+  it('điểm sai số > 35 m bị bỏ; điểm đầu tiên không cộng quãng đường', () => {
+    const e = new TrackEngine()
+    const first = e.push({ latitude: 21, longitude: 105.85, accuracy: 8, altitude: 0, speed: null, recorded_at: new Date(1000).toISOString() })
+    expect(first).toMatchObject({ distance: 0, reason: 'FIRST' })
+    expect(e.push({ latitude: 21.001, longitude: 105.85, accuracy: 60, altitude: 0, speed: null, recorded_at: new Date(2000).toISOString() }).reason).toBe('INACCURATE')
+  })
+})
+
+import { compactPoint, gpsReady } from './tracker'
+
+describe('GPS sẵn sàng + làm gọn điểm', () => {
+  it('chờ 3 điểm tốt liên tiếp hoặc 1 điểm rất tốt; điểm cũ không tính', () => {
+    const now = 100_000
+    expect(gpsReady([{ accuracy: 15, time: now - 2000 }], now)).toBe(false)
+    expect(gpsReady([{ accuracy: 15, time: now - 3000 }, { accuracy: 18, time: now - 2000 }, { accuracy: 12, time: now - 1000 }], now)).toBe(true)
+    expect(gpsReady([{ accuracy: 15, time: now - 3000 }, { accuracy: 40, time: now - 2000 }, { accuracy: 12, time: now - 1000 }], now)).toBe(false)
+    expect(gpsReady([{ accuracy: 8, time: now - 500 }], now)).toBe(true)
+    expect(gpsReady([{ accuracy: 8, time: now - 60_000 }], now)).toBe(false)
+  })
+  it('làm tròn toạ độ 1 cm, giữ quãng đường tích luỹ', () => {
+    const p = compactPoint({ latitude: 21.012345678912, longitude: 105.851234567891, accuracy: 7.345, altitude: 12.3456, speed: 3.14159, recorded_at: 'x', distance_m: 1234.5678 })
+    expect(p).toEqual({ latitude: 21.0123457, longitude: 105.8512346, accuracy: 7.3, altitude: 12.3, speed: 3.14, recorded_at: 'x', distance_m: 1234.6 })
+    expect(JSON.stringify(p).length).toBeLessThan(140)
+  })
+})

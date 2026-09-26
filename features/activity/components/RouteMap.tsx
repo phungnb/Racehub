@@ -3,10 +3,11 @@
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/shared/lib/cn'
+import { MAP_TILES } from '@/shared/config/map'
 import type { LatLng } from '../model/route'
 
 /**
- * Bản đồ tuyến chạy (Leaflet + nền CARTO tối, dữ liệu OpenStreetMap).
+ * Bản đồ tuyến chạy (Leaflet + nền OpenStreetMap, xem shared/config/map.ts).
  * Leaflet chỉ nạp ở trình duyệt khi màn hình mở, không làm nặng các trang khác.
  */
 export function RouteMap({ route, className }: { route: LatLng[]; className?: string }) {
@@ -20,9 +21,8 @@ export function RouteMap({ route, className }: { route: LatLng[]; className?: st
     import('leaflet').then((L) => {
       if (cancelled || !el.current) return
       map = L.map(el.current, { zoomControl: false, attributionControl: true, scrollWheelZoom: false })
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        subdomains: 'abcd', maxZoom: 19,
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+      L.tileLayer(MAP_TILES.url, {
+        maxZoom: MAP_TILES.maxZoom, attribution: MAP_TILES.attribution, className: MAP_TILES.darken ? 'map-dark' : '',
       }).addTo(map)
       const brand = getComputedStyle(document.documentElement).getPropertyValue('--color-brand').trim() || '#b6ff3b'
       // Viền tối dưới tuyến cho dễ nhìn trên nền bản đồ

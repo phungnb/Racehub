@@ -64,6 +64,30 @@ describe('chống gian lận (002300)', () => {
     expect(r.validation_reason).toContain('đi xe')
   })
 
+  it('mất tín hiệu GPS (tắt màn hình): tuyến 2 điểm nối thẳng 3 km → chờ xác minh, cờ GPS_GAP; mất ngắn → vẫn duyệt, cờ INFO', async () => {
+    const start = new Date(Date.now() - (hoursBack -= 3) * 3600_000)
+    const pts = [{ latitude: 21.03, longitude: 105.85, recorded_at: start.toISOString() },
+      { latitude: 21.03 + 3050 / 111_320, longitude: 105.85, recorded_at: new Date(start.getTime() + 1065_000).toISOString() }]
+    const r = (await asUser<{ r: R }>(db, U, '/rpc/submit_and_process_activity',
+      `select public.submit_and_process_activity(p_title => 'Chạy', p_source => 'DIRECT_GPS', p_started_at => $1, p_ended_at => $2,
+         p_elapsed_s => 1174, p_moving_s => 1065, p_distance_m => 3050, p_avg_pace_s => 349, p_track_points => $3::jsonb) as r`,
+      [start.toISOString(), new Date(start.getTime() + 1174_000).toISOString(), JSON.stringify(pts)])).rows[0].r
+    expect(r.validation_status).toBe('PENDING')
+    expect(r.validation_reason).toContain('Mất tín hiệu GPS')
+    expect((await risk(r.activity_id)).risk_flags).toEqual([expect.objectContaining({ code: 'GPS_GAP', severity: 'HIGH' })])
+
+    // Mất 80 giây (≈ 240 m, qua hầm) giữa bài ~5 km → vẫn hợp lệ, cờ INFO để tham khảo
+    const s2 = new Date(Date.now() - (hoursBack -= 3) * 3600_000)
+    const { pts: all, seconds } = track(s2, [[1700, 3]])
+    const holed = all.filter((_, i) => i < 150 || i > 165)
+    const ok = (await asUser<{ r: R }>(db, U, '/rpc/submit_and_process_activity',
+      `select public.submit_and_process_activity(p_title => 'Chạy', p_source => 'DIRECT_GPS', p_started_at => $1, p_ended_at => $2,
+         p_elapsed_s => $3, p_moving_s => $3, p_distance_m => 0, p_avg_pace_s => 0, p_track_points => $4::jsonb) as r`,
+      [s2.toISOString(), new Date(s2.getTime() + seconds * 1000).toISOString(), seconds, JSON.stringify(holed)])).rows[0].r
+    expect(ok.validation_status).toBe('APPROVED')
+    expect((await risk(ok.activity_id)).risk_flags).toEqual([expect.objectContaining({ code: 'GPS_GAP', severity: 'INFO' })])
+  })
+
   it('bài Strava: kết luận REVIEW của bộ phân tích → chờ duyệt kèm lý do; OK → duyệt ngay', async () => {
     await db.exec('set role service_role')
     try {

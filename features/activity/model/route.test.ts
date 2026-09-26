@@ -52,3 +52,14 @@ describe('route: vẽ & so sánh', () => {
       .toEqual(['Bài dài nhất 30 ngày qua', 'Dài hơn 5 km so với thường lệ', 'Nhanh hơn 30 giây/km so với thường lệ'])
   })
 })
+
+describe('từng km qua đoạn mất tín hiệu', () => {
+  it('một đoạn thẳng 3,15 km trong 1100 giây (tuyến chỉ có 2 điểm): đủ 3 km + phần lẻ, pace hợp lý', async () => {
+    const { splitsFromPoints, splitPace } = await import('./route')
+    const lat = (m: number) => 21 + m / 111_195
+    const s = splitsFromPoints([[21, 105.85, 0, 10], [lat(3150), 105.85, 1100, 10]])
+    expect(s.map((x) => x.distance_m)).toEqual([1000, 1000, 1000, 150])
+    // đoạn dài hơn 30 giây: chỉ tính phần di chuyển ước lượng (≥ 1,5 m/s) → không ra pace 0:06
+    for (const x of s.slice(0, 3)) expect(splitPace(x)).toBeGreaterThan(300)
+  })
+})

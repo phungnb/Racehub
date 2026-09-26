@@ -1,7 +1,7 @@
--- RaceHub: gộp 25 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 33 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -6613,6 +6613,2755 @@ revoke all on function private.character_bodies(), private.num_in(jsonb, text, n
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001006100_runner_nearby.sql
+-- ===================================================================
+-- 006100: Runner Nearby (Quanh đây) — V1, xem docs/RUNNER_NEARBY.md.
+-- • Mặc định TẮT; bật cần đồng ý riêng (phiên bản đồng ý) + ≥ 3 bài chạy hợp lệ.
+-- • Vị trí chỉ lưu Ô LƯỚI ~1 km (làm tròn 0,01°), KHÔNG lưu toạ độ gốc, có hạn (24 giờ / 7 / 30 ngày).
+-- • Khoảng cách hiển thị: số km (≥ 1) tính giữa tâm 2 ô + độ lệch cố định cho từng cặp (±0,5 km) → không dò tam giác được;
+--   đổi vị trí ≤ 3 lần / 24 giờ, tìm ≤ 60 lần / giờ.
+-- • Ai thấy tôi: VERIFIED (mặc định: người cũng đã đủ điều kiện) / SAME_GENDER / CLUBS (chung CLB).
+-- • Kết nối 2 chiều (phải chấp nhận), ≤ 15 lời mời / ngày, bị từ chối thì 30 ngày không gửi lại. Chưa có nhắn tin riêng:
+--   "Rủ chạy" = mời vào buổi chạy công khai / CLB. Chặn hai chiều, báo cáo (3 người báo cáo → tự ẩn chờ admin).
+-- • CLB: điểm tập công khai (ô lưới) + sự kiện CLB công khai (người ngoài đăng ký được).
+-- Cần 001500, 005600. Chạy lại nhiều lần vẫn an toàn. Không dùng SELECT … INTO, khối DO, LIMIT (SQL Editor).
+
+-- ---------------------------------------------------------------------
+-- 1. Bảng
+-- ---------------------------------------------------------------------
+create table if not exists public.runner_discovery_settings (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  enabled boolean not null default false,
+  visible_to text not null default 'VERIFIED' check (visible_to in ('VERIFIED', 'SAME_GENDER', 'CLUBS')),
+  purposes text[] not null default array['BUDDY']::text[],
+  goals text[] not null default '{}'::text[],
+  time_slots text[] not null default '{}'::text[],
+  share_pace boolean not null default true,
+  radius_km integer not null default 10 check (radius_km in (2, 5, 10, 20)),
+  bio text check (bio is null or char_length(bio) <= 140),
+  consent_version text,
+  consent_at timestamptz,
+  suspended_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.runner_location_presence (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  cell_lat numeric(6, 2) not null check (cell_lat between -90 and 90),
+  cell_lng numeric(6, 2) not null check (cell_lng between -180 and 180),
+  source text not null check (source in ('DEVICE', 'AREA')),
+  area_label text check (area_label is null or char_length(area_label) <= 60),
+  moves integer not null default 0,
+  moves_since timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  expires_at timestamptz not null
+);
+create index if not exists runner_presence_cell_idx on public.runner_location_presence (cell_lat, cell_lng);
+
+create table if not exists public.runner_connection_requests (
+  id uuid primary key default gen_random_uuid(),
+  from_id uuid not null references public.profiles(id) on delete cascade,
+  to_id uuid not null references public.profiles(id) on delete cascade,
+  message text check (message is null or char_length(message) <= 140),
+  status text not null default 'PENDING' check (status in ('PENDING', 'ACCEPTED', 'DECLINED', 'CANCELLED')),
+  created_at timestamptz not null default now(),
+  responded_at timestamptz,
+  check (from_id <> to_id)
+);
+create unique index if not exists runner_request_pending_uq on public.runner_connection_requests (from_id, to_id) where status = 'PENDING';
+create index if not exists runner_request_to_idx on public.runner_connection_requests (to_id, status);
+
+create table if not exists public.runner_connections (
+  user_a uuid not null references public.profiles(id) on delete cascade,
+  user_b uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_a, user_b),
+  check (user_a < user_b)
+);
+create index if not exists runner_connections_b_idx on public.runner_connections (user_b);
+
+create table if not exists public.user_blocks (
+  blocker uuid not null references public.profiles(id) on delete cascade,
+  blocked uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (blocker, blocked),
+  check (blocker <> blocked)
+);
+create index if not exists user_blocks_blocked_idx on public.user_blocks (blocked);
+
+create table if not exists public.user_reports (
+  id uuid primary key default gen_random_uuid(),
+  reporter uuid not null references public.profiles(id) on delete cascade,
+  target uuid not null references public.profiles(id) on delete cascade,
+  context text not null default 'NEARBY' check (context in ('NEARBY', 'CONNECTION', 'CLUB', 'OTHER')),
+  reason text not null check (reason in ('SPAM', 'HARASSMENT', 'FAKE', 'UNSAFE', 'OTHER')),
+  note text check (note is null or char_length(note) <= 500),
+  status text not null default 'OPEN' check (status in ('OPEN', 'RESOLVED', 'DISMISSED')),
+  resolution text,
+  resolved_by uuid references public.profiles(id) on delete set null,
+  resolved_at timestamptz,
+  created_at timestamptz not null default now(),
+  check (reporter <> target)
+);
+create index if not exists user_reports_status_idx on public.user_reports (status, created_at desc);
+
+-- Nhật ký lượt tìm (giới hạn tần suất, phát hiện dò vị trí) — giữ 7 ngày
+create table if not exists public.runner_nearby_searches (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists runner_searches_idx on public.runner_nearby_searches (user_id, created_at desc);
+
+-- Mọi đọc / ghi qua RPC
+alter table public.runner_discovery_settings enable row level security;
+alter table public.runner_location_presence enable row level security;
+alter table public.runner_connection_requests enable row level security;
+alter table public.runner_connections enable row level security;
+alter table public.user_blocks enable row level security;
+alter table public.user_reports enable row level security;
+alter table public.runner_nearby_searches enable row level security;
+revoke all on public.runner_discovery_settings, public.runner_location_presence, public.runner_connection_requests,
+  public.runner_connections, public.user_blocks, public.user_reports, public.runner_nearby_searches from anon, authenticated;
+
+-- CLB: điểm tập công khai; sự kiện CLB công khai
+alter table public.clubs add column if not exists area_label text;
+alter table public.clubs add column if not exists cell_lat numeric(6, 2);
+alter table public.clubs add column if not exists cell_lng numeric(6, 2);
+alter table public.club_events add column if not exists visibility text not null default 'CLUB';
+alter table public.club_events drop constraint if exists club_events_visibility_chk;
+alter table public.club_events add constraint club_events_visibility_chk check (visibility in ('CLUB', 'PUBLIC'));
+
+-- ---------------------------------------------------------------------
+-- 2. Hàm phụ
+-- ---------------------------------------------------------------------
+create or replace function private.nearby_consent_version() returns text language sql immutable as $$ select 'nearby-v1' $$;
+
+-- Số bài chạy hợp lệ (điều kiện bật)
+create or replace function private.valid_runs(p_user uuid) returns integer
+language sql stable security definer set search_path = public as $$
+  select count(*)::int from public.activities a
+   where a.user_id = p_user and a.validation_status = 'APPROVED' and coalesce(a.status, '') <> 'DELETED'
+$$;
+
+create or replace function private.nearby_eligible(p_user uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select private.valid_runs(p_user) >= 3
+     and not exists (select 1 from public.profiles p where p.id = p_user and p.banned_at is not null)
+$$;
+
+-- Pace điển hình (giây / km): trung vị 28 ngày, bài hợp lệ ≥ 1 km
+create or replace function private.typical_pace(p_user uuid) returns integer
+language sql stable security definer set search_path = public as $$
+  select round(percentile_cont(0.5) within group (order by a.moving_time_s / (a.distance_m / 1000.0)))::int
+    from public.activities a
+   where a.user_id = p_user and a.validation_status = 'APPROVED' and coalesce(a.status, '') <> 'DELETED'
+     and a.distance_m >= 1000 and a.moving_time_s > 0 and a.started_at > now() - interval '28 days'
+$$;
+
+create or replace function private.is_blocked(p_a uuid, p_b uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.user_blocks b where (b.blocker = p_a and b.blocked = p_b) or (b.blocker = p_b and b.blocked = p_a))
+$$;
+
+create or replace function private.are_connected(p_a uuid, p_b uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.runner_connections c where c.user_a = least(p_a, p_b) and c.user_b = greatest(p_a, p_b))
+$$;
+
+create or replace function private.share_club(p_a uuid, p_b uuid) returns integer
+language sql stable security definer set search_path = public as $$
+  select count(*)::int from public.club_members m1 join public.club_members m2 on m2.club_id = m1.club_id
+   where m1.user_id = p_a and m2.user_id = p_b and m1.status = 'APPROVED' and m2.status = 'APPROVED'
+$$;
+
+-- Người xem có được thấy người này theo "ai thấy tôi" không
+create or replace function private.nearby_visible(p_viewer uuid, p_target uuid, p_mode text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select case p_mode
+    when 'SAME_GENDER' then exists (select 1 from public.profiles a join public.profiles b on b.id = p_target
+                                     where a.id = p_viewer and a.gender is not null and a.gender = b.gender)
+    when 'CLUBS' then private.share_club(p_viewer, p_target) > 0
+    else true end
+$$;
+
+-- Khoảng cách (km) giữa tâm 2 ô lưới
+create or replace function private.cell_km(a_lat numeric, a_lng numeric, b_lat numeric, b_lng numeric) returns numeric
+language sql immutable as $$
+  select 6371 * 2 * asin(sqrt(power(sin(radians((b_lat - a_lat)::float8) / 2), 2)
+    + cos(radians(a_lat::float8)) * cos(radians(b_lat::float8)) * power(sin(radians((b_lng - a_lng)::float8) / 2), 2)))::numeric
+$$;
+
+-- Km hiển thị: làm tròn 1 km, cộng độ lệch cố định theo cặp (±0,5) → cùng một người luôn thấy cùng một số, không dò được
+create or replace function private.shown_km(p_km numeric, p_a uuid, p_b uuid) returns integer
+language sql immutable as $$
+  select greatest(1, round(p_km + ((abs(hashtext(least(p_a, p_b)::text || greatest(p_a, p_b)::text)) % 100) / 100.0 - 0.5))::int)
+$$;
+
+create or replace function private.first_name(p_user uuid) returns text
+language sql stable security definer set search_path = public as $$
+  -- tên gọi + chữ cái đầu họ: "Nguyễn Văn An" → "An N."
+  select case when n is null or n = '' then 'Runner'
+              when position(' ' in n) = 0 then n
+              else regexp_replace(n, '^.*\s', '') || ' ' || left(n, 1) || '.' end
+    from (select trim(coalesce((select display_name from public.profiles where id = p_user), '')) as n) x
+$$;
+
+-- ---------------------------------------------------------------------
+-- 3. Cài đặt + vị trí của tôi
+-- ---------------------------------------------------------------------
+create or replace function public.my_discovery() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  s public.runner_discovery_settings := (select x from public.runner_discovery_settings x where x.user_id = v_uid);
+  p public.runner_location_presence := (select x from public.runner_location_presence x where x.user_id = v_uid);
+begin
+  return jsonb_build_object(
+    'enabled', coalesce(s.enabled, false) and s.suspended_at is null,
+    'suspended', s.suspended_at is not null,
+    'visible_to', coalesce(s.visible_to, 'VERIFIED'), 'purposes', coalesce(to_jsonb(s.purposes), '["BUDDY"]'::jsonb),
+    'goals', coalesce(to_jsonb(s.goals), '[]'::jsonb), 'time_slots', coalesce(to_jsonb(s.time_slots), '[]'::jsonb),
+    'share_pace', coalesce(s.share_pace, true), 'radius_km', coalesce(s.radius_km, 10), 'bio', s.bio,
+    'consented', s.consent_version = private.nearby_consent_version(),
+    'valid_runs', private.valid_runs(v_uid), 'eligible', private.nearby_eligible(v_uid),
+    'pace_s', private.typical_pace(v_uid),
+    'presence', case when p.user_id is not null and p.expires_at > now() then jsonb_build_object(
+      'source', p.source, 'area_label', p.area_label, 'updated_at', p.updated_at, 'expires_at', p.expires_at,
+      'moves_left', greatest(0, 3 - case when p.moves_since > now() - interval '24 hours' then p.moves else 0 end)) end,
+    'incoming', (select count(*) from public.runner_connection_requests r where r.to_id = v_uid and r.status = 'PENDING'),
+    'connections', (select count(*) from public.runner_connections c where c.user_a = v_uid or c.user_b = v_uid));
+end $$;
+
+-- p: {enabled, consent, visible_to, purposes[], goals[], time_slots[], share_pace, radius_km, bio}
+create or replace function public.set_discovery(p jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  s public.runner_discovery_settings := (select x from public.runner_discovery_settings x where x.user_id = v_uid);
+  v_enabled boolean := coalesce((p->>'enabled')::boolean, s.enabled, false);
+  v_vis text := coalesce(p->>'visible_to', s.visible_to, 'VERIFIED');
+  v_radius integer := coalesce((p->>'radius_km')::int, s.radius_km, 10);
+  v_purposes text[] := coalesce((select array_agg(x) from jsonb_array_elements_text(case when jsonb_typeof(p->'purposes') = 'array' then p->'purposes' end) x), s.purposes, array['BUDDY']);
+  v_goals text[] := coalesce((select array_agg(x) from jsonb_array_elements_text(case when jsonb_typeof(p->'goals') = 'array' then p->'goals' end) x), s.goals, '{}');
+  v_slots text[] := coalesce((select array_agg(x) from jsonb_array_elements_text(case when jsonb_typeof(p->'time_slots') = 'array' then p->'time_slots' end) x), s.time_slots, '{}');
+  v_consent text := case when coalesce((p->>'consent')::boolean, false) then private.nearby_consent_version() else s.consent_version end;
+begin
+  if v_vis not in ('VERIFIED', 'SAME_GENDER', 'CLUBS') then raise exception 'INVALID_SETTINGS'; end if;
+  if v_radius not in (2, 5, 10, 20) then raise exception 'INVALID_SETTINGS'; end if;
+  if not (v_purposes <@ array['BUDDY', 'CLUB', 'COACH']) or not (v_goals <@ array['5K', '10K', 'HM', 'FM', 'TRAIL'])
+     or not (v_slots <@ array['EARLY', 'MORNING', 'NOON', 'EVENING', 'WEEKEND']) then raise exception 'INVALID_SETTINGS'; end if;
+  if v_enabled then
+    if coalesce(v_consent, '') <> private.nearby_consent_version() then raise exception 'CONSENT_REQUIRED'; end if;
+    if not private.nearby_eligible(v_uid) then raise exception 'NOT_ELIGIBLE'; end if;
+    if s.suspended_at is not null then raise exception 'NEARBY_SUSPENDED'; end if;
+  end if;
+  insert into public.runner_discovery_settings as t (user_id, enabled, visible_to, purposes, goals, time_slots, share_pace, radius_km, bio,
+                                                     consent_version, consent_at, updated_at)
+  values (v_uid, v_enabled, v_vis, v_purposes, v_goals, v_slots, coalesce((p->>'share_pace')::boolean, s.share_pace, true), v_radius,
+          case when p ? 'bio' then nullif(left(trim(coalesce(p->>'bio', '')), 140), '') else s.bio end,
+          v_consent, case when v_consent is distinct from s.consent_version then now() else s.consent_at end, now())
+  on conflict (user_id) do update set enabled = excluded.enabled, visible_to = excluded.visible_to, purposes = excluded.purposes,
+    goals = excluded.goals, time_slots = excluded.time_slots, share_pace = excluded.share_pace, radius_km = excluded.radius_km,
+    bio = excluded.bio, consent_version = excluded.consent_version, consent_at = excluded.consent_at, updated_at = now();
+  -- Tắt = xoá vị trí ngay
+  if not v_enabled then delete from public.runner_location_presence where user_id = v_uid; end if;
+  return public.my_discovery();
+end $$;
+
+-- Công bố vị trí gần đúng: làm tròn về ô ~1 km trước khi lưu; đổi ô tối đa 3 lần / 24 giờ
+create or replace function public.set_presence(p_lat double precision, p_lng double precision, p_source text, p_area text default null, p_hours integer default 168)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  s public.runner_discovery_settings := (select x from public.runner_discovery_settings x where x.user_id = v_uid);
+  p public.runner_location_presence := (select x from public.runner_location_presence x where x.user_id = v_uid);
+  v_lat numeric(6, 2) := round(p_lat::numeric, 2);
+  v_lng numeric(6, 2) := round(p_lng::numeric, 2);
+  v_moves integer;
+begin
+  if not coalesce(s.enabled, false) or s.suspended_at is not null then raise exception 'NEARBY_DISABLED'; end if;
+  if p_lat is null or p_lng is null or p_lat not between -90 and 90 or p_lng not between -180 and 180 then raise exception 'INVALID_LOCATION'; end if;
+  if p_source not in ('DEVICE', 'AREA') then raise exception 'INVALID_LOCATION'; end if;
+  if p_hours not in (24, 168, 720) then raise exception 'INVALID_LOCATION'; end if;
+  v_moves := case when p.user_id is null then 0 when p.moves_since > now() - interval '24 hours' then p.moves else 0 end;
+  if p.user_id is not null and (p.cell_lat <> v_lat or p.cell_lng <> v_lng) then
+    if v_moves >= 3 then raise exception 'TOO_MANY_MOVES'; end if;
+    v_moves := v_moves + 1;
+  end if;
+  insert into public.runner_location_presence as t (user_id, cell_lat, cell_lng, source, area_label, moves, moves_since, updated_at, expires_at)
+  values (v_uid, v_lat, v_lng, p_source, nullif(left(trim(coalesce(p_area, '')), 60), ''), v_moves,
+          case when p.user_id is null or p.moves_since <= now() - interval '24 hours' then now() else p.moves_since end,
+          now(), now() + make_interval(hours => p_hours))
+  on conflict (user_id) do update set cell_lat = excluded.cell_lat, cell_lng = excluded.cell_lng, source = excluded.source,
+    area_label = excluded.area_label, moves = excluded.moves, moves_since = excluded.moves_since, updated_at = now(), expires_at = excluded.expires_at;
+  return public.my_discovery();
+end $$;
+
+create or replace function public.clear_presence() returns void
+language sql security definer set search_path = public as $$
+  delete from public.runner_location_presence where user_id = private.require_uid()
+$$;
+
+-- ---------------------------------------------------------------------
+-- 4. Tìm runner phù hợp
+-- ---------------------------------------------------------------------
+-- p: {radius_km, pace: ALL|FAST|MID|EASY|UNKNOWN, purpose, goal, slot, offset}
+create or replace function public.nearby_runners(p jsonb default '{}'::jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  s public.runner_discovery_settings := (select x from public.runner_discovery_settings x where x.user_id = v_uid);
+  me public.runner_location_presence := (select x from public.runner_location_presence x where x.user_id = v_uid and x.expires_at > now());
+  v_radius integer := coalesce((p->>'radius_km')::int, s.radius_km, 10);
+  v_pace text := upper(coalesce(p->>'pace', 'ALL'));
+  v_purpose text := nullif(nullif(upper(coalesce(p->>'purpose', '')), ''), 'ALL');
+  v_goal text := nullif(nullif(upper(coalesce(p->>'goal', '')), ''), 'ALL');
+  v_slot text := nullif(nullif(upper(coalesce(p->>'slot', '')), ''), 'ALL');
+  v_offset integer := greatest(0, coalesce((p->>'offset')::int, 0));
+  v_my_pace integer := private.typical_pace(v_uid);
+  v_dlat numeric;
+  v_dlng numeric;
+begin
+  if not coalesce(s.enabled, false) or s.suspended_at is not null then raise exception 'NEARBY_DISABLED'; end if;
+  if me.user_id is null then raise exception 'NO_PRESENCE'; end if;
+  if v_radius not in (2, 5, 10, 20) then v_radius := 10; end if;
+  if (select count(*) from public.runner_nearby_searches x where x.user_id = v_uid and x.created_at > now() - interval '1 hour') >= 60 then
+    raise exception 'TOO_MANY_SEARCHES';
+  end if;
+  insert into public.runner_nearby_searches (user_id) values (v_uid);
+  delete from public.runner_nearby_searches where created_at < now() - interval '7 days';
+  delete from public.runner_location_presence where expires_at < now() - interval '1 day';
+  v_dlat := v_radius / 111.0 + 0.01;
+  v_dlng := v_radius / (111.0 * greatest(cos(radians(me.cell_lat::float8)), 0.2)) + 0.01;
+
+  return (
+    with cand as (
+      select o.user_id as id, ds, o, private.cell_km(me.cell_lat, me.cell_lng, o.cell_lat, o.cell_lng) as km,
+             case when ds.share_pace then private.typical_pace(o.user_id) end as pace
+        from public.runner_location_presence o
+        join public.runner_discovery_settings ds on ds.user_id = o.user_id
+       where o.user_id <> v_uid and o.expires_at > now() and ds.enabled and ds.suspended_at is null
+         and o.cell_lat between me.cell_lat - v_dlat and me.cell_lat + v_dlat
+         and o.cell_lng between me.cell_lng - v_dlng and me.cell_lng + v_dlng
+         and not private.is_blocked(v_uid, o.user_id)
+         and private.nearby_visible(v_uid, o.user_id, ds.visible_to)      -- họ cho mình thấy
+         and private.nearby_visible(o.user_id, v_uid, s.visible_to)       -- mình cho họ thấy (công bằng 2 chiều)
+         and private.nearby_eligible(o.user_id)
+    ), f as (
+      select c.*,
+        private.share_club(v_uid, c.id) as clubs,
+        (select count(*) from public.runner_connections a join public.runner_connections b
+            on (b.user_a = case when a.user_a = v_uid then a.user_b else a.user_a end or b.user_b = case when a.user_a = v_uid then a.user_b else a.user_a end)
+           where (a.user_a = v_uid or a.user_b = v_uid) and (b.user_a = c.id or b.user_b = c.id)) as mutual
+        from cand c
+       where c.km <= v_radius
+         and (v_pace = 'ALL' or (v_pace = 'UNKNOWN' and c.pace is null)
+              or (v_pace = 'FAST' and c.pace < 330) or (v_pace = 'MID' and c.pace between 330 and 420) or (v_pace = 'EASY' and c.pace > 420))
+         and (v_purpose is null or v_purpose = any((c.ds).purposes))
+         and (v_goal is null or v_goal = any((c.ds).goals))
+         and (v_slot is null or v_slot = any((c.ds).time_slots))
+    ), sc as (
+      select f.*,
+        -- pace 30 · khung giờ 20 · mục tiêu 15 · mục đích 10 · cộng đồng 15 · khoảng cách 10
+        (case when f.pace is null or v_my_pace is null then 12 else greatest(0, 30 - greatest(0, abs(f.pace - v_my_pace) - 20) * 30 / 70.0) end
+         + least(20, 10 * cardinality(array(select unnest((f.ds).time_slots) intersect select unnest(s.time_slots))))
+         + least(15, 8 * cardinality(array(select unnest((f.ds).goals) intersect select unnest(s.goals))))
+         + case when 'BUDDY' = any((f.ds).purposes) and 'BUDDY' = any(s.purposes) then 10 else 3 end
+         + least(15, 10 * least(f.clubs, 1) + 3 * f.mutual)
+         + case when f.km < 2 then 10 when f.km < 5 then 8 when f.km < 10 then 5 else 2 end
+         + (abs(hashtext(f.id::text || current_date::text)) % 5)) as score
+        from f
+    )
+    select jsonb_build_object('items', coalesce(jsonb_agg(y.x order by y.rn), '[]'::jsonb),
+      'total', (select count(*) from sc), 'nearby_total', (select count(*) from cand))
+      from (
+        select row_number() over (order by sc.score desc, sc.id) as rn, jsonb_build_object(
+          'id', sc.id, 'name', private.first_name(sc.id),
+          'avatar_url', (select avatar_url from public.profiles where id = sc.id),
+          'level', (select level from public.profiles where id = sc.id),
+          'km', private.shown_km(sc.km, v_uid, sc.id), 'area_label', (sc.o).area_label,
+          'pace_s', sc.pace, 'goals', to_jsonb((sc.ds).goals), 'time_slots', to_jsonb((sc.ds).time_slots),
+          'purposes', to_jsonb((sc.ds).purposes), 'bio', (sc.ds).bio, 'clubs', sc.clubs, 'mutual', sc.mutual,
+          'score', round(sc.score), 'connection',
+            case when private.are_connected(v_uid, sc.id) then 'CONNECTED'
+                 when exists (select 1 from public.runner_connection_requests r where r.from_id = v_uid and r.to_id = sc.id and r.status = 'PENDING') then 'PENDING_OUT'
+                 when exists (select 1 from public.runner_connection_requests r where r.from_id = sc.id and r.to_id = v_uid and r.status = 'PENDING') then 'PENDING_IN'
+                 else 'NONE' end,
+          'reasons', to_jsonb(array_remove(array[
+            case when sc.pace is not null and v_my_pace is not null and abs(sc.pace - v_my_pace) <= 30 then 'PACE' end,
+            case when (sc.ds).time_slots && s.time_slots then 'SLOT' end,
+            case when (sc.ds).goals && s.goals then 'GOAL' end,
+            case when sc.clubs > 0 then 'CLUB' end,
+            case when sc.mutual > 0 then 'MUTUAL' end], null))) as x
+          from sc
+      ) y(rn, x)
+     where y.rn > v_offset and y.rn <= v_offset + 30
+  );
+end $$;
+
+-- Buổi chạy công khai của CLB gần tôi (điểm hẹn là nơi công cộng → hiện km với 1 số lẻ)
+create or replace function public.nearby_events(p_radius_km integer default 20) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  me public.runner_location_presence := (select x from public.runner_location_presence x where x.user_id = v_uid and x.expires_at > now());
+begin
+  if me.user_id is null then raise exception 'NO_PRESENCE'; end if;
+  return (select coalesce(jsonb_agg(private.event_json(e, v_uid) || jsonb_build_object(
+            'club_name', c.name, 'club_avatar', c.avatar_url,
+            'km', round(private.cell_km(me.cell_lat, me.cell_lng, e.lat::numeric, e.lng::numeric), 1),
+            'is_member', exists (select 1 from public.club_members m where m.club_id = e.club_id and m.user_id = v_uid and m.status = 'APPROVED'))
+          order by e.starts_at), '[]'::jsonb)
+            from public.club_events e join public.clubs c on c.id = e.club_id
+           where e.visibility = 'PUBLIC' and e.status = 'SCHEDULED' and e.lat is not null
+             and e.starts_at > now() - interval '1 hour' and e.starts_at < now() + interval '14 days'
+             and private.cell_km(me.cell_lat, me.cell_lng, e.lat::numeric, e.lng::numeric) <= least(greatest(p_radius_km, 2), 50));
+end $$;
+
+create or replace function public.nearby_clubs(p_radius_km integer default 20) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  me public.runner_location_presence := (select x from public.runner_location_presence x where x.user_id = v_uid and x.expires_at > now());
+begin
+  if me.user_id is null then raise exception 'NO_PRESENCE'; end if;
+  return (select coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'name', c.name, 'avatar_url', c.avatar_url, 'accent_color', c.accent_color,
+            'member_count', c.member_count, 'area_label', c.area_label, 'join_policy', c.join_policy,
+            'km', round(private.cell_km(me.cell_lat, me.cell_lng, c.cell_lat, c.cell_lng)),
+            'is_member', exists (select 1 from public.club_members m where m.club_id = c.id and m.user_id = v_uid and m.status = 'APPROVED'),
+            'upcoming', (select count(*) from public.club_events e where e.club_id = c.id and e.visibility = 'PUBLIC' and e.status = 'SCHEDULED' and e.starts_at > now()))
+          order by private.cell_km(me.cell_lat, me.cell_lng, c.cell_lat, c.cell_lng)), '[]'::jsonb)
+            from public.clubs c
+           where c.cell_lat is not null
+             and private.cell_km(me.cell_lat, me.cell_lng, c.cell_lat, c.cell_lng) <= least(greatest(p_radius_km, 2), 50));
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 5. Kết nối
+-- ---------------------------------------------------------------------
+create or replace function public.send_connection(p_to uuid, p_message text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  s public.runner_discovery_settings := (select x from public.runner_discovery_settings x where x.user_id = v_uid);
+  t public.runner_discovery_settings := (select x from public.runner_discovery_settings x where x.user_id = p_to);
+  v_msg text := nullif(left(trim(coalesce(p_message, '')), 140), '');
+  v_in public.runner_connection_requests := (select r from public.runner_connection_requests r where r.from_id = p_to and r.to_id = v_uid and r.status = 'PENDING');
+  r public.runner_connection_requests;
+begin
+  if p_to = v_uid then raise exception 'INVALID_TARGET'; end if;
+  if not coalesce(s.enabled, false) or s.suspended_at is not null then raise exception 'NEARBY_DISABLED'; end if;
+  if t.user_id is null or not t.enabled or t.suspended_at is not null or not private.nearby_visible(v_uid, p_to, t.visible_to) then
+    raise exception 'TARGET_UNAVAILABLE';
+  end if;
+  if private.is_blocked(v_uid, p_to) then raise exception 'TARGET_UNAVAILABLE'; end if;
+  if private.are_connected(v_uid, p_to) then raise exception 'ALREADY_CONNECTED'; end if;
+  if v_msg is not null and v_msg ~* '(https?://|www\.|\.com|\.vn|zalo|telegram|t\.me)' then raise exception 'NO_LINKS'; end if;
+  -- Họ đã mời mình → chấp nhận luôn
+  if v_in.id is not null then return public.respond_connection(v_in.id, 'ACCEPT'); end if;
+  if exists (select 1 from public.runner_connection_requests x where x.from_id = v_uid and x.to_id = p_to and x.status = 'PENDING') then
+    raise exception 'ALREADY_REQUESTED';
+  end if;
+  if exists (select 1 from public.runner_connection_requests x where x.from_id = v_uid and x.to_id = p_to and x.status = 'DECLINED'
+              and x.responded_at > now() - interval '30 days') then raise exception 'REQUEST_COOLDOWN'; end if;
+  if (select count(*) from public.runner_connection_requests x where x.from_id = v_uid and x.created_at > now() - interval '24 hours') >= 15 then
+    raise exception 'TOO_MANY_REQUESTS';
+  end if;
+  insert into public.runner_connection_requests (from_id, to_id, message) values (v_uid, p_to, v_msg) returning * into r;
+  perform private.notify(p_to, null, 'RUNNER_CONNECT', private.first_name(v_uid) || ' muốn kết nối chạy cùng bạn',
+    coalesce(v_msg, 'Xem lời mời trong Quanh đây.'), '/nearby/connections', v_uid, true);
+  return jsonb_build_object('id', r.id, 'status', r.status);
+end $$;
+
+create or replace function public.respond_connection(p_id uuid, p_action text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  r public.runner_connection_requests := (select x from public.runner_connection_requests x where x.id = p_id);
+begin
+  if r.id is null or r.to_id <> v_uid then raise exception 'REQUEST_NOT_FOUND'; end if;
+  if r.status <> 'PENDING' then raise exception 'REQUEST_CLOSED'; end if;
+  if upper(p_action) = 'ACCEPT' then
+    if private.is_blocked(r.from_id, r.to_id) then raise exception 'TARGET_UNAVAILABLE'; end if;
+    update public.runner_connection_requests set status = 'ACCEPTED', responded_at = now() where id = r.id;
+    insert into public.runner_connections (user_a, user_b) values (least(r.from_id, r.to_id), greatest(r.from_id, r.to_id)) on conflict do nothing;
+    perform private.notify(r.from_id, null, 'RUNNER_CONNECTED', private.first_name(v_uid) || ' đã chấp nhận kết nối',
+      'Rủ nhau một buổi chạy nhé!', '/nearby/connections', v_uid, true);
+    return jsonb_build_object('id', r.id, 'status', 'ACCEPTED');
+  elsif upper(p_action) = 'DECLINE' then
+    update public.runner_connection_requests set status = 'DECLINED', responded_at = now() where id = r.id;
+    return jsonb_build_object('id', r.id, 'status', 'DECLINED');
+  end if;
+  raise exception 'INVALID_ACTION';
+end $$;
+
+create or replace function public.cancel_connection_request(p_id uuid) returns void
+language sql security definer set search_path = public as $$
+  update public.runner_connection_requests set status = 'CANCELLED', responded_at = now()
+   where id = p_id and from_id = private.require_uid() and status = 'PENDING'
+$$;
+
+create or replace function public.remove_connection(p_user uuid) returns void
+language sql security definer set search_path = public as $$
+  delete from public.runner_connections where user_a = least(private.require_uid(), p_user) and user_b = greatest(private.require_uid(), p_user)
+$$;
+
+create or replace function private.person_json(p_user uuid, p_viewer uuid) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('id', p.id, 'name', case when private.are_connected(p_user, p_viewer) then p.display_name else private.first_name(p.id) end,
+    'avatar_url', p.avatar_url, 'level', p.level,
+    'pace_s', case when coalesce((select share_pace from public.runner_discovery_settings where user_id = p.id), false) then private.typical_pace(p.id) end,
+    'goals', coalesce((select to_jsonb(goals) from public.runner_discovery_settings where user_id = p.id), '[]'::jsonb),
+    'time_slots', coalesce((select to_jsonb(time_slots) from public.runner_discovery_settings where user_id = p.id), '[]'::jsonb),
+    'bio', (select bio from public.runner_discovery_settings where user_id = p.id))
+    from public.profiles p where p.id = p_user
+$$;
+
+create or replace function public.my_connections() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := private.require_uid();
+begin
+  return jsonb_build_object(
+    'connections', (select coalesce(jsonb_agg(private.person_json(case when c.user_a = v_uid then c.user_b else c.user_a end, v_uid)
+                       || jsonb_build_object('since', c.created_at) order by c.created_at desc), '[]'::jsonb)
+                      from public.runner_connections c where (c.user_a = v_uid or c.user_b = v_uid)
+                       and not private.is_blocked(c.user_a, c.user_b)),
+    'incoming', (select coalesce(jsonb_agg(private.person_json(r.from_id, v_uid) || jsonb_build_object('request_id', r.id, 'message', r.message, 'at', r.created_at)
+                    order by r.created_at desc), '[]'::jsonb)
+                   from public.runner_connection_requests r where r.to_id = v_uid and r.status = 'PENDING' and not private.is_blocked(r.from_id, v_uid)),
+    'outgoing', (select coalesce(jsonb_agg(private.person_json(r.to_id, v_uid) || jsonb_build_object('request_id', r.id, 'message', r.message, 'at', r.created_at)
+                    order by r.created_at desc), '[]'::jsonb)
+                   from public.runner_connection_requests r where r.from_id = v_uid and r.status = 'PENDING'),
+    'blocked', (select coalesce(jsonb_agg(jsonb_build_object('id', b.blocked, 'name', private.first_name(b.blocked), 'at', b.created_at) order by b.created_at desc), '[]'::jsonb)
+                  from public.user_blocks b where b.blocker = v_uid));
+end $$;
+
+-- "Rủ chạy": mời người đã kết nối vào buổi chạy công khai / sự kiện CLB mình tham gia, hoặc vào CLB của mình
+create or replace function public.invite_to_run(p_user uuid, p_event_id uuid default null, p_club_id uuid default null, p_note text default null) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  e public.club_events;
+  v_note text := nullif(left(trim(coalesce(p_note, '')), 140), '');
+begin
+  if not private.are_connected(v_uid, p_user) or private.is_blocked(v_uid, p_user) then raise exception 'NOT_CONNECTED'; end if;
+  if (select count(*) from public.notifications n where n.actor_id = v_uid and n.kind = 'RUNNER_INVITE' and n.created_at > now() - interval '24 hours') >= 20 then
+    raise exception 'TOO_MANY_REQUESTS';
+  end if;
+  if p_event_id is not null then
+    e := (select x from public.club_events x where x.id = p_event_id);
+    if e.id is null or e.status <> 'SCHEDULED' or e.starts_at < now() then raise exception 'EVENT_NOT_FOUND'; end if;
+    if e.visibility <> 'PUBLIC' and not exists (select 1 from public.club_members m where m.club_id = e.club_id and m.user_id = p_user and m.status = 'APPROVED') then
+      raise exception 'EVENT_NOT_PUBLIC';
+    end if;
+    perform private.notify(p_user, e.club_id, 'RUNNER_INVITE', private.first_name(v_uid) || ' rủ bạn chạy: ' || e.title,
+      coalesce(v_note, to_char(e.starts_at at time zone 'Asia/Ho_Chi_Minh', 'HH24:MI DD/MM') || coalesce(' · ' || e.location_name, '')),
+      case when e.visibility = 'PUBLIC' then '/nearby/events/' || e.id else '/clubs/' || e.club_id || '/events/' || e.id end, v_uid, true);
+  elsif p_club_id is not null then
+    if not exists (select 1 from public.club_members m where m.club_id = p_club_id and m.user_id = v_uid and m.status = 'APPROVED') then raise exception 'FORBIDDEN'; end if;
+    perform private.notify(p_user, p_club_id, 'RUNNER_INVITE', private.first_name(v_uid) || ' rủ bạn vào CLB ' || (select name from public.clubs where id = p_club_id),
+      v_note, '/clubs/' || p_club_id, v_uid, true);
+  else
+    raise exception 'INVALID_INVITE';
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 6. Chặn / báo cáo
+-- ---------------------------------------------------------------------
+create or replace function public.block_user(p_user uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := private.require_uid();
+begin
+  if p_user = v_uid then raise exception 'INVALID_TARGET'; end if;
+  insert into public.user_blocks (blocker, blocked) values (v_uid, p_user) on conflict do nothing;
+  delete from public.runner_connections where user_a = least(v_uid, p_user) and user_b = greatest(v_uid, p_user);
+  update public.runner_connection_requests set status = 'CANCELLED', responded_at = now()
+   where status = 'PENDING' and ((from_id = v_uid and to_id = p_user) or (from_id = p_user and to_id = v_uid));
+end $$;
+
+create or replace function public.unblock_user(p_user uuid) returns void
+language sql security definer set search_path = public as $$
+  delete from public.user_blocks where blocker = private.require_uid() and blocked = p_user
+$$;
+
+create or replace function public.report_user(p_user uuid, p_reason text, p_note text default null, p_context text default 'NEARBY') returns void
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := private.require_uid();
+begin
+  if p_user = v_uid then raise exception 'INVALID_TARGET'; end if;
+  if upper(p_reason) not in ('SPAM', 'HARASSMENT', 'FAKE', 'UNSAFE', 'OTHER') then raise exception 'INVALID_REASON'; end if;
+  if exists (select 1 from public.user_reports r where r.reporter = v_uid and r.target = p_user and r.status = 'OPEN') then return; end if;
+  insert into public.user_reports (reporter, target, context, reason, note)
+  values (v_uid, p_user, coalesce(upper(p_context), 'NEARBY'), upper(p_reason), nullif(left(trim(coalesce(p_note, '')), 500), ''));
+  -- 3 người khác nhau cùng báo cáo → tự ẩn khỏi Quanh đây chờ admin
+  if (select count(distinct r.reporter) from public.user_reports r where r.target = p_user and r.status = 'OPEN') >= 3 then
+    update public.runner_discovery_settings set suspended_at = coalesce(suspended_at, now()) where user_id = p_user;
+    delete from public.runner_location_presence where user_id = p_user;
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 7. CLB: điểm tập, sự kiện công khai, người ngoài đăng ký
+-- ---------------------------------------------------------------------
+create or replace function public.set_club_location(p_club_id uuid, p_lat double precision, p_lng double precision, p_area text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.club_is_staff(p_club_id) and not public.is_system_admin() then raise exception 'FORBIDDEN'; end if;
+  if p_lat is null then
+    update public.clubs set cell_lat = null, cell_lng = null, area_label = null where id = p_club_id;
+    return;
+  end if;
+  if p_lat not between -90 and 90 or p_lng not between -180 and 180 then raise exception 'INVALID_LOCATION'; end if;
+  update public.clubs set cell_lat = round(p_lat::numeric, 2), cell_lng = round(p_lng::numeric, 2),
+    area_label = nullif(left(trim(coalesce(p_area, '')), 60), '') where id = p_club_id;
+end $$;
+
+-- Vị trí CLB hiện tại (ban quản trị xem để sửa; người khác chỉ thấy km qua nearby_clubs)
+create or replace function public.club_place(p_club_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare c public.clubs := (select x from public.clubs x where x.id = p_club_id);
+begin
+  if c.id is null then raise exception 'CLUB_NOT_FOUND'; end if;
+  if not public.club_is_staff(c.id) and not public.is_system_admin() then raise exception 'FORBIDDEN'; end if;
+  return jsonb_build_object('area_label', c.area_label, 'lat', c.cell_lat, 'lng', c.cell_lng);
+end $$;
+
+create or replace function public.set_club_event_visibility(p_event_id uuid, p_visibility text) returns void
+language plpgsql security definer set search_path = public as $$
+declare e public.club_events := (select x from public.club_events x where x.id = p_event_id);
+begin
+  if e.id is null then raise exception 'EVENT_NOT_FOUND'; end if;
+  if not public.club_is_staff(e.club_id) and not public.is_system_admin() then raise exception 'FORBIDDEN'; end if;
+  if upper(p_visibility) not in ('CLUB', 'PUBLIC') then raise exception 'INVALID_VISIBILITY'; end if;
+  if upper(p_visibility) = 'PUBLIC' and e.lat is null then raise exception 'EVENT_NEEDS_LOCATION'; end if;
+  update public.club_events set visibility = upper(p_visibility) where id = e.id;
+end $$;
+
+-- Đăng ký buổi chạy công khai (không cần là thành viên CLB)
+create or replace function public.rsvp_public_event(p_event_id uuid, p_status text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  e public.club_events := (select x from public.club_events x where x.id = p_event_id);
+begin
+  if e.id is null or e.visibility <> 'PUBLIC' then raise exception 'EVENT_NOT_FOUND'; end if;
+  if p_status not in ('GOING', 'MAYBE', 'NOT_GOING') then raise exception 'INVALID_STATUS'; end if;
+  if e.status = 'CANCELLED' then raise exception 'EVENT_CANCELLED'; end if;
+  if now() > e.starts_at + make_interval(mins => e.duration_min) then raise exception 'EVENT_ENDED'; end if;
+  if p_status = 'GOING' and e.capacity is not null
+     and (select count(*) from public.club_event_rsvps where event_id = e.id and status = 'GOING' and user_id <> v_uid) >= e.capacity then
+    raise exception 'EVENT_FULL';
+  end if;
+  insert into public.club_event_rsvps (event_id, user_id, status) values (e.id, v_uid, p_status)
+  on conflict (event_id, user_id) do update set status = excluded.status, updated_at = now();
+  return private.event_json(e, v_uid);
+end $$;
+
+-- Sự kiện CLB: kèm chế độ công khai
+create or replace function private.event_json(e public.club_events, p_uid uuid) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'id', e.id, 'club_id', e.club_id, 'title', e.title, 'description', e.description, 'starts_at', e.starts_at,
+    'ends_at', e.starts_at + make_interval(mins => e.duration_min), 'duration_min', e.duration_min,
+    'location_name', e.location_name, 'lat', e.lat, 'lng', e.lng, 'distance_km', e.distance_km, 'pace_text', e.pace_text,
+    'capacity', e.capacity, 'status', e.status, 'visibility', e.visibility, 'cancel_reason', e.cancel_reason,
+    'created_by', e.created_by, 'creator_name', (select display_name from public.profiles where id = e.created_by),
+    'going_count', (select count(*) from public.club_event_rsvps r where r.event_id = e.id and r.status = 'GOING'),
+    'maybe_count', (select count(*) from public.club_event_rsvps r where r.event_id = e.id and r.status = 'MAYBE'),
+    'checked_in_count', (select count(*) from public.club_event_rsvps r where r.event_id = e.id and r.checked_in_at is not null),
+    'my_status', (select r.status from public.club_event_rsvps r where r.event_id = e.id and r.user_id = p_uid),
+    'my_checked_in_at', (select r.checked_in_at from public.club_event_rsvps r where r.event_id = e.id and r.user_id = p_uid))
+$$;
+
+-- Chi tiết sự kiện: người ngoài CLB xem được sự kiện CÔNG KHAI (không kèm danh sách người tham gia)
+create or replace function public.club_event(p_event_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  e public.club_events := (select x from public.club_events x where x.id = p_event_id);
+  v_uid uuid := private.require_uid();
+  v_member boolean;
+begin
+  if e.id is null then raise exception 'EVENT_NOT_FOUND'; end if;
+  v_member := exists (select 1 from public.club_members m where m.club_id = e.club_id and m.user_id = v_uid and m.status = 'APPROVED');
+  if not v_member and e.visibility <> 'PUBLIC' and not public.is_system_admin() then
+    perform private.require_member(e.club_id);
+  end if;
+  return private.event_json(e, v_uid) || jsonb_build_object(
+    'is_member', v_member,
+    'club_name', (select c.name from public.clubs c where c.id = e.club_id),
+    'club_avatar', (select c.avatar_url from public.clubs c where c.id = e.club_id),
+    'can_manage', public.club_is_staff(e.club_id),
+    'checkin_open', e.status = 'SCHEDULED' and now() between e.starts_at - interval '2 hours'
+                                                          and e.starts_at + make_interval(mins => e.duration_min) + interval '2 hours',
+    'attendees', case when v_member or public.is_system_admin() then (select coalesce(jsonb_agg(jsonb_build_object(
+        'user_id', r.user_id, 'display_name', p.display_name, 'avatar_url', p.avatar_url, 'status', r.status,
+        'checked_in_at', r.checked_in_at, 'checkin_method', r.checkin_method)
+        order by (r.checked_in_at is null), r.status, p.display_name), '[]'::jsonb)
+      from public.club_event_rsvps r join public.profiles p on p.id = r.user_id
+     where r.event_id = e.id and r.status <> 'NOT_GOING') else '[]'::jsonb end);
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 8. Quản trị báo cáo
+-- ---------------------------------------------------------------------
+create or replace function public.admin_list_reports(p_status text default 'OPEN') returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform private.require_admin();
+  return (select coalesce(jsonb_agg(jsonb_build_object('id', r.id, 'reporter', r.reporter, 'reporter_name', private.display_name(r.reporter),
+            'target', r.target, 'target_name', private.display_name(r.target), 'context', r.context, 'reason', r.reason, 'note', r.note,
+            'status', r.status, 'resolution', r.resolution, 'created_at', r.created_at, 'resolved_at', r.resolved_at,
+            'target_reports', (select count(distinct x.reporter) from public.user_reports x where x.target = r.target),
+            'target_suspended', exists (select 1 from public.runner_discovery_settings s where s.user_id = r.target and s.suspended_at is not null))
+          order by r.created_at desc), '[]'::jsonb)
+            from public.user_reports r where upper(coalesce(p_status, 'ALL')) = 'ALL' or r.status = upper(p_status));
+end $$;
+
+-- p_action: DISMISS (không vi phạm, gỡ ẩn) | SUSPEND (khoá Quanh đây) | BAN (khoá tài khoản — dùng admin_set_user_ban)
+create or replace function public.admin_resolve_report(p_id uuid, p_action text, p_note text default null) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin uuid := private.require_admin();
+  r public.user_reports := (select x from public.user_reports x where x.id = p_id);
+begin
+  if r.id is null then raise exception 'REPORT_NOT_FOUND'; end if;
+  if upper(p_action) = 'DISMISS' then
+    update public.user_reports set status = 'DISMISSED', resolution = coalesce(nullif(trim(p_note), ''), 'Không vi phạm'), resolved_by = v_admin, resolved_at = now()
+     where target = r.target and status = 'OPEN';
+    update public.runner_discovery_settings set suspended_at = null where user_id = r.target;
+  elsif upper(p_action) = 'SUSPEND' then
+    update public.user_reports set status = 'RESOLVED', resolution = coalesce(nullif(trim(p_note), ''), 'Khoá Quanh đây'), resolved_by = v_admin, resolved_at = now()
+     where target = r.target and status = 'OPEN';
+    insert into public.runner_discovery_settings (user_id, enabled, suspended_at) values (r.target, false, now())
+    on conflict (user_id) do update set enabled = false, suspended_at = now();
+    delete from public.runner_location_presence where user_id = r.target;
+  else
+    raise exception 'INVALID_ACTION';
+  end if;
+  insert into public.admin_audit_log (actor_id, action, target, new_value)
+  values (v_admin, 'USER_REPORT_' || upper(p_action), 'profile:' || r.target, jsonb_build_object('report', r.id, 'note', p_note));
+end $$;
+
+-- Việc cần xử lý: + báo cáo người dùng
+create or replace function public.admin_inbox() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform private.require_admin();
+  return jsonb_build_object(
+    'orders', (select count(*) from public.orders o where o.status = 'PENDING' and (o.expires_at is null or o.expires_at > now())),
+    'reviews', (select count(*) from public.activities a where a.validation_status = 'PENDING' and coalesce(a.status, '') <> 'DELETED'),
+    'partners', (select count(*) from public.partners p where p.status = 'PENDING'),
+    'cups', (select count(*) from public.club_cups c where c.status = 'PENDING_REVIEW'),
+    'reports', (select count(distinct r.target) from public.user_reports r where r.status = 'OPEN'),
+    'errors', (select count(distinct e.code) from private.client_errors e where e.last_at > now() - interval '24 hours'),
+    'new_users_7d', (select count(*) from public.profiles p where p.created_at > now() - interval '7 days'),
+    'active_7d', (select count(distinct a.user_id) from public.activities a where a.started_at > now() - interval '7 days'),
+    'banned', (select count(*) from public.profiles p where p.banned_at is not null));
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 9. Quyền
+-- ---------------------------------------------------------------------
+revoke all on function private.nearby_consent_version(), private.valid_runs(uuid), private.nearby_eligible(uuid), private.typical_pace(uuid),
+  private.is_blocked(uuid, uuid), private.are_connected(uuid, uuid), private.share_club(uuid, uuid), private.nearby_visible(uuid, uuid, text),
+  private.cell_km(numeric, numeric, numeric, numeric), private.shown_km(numeric, uuid, uuid), private.first_name(uuid), private.person_json(uuid, uuid)
+  from public, anon, authenticated;
+revoke all on function public.my_discovery(), public.set_discovery(jsonb), public.set_presence(double precision, double precision, text, text, integer),
+  public.clear_presence(), public.nearby_runners(jsonb), public.nearby_events(integer), public.nearby_clubs(integer),
+  public.send_connection(uuid, text), public.respond_connection(uuid, text), public.cancel_connection_request(uuid), public.remove_connection(uuid),
+  public.my_connections(), public.invite_to_run(uuid, uuid, uuid, text), public.block_user(uuid), public.unblock_user(uuid),
+  public.report_user(uuid, text, text, text), public.set_club_location(uuid, double precision, double precision, text),
+  public.set_club_event_visibility(uuid, text), public.club_place(uuid), public.rsvp_public_event(uuid, text), public.admin_list_reports(text),
+  public.admin_resolve_report(uuid, text, text) from public, anon;
+grant execute on function public.my_discovery(), public.set_discovery(jsonb), public.set_presence(double precision, double precision, text, text, integer),
+  public.clear_presence(), public.nearby_runners(jsonb), public.nearby_events(integer), public.nearby_clubs(integer),
+  public.send_connection(uuid, text), public.respond_connection(uuid, text), public.cancel_connection_request(uuid), public.remove_connection(uuid),
+  public.my_connections(), public.invite_to_run(uuid, uuid, uuid, text), public.block_user(uuid), public.unblock_user(uuid),
+  public.report_user(uuid, text, text, text), public.set_club_location(uuid, double precision, double precision, text),
+  public.set_club_event_visibility(uuid, text), public.club_place(uuid), public.rsvp_public_event(uuid, text), public.admin_list_reports(text),
+  public.admin_resolve_report(uuid, text, text) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001006200_knowledge.sql
+-- ===================================================================
+-- 006200: RaceHub Knowledge — Trung tâm kiến thức & tin tức chạy bộ (docs/KNOWLEDGE.md).
+-- • Hai loại nội dung: ARTICLE (kiến thức lâu dài) và NEWS (tin đang diễn ra); 8 chuyên mục.
+-- • Vòng đời: DRAFT → REVIEW → SCHEDULED → PUBLISHED → ARCHIVED. Bài sức khoẻ / dinh dưỡng / chấn thương / giáo án
+--   phải qua DUYỆT CHUYÊN MÔN (chuyên gia hoặc admin) mới xuất bản được; sửa nội dung sau khi duyệt → duyệt lại.
+-- • Người đọc chỉ thấy bài đã xuất bản (và đã tới giờ đăng); mọi thao tác qua RPC, bảng khoá RLS.
+-- • Đọc bài KHÔNG cộng Xu / XP (XP chỉ từ km). Hoàn thành chuỗi "Bắt đầu chạy bộ" → huy hiệu (không kèm XP / Xu).
+-- • Ban nội dung: EDITOR (duyệt, xuất bản), WRITER (viết nháp, gửi duyệt), EXPERT (duyệt chuyên môn, viết). Admin toàn quyền.
+-- Chạy lại nhiều lần vẫn an toàn. Không dùng SELECT … INTO, khối DO, LIMIT (SQL Editor).
+
+-- ---------------------------------------------------------------------
+-- 1. Bảng
+-- ---------------------------------------------------------------------
+create table if not exists public.content_categories (
+  id text primary key,
+  name text not null,
+  description text,
+  icon text not null default 'BookOpen',
+  sort integer not null default 0,
+  needs_expert boolean not null default false,     -- bài thuộc chuyên mục này mặc định phải duyệt chuyên môn
+  market_kind text check (market_kind is null or market_kind in ('COACH', 'SHOP', 'SERVICE')),
+  is_active boolean not null default true
+);
+
+create table if not exists public.content_authors (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid unique references public.profiles(id) on delete set null,
+  name text not null check (char_length(name) between 2 and 80),
+  title text check (title is null or char_length(title) <= 80),
+  bio text check (bio is null or char_length(bio) <= 600),
+  avatar_url text,
+  kind text not null default 'EDITOR' check (kind in ('TEAM', 'EDITOR', 'COACH', 'EXPERT', 'COMMUNITY')),
+  partner_id uuid references public.partners(id) on delete set null,
+  verified boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.content_staff (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  role text not null check (role in ('EDITOR', 'WRITER', 'EXPERT')),
+  added_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.content_series (
+  id text primary key,
+  title text not null,
+  description text,
+  badge_code text,
+  is_active boolean not null default true
+);
+
+create table if not exists public.content_articles (
+  id uuid primary key default gen_random_uuid(),
+  slug text not null unique check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$' and char_length(slug) <= 90),
+  title text not null check (char_length(title) between 5 and 140),
+  summary text check (summary is null or char_length(summary) <= 300),
+  body text not null default '' check (char_length(body) <= 60000),
+  cover_image_url text,
+  category_id text not null references public.content_categories(id),
+  author_id uuid references public.content_authors(id) on delete set null,
+  content_type text not null default 'ARTICLE' check (content_type in ('ARTICLE', 'NEWS')),
+  status text not null default 'DRAFT' check (status in ('DRAFT', 'REVIEW', 'SCHEDULED', 'PUBLISHED', 'ARCHIVED')),
+  published_at timestamptz,
+  reading_time_minutes integer not null default 1,
+  source_url text,                                   -- tin tổng hợp: link bài gốc
+  source_name text,
+  is_featured boolean not null default false,
+  series_id text references public.content_series(id) on delete set null,
+  series_order integer,
+  ctas jsonb not null default '[]'::jsonb,           -- [{kind, target, label}] dẫn tới tính năng trong app
+  needs_expert_review boolean not null default false,
+  expert_reviewed_by uuid references public.profiles(id) on delete set null,
+  expert_reviewed_at timestamptz,
+  expert_note text,
+  review_note text,                                  -- ghi chú biên tập / lý do trả về
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  views integer not null default 0,
+  reads integer not null default 0,
+  saves integer not null default 0,
+  shares integer not null default 0,
+  cta_clicks integer not null default 0,
+  helpful_yes integer not null default 0,
+  helpful_no integer not null default 0,
+  read_seconds bigint not null default 0
+);
+create index if not exists content_articles_live_idx on public.content_articles (status, published_at desc);
+create index if not exists content_articles_cat_idx on public.content_articles (category_id, published_at desc);
+
+create table if not exists public.content_tags (
+  id uuid primary key default gen_random_uuid(),
+  slug text not null unique,
+  name text not null
+);
+create table if not exists public.content_article_tags (
+  article_id uuid not null references public.content_articles(id) on delete cascade,
+  tag_id uuid not null references public.content_tags(id) on delete cascade,
+  primary key (article_id, tag_id)
+);
+create table if not exists public.content_sources (
+  id uuid primary key default gen_random_uuid(),
+  article_id uuid not null references public.content_articles(id) on delete cascade,
+  title text not null,
+  url text,
+  publisher text,
+  sort integer not null default 0
+);
+create table if not exists public.content_bookmarks (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  article_id uuid not null references public.content_articles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, article_id)
+);
+create table if not exists public.content_read_history (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  article_id uuid not null references public.content_articles(id) on delete cascade,
+  first_at timestamptz not null default now(),
+  last_at timestamptz not null default now(),
+  progress integer not null default 0 check (progress between 0 and 100),
+  seconds integer not null default 0,
+  completed_at timestamptz,
+  primary key (user_id, article_id)
+);
+create table if not exists public.content_reviews (
+  article_id uuid not null references public.content_articles(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  helpful boolean not null,
+  comment text check (comment is null or char_length(comment) <= 500),
+  created_at timestamptz not null default now(),
+  primary key (article_id, user_id)
+);
+-- Thống kê theo ngày (lượt xem / đọc xong / chia sẻ / bấm hành động) + chống đếm trùng mỗi người mỗi ngày
+create table if not exists public.content_daily_stats (
+  article_id uuid not null references public.content_articles(id) on delete cascade,
+  day date not null,
+  views integer not null default 0,
+  reads integer not null default 0,
+  shares integer not null default 0,
+  cta_clicks integer not null default 0,
+  primary key (article_id, day)
+);
+create table if not exists public.content_user_events (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  article_id uuid not null references public.content_articles(id) on delete cascade,
+  kind text not null,
+  day date not null,
+  primary key (user_id, article_id, kind, day)
+);
+
+alter table public.content_categories enable row level security;
+alter table public.content_authors enable row level security;
+alter table public.content_staff enable row level security;
+alter table public.content_series enable row level security;
+alter table public.content_articles enable row level security;
+alter table public.content_tags enable row level security;
+alter table public.content_article_tags enable row level security;
+alter table public.content_sources enable row level security;
+alter table public.content_bookmarks enable row level security;
+alter table public.content_read_history enable row level security;
+alter table public.content_reviews enable row level security;
+alter table public.content_daily_stats enable row level security;
+alter table public.content_user_events enable row level security;
+revoke all on public.content_categories, public.content_authors, public.content_staff, public.content_series, public.content_articles,
+  public.content_tags, public.content_article_tags, public.content_sources, public.content_bookmarks, public.content_read_history,
+  public.content_reviews, public.content_daily_stats, public.content_user_events from anon, authenticated;
+
+-- Kho ảnh bài viết: content-media/<user_id>/<file> — chỉ ban nội dung / admin tải lên
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('content-media', 'content-media', true, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do nothing;
+create or replace function public.can_upload_content_media(p_name text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select (storage.foldername(p_name))[1] = auth.uid()::text
+     and (public.is_system_admin() or exists (select 1 from public.content_staff s where s.user_id = auth.uid()))
+$$;
+revoke all on function public.can_upload_content_media(text) from public, anon;
+grant execute on function public.can_upload_content_media(text) to authenticated;
+drop policy if exists content_media_insert on storage.objects;
+create policy content_media_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'content-media' and public.can_upload_content_media(name));
+
+-- ---------------------------------------------------------------------
+-- 2. Dữ liệu gốc: 8 chuyên mục, chuỗi người mới, huy hiệu, tác giả Ban biên tập
+-- ---------------------------------------------------------------------
+insert into public.content_categories (id, name, description, icon, sort, needs_expert, market_kind) values
+  ('BEGINNER', 'Bắt đầu chạy bộ', 'Chọn giày, kỹ thuật cơ bản, cách bắt đầu chạy 5K', 'Sprout', 1, false, null),
+  ('TRAINING', 'Giáo án & luyện tập', '5K, 10K, Half Marathon, Marathon; pace, interval, long run', 'ClipboardList', 2, true, 'COACH'),
+  ('NUTRITION', 'Dinh dưỡng & phục hồi', 'Gel, nước, điện giải, giấc ngủ, nghỉ ngơi và phục hồi', 'Apple', 3, true, 'SERVICE'),
+  ('INJURY', 'Phòng tránh chấn thương', 'Tải lượng tập, dấu hiệu cần nghỉ, khi nào nên gặp chuyên gia', 'HeartPulse', 4, true, 'SERVICE'),
+  ('GEAR', 'Thiết bị & trang phục', 'Giày, đồng hồ, áo chạy, phụ kiện và kinh nghiệm lựa chọn', 'Footprints', 5, false, 'SHOP'),
+  ('RACES', 'Giải chạy & sự kiện', 'Lịch giải, kinh nghiệm thi đấu, race review và kết quả', 'Medal', 6, false, null),
+  ('STORIES', 'Câu chuyện Runner', 'Hành trình PR, hoàn thành FM, câu chuyện CLB và cộng đồng', 'Sparkles', 7, false, null),
+  ('APP', 'Hướng dẫn RaceHub', 'XP, Xu, Challenge, Avatar, Market, Club và các tính năng app', 'Smartphone', 8, false, null)
+on conflict (id) do update set name = excluded.name, description = excluded.description, icon = excluded.icon, sort = excluded.sort,
+  market_kind = excluded.market_kind;
+
+insert into public.achievements (code, title, description, category, tier, icon, rule, xp_reward, xu_reward, sort)
+values ('LEARN_STARTER', 'Runner ham học', 'Đọc hết chuỗi bài "Bắt đầu chạy bộ" trong RaceHub Knowledge', 'LEARN', 'BRONZE', 'GraduationCap', null, 0, 0, 80)
+on conflict (code) do nothing;
+
+insert into public.content_series (id, title, description, badge_code) values
+  ('STARTER', 'Bắt đầu chạy bộ', 'Chuỗi bài cho người mới: từ đôi giày đầu tiên tới 5 km đầu tiên', 'LEARN_STARTER')
+on conflict (id) do nothing;
+
+insert into public.content_authors (id, name, title, bio, kind, verified)
+values ('00000000-0000-0000-0000-00000000c0a1', 'Ban biên tập RaceHub', 'Đội ngũ RaceHub',
+        'Hướng dẫn sử dụng app và tin tức từ đội ngũ RaceHub.', 'TEAM', true)
+on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------
+-- 3. Hàm nội bộ
+-- ---------------------------------------------------------------------
+-- Vai trò nội dung của người gọi: ADMIN / EDITOR / WRITER / EXPERT / null
+create or replace function private.content_role(p_uid uuid) returns text
+language sql stable security definer set search_path = public as $$
+  select case when exists (select 1 from public.profiles where id = p_uid and (role = 'SYSTEM_ADMIN' or is_admin is true)) then 'ADMIN'
+              else (select s.role from public.content_staff s where s.user_id = p_uid) end
+$$;
+
+create or replace function private.content_live(a public.content_articles) returns boolean
+language sql stable as $$
+  select a.status in ('PUBLISHED', 'SCHEDULED') and a.published_at is not null and a.published_at <= now()
+$$;
+
+-- ~200 từ / phút (tiếng Việt), tối thiểu 1 phút
+create or replace function private.reading_minutes(p_body text) returns integer
+language sql immutable as $$
+  select greatest(1, round(coalesce(array_length(regexp_split_to_array(trim(coalesce(p_body, '')), '\s+'), 1), 0) / 200.0)::int)
+$$;
+
+create or replace function private.slugify(p text) returns text
+language sql immutable as $$
+  select left(trim(both '-' from regexp_replace(private.search_key(p), '\s+', '-', 'g')), 80)
+$$;
+
+-- Thẻ bài (danh sách): kèm trạng thái của người đọc
+create or replace function private.content_card(a public.content_articles, p_uid uuid) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('id', a.id, 'slug', a.slug, 'title', a.title, 'summary', a.summary, 'cover_image_url', a.cover_image_url,
+    'category_id', a.category_id, 'category_name', (select c.name from public.content_categories c where c.id = a.category_id),
+    'content_type', a.content_type, 'reading_time_minutes', a.reading_time_minutes, 'published_at', a.published_at,
+    'author_name', (select au.name from public.content_authors au where au.id = a.author_id),
+    'is_featured', a.is_featured, 'source_name', a.source_name,
+    'saved', exists (select 1 from public.content_bookmarks b where b.user_id = p_uid and b.article_id = a.id),
+    'progress', coalesce((select h.progress from public.content_read_history h where h.user_id = p_uid and h.article_id = a.id), 0),
+    'completed', exists (select 1 from public.content_read_history h where h.user_id = p_uid and h.article_id = a.id and h.completed_at is not null))
+$$;
+
+-- Ghi thống kê ngày (đã chống trùng ở nơi gọi)
+create or replace function private.content_bump(p_article uuid, p_kind text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.content_daily_stats (article_id, day, views, reads, shares, cta_clicks)
+  values (p_article, (now() at time zone 'Asia/Ho_Chi_Minh')::date,
+          (p_kind = 'VIEW')::int, (p_kind = 'READ')::int, (p_kind = 'SHARE')::int, (p_kind = 'CTA')::int)
+  on conflict (article_id, day) do update set
+    views = content_daily_stats.views + (p_kind = 'VIEW')::int, reads = content_daily_stats.reads + (p_kind = 'READ')::int,
+    shares = content_daily_stats.shares + (p_kind = 'SHARE')::int, cta_clicks = content_daily_stats.cta_clicks + (p_kind = 'CTA')::int;
+  update public.content_articles set
+    views = views + (p_kind = 'VIEW')::int, reads = reads + (p_kind = 'READ')::int,
+    shares = shares + (p_kind = 'SHARE')::int, cta_clicks = cta_clicks + (p_kind = 'CTA')::int
+   where id = p_article;
+end $$;
+
+-- Hành động cuối bài: chỉ các loại đã biết, tối đa 3
+create or replace function private.clean_ctas(p jsonb) returns jsonb
+language sql immutable as $$
+  select coalesce(jsonb_agg(jsonb_build_object('kind', x.kind, 'target', nullif(left(trim(coalesce(x.target, '')), 80), ''),
+                                               'label', nullif(left(trim(coalesce(x.label, '')), 40), '')) order by x.n), '[]'::jsonb)
+    from (select e->>'kind' as kind, e->>'target' as target, e->>'label' as label, n
+            from jsonb_array_elements(case when jsonb_typeof(p) = 'array' then p else '[]'::jsonb end) with ordinality t(e, n)) x
+   where x.kind in ('GOAL', 'CHALLENGES', 'CHALLENGE', 'RACES', 'RACE', 'MARKET', 'PARTNER', 'CLUBS', 'CLUB', 'NEARBY',
+                    'CHARACTER', 'ONBOARDING', 'WALLET', 'ARTICLE', 'LINK')
+     and (x.kind <> 'LINK' or coalesce(x.target, '') ~ '^/[^/\\]')
+     and x.n <= 3
+$$;
+
+-- ---------------------------------------------------------------------
+-- 4. Người đọc
+-- ---------------------------------------------------------------------
+create or replace function public.knowledge_home() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_uid uuid := private.require_uid();
+begin
+  return jsonb_build_object(
+    'categories', (select coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'name', c.name, 'description', c.description, 'icon', c.icon,
+                      'count', (select count(*) from public.content_articles a where a.category_id = c.id and private.content_live(a)))
+                    order by c.sort), '[]'::jsonb) from public.content_categories c where c.is_active),
+    'featured', (select coalesce(jsonb_agg(private.content_card(y.a, v_uid) order by y.rn), '[]'::jsonb) from (
+                   select a, row_number() over (order by a.is_featured desc, a.published_at desc) rn
+                     from public.content_articles a where private.content_live(a) and a.content_type = 'ARTICLE') y where y.rn <= 4),
+    'news', (select coalesce(jsonb_agg(private.content_card(y.a, v_uid) order by y.rn), '[]'::jsonb) from (
+               select a, row_number() over (order by a.published_at desc) rn
+                 from public.content_articles a where private.content_live(a) and a.content_type = 'NEWS') y where y.rn <= 5),
+    'continue', (select coalesce(jsonb_agg(private.content_card(y.a, v_uid) order by y.rn), '[]'::jsonb) from (
+                   select a, row_number() over (order by h.last_at desc) rn
+                     from public.content_read_history h join public.content_articles a on a.id = h.article_id
+                    where h.user_id = v_uid and h.completed_at is null and h.progress between 5 and 89 and private.content_live(a)) y where y.rn <= 3),
+    'series', (select coalesce(jsonb_agg(jsonb_build_object('id', s.id, 'title', s.title, 'description', s.description, 'badge_code', s.badge_code,
+                  'total', (select count(*) from public.content_articles a where a.series_id = s.id and private.content_live(a)),
+                  'done', (select count(*) from public.content_articles a join public.content_read_history h on h.article_id = a.id
+                            where a.series_id = s.id and private.content_live(a) and h.user_id = v_uid and h.completed_at is not null),
+                  'next_slug', (select y.slug from (select a.slug, row_number() over (order by a.series_order, a.published_at) rn
+                                  from public.content_articles a where a.series_id = s.id and private.content_live(a)
+                                   and not exists (select 1 from public.content_read_history h where h.article_id = a.id and h.user_id = v_uid
+                                                    and h.completed_at is not null)) y where y.rn = 1))), '[]'::jsonb)
+                 from public.content_series s where s.is_active
+                  and exists (select 1 from public.content_articles a where a.series_id = s.id and private.content_live(a))),
+    'saved_count', (select count(*) from public.content_bookmarks b join public.content_articles a on a.id = b.article_id
+                     where b.user_id = v_uid and private.content_live(a)));
+end $$;
+
+-- p: {category, type: ARTICLE|NEWS, tag, q, saved: bool, offset}
+create or replace function public.knowledge_list(p jsonb default '{}'::jsonb) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_cat text := nullif(p->>'category', '');
+  v_type text := nullif(upper(coalesce(p->>'type', '')), '');
+  v_tag text := nullif(p->>'tag', '');
+  v_q text := coalesce(p->>'q', '');
+  v_saved boolean := coalesce((p->>'saved')::boolean, false);
+  v_offset integer := greatest(0, coalesce((p->>'offset')::int, 0));
+begin
+  return (
+    with f as (
+      select a, case when private.search_key(v_q) = '' then 0 else private.search_rank(a.title, v_q) end as rk
+        from public.content_articles a
+       where private.content_live(a)
+         and (v_cat is null or a.category_id = v_cat)
+         and (v_type is null or a.content_type = v_type)
+         and (v_tag is null or exists (select 1 from public.content_article_tags at join public.content_tags t on t.id = at.tag_id
+                                        where at.article_id = a.id and t.slug = v_tag))
+         and (not v_saved or exists (select 1 from public.content_bookmarks b where b.user_id = v_uid and b.article_id = a.id))
+         and (private.search_key(v_q) = '' or private.search_match(
+               private.search_hay(a.title) || ' ' || private.search_key(coalesce(a.summary, '')) || ' '
+               || coalesce((select string_agg(private.search_key(t.name), ' ') from public.content_article_tags at
+                              join public.content_tags t on t.id = at.tag_id where at.article_id = a.id), '') || ' ', v_q))
+    ), r as (
+      select f.a, row_number() over (order by f.rk, (f.a).published_at desc) as rn from f
+    )
+    select jsonb_build_object('total', (select count(*) from f),
+      'items', coalesce((select jsonb_agg(private.content_card(r.a, v_uid) order by r.rn) from r
+                          where r.rn > v_offset and r.rn <= v_offset + 20), '[]'::jsonb)));
+end $$;
+
+-- Mở bài: ghi lượt xem (mỗi người tối đa 1 lượt / ngày). Ban nội dung xem trước được bài chưa đăng.
+create or replace function public.knowledge_article(p_slug text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  a public.content_articles := (select x from public.content_articles x where x.slug = p_slug);
+  v_live boolean;
+  v_role text := private.content_role(v_uid);
+begin
+  if a.id is null then raise exception 'ARTICLE_NOT_FOUND'; end if;
+  v_live := private.content_live(a);
+  if not v_live and v_role is null then raise exception 'ARTICLE_NOT_FOUND'; end if;
+  if v_live then
+    insert into public.content_read_history (user_id, article_id) values (v_uid, a.id)
+    on conflict (user_id, article_id) do update set last_at = now();
+    insert into public.content_user_events (user_id, article_id, kind, day)
+    values (v_uid, a.id, 'VIEW', (now() at time zone 'Asia/Ho_Chi_Minh')::date) on conflict do nothing;
+    if found then perform private.content_bump(a.id, 'VIEW'); end if;
+  end if;
+  return private.content_card(a, v_uid) || jsonb_build_object(
+    'body', a.body, 'preview', not v_live, 'status', a.status, 'updated_at', a.updated_at, 'source_url', a.source_url,
+    'ctas', a.ctas, 'needs_expert_review', a.needs_expert_review, 'expert_reviewed_at', a.expert_reviewed_at,
+    'expert_name', (select private.display_name(a.expert_reviewed_by)),
+    'category', (select jsonb_build_object('id', c.id, 'name', c.name, 'icon', c.icon, 'market_kind', c.market_kind)
+                   from public.content_categories c where c.id = a.category_id),
+    'author', (select jsonb_build_object('id', au.id, 'name', au.name, 'title', au.title, 'bio', au.bio, 'avatar_url', au.avatar_url,
+                 'kind', au.kind, 'verified', au.verified, 'partner_id', au.partner_id)
+                 from public.content_authors au where au.id = a.author_id),
+    'tags', (select coalesce(jsonb_agg(jsonb_build_object('slug', t.slug, 'name', t.name) order by t.name), '[]'::jsonb)
+               from public.content_article_tags at join public.content_tags t on t.id = at.tag_id where at.article_id = a.id),
+    'sources', (select coalesce(jsonb_agg(jsonb_build_object('title', s.title, 'url', s.url, 'publisher', s.publisher) order by s.sort), '[]'::jsonb)
+                  from public.content_sources s where s.article_id = a.id),
+    'my_feedback', (select jsonb_build_object('helpful', r.helpful, 'comment', r.comment) from public.content_reviews r
+                     where r.article_id = a.id and r.user_id = v_uid),
+    'series', case when a.series_id is not null then (
+       select jsonb_build_object('id', s.id, 'title', s.title,
+         'items', (select coalesce(jsonb_agg(jsonb_build_object('slug', x.slug, 'title', x.title,
+                     'completed', exists (select 1 from public.content_read_history h where h.article_id = x.id and h.user_id = v_uid and h.completed_at is not null))
+                     order by x.series_order, x.published_at), '[]'::jsonb)
+                   from public.content_articles x where x.series_id = s.id and private.content_live(x)))
+         from public.content_series s where s.id = a.series_id) end,
+    'related', (select coalesce(jsonb_agg(private.content_card(y.x, v_uid) order by y.rn), '[]'::jsonb) from (
+                  select x, row_number() over (order by
+                           (select count(*) from public.content_article_tags t1 join public.content_article_tags t2 on t2.tag_id = t1.tag_id
+                             where t1.article_id = a.id and t2.article_id = x.id) desc,
+                           (x.category_id = a.category_id) desc, x.published_at desc) rn
+                    from public.content_articles x where x.id <> a.id and private.content_live(x)) y where y.rn <= 4));
+end $$;
+
+-- Tiến độ đọc (gọi khi cuộn / rời bài). Đọc xong = cuộn ≥ 90 % và đọc đủ lâu (≥ 30 % thời gian ước tính, tối đa 60 giây).
+-- Không cộng Xu / XP. Hoàn thành cả chuỗi → huy hiệu của chuỗi.
+create or replace function public.knowledge_progress(p_id uuid, p_progress integer, p_seconds integer default 0) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  a public.content_articles := (select x from public.content_articles x where x.id = p_id);
+  h public.content_read_history;
+  v_done boolean := false;
+  v_badge text;
+  v_total integer;
+  v_read integer;
+begin
+  if a.id is null or not private.content_live(a) then raise exception 'ARTICLE_NOT_FOUND'; end if;
+  insert into public.content_read_history (user_id, article_id, progress, seconds)
+  values (v_uid, a.id, least(100, greatest(0, coalesce(p_progress, 0))), least(600, greatest(0, coalesce(p_seconds, 0))))
+  on conflict (user_id, article_id) do update set
+    progress = greatest(content_read_history.progress, excluded.progress),
+    seconds = least(content_read_history.seconds + excluded.seconds, 36000), last_at = now();
+  update public.content_articles set read_seconds = read_seconds + least(600, greatest(0, coalesce(p_seconds, 0))) where id = a.id;
+  h := (select x from public.content_read_history x where x.user_id = v_uid and x.article_id = a.id);
+  if h.completed_at is null and h.progress >= 90 and h.seconds >= least(60, a.reading_time_minutes * 18) then
+    update public.content_read_history set completed_at = now() where user_id = v_uid and article_id = a.id;
+    perform private.content_bump(a.id, 'READ');
+    v_done := true;
+    if a.series_id is not null then
+      v_total := (select count(*) from public.content_articles x where x.series_id = a.series_id and private.content_live(x));
+      v_read := (select count(*) from public.content_articles x join public.content_read_history r on r.article_id = x.id
+                  where x.series_id = a.series_id and private.content_live(x) and r.user_id = v_uid and r.completed_at is not null);
+      v_badge := (select s.badge_code from public.content_series s where s.id = a.series_id);
+      if v_total > 0 and v_read >= v_total and v_badge is not null
+         and not exists (select 1 from public.user_achievements ua join public.achievements ac on ac.id = ua.achievement_id
+                          where ua.user_id = v_uid and ac.code = v_badge) then
+        insert into public.user_achievements (user_id, achievement_id)
+        select v_uid, ac.id from public.achievements ac where ac.code = v_badge;
+        perform private.notify(v_uid, null, 'BADGE', 'Huy hiệu mới: ' || coalesce((select title from public.achievements where code = v_badge), v_badge),
+          'Bạn đã đọc hết chuỗi "' || (select title from public.content_series where id = a.series_id) || '".', '/learn', null, false);
+      else
+        v_badge := null;
+      end if;
+    end if;
+  end if;
+  return jsonb_build_object('progress', h.progress, 'completed', h.completed_at is not null or v_done, 'just_completed', v_done, 'badge', v_badge);
+end $$;
+
+create or replace function public.knowledge_bookmark(p_id uuid, p_on boolean) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  a public.content_articles := (select x from public.content_articles x where x.id = p_id);
+begin
+  if a.id is null or (p_on and not private.content_live(a)) then raise exception 'ARTICLE_NOT_FOUND'; end if;
+  if p_on then
+    insert into public.content_bookmarks (user_id, article_id) values (v_uid, a.id) on conflict do nothing;
+    if found then update public.content_articles set saves = saves + 1 where id = a.id; end if;
+  else
+    delete from public.content_bookmarks where user_id = v_uid and article_id = a.id;
+    if found then update public.content_articles set saves = greatest(0, saves - 1) where id = a.id; end if;
+  end if;
+  return p_on;
+end $$;
+
+create or replace function public.knowledge_feedback(p_id uuid, p_helpful boolean, p_comment text default null) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  a public.content_articles := (select x from public.content_articles x where x.id = p_id);
+begin
+  if a.id is null or not private.content_live(a) then raise exception 'ARTICLE_NOT_FOUND'; end if;
+  insert into public.content_reviews (article_id, user_id, helpful, comment)
+  values (a.id, v_uid, p_helpful, nullif(left(trim(coalesce(p_comment, '')), 500), ''))
+  on conflict (article_id, user_id) do update set helpful = excluded.helpful, comment = coalesce(excluded.comment, content_reviews.comment), created_at = now();
+  update public.content_articles set
+    helpful_yes = (select count(*) from public.content_reviews r where r.article_id = a.id and r.helpful),
+    helpful_no = (select count(*) from public.content_reviews r where r.article_id = a.id and not r.helpful)
+   where id = a.id;
+end $$;
+
+-- Chia sẻ / bấm hành động cuối bài: đếm tối đa 1 lần / người / ngày / loại
+create or replace function public.knowledge_track(p_id uuid, p_kind text) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  a public.content_articles := (select x from public.content_articles x where x.id = p_id);
+begin
+  if upper(p_kind) not in ('SHARE', 'CTA') then raise exception 'INVALID_KIND'; end if;
+  if a.id is null or not private.content_live(a) then return; end if;
+  insert into public.content_user_events (user_id, article_id, kind, day)
+  values (v_uid, a.id, upper(p_kind), (now() at time zone 'Asia/Ho_Chi_Minh')::date) on conflict do nothing;
+  if found then perform private.content_bump(a.id, upper(p_kind)); end if;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 5. CMS (ban nội dung + admin)
+-- ---------------------------------------------------------------------
+create or replace function private.require_content_staff() returns text
+language plpgsql stable security definer set search_path = public as $$
+declare v_role text := private.content_role(private.require_uid());
+begin
+  if v_role is null then raise exception 'FORBIDDEN'; end if;
+  return v_role;
+end $$;
+
+create or replace function public.cms_meta() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_role text := private.require_content_staff();
+begin
+  return jsonb_build_object('role', v_role,
+    'categories', (select coalesce(jsonb_agg(to_jsonb(c) order by c.sort), '[]'::jsonb) from public.content_categories c),
+    'authors', (select coalesce(jsonb_agg(to_jsonb(au) || jsonb_build_object('user_name', private.display_name(au.user_id)) order by au.name), '[]'::jsonb)
+                  from public.content_authors au),
+    'series', (select coalesce(jsonb_agg(to_jsonb(s) order by s.title), '[]'::jsonb) from public.content_series s),
+    'tags', (select coalesce(jsonb_agg(jsonb_build_object('slug', t.slug, 'name', t.name) order by t.name), '[]'::jsonb) from public.content_tags t),
+    'staff', (select coalesce(jsonb_agg(jsonb_build_object('user_id', s.user_id, 'name', private.display_name(s.user_id), 'role', s.role, 'at', s.created_at)
+                 order by s.created_at), '[]'::jsonb) from public.content_staff s),
+    'counts', (select jsonb_object_agg(x.status, x.n) from (select a.status, count(*) n from public.content_articles a group by a.status) x));
+end $$;
+
+-- p: {status, category, type, q, mine, offset}
+create or replace function public.cms_list(p jsonb default '{}'::jsonb) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_role text := private.require_content_staff();
+  v_status text := nullif(upper(coalesce(p->>'status', '')), 'ALL');
+  v_cat text := nullif(p->>'category', '');
+  v_type text := nullif(upper(coalesce(p->>'type', '')), '');
+  v_q text := coalesce(p->>'q', '');
+  v_mine boolean := coalesce((p->>'mine')::boolean, false);
+  v_offset integer := greatest(0, coalesce((p->>'offset')::int, 0));
+begin
+  v_status := nullif(v_status, '');
+  return (
+    with f as (
+      select a from public.content_articles a
+       where (v_status is null or a.status = v_status or (v_status = 'EXPERT' and a.needs_expert_review and a.expert_reviewed_at is null
+                                                          and a.status in ('REVIEW', 'DRAFT')))
+         and (v_cat is null or a.category_id = v_cat) and (v_type is null or a.content_type = v_type)
+         and (not v_mine or a.created_by = v_uid)
+         and (private.search_key(v_q) = '' or private.search_match(private.search_hay(a.title) || ' ' || a.slug || ' ', v_q))
+    ), r as (select f.a, row_number() over (order by (f.a).updated_at desc) rn from f)
+    select jsonb_build_object('total', (select count(*) from f),
+      'items', coalesce((select jsonb_agg(jsonb_build_object('id', (r.a).id, 'slug', (r.a).slug, 'title', (r.a).title, 'status', (r.a).status,
+          'content_type', (r.a).content_type, 'category_id', (r.a).category_id, 'published_at', (r.a).published_at, 'updated_at', (r.a).updated_at,
+          'is_featured', (r.a).is_featured, 'cover_image_url', (r.a).cover_image_url,
+          'author_name', (select au.name from public.content_authors au where au.id = (r.a).author_id),
+          'created_by_name', private.display_name((r.a).created_by), 'mine', (r.a).created_by = v_uid,
+          'needs_expert_review', (r.a).needs_expert_review, 'expert_reviewed_at', (r.a).expert_reviewed_at, 'review_note', (r.a).review_note,
+          'live', private.content_live(r.a),
+          'views', (r.a).views, 'reads', (r.a).reads, 'saves', (r.a).saves, 'cta_clicks', (r.a).cta_clicks,
+          'helpful_yes', (r.a).helpful_yes, 'helpful_no', (r.a).helpful_no) order by r.rn)
+        from r where r.rn > v_offset and r.rn <= v_offset + 30), '[]'::jsonb)));
+end $$;
+
+create or replace function public.cms_get(p_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_role text := private.require_content_staff();
+  a public.content_articles := (select x from public.content_articles x where x.id = p_id);
+begin
+  if a.id is null then raise exception 'ARTICLE_NOT_FOUND'; end if;
+  return to_jsonb(a) || jsonb_build_object(
+    'tags', (select coalesce(jsonb_agg(t.name order by t.name), '[]'::jsonb) from public.content_article_tags at
+               join public.content_tags t on t.id = at.tag_id where at.article_id = a.id),
+    'sources', (select coalesce(jsonb_agg(jsonb_build_object('title', s.title, 'url', s.url, 'publisher', s.publisher) order by s.sort), '[]'::jsonb)
+                  from public.content_sources s where s.article_id = a.id),
+    'expert_name', private.display_name(a.expert_reviewed_by), 'created_by_name', private.display_name(a.created_by),
+    'feedback', (select coalesce(jsonb_agg(jsonb_build_object('helpful', r.helpful, 'comment', r.comment, 'at', r.created_at) order by r.created_at desc), '[]'::jsonb)
+                   from public.content_reviews r where r.article_id = a.id and r.comment is not null));
+end $$;
+
+-- Tạo / sửa bài. p: {id?, title, slug?, summary, body, cover_image_url, category_id, content_type, author_id, tags[], sources[],
+--                    ctas[], is_featured, series_id, series_order, source_url, source_name, needs_expert_review}
+-- WRITER / EXPERT chỉ sửa bài mình tạo khi còn DRAFT / REVIEW. Sửa nội dung sau khi đã duyệt chuyên môn → phải duyệt lại.
+create or replace function public.cms_save(p jsonb) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_role text := private.require_content_staff();
+  a public.content_articles := (select x from public.content_articles x where x.id = nullif(p->>'id', '')::uuid);
+  v_id uuid;
+  v_title text := trim(coalesce(p->>'title', ''));
+  v_slug text := nullif(private.slugify(coalesce(nullif(p->>'slug', ''), p->>'title')), '');
+  v_body text := coalesce(p->>'body', '');
+  v_cat text := coalesce(nullif(p->>'category_id', ''), a.category_id);
+  v_expert boolean;
+  v_editor boolean := v_role in ('ADMIN', 'EDITOR');
+begin
+  if nullif(p->>'id', '') is not null and a.id is null then raise exception 'ARTICLE_NOT_FOUND'; end if;
+  if a.id is not null and not v_editor and (a.created_by is distinct from v_uid or a.status not in ('DRAFT', 'REVIEW')) then
+    raise exception 'FORBIDDEN';
+  end if;
+  if char_length(v_title) < 5 then raise exception 'TITLE_TOO_SHORT'; end if;
+  if v_slug is null then raise exception 'INVALID_SLUG'; end if;
+  if not exists (select 1 from public.content_categories c where c.id = v_cat) then raise exception 'INVALID_CATEGORY'; end if;
+  if exists (select 1 from public.content_articles x where x.slug = v_slug and x.id is distinct from a.id) then raise exception 'SLUG_TAKEN'; end if;
+  if nullif(p->>'cover_image_url', '') is not null and p->>'cover_image_url' !~ '^https://' then raise exception 'INVALID_URL'; end if;
+  if nullif(p->>'source_url', '') is not null and p->>'source_url' !~ '^https?://' then raise exception 'INVALID_URL'; end if;
+  -- Chuyên mục sức khoẻ / giáo án luôn cần duyệt chuyên môn; chỉ admin tắt được
+  v_expert := (select c.needs_expert from public.content_categories c where c.id = v_cat)
+              or coalesce((p->>'needs_expert_review')::boolean, a.needs_expert_review, false);
+  if v_role = 'ADMIN' and (p ? 'needs_expert_review') then v_expert := (p->>'needs_expert_review')::boolean; end if;
+
+  if a.id is null then
+    insert into public.content_articles (slug, title, summary, body, cover_image_url, category_id, author_id, content_type, reading_time_minutes,
+      source_url, source_name, is_featured, series_id, series_order, ctas, needs_expert_review, created_by)
+    values (v_slug, v_title, nullif(left(trim(coalesce(p->>'summary', '')), 300), ''), v_body, nullif(p->>'cover_image_url', ''), v_cat,
+      coalesce(nullif(p->>'author_id', '')::uuid, (select au.id from public.content_authors au where au.user_id = v_uid)),
+      case when upper(coalesce(p->>'content_type', '')) = 'NEWS' then 'NEWS' else 'ARTICLE' end, private.reading_minutes(v_body),
+      nullif(p->>'source_url', ''), nullif(left(trim(coalesce(p->>'source_name', '')), 80), ''),
+      v_editor and coalesce((p->>'is_featured')::boolean, false), nullif(p->>'series_id', ''), nullif(p->>'series_order', '')::int,
+      private.clean_ctas(p->'ctas'), v_expert, v_uid)
+    returning id into v_id;
+  else
+    v_id := a.id;
+    update public.content_articles set slug = v_slug, title = v_title, summary = nullif(left(trim(coalesce(p->>'summary', '')), 300), ''),
+      body = v_body, cover_image_url = nullif(p->>'cover_image_url', ''), category_id = v_cat,
+      author_id = case when p ? 'author_id' then nullif(p->>'author_id', '')::uuid else author_id end,
+      content_type = case when upper(coalesce(p->>'content_type', '')) = 'NEWS' then 'NEWS' else 'ARTICLE' end,
+      reading_time_minutes = private.reading_minutes(v_body),
+      source_url = nullif(p->>'source_url', ''), source_name = nullif(left(trim(coalesce(p->>'source_name', '')), 80), ''),
+      is_featured = case when v_editor then coalesce((p->>'is_featured')::boolean, is_featured) else is_featured end,
+      series_id = nullif(p->>'series_id', ''), series_order = nullif(p->>'series_order', '')::int,
+      ctas = private.clean_ctas(p->'ctas'), needs_expert_review = v_expert,
+      -- nội dung chuyên môn đổi mà người sửa không phải chuyên gia → duyệt lại
+      expert_reviewed_at = case when body is distinct from v_body and v_role not in ('ADMIN', 'EXPERT') then null else expert_reviewed_at end,
+      expert_reviewed_by = case when body is distinct from v_body and v_role not in ('ADMIN', 'EXPERT') then null else expert_reviewed_by end,
+      updated_at = now()
+     where id = v_id;
+    -- bài đang đăng mất duyệt chuyên môn → gỡ về chờ duyệt
+    update public.content_articles set status = 'REVIEW', review_note = 'Nội dung đã đổi — cần duyệt chuyên môn lại'
+     where id = v_id and needs_expert_review and expert_reviewed_at is null and status in ('SCHEDULED', 'PUBLISHED');
+  end if;
+
+  -- Tag: tạo mới nếu chưa có
+  delete from public.content_article_tags where article_id = v_id;
+  insert into public.content_tags (slug, name)
+  select distinct private.slugify(t), left(trim(t), 40) from jsonb_array_elements_text(coalesce(p->'tags', '[]'::jsonb)) t
+   where private.slugify(t) <> '' on conflict (slug) do nothing;
+  insert into public.content_article_tags (article_id, tag_id)
+  select distinct v_id, ct.id from jsonb_array_elements_text(coalesce(p->'tags', '[]'::jsonb)) t
+    join public.content_tags ct on ct.slug = private.slugify(t)
+  on conflict do nothing;
+  -- Nguồn tham khảo
+  delete from public.content_sources where article_id = v_id;
+  insert into public.content_sources (article_id, title, url, publisher, sort)
+  select v_id, left(trim(s->>'title'), 200), case when s->>'url' ~ '^https?://' then left(s->>'url', 500) end,
+         nullif(left(trim(coalesce(s->>'publisher', '')), 80), ''), n::int
+    from jsonb_array_elements(coalesce(p->'sources', '[]'::jsonb)) with ordinality x(s, n)
+   where char_length(trim(coalesce(s->>'title', ''))) > 0 and n <= 20;
+  return v_id;
+end $$;
+
+-- Chuyển trạng thái. WRITER / EXPERT: DRAFT ↔ REVIEW bài của mình. EDITOR / ADMIN: mọi trạng thái.
+-- Xuất bản / hẹn giờ cần: có nội dung, (nếu cần) đã duyệt chuyên môn. p_at: giờ đăng (hẹn giờ).
+create or replace function public.cms_set_status(p_id uuid, p_status text, p_at timestamptz default null, p_note text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_role text := private.require_content_staff();
+  a public.content_articles := (select x from public.content_articles x where x.id = p_id);
+  v_status text := upper(coalesce(p_status, ''));
+begin
+  if a.id is null then raise exception 'ARTICLE_NOT_FOUND'; end if;
+  if v_status not in ('DRAFT', 'REVIEW', 'SCHEDULED', 'PUBLISHED', 'ARCHIVED') then raise exception 'INVALID_STATUS'; end if;
+  if v_role not in ('ADMIN', 'EDITOR') and (a.created_by is distinct from v_uid or v_status not in ('DRAFT', 'REVIEW')
+                                             or a.status not in ('DRAFT', 'REVIEW')) then
+    raise exception 'FORBIDDEN';
+  end if;
+  if v_status in ('SCHEDULED', 'PUBLISHED') then
+    if char_length(trim(a.body)) < 50 and a.source_url is null then raise exception 'BODY_TOO_SHORT'; end if;
+    if a.needs_expert_review and a.expert_reviewed_at is null then raise exception 'EXPERT_REVIEW_REQUIRED'; end if;
+    if v_status = 'SCHEDULED' and (p_at is null or p_at <= now()) then raise exception 'INVALID_SCHEDULE'; end if;
+  end if;
+  update public.content_articles set status = v_status,
+    published_at = case when v_status = 'PUBLISHED' then coalesce(case when a.status = 'PUBLISHED' then a.published_at end, now())
+                        when v_status = 'SCHEDULED' then p_at else published_at end,
+    review_note = case when p_note is not null then left(p_note, 300) when v_status in ('SCHEDULED', 'PUBLISHED') then null else review_note end,
+    updated_at = now()
+   where id = a.id;
+  -- Trả về người viết khi biên tập viên trả bài
+  if v_status = 'DRAFT' and a.status = 'REVIEW' and a.created_by is not null and a.created_by <> v_uid then
+    perform private.notify(a.created_by, null, 'CONTENT', 'Bài viết cần chỉnh sửa', '"' || a.title || '": ' || coalesce(p_note, 'Xem ghi chú biên tập'),
+      '/learn/studio', v_uid, false);
+  end if;
+  if v_status = 'PUBLISHED' and a.status <> 'PUBLISHED' and a.created_by is not null and a.created_by <> v_uid then
+    perform private.notify(a.created_by, null, 'CONTENT', 'Bài viết đã được đăng', a.title, '/learn/' || a.slug, v_uid, false);
+  end if;
+  insert into public.admin_audit_log (actor_id, action, target, new_value)
+  values (v_uid, 'CONTENT_' || v_status, 'article:' || a.id, jsonb_build_object('title', a.title, 'from', a.status, 'at', p_at, 'note', p_note));
+  return jsonb_build_object('status', v_status);
+end $$;
+
+-- Duyệt chuyên môn (chuyên gia / admin). Không đạt → trả về nháp kèm ghi chú.
+create or replace function public.cms_expert_review(p_id uuid, p_approve boolean, p_note text default null) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_role text := private.require_content_staff();
+  a public.content_articles := (select x from public.content_articles x where x.id = p_id);
+begin
+  if v_role not in ('ADMIN', 'EXPERT') then raise exception 'FORBIDDEN'; end if;
+  if a.id is null then raise exception 'ARTICLE_NOT_FOUND'; end if;
+  if a.created_by = v_uid and v_role <> 'ADMIN' then raise exception 'CANNOT_REVIEW_OWN'; end if;
+  if p_approve then
+    update public.content_articles set expert_reviewed_by = v_uid, expert_reviewed_at = now(), expert_note = nullif(left(trim(coalesce(p_note, '')), 300), ''),
+      updated_at = now() where id = a.id;
+  else
+    if char_length(trim(coalesce(p_note, ''))) < 5 then raise exception 'NOTE_REQUIRED'; end if;
+    update public.content_articles set expert_reviewed_by = null, expert_reviewed_at = null, expert_note = left(trim(p_note), 300),
+      status = case when status in ('SCHEDULED', 'PUBLISHED') then 'REVIEW' else 'DRAFT' end,
+      review_note = 'Chuyên gia góp ý: ' || left(trim(p_note), 280), updated_at = now() where id = a.id;
+    if a.created_by is not null and a.created_by <> v_uid then
+      perform private.notify(a.created_by, null, 'CONTENT', 'Chuyên gia góp ý bài viết', '"' || a.title || '": ' || left(trim(p_note), 200), '/learn/studio', v_uid, false);
+    end if;
+  end if;
+  insert into public.admin_audit_log (actor_id, action, target, new_value)
+  values (v_uid, case when p_approve then 'CONTENT_EXPERT_APPROVE' else 'CONTENT_EXPERT_REJECT' end, 'article:' || a.id, jsonb_build_object('note', p_note));
+end $$;
+
+create or replace function public.cms_delete(p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_role text := private.require_content_staff();
+  a public.content_articles := (select x from public.content_articles x where x.id = p_id);
+begin
+  if a.id is null then raise exception 'ARTICLE_NOT_FOUND'; end if;
+  -- Bài đã từng đăng: chỉ lưu trữ (giữ link, thống kê); nháp chưa đăng: xoá được
+  if a.published_at is not null and a.published_at <= now() then raise exception 'ARCHIVE_INSTEAD'; end if;
+  if v_role not in ('ADMIN', 'EDITOR') and a.created_by is distinct from v_uid then raise exception 'FORBIDDEN'; end if;
+  delete from public.content_articles where id = a.id;
+end $$;
+
+-- Tác giả (EDITOR / ADMIN). p: {id?, name, title, bio, avatar_url, kind, user_id, partner_id, verified}
+create or replace function public.cms_save_author(p jsonb) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_role text := private.require_content_staff();
+  v_id uuid := nullif(p->>'id', '')::uuid;
+begin
+  if v_role not in ('ADMIN', 'EDITOR') then raise exception 'FORBIDDEN'; end if;
+  if char_length(trim(coalesce(p->>'name', ''))) < 2 then raise exception 'NAME_REQUIRED'; end if;
+  if nullif(p->>'avatar_url', '') is not null and p->>'avatar_url' !~ '^https://' then raise exception 'INVALID_URL'; end if;
+  if v_id is null then
+    insert into public.content_authors (name, title, bio, avatar_url, kind, user_id, partner_id, verified)
+    values (left(trim(p->>'name'), 80), nullif(left(trim(coalesce(p->>'title', '')), 80), ''), nullif(left(trim(coalesce(p->>'bio', '')), 600), ''),
+      nullif(p->>'avatar_url', ''), coalesce(nullif(upper(p->>'kind'), ''), 'EDITOR'), nullif(p->>'user_id', '')::uuid,
+      nullif(p->>'partner_id', '')::uuid, coalesce((p->>'verified')::boolean, false))
+    returning id into v_id;
+  else
+    update public.content_authors set name = left(trim(p->>'name'), 80), title = nullif(left(trim(coalesce(p->>'title', '')), 80), ''),
+      bio = nullif(left(trim(coalesce(p->>'bio', '')), 600), ''), avatar_url = nullif(p->>'avatar_url', ''),
+      kind = coalesce(nullif(upper(p->>'kind'), ''), kind), user_id = nullif(p->>'user_id', '')::uuid,
+      partner_id = nullif(p->>'partner_id', '')::uuid, verified = coalesce((p->>'verified')::boolean, verified)
+     where id = v_id;
+    if not found then raise exception 'AUTHOR_NOT_FOUND'; end if;
+  end if;
+  return v_id;
+end $$;
+
+-- Ban nội dung: chỉ admin thêm / bớt. p_role null = gỡ.
+create or replace function public.cms_set_staff(p_user uuid, p_role text) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_admin uuid := private.require_admin();
+begin
+  if p_role is null or p_role = '' then
+    delete from public.content_staff where user_id = p_user;
+  else
+    if upper(p_role) not in ('EDITOR', 'WRITER', 'EXPERT') then raise exception 'INVALID_ROLE'; end if;
+    if not exists (select 1 from public.profiles where id = p_user) then raise exception 'USER_NOT_FOUND'; end if;
+    insert into public.content_staff (user_id, role, added_by) values (p_user, upper(p_role), v_admin)
+    on conflict (user_id) do update set role = excluded.role, added_by = excluded.added_by;
+  end if;
+  insert into public.admin_audit_log (actor_id, action, target, new_value)
+  values (v_admin, 'CONTENT_STAFF', 'profile:' || p_user, jsonb_build_object('role', p_role));
+end $$;
+
+-- Thống kê nội dung (ban nội dung): tổng + theo ngày + bài nổi bật nhất
+create or replace function public.cms_stats(p_days integer default 30) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_role text := private.require_content_staff();
+  v_from date := (now() at time zone 'Asia/Ho_Chi_Minh')::date - greatest(1, least(coalesce(p_days, 30), 365)) + 1;
+begin
+  return jsonb_build_object(
+    'totals', (select jsonb_build_object('views', coalesce(sum(d.views), 0), 'reads', coalesce(sum(d.reads), 0),
+                 'shares', coalesce(sum(d.shares), 0), 'cta_clicks', coalesce(sum(d.cta_clicks), 0))
+                 from public.content_daily_stats d where d.day >= v_from),
+    'saves', (select count(*) from public.content_bookmarks b where b.created_at >= v_from),
+    'readers', (select count(distinct h.user_id) from public.content_read_history h where h.last_at >= v_from),
+    'avg_read_seconds', (select coalesce(round(avg(h.seconds)), 0) from public.content_read_history h where h.last_at >= v_from and h.seconds > 0),
+    'published', (select count(*) from public.content_articles a where private.content_live(a)),
+    'days', (select coalesce(jsonb_agg(jsonb_build_object('day', g.day, 'views', coalesce(s.views, 0), 'reads', coalesce(s.reads, 0)) order by g.day), '[]'::jsonb)
+               from (select generate_series(v_from, (now() at time zone 'Asia/Ho_Chi_Minh')::date, interval '1 day')::date as day) g
+               left join (select d.day, sum(d.views) views, sum(d.reads) reads from public.content_daily_stats d where d.day >= v_from group by d.day) s on s.day = g.day),
+    'top', (select coalesce(jsonb_agg(y.j order by y.rn), '[]'::jsonb) from (
+              select jsonb_build_object('id', a.id, 'slug', a.slug, 'title', a.title, 'category_id', a.category_id,
+                       'views', sum(d.views), 'reads', sum(d.reads), 'shares', sum(d.shares), 'cta_clicks', sum(d.cta_clicks),
+                       'read_rate', round(100.0 * sum(d.reads) / greatest(sum(d.views), 1)),
+                       'cta_rate', round(100.0 * sum(d.cta_clicks) / greatest(sum(d.views), 1))) j,
+                     row_number() over (order by sum(d.views) desc) rn
+                from public.content_daily_stats d join public.content_articles a on a.id = d.article_id
+               where d.day >= v_from group by a.id) y where y.rn <= 10));
+end $$;
+
+-- Vai trò nội dung của tôi (để hiện nút CMS)
+create or replace function public.my_content_role() returns text
+language sql stable security definer set search_path = public as $$
+  select private.content_role(auth.uid())
+$$;
+
+-- Việc cần xử lý: + bài chờ duyệt
+create or replace function public.admin_inbox() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform private.require_admin();
+  return jsonb_build_object(
+    'orders', (select count(*) from public.orders o where o.status = 'PENDING' and (o.expires_at is null or o.expires_at > now())),
+    'reviews', (select count(*) from public.activities a where a.validation_status = 'PENDING' and coalesce(a.status, '') <> 'DELETED'),
+    'partners', (select count(*) from public.partners p where p.status = 'PENDING'),
+    'cups', (select count(*) from public.club_cups c where c.status = 'PENDING_REVIEW'),
+    'reports', (select count(distinct r.target) from public.user_reports r where r.status = 'OPEN'),
+    'content', (select count(*) from public.content_articles a where a.status = 'REVIEW'),
+    'errors', (select count(distinct e.code) from private.client_errors e where e.last_at > now() - interval '24 hours'),
+    'new_users_7d', (select count(*) from public.profiles p where p.created_at > now() - interval '7 days'),
+    'active_7d', (select count(distinct a.user_id) from public.activities a where a.started_at > now() - interval '7 days'),
+    'banned', (select count(*) from public.profiles p where p.banned_at is not null));
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 6. Bài mẫu (chạy lại không ghi đè bài đã sửa)
+--    • Hướng dẫn RaceHub: đăng ngay (nội dung về app).
+--    • Chuỗi "Bắt đầu chạy bộ": để CHỜ DUYỆT — nội dung sức khoẻ / giáo án cần chuyên gia xem trước khi đăng.
+-- ---------------------------------------------------------------------
+insert into public.content_articles (slug, title, summary, body, category_id, author_id, content_type, status, published_at, reading_time_minutes,
+  is_featured, series_id, series_order, ctas, needs_expert_review)
+select x.slug, x.title, x.summary, x.body, x.cat, '00000000-0000-0000-0000-00000000c0a1', x.typ, x.st,
+       case when x.st = 'PUBLISHED' then now() end, private.reading_minutes(x.body), x.feat, x.series, x.ord, x.ctas::jsonb, x.expert
+  from (values
+  ('xp-xu-level-hoat-dong-the-nao', 'XP, Xu và cấp độ trong RaceHub hoạt động thế nào?',
+   'XP chỉ đến từ km chạy hợp lệ; Xu dùng cho vật phẩm, quà tặng và tính năng. Hiểu đúng để chơi công bằng.',
+   E'## XP: thước đo quãng đường\n\nMỗi km chạy **hợp lệ** (đồng bộ từ Strava hoặc ghi trong app, qua kiểm tra chống gian lận) mới sinh ra XP. Không có cách nào khác để có XP — không mua được, không đọc bài, không bấm quảng cáo.\n\n- XP cộng dồn lên **cấp độ** của bạn.\n- Bài bị nghi đi xe hoặc GPS nhảy sẽ chờ duyệt, chưa tính XP.\n\n## Xu: đồng tiền trong game\n\nXu dùng để mua vật phẩm cho nhân vật, tặng quà cho bạn chạy và dùng một số tính năng. Xu có thể nhận từ nhiệm vụ, thử thách hoặc nạp thêm.\n\n> RaceHub không giữ tiền của bạn và không cho chuyển Xu giữa người dùng.\n\n## Mẹo\n\n1. Kết nối Strava để bài chạy tự về.\n2. Đặt **mục tiêu tuần** vừa sức để giữ chuỗi ngày chạy.\n3. Tham gia thử thách để có thêm động lực.',
+   'APP', 'ARTICLE', 'PUBLISHED', true, null, null, '[{"kind":"GOAL","label":"Đặt mục tiêu tuần"},{"kind":"CHALLENGES","label":"Khám phá thử thách"}]', false),
+  ('tham-gia-thu-thach-dau-tien', 'Tham gia thử thách đầu tiên của bạn',
+   'Thử thách cá nhân, thử thách CLB, giải chạy ảo — chọn cái phù hợp và bắt đầu.',
+   E'## Có những loại thử thách nào?\n\n- **Thử thách cộng đồng**: chạy đủ km trong thời gian quy định.\n- **Thử thách CLB**: đua cùng thành viên CLB, có thể chia đội.\n- **Giải chạy ảo**: đăng ký cự ly, chạy ở bất kỳ đâu, nhận BIB và chứng nhận.\n\n## Bắt đầu thế nào?\n\n1. Mở **Thử thách**, đọc kỹ thể lệ (thời gian, cách tính km, phần thưởng).\n2. Bấm tham gia. Bài chạy hợp lệ trong thời gian thử thách tự được tính.\n3. Theo dõi bảng xếp hạng và tiến độ của bạn.\n\n> Chọn mục tiêu vừa sức: hoàn thành một thử thách nhỏ tốt hơn bỏ dở một thử thách lớn.',
+   'APP', 'ARTICLE', 'PUBLISHED', false, null, null, '[{"kind":"CHALLENGES","label":"Xem thử thách đang mở"},{"kind":"RACES","label":"Giải chạy ảo"}]', false),
+  ('tim-ban-chay-voi-quanh-day', 'Tìm bạn chạy cùng pace với Quanh đây',
+   'Tính năng mới: runner hợp pace, hợp giờ ở gần bạn, buổi chạy công khai của CLB — vị trí chỉ lưu gần đúng.',
+   E'## Quanh đây là gì?\n\nQuanh đây giúp bạn tìm **runner cùng pace, cùng khung giờ, cùng mục tiêu** ở gần, cùng các buổi chạy công khai và CLB trong khu vực.\n\n## Quyền riêng tư\n\n- Chỉ lưu vùng khoảng 1 km bạn chọn, tự hết hạn.\n- Người khác chỉ thấy khoảng cách ước chừng.\n- Bạn chọn ai thấy mình; chặn, báo cáo bất cứ lúc nào.\n\n## An toàn khi gặp nhau\n\nKết nối xong, hãy rủ nhau vào **buổi chạy nhóm nơi công cộng** của CLB. Báo người thân lịch chạy và không chia sẻ địa chỉ nhà.',
+   'APP', 'NEWS', 'PUBLISHED', false, null, null, '[{"kind":"NEARBY","label":"Mở Quanh đây"}]', false),
+  ('nhan-vat-va-tu-do', 'Nhân vật và tủ đồ: thể hiện phong cách runner',
+   'Chọn dáng nhân vật, phối đồ, mặc đồng phục CLB và mở khoá vật phẩm theo thành tích.',
+   E'## Nhân vật của bạn\n\nMỗi runner có một nhân vật 2D. Vào **Nhân vật** để chọn dáng, màu da, kiểu tóc.\n\n## Tủ đồ\n\n- Vật phẩm mua bằng Xu hoặc mở khoá theo cấp độ, huy hiệu, thử thách.\n- CLB có thể thiết kế **đồng phục riêng** (áo, quần, tất, giày) cho thành viên.\n\n> Áo thật chỉ bán qua cửa hàng đối tác trong Chợ Runner — vật phẩm trong app là đồ trang trí cho nhân vật.',
+   'APP', 'ARTICLE', 'PUBLISHED', false, null, null, '[{"kind":"CHARACTER","label":"Mở tủ đồ"}]', false),
+  ('lo-trinh-0-den-5-km', 'Bắt đầu chạy bộ: lộ trình từ 0 đến 5 km',
+   'Kết hợp đi bộ và chạy chậm trong 8 tuần để chạy liền 5 km mà không quá sức.',
+   E'> Bản nháp — cần chuyên gia duyệt trước khi đăng.\n\n## Nguyên tắc\n\n- Chạy **chậm tới mức nói chuyện được**.\n- 3 buổi / tuần, xen ngày nghỉ.\n- Tăng dần, không tăng quá nhanh.\n\n## Gợi ý 8 tuần\n\n| Tuần | Mỗi buổi |\n|---|---|\n| 1–2 | Đi bộ 2 phút + chạy 1 phút × 8 |\n| 3–4 | Đi bộ 1 phút 30 + chạy 2 phút × 7 |\n| 5–6 | Đi bộ 1 phút + chạy 4 phút × 5 |\n| 7 | Chạy 10 phút × 2, đi bộ 2 phút giữa |\n| 8 | Chạy liền 25–35 phút |\n\n## Khi nào nên dừng?\n\nĐau nhói, đau tăng dần khi chạy, chóng mặt, tức ngực — dừng lại và hỏi ý kiến nhân viên y tế.',
+   'BEGINNER', 'ARTICLE', 'REVIEW', true, 'STARTER', 1, '[{"kind":"GOAL","label":"Đặt mục tiêu tuần đầu tiên"},{"kind":"CLUBS","label":"Tìm CLB để chạy cùng"}]', true),
+  ('chon-giay-chay-bo-dau-tien', 'Cách chọn giày chạy bộ đầu tiên',
+   'Vừa chân, êm vừa phải, phù hợp mặt đường — thử giày buổi chiều và chạy thử trước khi mua.',
+   E'## Những điều quan trọng\n\n- **Vừa chân**: mũi giày dư khoảng một đốt ngón tay.\n- **Thoải mái ngay khi thử**: giày chạy không cần \"đi cho quen\".\n- **Mặt đường**: đường nhựa dùng giày road; đường mòn dùng giày trail.\n\n## Mẹo khi mua\n\n1. Thử giày buổi chiều (chân nở hơn).\n2. Mang đúng loại tất bạn hay chạy.\n3. Chạy thử vài bước trong cửa hàng.\n\nHỏi cửa hàng đối tác trong Chợ Runner để được đo chân và tư vấn.',
+   'BEGINNER', 'ARTICLE', 'REVIEW', false, 'STARTER', 2, '[{"kind":"MARKET","target":"SHOP","label":"Cửa hàng đối tác"}]', false),
+  ('easy-tempo-interval-khac-nhau', 'Phân biệt Easy Run, Tempo và Interval',
+   'Ba kiểu buổi chạy cơ bản: chạy nhẹ xây nền, tempo tăng ngưỡng, interval tăng tốc độ.',
+   E'> Bản nháp — cần chuyên gia duyệt trước khi đăng.\n\n## Easy run\n\nChạy nhẹ, nói chuyện được thành câu. Chiếm phần lớn thời gian tập.\n\n## Tempo\n\nChạy \"khó chịu nhưng giữ được\" khoảng 20–30 phút. Chỉ nói được vài từ.\n\n## Interval\n\nCác quãng nhanh ngắn xen nghỉ, ví dụ 6 × 400 m. Chỉ nên tập khi đã có nền chạy nhẹ đều đặn.\n\n> Người mới: tập trung easy run 4–8 tuần trước khi thêm tempo / interval.',
+   'TRAINING', 'ARTICLE', 'REVIEW', false, 'STARTER', 3, '[{"kind":"MARKET","target":"COACH","label":"Tìm HLV"}]', true),
+  ('khi-nao-bo-sung-nuoc-va-gel', 'Khi nào nên bổ sung nước và gel?',
+   'Chạy dưới 60 phút thường chỉ cần nước; chạy dài hơn cần tính tới năng lượng và điện giải.',
+   E'> Bản nháp — cần chuyên gia dinh dưỡng duyệt trước khi đăng.\n\n## Nước\n\nUống theo cảm giác khát, chú ý thời tiết nóng ẩm.\n\n## Gel và năng lượng\n\nBuổi chạy trên 60–75 phút có thể cần bổ sung năng lượng. **Thử gel trong buổi tập**, không thử lần đầu trong ngày thi đấu.\n\n## Điện giải\n\nRa nhiều mồ hôi, chạy lâu trong trời nóng: cân nhắc nước điện giải.\n\n> Nội dung mang tính tham khảo chung, không thay cho tư vấn của chuyên gia dinh dưỡng / y tế.',
+   'NUTRITION', 'ARTICLE', 'REVIEW', false, 'STARTER', 4, '[{"kind":"MARKET","target":"SERVICE","label":"Chuyên gia dinh dưỡng"}]', true)
+  ) as x(slug, title, summary, body, cat, typ, st, feat, series, ord, ctas, expert)
+on conflict (slug) do nothing;
+
+-- ---------------------------------------------------------------------
+-- 7. Quyền
+-- ---------------------------------------------------------------------
+revoke all on function private.content_role(uuid), private.content_live(public.content_articles), private.reading_minutes(text), private.slugify(text),
+  private.content_card(public.content_articles, uuid), private.content_bump(uuid, text), private.clean_ctas(jsonb), private.require_content_staff()
+  from public, anon, authenticated;
+revoke all on function public.knowledge_home(), public.knowledge_list(jsonb), public.knowledge_article(text), public.knowledge_progress(uuid, integer, integer),
+  public.knowledge_bookmark(uuid, boolean), public.knowledge_feedback(uuid, boolean, text), public.knowledge_track(uuid, text),
+  public.cms_meta(), public.cms_list(jsonb), public.cms_get(uuid), public.cms_save(jsonb), public.cms_set_status(uuid, text, timestamptz, text),
+  public.cms_expert_review(uuid, boolean, text), public.cms_delete(uuid), public.cms_save_author(jsonb), public.cms_set_staff(uuid, text),
+  public.cms_stats(integer), public.my_content_role() from public, anon;
+grant execute on function public.knowledge_home(), public.knowledge_list(jsonb), public.knowledge_article(text), public.knowledge_progress(uuid, integer, integer),
+  public.knowledge_bookmark(uuid, boolean), public.knowledge_feedback(uuid, boolean, text), public.knowledge_track(uuid, text),
+  public.cms_meta(), public.cms_list(jsonb), public.cms_get(uuid), public.cms_save(jsonb), public.cms_set_status(uuid, text, timestamptz, text),
+  public.cms_expert_review(uuid, boolean, text), public.cms_delete(uuid), public.cms_save_author(jsonb), public.cms_set_staff(uuid, text),
+  public.cms_stats(integer), public.my_content_role() to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001006300_club_news_albums.sql
+-- ===================================================================
+-- 006300: Quản lý CLB — Tin CLB của ban chủ nhiệm + Kho link ảnh CLB.
+-- • Tin CLB (club_posts.kind = 'NEWS'): chỉ ban quản trị CLB đăng; có tiêu đề, chuyên mục (thông báo / sự kiện / giải chạy /
+--   kết quả / tập luyện / khác), link kèm theo, ảnh; tuỳ chọn ghim đầu bảng tin và / hoặc gửi thông báo tới mọi thành viên.
+--   Bảng tin có bộ lọc "Tin CLB" để runner không bị trôi tin giữa bài chạy tự động.
+-- • Kho ảnh (club_albums): lưu LINK album (Google Photos, Drive, Facebook, iCloud, OneDrive, Flickr…) theo sự kiện / giải / buổi tập,
+--   có ảnh bìa, ngày chụp, tìm kiếm không dấu, lọc theo loại và năm. Thành viên gửi link → ban quản trị duyệt; ban quản trị thêm trực tiếp.
+-- Chạy lại nhiều lần vẫn an toàn. Không dùng SELECT … INTO, khối DO, LIMIT (SQL Editor).
+
+-- ---------------------------------------------------------------------
+-- 1. Tin CLB
+-- ---------------------------------------------------------------------
+alter table public.club_posts drop constraint if exists club_posts_kind_check;
+alter table public.club_posts add constraint club_posts_kind_check
+  check (kind in ('POST', 'ANNOUNCEMENT', 'AUTO_RUN', 'AUTO_JOIN', 'RECAP', 'CHALLENGE', 'NEWS'));
+
+create or replace function private.news_categories() returns text[]
+language sql immutable as $$ select array['NOTICE', 'EVENT', 'RACE', 'RESULT', 'TRAINING', 'OTHER'] $$;
+
+-- p: {id?, title, body, category, link, image_paths[], pin, notify}
+create or replace function public.publish_club_news(p_club_id uuid, p jsonb) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_id uuid := nullif(p->>'id', '')::uuid;
+  v_title text := trim(coalesce(p->>'title', ''));
+  v_body text := trim(coalesce(p->>'body', ''));
+  v_cat text := upper(coalesce(nullif(p->>'category', ''), 'NOTICE'));
+  v_link text := nullif(trim(coalesce(p->>'link', '')), '');
+  v_paths text[] := coalesce((select array_agg(x) from jsonb_array_elements_text(coalesce(p->'image_paths', '[]'::jsonb)) x), '{}');
+  v_pin boolean := coalesce((p->>'pin')::boolean, false);
+  v_old public.club_posts;
+  m record;
+begin
+  if not public.club_is_staff(p_club_id) then raise exception 'FORBIDDEN'; end if;
+  if char_length(v_title) < 3 or char_length(v_title) > 120 then raise exception 'TITLE_REQUIRED'; end if;
+  if char_length(v_body) > 4000 or cardinality(v_paths) > 4 then raise exception 'POST_TOO_LONG'; end if;
+  if not (v_cat = any (private.news_categories())) then raise exception 'INVALID_CATEGORY'; end if;
+  if v_link is not null and (v_link !~ '^https?://' or char_length(v_link) > 500) then raise exception 'INVALID_URL'; end if;
+  if exists (select 1 from unnest(v_paths) x where x not like p_club_id::text || '/' || v_uid::text || '/%') then
+    raise exception 'INVALID_IMAGE_PATH';
+  end if;
+
+  if v_id is null then
+    if (select count(*) from public.club_posts where club_id = p_club_id and kind = 'NEWS' and created_at > now() - interval '24 hours') >= 20 then
+      raise exception 'RATE_LIMITED';
+    end if;
+    insert into public.club_posts (club_id, author_id, kind, title, body, image_paths, is_pinned, meta)
+    values (p_club_id, v_uid, 'NEWS', v_title, v_body, v_paths, v_pin, jsonb_build_object('category', v_cat, 'link', v_link))
+    returning id into v_id;
+    if coalesce((p->>'notify')::boolean, false) then
+      for m in select user_id from public.club_members where club_id = p_club_id and status = 'APPROVED' and user_id <> v_uid loop
+        perform private.notify(m.user_id, p_club_id, 'CLUB_NEWS', v_title, left(coalesce(nullif(v_body, ''), 'Tin mới từ CLB'), 140),
+          '/clubs/' || p_club_id || '?post=' || v_id, v_uid, true);
+      end loop;
+    end if;
+  else
+    v_old := (select x from public.club_posts x where x.id = v_id);
+    if v_old.id is null or v_old.club_id <> p_club_id or v_old.kind <> 'NEWS' then raise exception 'POST_NOT_FOUND'; end if;
+    -- ảnh cũ giữ nguyên được (người đăng khác trong ban quản trị)
+    if exists (select 1 from unnest(v_paths) x where x not like p_club_id::text || '/' || v_uid::text || '/%' and not (x = any (v_old.image_paths))) then
+      raise exception 'INVALID_IMAGE_PATH';
+    end if;
+    update public.club_posts set title = v_title, body = v_body, image_paths = v_paths, is_pinned = v_pin,
+      meta = coalesce(meta, '{}'::jsonb) || jsonb_build_object('category', v_cat, 'link', v_link, 'edited_at', now())
+     where id = v_id;
+  end if;
+  return v_id;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 2. Kho link ảnh CLB
+-- ---------------------------------------------------------------------
+create table if not exists public.club_albums (
+  id uuid primary key default gen_random_uuid(),
+  club_id uuid not null references public.clubs(id) on delete cascade,
+  title text not null check (char_length(title) between 3 and 120),
+  url text not null check (url ~ '^https?://' and char_length(url) <= 500),
+  description text check (description is null or char_length(description) <= 500),
+  kind text not null default 'EVENT' check (kind in ('EVENT', 'RACE', 'TRAINING', 'SOCIAL', 'OTHER')),
+  taken_on date not null default (now() at time zone 'Asia/Ho_Chi_Minh')::date,
+  event_id uuid references public.club_events(id) on delete set null,
+  race_name text check (race_name is null or char_length(race_name) <= 120),
+  cover_path text,
+  photographer text check (photographer is null or char_length(photographer) <= 80),
+  status text not null default 'APPROVED' check (status in ('PENDING', 'APPROVED')),
+  created_by uuid references public.profiles(id) on delete set null,
+  approved_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  opens integer not null default 0
+);
+create index if not exists club_albums_list_idx on public.club_albums (club_id, status, taken_on desc);
+create index if not exists club_albums_event_idx on public.club_albums (event_id);
+alter table public.club_albums enable row level security;
+revoke all on public.club_albums from anon, authenticated;
+
+create or replace function private.album_json(a public.club_albums) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('id', a.id, 'club_id', a.club_id, 'title', a.title, 'url', a.url, 'description', a.description, 'kind', a.kind,
+    'taken_on', a.taken_on, 'event_id', a.event_id, 'event_title', (select e.title from public.club_events e where e.id = a.event_id),
+    'race_name', a.race_name, 'cover_path', a.cover_path, 'photographer', a.photographer, 'status', a.status, 'opens', a.opens,
+    'created_by', a.created_by, 'created_by_name', private.display_name(a.created_by), 'created_at', a.created_at)
+$$;
+
+-- p: {q, kind, year, event_id, offset}. Thành viên thấy album đã duyệt + album mình gửi đang chờ; ban quản trị thấy cả hàng chờ.
+create or replace function public.club_albums(p_club_id uuid, p jsonb default '{}'::jsonb) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_staff boolean := public.club_is_staff(p_club_id);
+  v_q text := coalesce(p->>'q', '');
+  v_kind text := nullif(upper(coalesce(p->>'kind', '')), 'ALL');
+  v_year integer := nullif(p->>'year', '')::int;
+  v_event uuid := nullif(p->>'event_id', '')::uuid;
+  v_offset integer := greatest(0, coalesce((p->>'offset')::int, 0));
+begin
+  if not public.club_is_member(p_club_id) and not public.is_system_admin() then raise exception 'NOT_A_MEMBER'; end if;
+  v_kind := nullif(v_kind, '');
+  return (
+    with vis as (
+      select a from public.club_albums a
+       where a.club_id = p_club_id and (a.status = 'APPROVED' or v_staff or a.created_by = v_uid)
+    ), f as (
+      select v.a from vis v
+       where (v_kind is null or (v.a).kind = v_kind)
+         and (v_year is null or extract(year from (v.a).taken_on) = v_year)
+         and (v_event is null or (v.a).event_id = v_event)
+         and (private.search_key(v_q) = '' or private.search_match(
+               private.search_hay((v.a).title) || ' ' || private.search_key(coalesce((v.a).race_name, '') || ' ' || coalesce((v.a).description, '')
+               || ' ' || coalesce((select e.title from public.club_events e where e.id = (v.a).event_id), '') || ' ' || coalesce((v.a).photographer, '')) || ' ', v_q))
+    ), r as (
+      select f.a, row_number() over (order by ((f.a).status = 'PENDING') desc, (f.a).taken_on desc, (f.a).created_at desc) rn from f
+    )
+    select jsonb_build_object(
+      'total', (select count(*) from f),
+      'items', coalesce((select jsonb_agg(private.album_json(r.a) order by r.rn) from r where r.rn > v_offset and r.rn <= v_offset + 30), '[]'::jsonb),
+      'years', (select coalesce(jsonb_agg(y order by y desc), '[]'::jsonb) from (select distinct extract(year from (v.a).taken_on)::int y from vis v) z),
+      'pending', case when v_staff then (select count(*) from public.club_albums a where a.club_id = p_club_id and a.status = 'PENDING') else 0 end,
+      'can_manage', v_staff));
+end $$;
+
+-- Thêm / sửa album. p: {id?, title, url, description, kind, taken_on, event_id, race_name, cover_path, photographer, notify}
+-- Ban quản trị: đăng ngay. Thành viên: gửi chờ duyệt (tối đa 10 link / ngày), sửa được link của mình khi còn chờ.
+create or replace function public.save_club_album(p_club_id uuid, p jsonb) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_staff boolean := public.club_is_staff(p_club_id);
+  v_id uuid := nullif(p->>'id', '')::uuid;
+  v_old public.club_albums := (select x from public.club_albums x where x.id = nullif(p->>'id', '')::uuid);
+  v_title text := trim(coalesce(p->>'title', ''));
+  v_url text := trim(coalesce(p->>'url', ''));
+  v_kind text := upper(coalesce(nullif(p->>'kind', ''), 'EVENT'));
+  v_event uuid := nullif(p->>'event_id', '')::uuid;
+  v_cover text := nullif(p->>'cover_path', '');
+  v_date date := coalesce(nullif(p->>'taken_on', '')::date, (now() at time zone 'Asia/Ho_Chi_Minh')::date);
+  m record;
+begin
+  if not public.club_is_member(p_club_id) then raise exception 'NOT_A_MEMBER'; end if;
+  if char_length(v_title) < 3 or char_length(v_title) > 120 then raise exception 'TITLE_REQUIRED'; end if;
+  if v_url !~ '^https?://[^\s/$.?#][^\s]*$' or char_length(v_url) > 500 then raise exception 'INVALID_URL'; end if;
+  if v_kind not in ('EVENT', 'RACE', 'TRAINING', 'SOCIAL', 'OTHER') then raise exception 'INVALID_KIND'; end if;
+  if v_date > (now() at time zone 'Asia/Ho_Chi_Minh')::date + 1 then raise exception 'INVALID_DATE'; end if;
+  if v_event is not null and not exists (select 1 from public.club_events e where e.id = v_event and e.club_id = p_club_id) then
+    raise exception 'EVENT_NOT_FOUND';
+  end if;
+  if v_cover is not null and v_cover is distinct from v_old.cover_path and v_cover not like p_club_id::text || '/' || v_uid::text || '/%' then
+    raise exception 'INVALID_IMAGE_PATH';
+  end if;
+
+  if v_old.id is null then
+    if v_id is not null then raise exception 'ALBUM_NOT_FOUND'; end if;
+    if not v_staff and (select count(*) from public.club_albums a where a.created_by = v_uid and a.created_at > now() - interval '24 hours') >= 10 then
+      raise exception 'RATE_LIMITED';
+    end if;
+    if exists (select 1 from public.club_albums a where a.club_id = p_club_id and a.url = v_url) then raise exception 'ALBUM_EXISTS'; end if;
+    insert into public.club_albums (club_id, title, url, description, kind, taken_on, event_id, race_name, cover_path, photographer, status, created_by, approved_by)
+    values (p_club_id, v_title, v_url, nullif(left(trim(coalesce(p->>'description', '')), 500), ''), v_kind, v_date, v_event,
+      nullif(left(trim(coalesce(p->>'race_name', '')), 120), ''), v_cover, nullif(left(trim(coalesce(p->>'photographer', '')), 80), ''),
+      case when v_staff then 'APPROVED' else 'PENDING' end, v_uid, case when v_staff then v_uid end)
+    returning id into v_id;
+    if v_staff and coalesce((p->>'notify')::boolean, false) then
+      for m in select user_id from public.club_members where club_id = p_club_id and status = 'APPROVED' and user_id <> v_uid loop
+        perform private.notify(m.user_id, p_club_id, 'CLUB_ALBUM', 'Album ảnh mới: ' || v_title, 'Xem ảnh trong tab Ảnh của CLB',
+          '/clubs/' || p_club_id || '/photos', v_uid, false);
+      end loop;
+    elsif not v_staff then
+      for m in select user_id from public.club_members where club_id = p_club_id and status = 'APPROVED' and role in ('OWNER', 'CAPTAIN') loop
+        perform private.notify(m.user_id, p_club_id, 'CLUB_ALBUM', 'Link ảnh chờ duyệt', private.display_name(v_uid) || ' gửi album "' || v_title || '"',
+          '/clubs/' || p_club_id || '/photos', v_uid, false);
+      end loop;
+    end if;
+  else
+    if v_old.club_id <> p_club_id then raise exception 'ALBUM_NOT_FOUND'; end if;
+    if not v_staff and (v_old.created_by is distinct from v_uid or v_old.status <> 'PENDING') then raise exception 'FORBIDDEN'; end if;
+    if exists (select 1 from public.club_albums a where a.club_id = p_club_id and a.url = v_url and a.id <> v_old.id) then raise exception 'ALBUM_EXISTS'; end if;
+    update public.club_albums set title = v_title, url = v_url, description = nullif(left(trim(coalesce(p->>'description', '')), 500), ''),
+      kind = v_kind, taken_on = v_date, event_id = v_event, race_name = nullif(left(trim(coalesce(p->>'race_name', '')), 120), ''),
+      cover_path = v_cover, photographer = nullif(left(trim(coalesce(p->>'photographer', '')), 80), ''), updated_at = now()
+     where id = v_old.id;
+  end if;
+  return v_id;
+end $$;
+
+-- Duyệt link thành viên gửi: đồng ý → hiện cho cả CLB; từ chối → xoá, báo người gửi
+create or replace function public.review_club_album(p_id uuid, p_approve boolean, p_note text default null) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  a public.club_albums := (select x from public.club_albums x where x.id = p_id);
+begin
+  if a.id is null then raise exception 'ALBUM_NOT_FOUND'; end if;
+  if not public.club_is_staff(a.club_id) then raise exception 'FORBIDDEN'; end if;
+  if p_approve then
+    update public.club_albums set status = 'APPROVED', approved_by = v_uid, updated_at = now() where id = a.id;
+    if a.created_by is not null and a.created_by <> v_uid and a.status = 'PENDING' then
+      perform private.notify(a.created_by, a.club_id, 'CLUB_ALBUM', 'Album của bạn đã được duyệt', a.title, '/clubs/' || a.club_id || '/photos', v_uid, false);
+    end if;
+  else
+    delete from public.club_albums where id = a.id;
+    if a.created_by is not null and a.created_by <> v_uid then
+      perform private.notify(a.created_by, a.club_id, 'CLUB_ALBUM', 'Album chưa được duyệt', a.title || coalesce(': ' || nullif(trim(p_note), ''), ''),
+        '/clubs/' || a.club_id || '/photos', v_uid, false);
+    end if;
+  end if;
+end $$;
+
+create or replace function public.delete_club_album(p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  a public.club_albums := (select x from public.club_albums x where x.id = p_id);
+begin
+  if a.id is null then raise exception 'ALBUM_NOT_FOUND'; end if;
+  if not public.club_is_staff(a.club_id) and a.created_by is distinct from v_uid then raise exception 'FORBIDDEN'; end if;
+  delete from public.club_albums where id = a.id;
+end $$;
+
+-- Đếm lượt mở (để ban quản trị biết album nào được xem nhiều)
+create or replace function public.open_club_album(p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare a public.club_albums := (select x from public.club_albums x where x.id = p_id);
+begin
+  if a.id is null or a.status <> 'APPROVED' or not public.club_is_member(a.club_id) then return; end if;
+  update public.club_albums set opens = opens + 1 where id = a.id;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 3. Quyền
+-- ---------------------------------------------------------------------
+revoke all on function private.news_categories(), private.album_json(public.club_albums) from public, anon, authenticated;
+revoke all on function public.publish_club_news(uuid, jsonb), public.club_albums(uuid, jsonb), public.save_club_album(uuid, jsonb),
+  public.review_club_album(uuid, boolean, text), public.delete_club_album(uuid), public.open_club_album(uuid) from public, anon;
+grant execute on function public.publish_club_news(uuid, jsonb), public.club_albums(uuid, jsonb), public.save_club_album(uuid, jsonb),
+  public.review_club_album(uuid, boolean, text), public.delete_club_album(uuid), public.open_club_album(uuid) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001006400_bib_market.sql
+-- ===================================================================
+-- 006400: Chợ BIB — runner nhượng lại / tìm mua BIB giải chạy thật.
+-- Nguyên tắc (docs/CHO_RUNNER.md):
+-- • RaceHub KHÔNG giữ tiền, không làm trung gian thanh toán; hai bên tự liên hệ.
+-- • Không bán cao hơn giá gốc (chống phe vé): giá bán ≤ giá mua ban đầu.
+-- • Khuyến khích chuyển nhượng CHÍNH THỨC qua BTC (đổi tên VĐV). Nhiều giải cấm chạy BIB người khác — ghi rõ cách chuyển.
+-- • Chỉ runner đã xác minh (≥ 3 bài chạy hợp lệ, không bị khoá) mới đăng tin; tối đa 5 tin đang mở.
+-- • Thông tin liên hệ ẩn trong danh sách; bấm "Xem liên hệ" mới hiện (≤ 30 lần / ngày, có ghi lại) → hạn chế cào số điện thoại.
+-- • Tin tự hết hạn sau ngày giải. Báo cáo tin → hàng đợi Báo cáo của admin; admin ẩn tin.
+-- Chạy lại nhiều lần vẫn an toàn. Không dùng SELECT … INTO, khối DO, LIMIT (SQL Editor).
+
+create table if not exists public.bib_listings (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  kind text not null default 'SELL' check (kind in ('SELL', 'BUY')),
+  race_name text not null check (char_length(race_name) between 3 and 120),
+  race_date date not null,
+  city text check (city is null or char_length(city) <= 40),
+  distance text not null check (distance in ('5K', '10K', '21K', '42K', 'ULTRA', 'OTHER')),
+  distance_note text check (distance_note is null or char_length(distance_note) <= 40),
+  original_price integer check (original_price is null or original_price between 0 and 50000000),
+  price integer check (price is null or price between 0 and 50000000),
+  transfer text not null default 'OFFICIAL' check (transfer in ('OFFICIAL', 'ASK')),
+  shirt_size text check (shirt_size is null or char_length(shirt_size) <= 10),
+  note text check (note is null or char_length(note) <= 500),
+  contacts jsonb not null default '{}'::jsonb,
+  status text not null default 'OPEN' check (status in ('OPEN', 'RESERVED', 'DONE', 'CANCELLED', 'HIDDEN')),
+  hidden_reason text,
+  views integer not null default 0,
+  reveals integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (kind = 'BUY' or (price is not null and original_price is not null and price <= original_price))
+);
+create index if not exists bib_listings_list_idx on public.bib_listings (status, race_date);
+create table if not exists public.bib_contact_reveals (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  listing_id uuid not null references public.bib_listings(id) on delete cascade,
+  at timestamptz not null default now(),
+  primary key (user_id, listing_id)
+);
+alter table public.bib_listings enable row level security;
+alter table public.bib_contact_reveals enable row level security;
+revoke all on public.bib_listings, public.bib_contact_reveals from anon, authenticated;
+
+-- Báo cáo dùng chung: thêm ngữ cảnh BIB / MARKET
+alter table public.user_reports drop constraint if exists user_reports_context_check;
+alter table public.user_reports add constraint user_reports_context_check check (context in ('NEARBY', 'CONNECTION', 'CLUB', 'BIB', 'MARKET', 'OTHER'));
+
+-- Liên hệ: chỉ giữ số điện thoại / Zalo / Facebook / Messenger hợp lệ
+create or replace function private.bib_contacts(p jsonb) returns jsonb
+language sql immutable as $$
+  select jsonb_strip_nulls(jsonb_build_object(
+    'phone', case when coalesce(p->>'phone', '') ~ '^\+?[0-9 .]{8,15}$' then regexp_replace(p->>'phone', '[ .]', '', 'g') end,
+    'zalo', case when coalesce(p->>'zalo', '') ~ '^\+?[0-9 .]{8,15}$' then regexp_replace(p->>'zalo', '[ .]', '', 'g') end,
+    'facebook', case when coalesce(p->>'facebook', '') ~ '^https://(www\.|m\.)?(facebook\.com|fb\.com|m\.me)/[^\s]+$' then left(p->>'facebook', 200) end))
+$$;
+
+create or replace function private.bib_json(b public.bib_listings, p_uid uuid, p_full boolean) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('id', b.id, 'kind', b.kind, 'race_name', b.race_name, 'race_date', b.race_date, 'city', b.city,
+    'distance', b.distance, 'distance_note', b.distance_note, 'original_price', b.original_price, 'price', b.price,
+    'transfer', b.transfer, 'shirt_size', b.shirt_size, 'note', b.note, 'status', b.status, 'created_at', b.created_at,
+    'mine', b.user_id = p_uid,
+    'seller', (select jsonb_build_object('id', p.id, 'name', coalesce(p.display_name, 'Runner'), 'avatar_url', p.avatar_url, 'level', p.level,
+                 'runs', private.valid_runs(p.id), 'since', p.created_at) from public.profiles p where p.id = b.user_id),
+    'revealed', exists (select 1 from public.bib_contact_reveals r where r.user_id = p_uid and r.listing_id = b.id))
+  || case when p_full or b.user_id = p_uid
+          or exists (select 1 from public.bib_contact_reveals r where r.user_id = p_uid and r.listing_id = b.id)
+     then jsonb_build_object('contacts', b.contacts) else '{}'::jsonb end
+  || case when b.user_id = p_uid then jsonb_build_object('views', b.views, 'reveals', b.reveals, 'hidden_reason', b.hidden_reason) else '{}'::jsonb end
+$$;
+
+-- p: {kind, q, city, distance, mine, offset}. Chỉ tin đang mở và giải chưa diễn ra (trừ "tin của tôi").
+create or replace function public.bib_listings(p jsonb default '{}'::jsonb) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_kind text := nullif(upper(coalesce(p->>'kind', '')), '');
+  v_q text := coalesce(p->>'q', '');
+  v_city text := nullif(p->>'city', '');
+  v_dist text := nullif(upper(coalesce(p->>'distance', '')), '');
+  v_mine boolean := coalesce((p->>'mine')::boolean, false);
+  v_offset integer := greatest(0, coalesce((p->>'offset')::int, 0));
+  v_today date := (now() at time zone 'Asia/Ho_Chi_Minh')::date;
+begin
+  return (
+    with f as (
+      select b from public.bib_listings b
+       where case when v_mine then b.user_id = v_uid
+                  else b.status in ('OPEN', 'RESERVED') and b.race_date >= v_today end
+         and (v_kind is null or b.kind = v_kind)
+         and (v_city is null or b.city = v_city)
+         and (v_dist is null or b.distance = v_dist)
+         and (private.search_key(v_q) = '' or private.search_match(private.search_hay(b.race_name) || ' ' || private.search_key(coalesce(b.city, '')) || ' ', v_q))
+    ), r as (
+      select f.b, row_number() over (order by case when v_mine then 0 else ((f.b).status = 'RESERVED')::int end, (f.b).race_date, (f.b).created_at desc) rn from f
+    )
+    select jsonb_build_object('total', (select count(*) from f),
+      'items', coalesce((select jsonb_agg(private.bib_json(r.b, v_uid, false) order by r.rn) from r where r.rn > v_offset and r.rn <= v_offset + 30), '[]'::jsonb),
+      'eligible', private.nearby_eligible(v_uid), 'valid_runs', private.valid_runs(v_uid),
+      'open_count', (select count(*) from public.bib_listings b where b.user_id = v_uid and b.status in ('OPEN', 'RESERVED'))));
+end $$;
+
+-- Đăng / sửa tin. p: {id?, kind, race_name, race_date, city, distance, distance_note, original_price, price, transfer, shirt_size, note, contacts{phone,zalo,facebook}}
+create or replace function public.save_bib_listing(p jsonb) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_old public.bib_listings := (select x from public.bib_listings x where x.id = nullif(p->>'id', '')::uuid);
+  v_kind text := upper(coalesce(nullif(p->>'kind', ''), v_old.kind, 'SELL'));
+  v_date date := nullif(p->>'race_date', '')::date;
+  v_orig integer := nullif(p->>'original_price', '')::int;
+  v_price integer := nullif(p->>'price', '')::int;
+  v_contacts jsonb := private.bib_contacts(coalesce(p->'contacts', '{}'::jsonb));
+  v_note text := nullif(left(trim(coalesce(p->>'note', '')), 500), '');
+  v_id uuid;
+begin
+  if not private.nearby_eligible(v_uid) then raise exception 'NOT_ELIGIBLE'; end if;
+  if nullif(p->>'id', '') is not null and (v_old.id is null or v_old.user_id <> v_uid) then raise exception 'LISTING_NOT_FOUND'; end if;
+  if v_old.status = 'HIDDEN' then raise exception 'LISTING_HIDDEN'; end if;
+  if v_kind not in ('SELL', 'BUY') then raise exception 'INVALID_KIND'; end if;
+  if char_length(trim(coalesce(p->>'race_name', ''))) < 3 then raise exception 'RACE_REQUIRED'; end if;
+  if v_date is null or v_date < (now() at time zone 'Asia/Ho_Chi_Minh')::date then raise exception 'RACE_DATE_PAST'; end if;
+  if upper(coalesce(p->>'distance', '')) not in ('5K', '10K', '21K', '42K', 'ULTRA', 'OTHER') then raise exception 'INVALID_DISTANCE'; end if;
+  if v_kind = 'SELL' and (v_orig is null or v_price is null) then raise exception 'PRICE_REQUIRED'; end if;
+  if v_kind = 'SELL' and v_price > v_orig then raise exception 'PRICE_ABOVE_ORIGINAL'; end if;
+  if v_contacts = '{}'::jsonb then raise exception 'CONTACT_REQUIRED'; end if;
+  if v_note ~* '(https?://|www\.)' and v_note !~* '(facebook\.com|fb\.com)' then raise exception 'NO_LINKS'; end if;
+
+  if v_old.id is null then
+    if (select count(*) from public.bib_listings b where b.user_id = v_uid and b.status in ('OPEN', 'RESERVED')) >= 5 then raise exception 'TOO_MANY_LISTINGS'; end if;
+    if (select count(*) from public.bib_listings b where b.user_id = v_uid and b.created_at > now() - interval '24 hours') >= 10 then raise exception 'RATE_LIMITED'; end if;
+    insert into public.bib_listings (user_id, kind, race_name, race_date, city, distance, distance_note, original_price, price, transfer, shirt_size, note, contacts)
+    values (v_uid, v_kind, left(trim(p->>'race_name'), 120), v_date, nullif(left(trim(coalesce(p->>'city', '')), 40), ''), upper(p->>'distance'),
+      nullif(left(trim(coalesce(p->>'distance_note', '')), 40), ''), v_orig, v_price,
+      case when upper(coalesce(p->>'transfer', '')) = 'ASK' then 'ASK' else 'OFFICIAL' end,
+      nullif(left(trim(coalesce(p->>'shirt_size', '')), 10), ''), v_note, v_contacts)
+    returning id into v_id;
+  else
+    v_id := v_old.id;
+    update public.bib_listings set kind = v_kind, race_name = left(trim(p->>'race_name'), 120), race_date = v_date,
+      city = nullif(left(trim(coalesce(p->>'city', '')), 40), ''), distance = upper(p->>'distance'),
+      distance_note = nullif(left(trim(coalesce(p->>'distance_note', '')), 40), ''), original_price = v_orig, price = v_price,
+      transfer = case when upper(coalesce(p->>'transfer', '')) = 'ASK' then 'ASK' else 'OFFICIAL' end,
+      shirt_size = nullif(left(trim(coalesce(p->>'shirt_size', '')), 10), ''), note = v_note, contacts = v_contacts, updated_at = now()
+     where id = v_id;
+  end if;
+  return v_id;
+end $$;
+
+-- Người đăng đổi trạng thái: OPEN (mở lại) / RESERVED (đang giao dịch) / DONE (đã xong) / CANCELLED (gỡ)
+create or replace function public.set_bib_status(p_id uuid, p_status text) returns void
+language plpgsql security definer set search_path = public as $$
+declare b public.bib_listings := (select x from public.bib_listings x where x.id = p_id);
+begin
+  if b.id is null or b.user_id <> private.require_uid() then raise exception 'LISTING_NOT_FOUND'; end if;
+  if b.status = 'HIDDEN' then raise exception 'LISTING_HIDDEN'; end if;
+  if upper(p_status) not in ('OPEN', 'RESERVED', 'DONE', 'CANCELLED') then raise exception 'INVALID_STATUS'; end if;
+  update public.bib_listings set status = upper(p_status), updated_at = now() where id = b.id;
+end $$;
+
+-- Xem liên hệ: cần đăng nhập + tài khoản không bị khoá; ≤ 30 tin khác nhau / 24 giờ
+create or replace function public.bib_contact(p_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  b public.bib_listings := (select x from public.bib_listings x where x.id = p_id);
+begin
+  if b.id is null or b.status not in ('OPEN', 'RESERVED') then raise exception 'LISTING_NOT_FOUND'; end if;
+  if exists (select 1 from public.profiles p where p.id = v_uid and p.banned_at is not null) then raise exception 'FORBIDDEN'; end if;
+  if b.user_id <> v_uid and not exists (select 1 from public.bib_contact_reveals r where r.user_id = v_uid and r.listing_id = b.id) then
+    if (select count(*) from public.bib_contact_reveals r where r.user_id = v_uid and r.at > now() - interval '24 hours') >= 30 then
+      raise exception 'TOO_MANY_REVEALS';
+    end if;
+    insert into public.bib_contact_reveals (user_id, listing_id) values (v_uid, b.id);
+    update public.bib_listings set reveals = reveals + 1 where id = b.id;
+  end if;
+  return b.contacts;
+end $$;
+
+-- Báo cáo tin BIB → hàng đợi Báo cáo của admin (ngữ cảnh BIB, kèm mã tin)
+create or replace function public.report_bib(p_id uuid, p_reason text, p_note text default null) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  b public.bib_listings := (select x from public.bib_listings x where x.id = p_id);
+begin
+  if b.id is null then raise exception 'LISTING_NOT_FOUND'; end if;
+  if b.user_id = v_uid then raise exception 'INVALID_TARGET'; end if;
+  if upper(p_reason) not in ('SPAM', 'HARASSMENT', 'FAKE', 'UNSAFE', 'OTHER') then raise exception 'INVALID_REASON'; end if;
+  if exists (select 1 from public.user_reports r where r.reporter = v_uid and r.target = b.user_id and r.context = 'BIB' and r.status = 'OPEN') then return; end if;
+  insert into public.user_reports (reporter, target, context, reason, note)
+  values (v_uid, b.user_id, 'BIB', upper(p_reason), left('Tin BIB "' || b.race_name || '" (' || b.id || '): ' || coalesce(nullif(trim(p_note), ''), ''), 500));
+  -- 3 người khác nhau báo cáo tin này → tạm ẩn chờ admin
+  if (select count(distinct r.reporter) from public.user_reports r where r.target = b.user_id and r.context = 'BIB' and r.status = 'OPEN'
+        and r.note like '%' || b.id || '%') >= 3 then
+    update public.bib_listings set status = 'HIDDEN', hidden_reason = 'Tạm ẩn do nhiều báo cáo, chờ quản trị viên xem xét' where id = b.id;
+  end if;
+end $$;
+
+-- Admin: ẩn / hiện lại tin
+create or replace function public.admin_hide_bib(p_id uuid, p_hide boolean, p_reason text default null) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin uuid := private.require_admin();
+  b public.bib_listings := (select x from public.bib_listings x where x.id = p_id);
+begin
+  if b.id is null then raise exception 'LISTING_NOT_FOUND'; end if;
+  if p_hide and char_length(trim(coalesce(p_reason, ''))) < 3 then raise exception 'REASON_REQUIRED'; end if;
+  update public.bib_listings set status = case when p_hide then 'HIDDEN' else 'OPEN' end,
+    hidden_reason = case when p_hide then left(trim(p_reason), 300) end, updated_at = now() where id = b.id;
+  perform private.notify(b.user_id, null, 'MARKET', case when p_hide then 'Tin BIB đã bị ẩn' else 'Tin BIB đã hiện lại' end,
+    b.race_name || coalesce(': ' || nullif(trim(p_reason), ''), ''), '/market?tab=bib', v_admin, true);
+  insert into public.admin_audit_log (actor_id, action, target, new_value)
+  values (v_admin, case when p_hide then 'BIB_HIDE' else 'BIB_UNHIDE' end, 'bib:' || b.id, jsonb_build_object('reason', p_reason));
+end $$;
+
+create or replace function public.admin_bib_listings(p_status text default 'ALL') returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_admin uuid := private.require_admin();
+begin
+  return (select coalesce(jsonb_agg(y.j order by y.rn), '[]'::jsonb) from (
+    select private.bib_json(b, v_admin, true) || jsonb_build_object('hidden_reason', b.hidden_reason, 'views', b.views, 'reveals', b.reveals) j,
+           row_number() over (order by b.created_at desc) rn
+      from public.bib_listings b where upper(coalesce(p_status, 'ALL')) = 'ALL' or b.status = upper(p_status)) y where y.rn <= 200);
+end $$;
+
+revoke all on function private.bib_contacts(jsonb), private.bib_json(public.bib_listings, uuid, boolean) from public, anon, authenticated;
+revoke all on function public.bib_listings(jsonb), public.save_bib_listing(jsonb), public.set_bib_status(uuid, text), public.bib_contact(uuid),
+  public.report_bib(uuid, text, text), public.admin_hide_bib(uuid, boolean, text), public.admin_bib_listings(text) from public, anon;
+grant execute on function public.bib_listings(jsonb), public.save_bib_listing(jsonb), public.set_bib_status(uuid, text), public.bib_contact(uuid),
+  public.report_bib(uuid, text, text), public.admin_hide_bib(uuid, boolean, text), public.admin_bib_listings(text) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001006500_gps_gap_check.sql
+-- ===================================================================
+-- 006500: Chấm bài chạy ghi trong app — thêm phát hiện MẤT TÍN HIỆU GPS.
+-- Trước đây: tắt màn hình khi ghi bằng trình duyệt (iPhone dừng GPS) → điểm tiếp theo nối thẳng, bài vẫn được duyệt
+-- (tuyến chỉ còn 2 điểm, quãng đường "ảo"). Nay: đoạn > 60 giây và > 150 m giữa hai điểm = mất tín hiệu;
+-- tổng đoạn nối thẳng > 25 % quãng đường (và > 500 m) → bài chờ xác minh, kèm cờ GPS_GAP để ban quản trị xem.
+-- Giữ nguyên mọi luật cũ (002400). Chạy lại nhiều lần vẫn an toàn.
+
+create or replace function public.submit_and_process_activity(
+  p_title text, p_source text, p_started_at timestamptz, p_ended_at timestamptz,
+  p_elapsed_s integer, p_moving_s integer, p_distance_m numeric, p_avg_pace_s integer, p_track_points jsonb
+) returns json
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  v_uid uuid := private.require_uid();
+  cfg jsonb := private.economy_config();
+  v_points jsonb := coalesce(p_track_points, '[]'::jsonb);
+  v_n integer;
+  v_gps_m numeric := 0;
+  v_spikes integer := 0;
+  v_prev jsonb;
+  v_p jsonb;
+  v_seg numeric;
+  v_dt numeric;
+  v_distance numeric;
+  v_moving integer;
+  v_pace integer;
+  v_status text := 'APPROVED';
+  v_reason text := 'Hoạt động hợp lệ qua kiểm tra tự động.';
+  v_activity uuid;
+  v_seq integer := 0;
+  v_reward jsonb;
+  -- Tốc độ duy trì (quãng đường trong cửa sổ 30 s) — cùng luật với features/activity/model/fraud.ts
+  v_t numeric[] := '{}';
+  v_c numeric[] := '{}';
+  v_t0 timestamptz;
+  v_i integer; v_j integer := 1; v_w numeric; v_sp numeric;
+  v_run_sev numeric; v_run_nor numeric; v_run_veh numeric;
+  v_sev numeric := 0; v_nor numeric := 0; v_veh numeric := 0;
+  v_flags jsonb := '[]'::jsonb;
+  -- Mất tín hiệu GPS: đoạn > 60 giây và > 150 m giữa hai điểm liên tiếp (tắt màn hình, hầm…) = tuyến bị nối thẳng
+  v_gaps integer := 0;
+  v_gap_s numeric := 0;
+  v_gap_m numeric := 0;
+  v_score integer := 0;
+begin
+  -- Kiểm tra đầu vào cơ bản
+  if p_started_at is null or p_ended_at is null or p_ended_at <= p_started_at then raise exception 'INVALID_TIME_RANGE'; end if;
+  if p_started_at > now() + interval '5 minutes' then raise exception 'INVALID_TIME_RANGE'; end if;
+  if p_ended_at - p_started_at > interval '24 hours' then raise exception 'ACTIVITY_TOO_LONG'; end if;
+  if jsonb_typeof(v_points) <> 'array' then raise exception 'INVALID_TRACK_POINTS'; end if;
+  v_n := jsonb_array_length(v_points);
+  if v_n > 20000 then raise exception 'TOO_MANY_TRACK_POINTS'; end if;
+
+  -- Chống gửi trùng / chồng thời gian với bài chạy khác
+  if exists (select 1 from public.activities
+              where user_id = v_uid and started_at < p_ended_at and ended_at > p_started_at) then
+    raise exception 'ACTIVITY_DUPLICATE';
+  end if;
+  if (select count(*) from public.activities where user_id = v_uid and created_at > now() - interval '1 day') >= 20 then
+    raise exception 'RATE_LIMITED';
+  end if;
+
+  -- Tính lại quãng đường từ GPS (không tin số client gửi)
+  for v_p in select value from jsonb_array_elements(v_points) loop
+    if v_prev is not null then
+      v_seg := private.haversine_m((v_prev->>'latitude')::numeric, (v_prev->>'longitude')::numeric,
+                                   (v_p->>'latitude')::numeric, (v_p->>'longitude')::numeric);
+      v_dt := extract(epoch from ((v_p->>'recorded_at')::timestamptz - (v_prev->>'recorded_at')::timestamptz));
+      if v_dt > 0 and v_seg / v_dt > 12 then v_spikes := v_spikes + 1; end if;   -- > 43 km/h
+      if v_dt > 60 and v_seg > 150 then v_gaps := v_gaps + 1; v_gap_s := v_gap_s + v_dt; v_gap_m := v_gap_m + v_seg; end if;
+      v_gps_m := v_gps_m + coalesce(v_seg, 0);
+    end if;
+    v_t0 := coalesce(v_t0, (v_p->>'recorded_at')::timestamptz, p_started_at);
+    v_t := v_t || extract(epoch from (coalesce((v_p->>'recorded_at')::timestamptz, v_t0) - v_t0));
+    v_c := v_c || v_gps_m;
+    v_prev := v_p;
+  end loop;
+
+  -- Đoạn liên tục dài nhất có tốc độ ≥ 20 km/h, ≥ 17 km/h, ≥ 25 km/h
+  for v_i in 2 .. coalesce(array_length(v_t, 1), 0) loop
+    while v_j < v_i and v_t[v_i] - v_t[v_j] > 30 loop v_j := v_j + 1; end loop;
+    v_w := v_t[v_i] - v_t[v_j];
+    if v_w < 15 then continue; end if;
+    v_sp := (v_c[v_i] - v_c[v_j]) / v_w;
+    if v_sp >= 20 / 3.6 then v_run_sev := coalesce(v_run_sev, v_t[v_j]); v_sev := greatest(v_sev, v_t[v_i] - v_run_sev); else v_run_sev := null; end if;
+    if v_sp >= 17 / 3.6 then v_run_nor := coalesce(v_run_nor, v_t[v_j]); v_nor := greatest(v_nor, v_t[v_i] - v_run_nor); else v_run_nor := null; end if;
+    if v_sp >= 25 / 3.6 then v_run_veh := coalesce(v_run_veh, v_t[v_j]); v_veh := greatest(v_veh, v_t[v_i] - v_run_veh); else v_run_veh := null; end if;
+  end loop;
+  if v_veh >= 30 then
+    v_flags := v_flags || jsonb_build_object('code', 'VEHICLE_BURST', 'severity', 'SEVERE', 'durationS', round(v_veh));
+    v_score := v_score + 35;
+  end if;
+  if v_sev >= 120 then
+    v_flags := v_flags || jsonb_build_object('code', 'SUSTAINED_SPEED', 'severity', 'SEVERE', 'durationS', round(v_sev));
+    v_score := v_score + 35;
+  elsif v_nor >= 180 then
+    v_flags := v_flags || jsonb_build_object('code', 'SUSTAINED_SPEED', 'severity', 'HIGH', 'durationS', round(v_nor));
+    v_score := v_score + 28;
+  end if;
+  if v_spikes > 3 then
+    v_flags := v_flags || jsonb_build_object('code', 'GPS_TELEPORT', 'severity', 'HIGH', 'count', v_spikes);
+    v_score := v_score + 20;
+  end if;
+
+  if v_gaps > 0 then
+    v_flags := v_flags || jsonb_build_object('code', 'GPS_GAP', 'severity', case when v_gap_m > greatest(500, 0.25 * v_gps_m) then 'HIGH' else 'INFO' end,
+      'count', v_gaps, 'durationS', round(v_gap_s), 'meters', round(v_gap_m));
+  end if;
+  v_moving := least(greatest(coalesce(p_moving_s, 0), 0), extract(epoch from (p_ended_at - p_started_at))::integer);
+  v_distance := case when v_n >= 2 then round(v_gps_m) else greatest(coalesce(p_distance_m, 0), 0) end;
+  v_pace := case when v_distance > 0 then round(v_moving / (v_distance / 1000.0)) else 0 end;
+
+  -- Luật xác thực (xem ADR-007)
+  if v_distance < 200 then
+    v_status := 'REJECTED'; v_reason := 'Quá ngắn (< 200 m), không đủ điều kiện ghi nhận.';
+  elsif v_n < 2 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 40);
+    v_reason := 'Bài không có dữ liệu GPS — không đối chiếu được quãng đường.';
+  elsif v_pace < (cfg->>'minValidPace')::numeric * 60 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 75);
+    v_reason := 'Pace trung bình nhanh hơn 3:00/km — vượt khả năng chạy bộ.';
+  elsif v_veh >= 30 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 85);
+    v_reason := 'Di chuyển ≥ 25 km/h liên tục ' || round(v_veh) || ' giây — giống đi xe.';
+  elsif v_sev >= 120 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 70);
+    v_reason := 'Giữ tốc độ ≥ 20 km/h (pace 3:00) liên tục ' || round(v_sev) || ' giây.';
+  elsif v_nor >= 180 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 65);
+    v_reason := 'Giữ tốc độ ≥ 17 km/h (pace 3:32) liên tục ' || round(v_nor) || ' giây.';
+  elsif v_spikes > 3 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 50);
+    v_reason := 'Vị trí GPS nhảy xa bất thường ' || v_spikes || ' lần (> 43 km/h).';
+  elsif v_gap_m > greatest(500, 0.25 * v_gps_m) then
+    v_status := 'PENDING'; v_score := greatest(v_score, 40);
+    v_reason := 'Mất tín hiệu GPS ' || greatest(1, round(v_gap_s / 60)) || ' phút — ' || round(v_gap_m / 1000.0, 2)
+                || ' km được nối thẳng, không đối chiếu được tuyến (thường do tắt màn hình khi ghi bằng trình duyệt).';
+  elsif p_distance_m > 0 and abs(p_distance_m - v_distance) > greatest(0.15 * v_distance, 100) then
+    v_status := 'PENDING'; v_score := greatest(v_score, 45);
+    v_reason := 'Quãng đường app gửi lên lệch nhiều so với tuyến GPS.';
+  end if;
+  if v_status = 'PENDING' then
+    v_reason := left('Mức nghi vấn: ' || private.risk_label(private.risk_level(v_score)) || '. ' || v_reason
+                     || ' Bài được tính sau khi ban quản trị CLB hoặc admin xác minh.', 500);
+  end if;
+
+  v_activity := gen_random_uuid();
+  insert into public.activities (
+    id, user_id, title, source, started_at, ended_at, elapsed_time_s, moving_time_s,
+    distance_m, moving_distance_m, avg_pace_s, status, validation_status, validation_reason,
+    risk_score, risk_level, risk_flags)
+  values (
+    v_activity, v_uid, left(coalesce(nullif(trim(p_title), ''), 'Buổi chạy'), 120),
+    case when p_source in ('DIRECT_GPS', 'STRAVA', 'GARMIN') then p_source else 'DIRECT_GPS' end,
+    p_started_at, p_ended_at, greatest(coalesce(p_elapsed_s, 0), v_moving), v_moving,
+    v_distance, v_distance, v_pace,
+    case v_status when 'APPROVED' then 'READY' when 'PENDING' then 'PROCESSING' else 'REJECTED' end,
+    v_status, v_reason,
+    least(v_score, 100), private.risk_level(v_score),
+    case when jsonb_array_length(v_flags) > 0 then v_flags end);
+
+  for v_p in select value from jsonb_array_elements(v_points) loop
+    v_seq := v_seq + 1;
+    insert into public.activity_track_points (activity_id, sequence, latitude, longitude, accuracy, altitude, speed, recorded_at)
+    values (v_activity, v_seq, (v_p->>'latitude')::numeric, (v_p->>'longitude')::numeric,
+            (v_p->>'accuracy')::numeric, (v_p->>'altitude')::numeric, (v_p->>'speed')::numeric,
+            coalesce((v_p->>'recorded_at')::timestamptz, p_started_at));
+  end loop;
+
+  if v_status = 'APPROVED' then
+    v_reward := (select jsonb_build_object('earned_xu', x.earned_xu, 'earned_xp', x.earned_xp)
+                   from public.activities x where x.id = v_activity);         -- trigger trg_auto_reward đã thưởng
+  end if;
+
+  return json_build_object(
+    'success', true, 'activity_id', v_activity,
+    'validation_status', v_status, 'validation_reason', v_reason,
+    'distance_m', v_distance,
+    'earned_xp', coalesce((v_reward->>'earned_xp')::integer, 0),
+    'earned_xu', coalesce((v_reward->>'earned_xu')::numeric, 0));
+end $$;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001006600_gps_track_distance.sql
+-- ===================================================================
+-- 006600: Quãng đường bài chạy trong app = đúng con số app đo (GPS-3).
+-- Trước đây máy chủ cộng khoảng cách giữa các điểm tuyến. Điểm GPS luôn có nhiễu (rung ±5–15 m) nên cách cộng này
+-- DƯ 2–11 % (mô phỏng: phố cao tầng +10,7 %), trong khi app đã hiệu chỉnh bằng vận tốc Doppler (lệch < 2 %).
+-- Nay: mỗi điểm mang quãng đường tích luỹ app đo (distance_m). Máy chủ nhận từng đoạn nhưng KẸP theo hình học tuyến:
+--   đoạn app báo ≤ 1,1 × khoảng cách thẳng giữa hai điểm + 3 m, và tổng ≤ tổng khoảng cách thẳng
+--   → không thể khai khống quá tuyến GPS thật; app cũ (không gửi distance_m) dùng cách cũ.
+-- Kèm: lưu quãng đường tích luỹ từng điểm + tính TỪNG KM ngay trên máy chủ (activity_details.splits).
+-- Chạy lại nhiều lần vẫn an toàn.
+
+alter table public.activity_track_points add column if not exists distance_m numeric;
+
+create or replace function public.submit_and_process_activity(
+  p_title text, p_source text, p_started_at timestamptz, p_ended_at timestamptz,
+  p_elapsed_s integer, p_moving_s integer, p_distance_m numeric, p_avg_pace_s integer, p_track_points jsonb
+) returns json
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  v_uid uuid := private.require_uid();
+  cfg jsonb := private.economy_config();
+  v_points jsonb := coalesce(p_track_points, '[]'::jsonb);
+  v_n integer;
+  v_gps_m numeric := 0;
+  -- Quãng đường theo app (đã kẹp) + từng km
+  v_trk_m numeric := 0;
+  v_cd numeric;
+  v_cd_prev numeric;
+  v_step numeric;
+  v_seg_t numeric;
+  v_sd numeric := 0;
+  v_st numeric := 0;
+  v_over numeric;
+  v_over_t numeric;
+  v_alt0 numeric;
+  v_splits jsonb := '[]'::jsonb;
+  v_spikes integer := 0;
+  v_prev jsonb;
+  v_p jsonb;
+  v_seg numeric;
+  v_dt numeric;
+  v_distance numeric;
+  v_moving integer;
+  v_pace integer;
+  v_status text := 'APPROVED';
+  v_reason text := 'Hoạt động hợp lệ qua kiểm tra tự động.';
+  v_activity uuid;
+  v_seq integer := 0;
+  v_reward jsonb;
+  -- Tốc độ duy trì (quãng đường trong cửa sổ 30 s) — cùng luật với features/activity/model/fraud.ts
+  v_t numeric[] := '{}';
+  v_c numeric[] := '{}';
+  v_t0 timestamptz;
+  v_i integer; v_j integer := 1; v_w numeric; v_sp numeric;
+  v_run_sev numeric; v_run_nor numeric; v_run_veh numeric;
+  v_sev numeric := 0; v_nor numeric := 0; v_veh numeric := 0;
+  v_flags jsonb := '[]'::jsonb;
+  -- Mất tín hiệu GPS: đoạn > 60 giây và > 150 m giữa hai điểm liên tiếp (tắt màn hình, hầm…) = tuyến bị nối thẳng
+  v_gaps integer := 0;
+  v_gap_s numeric := 0;
+  v_gap_m numeric := 0;
+  v_score integer := 0;
+begin
+  -- Kiểm tra đầu vào cơ bản
+  if p_started_at is null or p_ended_at is null or p_ended_at <= p_started_at then raise exception 'INVALID_TIME_RANGE'; end if;
+  if p_started_at > now() + interval '5 minutes' then raise exception 'INVALID_TIME_RANGE'; end if;
+  if p_ended_at - p_started_at > interval '24 hours' then raise exception 'ACTIVITY_TOO_LONG'; end if;
+  if jsonb_typeof(v_points) <> 'array' then raise exception 'INVALID_TRACK_POINTS'; end if;
+  v_n := jsonb_array_length(v_points);
+  if v_n > 20000 then raise exception 'TOO_MANY_TRACK_POINTS'; end if;
+
+  -- Chống gửi trùng / chồng thời gian với bài chạy khác
+  if exists (select 1 from public.activities
+              where user_id = v_uid and started_at < p_ended_at and ended_at > p_started_at) then
+    raise exception 'ACTIVITY_DUPLICATE';
+  end if;
+  if (select count(*) from public.activities where user_id = v_uid and created_at > now() - interval '1 day') >= 20 then
+    raise exception 'RATE_LIMITED';
+  end if;
+
+  -- Tính lại quãng đường từ GPS (không tin số client gửi)
+  for v_p in select value from jsonb_array_elements(v_points) loop
+    v_cd := case when jsonb_typeof(v_p->'distance_m') = 'number' then (v_p->>'distance_m')::numeric end;
+    if v_prev is null then v_alt0 := case when jsonb_typeof(v_p->'altitude') = 'number' then (v_p->>'altitude')::numeric end; end if;
+    if v_prev is not null then
+      v_seg := private.haversine_m((v_prev->>'latitude')::numeric, (v_prev->>'longitude')::numeric,
+                                   (v_p->>'latitude')::numeric, (v_p->>'longitude')::numeric);
+      v_dt := extract(epoch from ((v_p->>'recorded_at')::timestamptz - (v_prev->>'recorded_at')::timestamptz));
+      if v_dt > 0 and v_seg / v_dt > 12 then v_spikes := v_spikes + 1; end if;   -- > 43 km/h
+      if v_dt > 60 and v_seg > 150 then v_gaps := v_gaps + 1; v_gap_s := v_gap_s + v_dt; v_gap_m := v_gap_m + v_seg; end if;
+      v_gps_m := v_gps_m + coalesce(v_seg, 0);
+      -- Đoạn theo app: có distance_m ở cả hai điểm → dùng, kẹp [0, 1,1 × đoạn thẳng + 3 m]; thiếu → đoạn thẳng
+      v_step := case when v_cd is not null and v_cd_prev is not null
+                     then least(greatest(v_cd - v_cd_prev, 0), 1.1 * coalesce(v_seg, 0) + 3)
+                     else coalesce(v_seg, 0) end;
+      v_trk_m := v_trk_m + v_step;
+      -- Từng km: đoạn ≤ 30 s tính đủ giờ; dài hơn (đứng chờ / mất tín hiệu) chỉ tính phần di chuyển ước lượng ≥ 1,5 m/s
+      if v_dt > 0 then
+        v_seg_t := case when v_dt <= 30 then v_dt else least(v_dt, v_step / 1.5) end;
+        v_sd := v_sd + v_step; v_st := v_st + v_seg_t;
+        while v_sd >= 1000 loop
+          v_over := v_sd - 1000;
+          v_over_t := case when v_step > 0 then v_seg_t * v_over / v_step else 0 end;
+          v_splits := v_splits || jsonb_build_object('distance_m', 1000, 'moving_s', greatest(0, round(v_st - v_over_t)),
+            'elev_m', case when v_alt0 is not null and jsonb_typeof(v_p->'altitude') = 'number' then round(((v_p->>'altitude')::numeric - v_alt0) * 10) / 10 end,
+            'hr', null);
+          v_sd := v_over; v_st := v_over_t;
+          v_alt0 := case when jsonb_typeof(v_p->'altitude') = 'number' then (v_p->>'altitude')::numeric end;
+        end loop;
+      end if;
+    end if;
+    v_cd_prev := v_cd;
+    v_t0 := coalesce(v_t0, (v_p->>'recorded_at')::timestamptz, p_started_at);
+    v_t := v_t || extract(epoch from (coalesce((v_p->>'recorded_at')::timestamptz, v_t0) - v_t0));
+    v_c := v_c || v_trk_m;
+    v_prev := v_p;
+  end loop;
+
+  -- Đoạn liên tục dài nhất có tốc độ ≥ 20 km/h, ≥ 17 km/h, ≥ 25 km/h
+  for v_i in 2 .. coalesce(array_length(v_t, 1), 0) loop
+    while v_j < v_i and v_t[v_i] - v_t[v_j] > 30 loop v_j := v_j + 1; end loop;
+    v_w := v_t[v_i] - v_t[v_j];
+    if v_w < 15 then continue; end if;
+    v_sp := (v_c[v_i] - v_c[v_j]) / v_w;
+    if v_sp >= 20 / 3.6 then v_run_sev := coalesce(v_run_sev, v_t[v_j]); v_sev := greatest(v_sev, v_t[v_i] - v_run_sev); else v_run_sev := null; end if;
+    if v_sp >= 17 / 3.6 then v_run_nor := coalesce(v_run_nor, v_t[v_j]); v_nor := greatest(v_nor, v_t[v_i] - v_run_nor); else v_run_nor := null; end if;
+    if v_sp >= 25 / 3.6 then v_run_veh := coalesce(v_run_veh, v_t[v_j]); v_veh := greatest(v_veh, v_t[v_i] - v_run_veh); else v_run_veh := null; end if;
+  end loop;
+  if v_veh >= 30 then
+    v_flags := v_flags || jsonb_build_object('code', 'VEHICLE_BURST', 'severity', 'SEVERE', 'durationS', round(v_veh));
+    v_score := v_score + 35;
+  end if;
+  if v_sev >= 120 then
+    v_flags := v_flags || jsonb_build_object('code', 'SUSTAINED_SPEED', 'severity', 'SEVERE', 'durationS', round(v_sev));
+    v_score := v_score + 35;
+  elsif v_nor >= 180 then
+    v_flags := v_flags || jsonb_build_object('code', 'SUSTAINED_SPEED', 'severity', 'HIGH', 'durationS', round(v_nor));
+    v_score := v_score + 28;
+  end if;
+  if v_spikes > 3 then
+    v_flags := v_flags || jsonb_build_object('code', 'GPS_TELEPORT', 'severity', 'HIGH', 'count', v_spikes);
+    v_score := v_score + 20;
+  end if;
+
+  if v_gaps > 0 then
+    v_flags := v_flags || jsonb_build_object('code', 'GPS_GAP', 'severity', case when v_gap_m > greatest(500, 0.25 * v_gps_m) then 'HIGH' else 'INFO' end,
+      'count', v_gaps, 'durationS', round(v_gap_s), 'meters', round(v_gap_m));
+  end if;
+  v_moving := least(greatest(coalesce(p_moving_s, 0), 0), extract(epoch from (p_ended_at - p_started_at))::integer);
+  v_distance := case when v_n >= 2 then round(least(v_trk_m, v_gps_m)) else greatest(coalesce(p_distance_m, 0), 0) end;
+  v_pace := case when v_distance > 0 then round(v_moving / (v_distance / 1000.0)) else 0 end;
+
+  -- Luật xác thực (xem ADR-007)
+  if v_distance < 200 then
+    v_status := 'REJECTED'; v_reason := 'Quá ngắn (< 200 m), không đủ điều kiện ghi nhận.';
+  elsif v_n < 2 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 40);
+    v_reason := 'Bài không có dữ liệu GPS — không đối chiếu được quãng đường.';
+  elsif v_pace < (cfg->>'minValidPace')::numeric * 60 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 75);
+    v_reason := 'Pace trung bình nhanh hơn 3:00/km — vượt khả năng chạy bộ.';
+  elsif v_veh >= 30 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 85);
+    v_reason := 'Di chuyển ≥ 25 km/h liên tục ' || round(v_veh) || ' giây — giống đi xe.';
+  elsif v_sev >= 120 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 70);
+    v_reason := 'Giữ tốc độ ≥ 20 km/h (pace 3:00) liên tục ' || round(v_sev) || ' giây.';
+  elsif v_nor >= 180 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 65);
+    v_reason := 'Giữ tốc độ ≥ 17 km/h (pace 3:32) liên tục ' || round(v_nor) || ' giây.';
+  elsif v_spikes > 3 then
+    v_status := 'PENDING'; v_score := greatest(v_score, 50);
+    v_reason := 'Vị trí GPS nhảy xa bất thường ' || v_spikes || ' lần (> 43 km/h).';
+  elsif v_gap_m > greatest(500, 0.25 * v_gps_m) then
+    v_status := 'PENDING'; v_score := greatest(v_score, 40);
+    v_reason := 'Mất tín hiệu GPS ' || greatest(1, round(v_gap_s / 60)) || ' phút — ' || round(v_gap_m / 1000.0, 2)
+                || ' km được nối thẳng, không đối chiếu được tuyến (thường do tắt màn hình khi ghi bằng trình duyệt).';
+  elsif p_distance_m > 0 and abs(p_distance_m - v_distance) > greatest(0.15 * v_distance, 100) then
+    v_status := 'PENDING'; v_score := greatest(v_score, 45);
+    v_reason := 'Quãng đường app gửi lên lệch nhiều so với tuyến GPS.';
+  end if;
+  if v_status = 'PENDING' then
+    v_reason := left('Mức nghi vấn: ' || private.risk_label(private.risk_level(v_score)) || '. ' || v_reason
+                     || ' Bài được tính sau khi ban quản trị CLB hoặc admin xác minh.', 500);
+  end if;
+
+  v_activity := gen_random_uuid();
+  insert into public.activities (
+    id, user_id, title, source, started_at, ended_at, elapsed_time_s, moving_time_s,
+    distance_m, moving_distance_m, avg_pace_s, status, validation_status, validation_reason,
+    risk_score, risk_level, risk_flags)
+  values (
+    v_activity, v_uid, left(coalesce(nullif(trim(p_title), ''), 'Buổi chạy'), 120),
+    case when p_source in ('DIRECT_GPS', 'STRAVA', 'GARMIN') then p_source else 'DIRECT_GPS' end,
+    p_started_at, p_ended_at, greatest(coalesce(p_elapsed_s, 0), v_moving), v_moving,
+    v_distance, v_distance, v_pace,
+    case v_status when 'APPROVED' then 'READY' when 'PENDING' then 'PROCESSING' else 'REJECTED' end,
+    v_status, v_reason,
+    least(v_score, 100), private.risk_level(v_score),
+    case when jsonb_array_length(v_flags) > 0 then v_flags end);
+
+  for v_p in select value from jsonb_array_elements(v_points) loop
+    v_seq := v_seq + 1;
+    insert into public.activity_track_points (activity_id, sequence, latitude, longitude, accuracy, altitude, speed, recorded_at, distance_m)
+    values (v_activity, v_seq, (v_p->>'latitude')::numeric, (v_p->>'longitude')::numeric,
+            (v_p->>'accuracy')::numeric, (v_p->>'altitude')::numeric, (v_p->>'speed')::numeric,
+            coalesce((v_p->>'recorded_at')::timestamptz, p_started_at), round(v_c[v_seq], 1));
+  end loop;
+
+  -- Từng km (km lẻ cuối ≥ 100 m) — màn chi tiết bài chạy đọc thẳng, khớp quãng đường đã lưu
+  if v_n >= 2 then
+    if v_sd >= 100 and v_st > 0 then
+      v_splits := v_splits || jsonb_build_object('distance_m', round(v_sd), 'moving_s', round(v_st), 'elev_m', null, 'hr', null);
+    end if;
+    insert into public.activity_details (activity_id, splits, start_lat, start_lng, detailed)
+    values (v_activity, v_splits, (v_points->0->>'latitude')::numeric, (v_points->0->>'longitude')::numeric, true)
+    on conflict (activity_id) do update set splits = excluded.splits;
+  end if;
+
+  if v_status = 'APPROVED' then
+    v_reward := (select jsonb_build_object('earned_xu', x.earned_xu, 'earned_xp', x.earned_xp)
+                   from public.activities x where x.id = v_activity);         -- trigger trg_auto_reward đã thưởng
+  end if;
+
+  return json_build_object(
+    'success', true, 'activity_id', v_activity,
+    'validation_status', v_status, 'validation_reason', v_reason,
+    'distance_m', v_distance,
+    'earned_xp', coalesce((v_reward->>'earned_xp')::integer, 0),
+    'earned_xu', coalesce((v_reward->>'earned_xu')::numeric, 0));
+end $$;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001006700_strava_display_compliance.sql
+-- ===================================================================
+-- 006700: Tuân thủ Thoả thuận API Strava (hiệu lực 11/11/2024): dữ liệu Strava của một người chỉ được hiển thị cho
+-- CHÍNH người đó trong app bên thứ ba. Bài đồng bộ từ Strava: người khác chỉ thấy số tổng (quãng đường, thời gian, pace)
+-- — ẩn bản đồ tuyến, từng km, nhịp tim, nhịp bước, calo, thiết bị. Chủ bài vẫn xem đầy đủ.
+-- Bài ghi bằng app RaceHub / nhập tay không bị ảnh hưởng. Chạy lại nhiều lần vẫn an toàn.
+-- Còn lại cần chủ sản phẩm quyết định (xem docs/RUI_RO_VA_PHONG_NGUA.md): quãng đường Strava trên BXH / bảng tin CLB.
+
+create or replace function public.activity_detail(p_activity_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  a public.activities := (select x from public.activities x where x.id = p_activity_id);
+  d public.activity_details := (select x from public.activity_details x where x.activity_id = p_activity_id);
+  v_mine boolean;
+  v_map boolean;
+  -- Bài đồng bộ từ Strava, người xem không phải chủ bài → chỉ số tổng, không chi tiết (API Agreement Strava 11/2024)
+  v_strava_other boolean;
+begin
+  if a.id is null or coalesce(a.status, '') = 'DELETED' then raise exception 'ACTIVITY_NOT_FOUND'; end if;
+  v_mine := a.user_id = v_uid;
+  if not v_mine and not (public.can_view_activities(a.user_id) and public.activity_is_countable(a.status, a.validation_status)) then
+    raise exception 'ACTIVITY_NOT_FOUND';
+  end if;
+  v_strava_other := not v_mine and a.source = 'STRAVA';
+  v_map := v_mine or (not v_strava_other and public.can_view_map(a.user_id));
+
+  return jsonb_build_object(
+    'id', a.id, 'title', a.title, 'source', a.source, 'sport_type', a.sport_type, 'device_name', case when not v_strava_other then a.device_name end,
+    'started_at', a.started_at, 'distance_m', coalesce(a.moving_distance_m, a.distance_m, 0),
+    'moving_s', coalesce(a.moving_time_s, a.elapsed_time_s, 0), 'elapsed_s', coalesce(a.elapsed_time_s, 0),
+    'avg_pace_s', a.avg_pace_s, 'elevation_gain_m', coalesce(a.elevation_gain_m, 0),
+    'avg_heartrate', case when not v_strava_other then a.avg_heartrate end,
+    'max_heartrate', case when not v_strava_other then d.max_heartrate end,
+    'avg_cadence', case when not v_strava_other then d.avg_cadence end,
+    'calories', case when not v_strava_other then d.calories end,
+    'strava_limited', v_strava_other,
+    'validation_status', a.validation_status,
+    'validation_reason', case when v_mine then a.validation_reason end,
+    'earned_xu', a.earned_xu, 'earned_xp', a.earned_xp,
+    'is_mine', v_mine,
+    'owner', (select jsonb_build_object('id', p.id, 'display_name', p.display_name, 'avatar_url', p.avatar_url, 'level', p.level)
+                from public.profiles p where p.id = a.user_id),
+    'map_allowed', v_map,
+    'polyline', case when v_map then d.polyline end,
+    -- Bài GPS trong app: điểm GPS rút gọn ≤ ~1000 điểm [lat, lng, giây kể từ lúc bắt đầu, độ cao]
+    'points', case when v_map and d.polyline is null then (
+        select jsonb_agg(jsonb_build_array(s.latitude, s.longitude,
+                 round(extract(epoch from (s.recorded_at - a.started_at))), s.altitude) order by s.sequence)
+          from (select t.latitude, t.longitude, t.recorded_at, t.altitude, t.sequence,
+                       row_number() over (order by t.sequence) as rn, count(*) over () as cnt
+                  from public.activity_track_points t where t.activity_id = a.id) s
+         where s.rn % greatest(ceil(s.cnt / 1000.0)::int, 1) = 0 or s.rn = s.cnt) end,
+    'splits', case when not v_strava_other then d.splits end,
+    'needs_detail', v_mine and a.source = 'STRAVA' and not coalesce(d.detailed, false),
+    'challenges', case when v_mine then (
+        select coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'title', c.title, 'counted_m', e.counted_m) order by e.created_at), '[]'::jsonb)
+          from public.challenge_progress_events e join public.challenges c on c.id = e.challenge_id
+         where e.activity_id = a.id) else '[]'::jsonb end,
+    'cheers', (select jsonb_build_object('count', count(*), 'total', coalesce(sum(ch.amount), 0))
+                 from public.cheers ch where ch.activity_id = a.id),
+    -- So với 10 bài trước đó của chính người chạy (để hiện "dài hơn / nhanh hơn thường lệ")
+    'compare', (select jsonb_build_object(
+          'runs', count(*),
+          'avg_distance_m', round(avg(coalesce(x.moving_distance_m, x.distance_m))),
+          'avg_pace_s', round(avg(x.avg_pace_s) filter (where x.avg_pace_s > 0)),
+          'longest_30d', coalesce(a.distance_m >= (select max(y.distance_m) from public.activities y
+                              where y.user_id = a.user_id and y.id <> a.id and public.activity_is_countable(y.status, y.validation_status)
+                                and y.started_at > a.started_at - interval '30 days' and y.started_at <= a.started_at), true))
+        from (select z.*, row_number() over (order by z.started_at desc) as rn
+                from public.activities z
+               where z.user_id = a.user_id and z.id <> a.id and z.started_at < a.started_at
+                 and public.activity_is_countable(z.status, z.validation_status)) x
+       where x.rn <= 10)
+  );
+end $$;
+
+revoke all on function public.activity_detail(uuid) from public, anon;
+grant execute on function public.activity_detail(uuid) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001006800_account_deletion.sql
+-- ===================================================================
+-- 006800: Xoá tài khoản ngay trong app.
+-- Bắt buộc với app có đăng ký tài khoản trên App Store (Apple, mục 5.1.1(v)) và Google Play; đồng thời đáp ứng quyền
+-- yêu cầu xoá dữ liệu của Luật Bảo vệ dữ liệu cá nhân 2025 (hiệu lực 01/01/2026; dữ liệu vị trí là dữ liệu nhạy cảm).
+--
+-- Cách xoá: XOÁ dữ liệu cá nhân + ẨN DANH phần còn lại, giữ bản ghi giao dịch (đơn hàng, sổ Xu) ở dạng ẩn danh
+-- vì nghĩa vụ kế toán / đối soát. Sau RPC này, route /api/account/delete xoá mềm tài khoản đăng nhập (auth)
+-- — email được làm rối, người dùng đăng ký lại được bằng chính email đó như tài khoản mới.
+--
+-- Chặn: quản trị viên (phải được gỡ quyền trước) và chủ nhiệm CLB còn thành viên khác (chuyển quyền trước).
+-- Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT. Chạy lại nhiều lần vẫn an toàn.
+
+alter table public.profiles add column if not exists deleted_at timestamptz;
+
+create or replace function public.delete_my_account(p_confirm text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_p public.profiles := (select x from public.profiles x where x.id = v_uid);
+  v_runs integer;
+begin
+  if coalesce(upper(trim(p_confirm)), '') not in ('XOÁ', 'XÓA', 'XOA') then raise exception 'CONFIRM_REQUIRED'; end if;
+  if v_p.id is null then raise exception 'PROFILE_NOT_FOUND'; end if;
+  if v_p.deleted_at is not null then return jsonb_build_object('ok', true, 'already', true); end if;
+  if coalesce(v_p.is_admin, false) or coalesce(v_p.role, '') in ('ADMIN', 'SUPER_ADMIN') then raise exception 'ADMIN_CANNOT_DELETE'; end if;
+  if exists (select 1 from public.clubs c where c.owner_id = v_uid
+               and exists (select 1 from public.club_members m where m.club_id = c.id and m.user_id <> v_uid and m.status = 'ACTIVE')) then
+    raise exception 'TRANSFER_CLUB_FIRST';
+  end if;
+
+  -- 1. Bài chạy: xoá tuyến GPS + chi tiết (dữ liệu vị trí), ẩn bài (không còn hiện ở đâu)
+  delete from public.activity_track_points t using public.activities a where t.activity_id = a.id and a.user_id = v_uid;
+  delete from public.activity_details d using public.activities a where d.activity_id = a.id and a.user_id = v_uid;
+  update public.activities set status = 'DELETED', title = 'Buổi chạy', device_name = null where user_id = v_uid;
+  v_runs := (select count(*) from public.activities where user_id = v_uid);
+
+  -- 2. Dữ liệu cá nhân / thiết bị / vị trí
+  delete from public.profile_details where user_id = v_uid;
+  delete from public.push_subscriptions where user_id = v_uid;
+  delete from public.push_settings where user_id = v_uid;
+  delete from public.notification_settings where user_id = v_uid;
+  delete from public.notifications where user_id = v_uid;
+  delete from public.runner_discovery_settings where user_id = v_uid;
+  delete from public.runner_location_presence where user_id = v_uid;
+  delete from public.runner_nearby_searches where user_id = v_uid;
+  delete from public.connected_accounts where user_id = v_uid;
+  delete from public.content_bookmarks where user_id = v_uid;
+  delete from public.content_read_history where user_id = v_uid;
+  delete from public.content_user_events where user_id = v_uid;
+  delete from public.club_message_reads where user_id = v_uid;
+  delete from public.bib_listings where user_id = v_uid;
+  delete from public.bib_contact_reveals where user_id = v_uid;
+  delete from public.content_staff where user_id = v_uid;
+  update public.content_authors set user_id = null where user_id = v_uid;
+  update public.partners set status = 'HIDDEN', contacts = '{}'::jsonb, address = null where owner_id = v_uid;
+  update public.challenge_honor_prefs set photo_url = null, hidden = true where user_id = v_uid;
+
+  -- 3. Rời mọi CLB (CLB chỉ còn mình mình thì CLB giữ nguyên, không còn thành viên)
+  delete from public.club_members where user_id = v_uid;
+
+  -- 4. Hồ sơ: ẩn danh (bài viết / tin nhắn cũ trong CLB hiện "Người dùng đã xoá")
+  update public.profiles set
+    display_name = 'Người dùng đã xoá', avatar_url = null, bio = null, gender = null,
+    strava_connected = false, strava_access_token = null, strava_refresh_token = null,
+    strava_token_expires_at = null, strava_athlete_id = null,
+    gift_wall_public = false, referral_code = null,
+    banned_at = coalesce(banned_at, now()), banned_reason = 'ACCOUNT_DELETED',
+    deleted_at = now(), updated_at = now()
+  where id = v_uid;
+
+  return jsonb_build_object('ok', true, 'activities_hidden', v_runs);
+end $$;
+
+revoke all on function public.delete_my_account(text) from public, anon;
+grant execute on function public.delete_my_account(text) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -6705,11 +9454,27 @@ begin
     jsonb_build_object('file', '20261001005900', 'label', 'Bộ đồng phục: áo + quần + tất + giày, họa tiết, mặc cả bộ',
       'ok', to_regprocedure('private.clean_design(jsonb, text)') is not null),
     jsonb_build_object('file', '20261001006000', 'label', 'Bộ sưu tập nhân vật (dáng) + thiết kế in kéo thả, độ đậm màu, ảnh vải',
-      'ok', to_regprocedure('private.character_bodies()') is not null));
+      'ok', to_regprocedure('private.character_bodies()') is not null),
+    jsonb_build_object('file', '20261001006100', 'label', 'Quanh đây: runner gần bạn (ô ~1 km), kết nối, rủ chạy, buổi chạy công khai, chặn / báo cáo',
+      'ok', to_regprocedure('public.nearby_runners(jsonb)') is not null),
+    jsonb_build_object('file', '20261001006200', 'label', 'RaceHub Knowledge: kiến thức & tin tức, CMS có duyệt chuyên môn, tiến độ đọc, chuỗi bài → huy hiệu',
+      'ok', to_regprocedure('public.knowledge_home()') is not null),
+    jsonb_build_object('file', '20261001006300', 'label', 'Quản lý CLB: Tin CLB của ban chủ nhiệm + kho link ảnh CLB (album sự kiện, giải chạy)',
+      'ok', to_regprocedure('public.club_albums(uuid, jsonb)') is not null),
+    jsonb_build_object('file', '20261001006400', 'label', 'Chợ BIB: nhượng / tìm mua BIB (không cao hơn giá gốc, liên hệ ẩn, báo cáo, admin ẩn tin)',
+      'ok', to_regprocedure('public.bib_listings(jsonb)') is not null),
+    jsonb_build_object('file', '20261001006500', 'label', 'Chấm bài GPS: phát hiện mất tín hiệu (tắt màn hình) — tuyến nối thẳng phải xác minh',
+      'ok', exists (select 1 from pg_proc where proname = 'submit_and_process_activity' and prosrc like '%GPS_GAP%')),
+    jsonb_build_object('file', '20261001006600', 'label', 'Quãng đường bài GPS = số app đo (kẹp theo tuyến) + từng km trên máy chủ',
+      'ok', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'activity_track_points' and column_name = 'distance_m')),
+    jsonb_build_object('file', '20261001006700', 'label', 'Quy định API Strava: bài Strava của người khác chỉ hiện số tổng (ẩn bản đồ, từng km, nhịp tim)',
+      'ok', exists (select 1 from pg_proc where proname = 'activity_detail' and prosrc like '%strava_limited%')),
+    jsonb_build_object('file', '20261001006800', 'label', 'Xoá tài khoản trong app (Apple 5.1.1(v), Luật BVDLCN 2025): xoá dữ liệu cá nhân + ẩn danh',
+      'ok', to_regprocedure('public.delete_my_account(text)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
-                  from unnest(array['avatars', 'character-layers', 'club-media', 'race-media', 'uniform-media']) b(id)
+                  from unnest(array['avatars', 'character-layers', 'club-media', 'race-media', 'uniform-media', 'content-media']) b(id)
                   left join storage.buckets s on s.id = b.id);
 
   v_stats := jsonb_build_object(

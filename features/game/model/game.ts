@@ -1,6 +1,6 @@
 // Lớp game (migration 000800): kiểu dữ liệu + hàm thuần cho giao diện.
 import {
-  Award, CalendarCheck, CalendarDays, Crown, Flag, Flame, Footprints, Gem, Globe2, HandHeart, Map, Medal, Milestone, Moon,
+  Award, CalendarCheck, CalendarDays, Crown, Flag, Flame, Footprints, Gem, GraduationCap, Globe2, HandHeart, Map, Medal, Milestone, Moon,
   Repeat, Route, Shield, Sparkles, Star, Sunrise, Target, Trophy, Users, type LucideIcon,
 } from 'lucide-react'
 
@@ -133,7 +133,7 @@ export interface Wallet {
 }
 
 const ICONS: Record<string, LucideIcon> = {
-  Award, CalendarCheck, CalendarDays, Crown, Flag, Flame, Footprints, Gem, Globe2, HandHeart, Map, Medal, Milestone, Moon,
+  Award, CalendarCheck, CalendarDays, Crown, Flag, Flame, Footprints, Gem, Globe2, GraduationCap, HandHeart, Map, Medal, Milestone, Moon,
   Repeat, Route, Shield, Sparkles, Star, Sunrise, Target, Trophy, Users,
 }
 /** Tên icon lưu trong DB → component (không có thì dùng Target) */
@@ -158,7 +158,7 @@ export const LEAGUE_TIERS = [
 export const leagueTier = (tier: number | null | undefined) => LEAGUE_TIERS[Math.min(5, Math.max(1, tier ?? 1)) - 1]
 
 export const CATEGORY_LABEL: Record<string, string> = {
-  DISTANCE: 'Quãng đường', RACE: 'Cự ly', HABIT: 'Thói quen', CHALLENGE: 'Thử thách', SOCIAL: 'Cộng đồng', LEVEL: 'Cấp độ',
+  DISTANCE: 'Quãng đường', RACE: 'Cự ly', HABIT: 'Thói quen', CHALLENGE: 'Thử thách', SOCIAL: 'Cộng đồng', LEVEL: 'Cấp độ', LEARN: 'Kiến thức',
 }
 
 /** Tỉ lệ hoàn thành 0–1 */

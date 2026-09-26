@@ -112,6 +112,8 @@ Họa tiết là "màu thứ hai" vẽ theo mặt nạ nên giữ nếp vải nh
 
 **Dáng nhân vật:** `male` (khoanh tay), `male_relax` (thư thái), `male_run` (đang chạy), `female` (chống hông), `female_tee` (áo thun), `female_run` (đang chạy). Người chơi chọn ở **Tủ đồ** (lưu `user_avatar.body`). Mọi món **đổi màu** (áo, quần, tất, giày, họa tiết, lớp in) tự lên mọi dáng; món **lớp ảnh** (mũ, kính…) cần bản vẽ riêng cho từng dáng (`layer_urls.<mã dáng>`), chưa có thì không hiện ở dáng đó.
 
+**Tách nền:** mọi `base.webp` là ảnh **trong suốt** (sinh bằng `python3 scripts/character/cutout.py`: mô hình phông + khử viền tóc + bóng đổ trong suốt, đồng thời cắt mặt nạ đổi màu cho khỏi lem ra sàn). Nền do khung hiển thị quyết định. Thay ảnh gốc thì chạy `segment*.py` trước rồi `cutout.py`.
+
 **Thêm dáng mới:** ảnh 2:3 (nhân vật mặc áo xanh, quần đen, tất trắng, nền xám trơn) đặt ở `scripts/character/source/runner_<mã>.webp`, thêm cấu hình (khoảng cao áo / quần, đa giác tất / giày) trong `scripts/character/segment_bodies.py`, chạy `python3 scripts/character/segment_bodies.py <mã>`, rồi khai báo mã trong `BODIES`, `PRINT_ZONES`, `PORTRAIT` (client) và `private.character_bodies()` (SQL).
 
 **Thiết kế in (Kit Studio → Thiết kế in):**

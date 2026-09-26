@@ -87,7 +87,9 @@ export function ActivityDetailScreen({ id }: { id: string }) {
 
       {/* Bản đồ */}
       <div className="overflow-hidden rounded-[var(--radius-card)] border border-border">
-        {!a.map_allowed ? (
+        {a.strava_limited ? (
+          <Placeholder icon={Lock} text="Bài đồng bộ từ Strava: theo quy định của Strava, chỉ người chạy xem được bản đồ và chi tiết" />
+        ) : !a.map_allowed ? (
           <Placeholder icon={Lock} text="Người chạy để bản đồ ở chế độ riêng tư" />
         ) : route.length >= 2 ? (
           <RouteMap route={route} className="h-64 w-full" />
@@ -127,7 +129,7 @@ export function ActivityDetailScreen({ id }: { id: string }) {
         <SectionTitle>Từng km</SectionTitle>
         {splits.length > 0 ? <Splits splits={splits} />
           : a.needs_detail ? <p className="flex items-center gap-2 text-sm text-fg-muted"><Loader2 className="size-4 animate-spin" aria-hidden />Đang lấy dữ liệu từng km từ Strava…</p>
-          : <p className="text-sm text-fg-muted">Bài chạy này không có dữ liệu từng km.</p>}
+          : <p className="text-sm text-fg-muted">{a.strava_limited ? 'Chi tiết từng km của bài Strava chỉ người chạy xem được.' : 'Bài chạy này không có dữ liệu từng km.'}</p>}
       </section>
 
       {/* Phần thưởng + thử thách */}
