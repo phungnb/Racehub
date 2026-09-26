@@ -19,8 +19,14 @@ export interface Club {
   plan?: 'FREE' | 'PRO'
   pro_until?: string | null
   slug?: string | null
+  /** Tường nhà CLB Pro (migration 008100) */
+  cover_url?: string | null
+  cover_position?: number | null
+  tagline?: string | null
+  theme?: ClubTheme | null
   created_at: string
 }
+export type ClubTheme = 'AURORA' | 'SUNSET' | 'OCEAN' | 'FOREST' | 'GOLD' | 'NIGHT'
 
 export interface MemberProfile {
   id: string
@@ -57,7 +63,7 @@ const normalizeMember = (r: MemberRow): ClubMember => ({ ...r, profile: one(r.pr
 /* ---------------------------------- Đọc ---------------------------------- */
 
 /** Cột công khai của bảng clubs (migration 003400: mã mời / ngân hàng không đọc trực tiếp được) */
-export const CLUB_COLUMNS = 'id, name, description, avatar_url, accent_color, owner_id, treasury_balance, member_count, member_limit, join_policy, plan, pro_until, slug, created_at'
+export const CLUB_COLUMNS = 'id, name, description, avatar_url, accent_color, owner_id, treasury_balance, member_count, member_limit, join_policy, plan, pro_until, slug, cover_url, cover_position, tagline, theme, created_at'
 
 export async function getClub(clubId: string): Promise<Club> {
   const { data, error } = await supabase.from('clubs').select(CLUB_COLUMNS).eq('id', clubId).single()
@@ -167,6 +173,27 @@ export async function updateClub(clubId: string, fields: { name?: string; descri
   })
   if (error) throw error
   return data as Club
+}
+
+/** Ảnh bìa CLB Pro: thu nhỏ còn ≤ 1600px JPEG trước khi tải (giới hạn 2 MB của kho ảnh CLB) */
+export async function uploadClubCover(clubId: string, file: File): Promise<string> {
+  if (!IMAGE_TYPES.includes(file.type)) throw new Error('AVATAR_TYPE')
+  const bmp = await createImageBitmap(file)
+  const scale = Math.min(1, 1600 / bmp.width)
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(bmp.width * scale); canvas.height = Math.round(bmp.height * scale)
+  canvas.getContext('2d')!.drawImage(bmp, 0, 0, canvas.width, canvas.height)
+  const blob = await new Promise<Blob>((ok, bad) => canvas.toBlob((b) => (b ? ok(b) : bad(new Error('AVATAR_TYPE'))), 'image/jpeg', 0.85))
+  if (blob.size > MAX_AVATAR_BYTES) throw new Error('AVATAR_SIZE')
+  const path = `${clubId}/cover-${Date.now()}.jpg`
+  const { error } = await supabase.storage.from(AVATAR_BUCKET).upload(path, blob, { cacheControl: '3600', upsert: false, contentType: 'image/jpeg' })
+  if (error) throw error
+  return supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path).data.publicUrl
+}
+
+export async function setClubBranding(clubId: string, b: { cover_url: string | null; cover_position: number; tagline: string | null; theme: ClubTheme | null }) {
+  const { error } = await supabase.rpc('set_club_branding', { p_club_id: clubId, p: b })
+  if (error) throw error
 }
 
 export async function setClubAccent(clubId: string, color: string | null) {
@@ -305,6 +332,13 @@ const MESSAGES: Record<string, string> = {
   BOOST_DAY_TOO_LATE: 'Ngày vàng phải đặt trước, từ ngày mai trở đi (ngày đã bắt đầu thì không đổi được).',
   INVALID_MULTIPLIER: 'Hệ số chỉ được ×1,5, ×2 hoặc ×3.',
   BOOST_DAYS_LIMIT: 'Mỗi tháng tối đa 4 ngày vàng.',
+  TAGLINE_TOO_LONG: 'Khẩu hiệu tối đa 80 ký tự.',
+  EXCHANGE_PENDING: 'Đã có một thư mời đang chờ CLB này trả lời.',
+  EXCHANGE_LIMIT: 'Mỗi CLB tối đa 5 thư mời đang chờ.',
+  EXCHANGE_CLOSED: 'Thư mời đã được trả lời hoặc đã huỷ.',
+  EXCHANGE_EXPIRED: 'Buổi giao lưu đã qua giờ.',
+  EXCHANGE_NOT_FOUND: 'Không tìm thấy thư mời.',
+  REASON_REQUIRED: 'Hãy ghi lý do (ít nhất 3 ký tự).',
   CLUB_BANK_MISSING: 'CLB chưa khai tài khoản nhận tiền (tab Quỹ) nên chưa đặt hàng được.',
   ORDERS_CLOSED: 'Sản phẩm đã chốt đơn.',
   OUT_OF_STOCK: 'Không còn đủ số lượng.',

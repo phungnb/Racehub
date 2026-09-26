@@ -23,8 +23,9 @@ describe('trang công khai CLB (008000)', () => {
   it('khách chưa đăng nhập xem được CLB Pro; chỉ số tổng, không có dữ liệu bài chạy', async () => {
     const c = await page(' Saigon-Runners ')
     expect(c).toMatchObject({ name: 'Sài Gòn Runners', description: 'Chạy sáng Thảo Cầm Viên', slug: 'saigon-runners', events_held: 0, challenges_held: 0 })
-    expect(Object.keys(c!).sort()).toEqual(['accent_color', 'avatar_url', 'challenges_held', 'description', 'events_held', 'events_upcoming',
-      'founded_at', 'id', 'join_policy', 'member_count', 'name', 'slug'])
+    // 008100 thêm tường nhà: cover_url, cover_position, tagline, theme — vẫn không có dữ liệu bài chạy / tên thành viên
+    expect(Object.keys(c!).sort()).toEqual(['accent_color', 'avatar_url', 'challenges_held', 'cover_position', 'cover_url', 'description',
+      'events_held', 'events_upcoming', 'founded_at', 'id', 'join_policy', 'member_count', 'name', 'slug', 'tagline', 'theme'])
   })
 
   it('hết Pro / sai link → không có trang', async () => {

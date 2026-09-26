@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { CalendarPlus, CalendarX2, CheckCircle2, MapPin, Plus, Route, Timer, Users, Vote } from 'lucide-react'
+import { CalendarPlus, CalendarX2, CheckCircle2, Handshake, MapPin, Plus, Route, Timer, Users, Vote } from 'lucide-react'
 import { Button, EmptyState, ErrorState, SectionTitle, SegmentedControl, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
@@ -27,6 +27,15 @@ export function ClubEventsScreen({ clubId }: { clubId: string }) {
   return (
     <div className="space-y-6">
       <section className="space-y-3">
+        <Link href={routes.clubTab(clubId, 'exchange')}
+          className="flex items-center gap-3 rounded-2xl border border-brand/30 bg-gradient-to-r from-brand/15 to-transparent px-4 py-3">
+          <Handshake className="size-5 shrink-0 text-brand" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">Giao lưu CLB</span>
+            <span className="block text-xs text-fg-muted">{isStaff ? 'Gửi / trả lời thư mời chạy chung với CLB khác' : 'Các buổi chạy chung với CLB khác'}</span>
+          </span>
+          <span className="text-fg-subtle" aria-hidden>›</span>
+        </Link>
         <div className="flex items-center gap-2">
           <SegmentedControl value={scope} onChange={setScope} className="flex-1"
             options={[{ value: 'UPCOMING', label: 'Sắp tới' }, { value: 'PAST', label: 'Đã qua' }]} />

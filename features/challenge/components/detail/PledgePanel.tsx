@@ -6,6 +6,7 @@ import { AlertTriangle, Check, Flag, Lock, Scale, Shuffle, Trophy } from 'lucide
 import { toast } from 'sonner'
 import { Avatar, Button, Card, Input, RankSearch, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
 import { filterSearch } from '@/shared/lib/search'
+import { DoneFilter, useDoneFilter } from './DoneFilter'
 import { cn } from '@/shared/lib/cn'
 import { formatNumber } from '@/shared/lib/format'
 import {
@@ -248,12 +249,15 @@ function MoveSheet({ member, board, onClose, onPick, loading }: {
 /** Bảng xếp hạng theo % mục tiêu tự đăng ký */
 function PledgeRanking({ board, team, teamsById }: { board: PledgeBoard; team: boolean; teamsById: Record<string, { color: string; name: string }> }) {
   const [q, setQ] = useState('')
+  const [doneMode, setDoneMode] = useDoneFilter()
   if (!board.members.length) return <p className="py-6 text-center text-sm text-fg-muted">Chưa có ai tham gia.</p>
-  const ranked = board.members.map((m, i) => ({ m, rank: i + 1 }))
+  const all = board.members.map((m, i) => ({ m, rank: i + 1 }))
+  const ranked = doneMode === 'ALL' ? all : all.filter((x) => (doneMode === 'DONE') === !!x.m.completed)
   const list = filterSearch(ranked, q, (x) => [x.m.display_name])
   return (
     <section className="space-y-2">
       <SectionTitle>Theo % mục tiêu</SectionTitle>
+      <DoneFilter mode={doneMode} onChange={setDoneMode} ended={false} total={all.length} done={all.filter((x) => x.m.completed).length} />
       {ranked.length > 5 && <RankSearch value={q} onChange={setQ} total={ranked.length} matched={list.length} />}
       <ol className="divide-y divide-border rounded-[var(--radius-card)] border border-border bg-surface">
         {list.map(({ m, rank }) => (

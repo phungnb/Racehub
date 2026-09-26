@@ -21,6 +21,7 @@ import {
 import { useChallenge, useChallengeActions } from '../../hooks/useChallenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
 import { PledgePanel } from './PledgePanel'
+import { DoneFilter, useDoneFilter } from './DoneFilter'
 import { RulesInfoCard } from './RulesInfo'
 import { TopSupported } from '@/features/game'
 import { HonorPanel, useHonor } from '../honor/HonorPanel'
@@ -258,10 +259,16 @@ function Leaderboard({ d, rows, loading, error, standings }: {
 }) {
   const [team, setTeam] = useState<string | 'ALL'>('ALL')
   const [q, setQ] = useState('')
+  const [doneMode, setDoneMode] = useDoneFilter()
+  const [now] = useState(() => Date.now())
   const c = d.challenge
   if (loading) return <div className="space-y-2">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-14" />)}</div>
   if (error) return <ErrorState message="Không tải được bảng xếp hạng." />
-  const inTeam = (rows ?? []).filter((r) => team === 'ALL' || r.team_id === team)
+  // Có mục tiêu thì mới có "hoàn thành": lọc được người chưa / không hoàn thành
+  const hasGoal = c.target_value > 0 || (rows ?? []).some((r) => r.completed_at)
+  const ended = now >= Date.parse(c.end_date)
+  const inTeamAll = (rows ?? []).filter((r) => team === 'ALL' || r.team_id === team)
+  const inTeam = !hasGoal || doneMode === 'ALL' ? inTeamAll : inTeamAll.filter((r) => (doneMode === 'DONE') === !!r.completed_at)
   const list = filterSearch(inTeam, q, (r) => [r.display_name])
   const meRow = d.me ? (rows ?? []).find((r) => r.participant_id === d.me?.id) : undefined
   const teamOf = new Map(standings.map((t) => [t.team_id, t]))
@@ -278,12 +285,17 @@ function Leaderboard({ d, rows, loading, error, standings }: {
           ))}
         </div>
       )}
+      {hasGoal && (
+        <DoneFilter mode={doneMode} onChange={setDoneMode} ended={ended} total={inTeamAll.length}
+          done={inTeamAll.filter((r) => r.completed_at).length} />
+      )}
       {(rows?.length ?? 0) > 5 && (
         <RankSearch value={q} onChange={setQ} total={inTeam.length} matched={list.length}
           onFindMe={meRow ? () => { setTeam('ALL'); requestAnimationFrame(() => scrollToRow(`lb-${meRow.participant_id}`)) } : undefined} />
       )}
       {list.length === 0 ? (
-        q.trim() ? null : <EmptyState icon={Trophy} title="Chưa có ai trên bảng" description="Hãy tham gia và chạy bài đầu tiên để lên bảng xếp hạng." />
+        q.trim() ? null : doneMode === 'NOT' && hasGoal ? <EmptyState icon={Check} title="Ai cũng đã hoàn thành!" description="Không còn vận động viên nào chưa đạt mục tiêu." />
+          : <EmptyState icon={Trophy} title="Chưa có ai trên bảng" description="Hãy tham gia và chạy bài đầu tiên để lên bảng xếp hạng." />
       ) : (
         <ol className="space-y-1.5">
           {list.map((r) => {
@@ -301,7 +313,8 @@ function Leaderboard({ d, rows, loading, error, standings }: {
                     <LevelBadge level={r.level} />
                     {r.completed_at && <Check className="size-4 shrink-0 text-coin" aria-label="Đã hoàn thành" />}
                   </span>
-                  <span className="text-xs text-fg-subtle">{r.run_count} buổi{t ? ` · ${t.name}` : ''}{r.reward_xu > 0 ? ` · +${formatNumber(r.reward_xu)} Xu` : ''}</span>
+                  <span className="text-xs text-fg-subtle">{r.run_count} buổi{t ? ` · ${t.name}` : ''}{r.reward_xu > 0 ? ` · +${formatNumber(r.reward_xu)} Xu` : ''}
+                    {hasGoal && !r.completed_at && c.target_value > 0 && <span className="text-danger"> · {ended ? 'thiếu' : 'còn'} {formatScore(c.objective, Math.max(c.target_value - r.score, 0))}</span>}</span>
                 </span>
                 <span className="font-mono tabular font-bold">{formatScore(c.objective, r.score)}</span>
               </li>

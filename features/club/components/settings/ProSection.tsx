@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BarChart3, Check, Crown, Download, Link2, Ticket, Users } from 'lucide-react'
+import { BarChart3, Check, Crown, Download, Link2, Sparkles, Ticket, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, ErrorState, Input, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -10,11 +10,13 @@ import { formatNumber } from '@/shared/lib/format'
 import { clubErrorMessage, getAttendanceReport, getClubPlan, setClubSlug, type AttendanceRow, type Club } from '../../api/clubApi'
 import { clubKeys } from '../../hooks/keys'
 import { ClubProPurchase } from '@/features/billing'
+import { BrandingEditor } from './BrandingEditor'
 
 const BENEFITS = [
   { icon: Users, text: 'Không giới hạn Quản trị viên (gói miễn phí: 2)' },
   { icon: Link2, text: 'Trang công khai + link mời dễ nhớ: racehub…/c/ten-clb' },
   { icon: BarChart3, text: 'Báo cáo chuyên cần: buổi chạy, km, điểm danh sự kiện, đóng quỹ — xuất CSV' },
+  { icon: Sparkles, text: 'Tường nhà nổi bật: ảnh bìa, khẩu hiệu, chủ đề màu, huy hiệu ✦ PRO' },
   { icon: Ticket, text: '2 lượt tạo thử thách CLB ≤100 người mỗi tháng (trừ quỹ CLB 0 Xu)' },
 ]
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('vi-VN')
@@ -57,6 +59,7 @@ export function ProSection({ club }: { club: Club }) {
             <Button block variant="secondary" onClick={() => setReport(true)}><BarChart3 className="size-4" aria-hidden />Báo cáo chuyên cần</Button>
           </>
         ) : null}
+        <BrandingEditor club={club} active={p.active} />
         <ClubProPurchase clubId={club.id} active={p.active} />
       </Card>
       {report && <ReportSheet club={club} onClose={() => setReport(false)} />}
