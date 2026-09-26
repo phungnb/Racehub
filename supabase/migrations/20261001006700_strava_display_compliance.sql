@@ -33,6 +33,7 @@ begin
     'avg_cadence', case when not v_strava_other then d.avg_cadence end,
     'calories', case when not v_strava_other then d.calories end,
     'strava_limited', v_strava_other,
+    'strava_id', case when v_mine and a.source = 'STRAVA' then a.source_activity_id end,
     'validation_status', a.validation_status,
     'validation_reason', case when v_mine then a.validation_reason end,
     'earned_xu', a.earned_xu, 'earned_xp', a.earned_xp,

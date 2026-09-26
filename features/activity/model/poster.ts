@@ -19,6 +19,8 @@ export interface PosterData {
   character: HTMLCanvasElement | null
   /** Tên miền hiện ở chân ảnh */
   site: string
+  /** Bài lấy từ Strava → ghi "Powered by Strava" trên ảnh (bắt buộc theo Strava Brand Guidelines) */
+  fromStrava?: boolean
 }
 
 const C = { bg1: '#0a0d12', bg2: '#141a24', brand: '#b6ff3b', fg: '#f2f5f9', muted: '#8b95a5', end: '#ff4d4f' }
@@ -225,6 +227,11 @@ export async function drawPoster(canvas: HTMLCanvasElement, d: PosterData, forma
   ctx.fillStyle = C.brand
   ctx.textAlign = 'right'
   ctx.fillText(d.site, W - M, fy)
+  if (d.fromStrava) {
+    ctx.font = `700 24px ${sans}`
+    ctx.fillStyle = '#FC5200'
+    ctx.fillText('Powered by Strava', W - M, fy - (story ? 42 : 36))
+  }
   ctx.textAlign = 'left'
 }
 

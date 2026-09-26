@@ -6,6 +6,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { ArrowLeft, BellRing, Check, CheckCircle2, ChevronRight, KeyRound, Loader2, Search, Users, Watch } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, Field, Input, Skeleton } from '@/shared/ui'
+import { StravaConnectButton } from '@/features/integrations'
 import { cn } from '@/shared/lib/cn'
 import { useDebounced } from '@/shared/lib/search'
 import { ICONS } from '@/shared/config/brand'
@@ -172,7 +173,7 @@ function DeviceStep({ onDone }: { onDone: () => void }) {
       ) : (
         <div className="mt-6 space-y-2">
           {/* Link thường (không prefetch) vì đây là route API chuyển hướng sang Strava */}
-          <a href={href} className="block"><Button block size="lg">Kết nối Strava</Button></a>
+          <StravaConnectButton href={href} size="lg" />
           <Button block variant="ghost" onClick={onDone}>Để sau — tôi ghi bài chạy trong app</Button>
         </div>
       )}

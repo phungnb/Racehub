@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { BarChart3, ChevronRight, Crown, Gift, Pencil, Settings, Sparkles, Watch, Ticket, Store } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, LevelBadge, ProgressBar, SegmentedControl, Skeleton } from '@/shared/ui'
+import { StravaConnectButton } from '@/features/integrations'
 import { formatKm, formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import { levelProgress } from '@/features/progression'
@@ -91,13 +92,13 @@ function Devices({ profile }: { profile: Profile }) {
     <ul className="divide-y divide-border">
       <li className="flex items-center gap-3 py-3">
         <span className="grid size-9 place-items-center rounded-lg bg-[#fc4c02]/15 font-black text-[#fc4c02]" aria-hidden>S</span>
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <p className="font-semibold">Strava</p>
           <p className="text-xs text-fg-muted">{profile.strava_connected ? 'Đã kết nối · bài chạy tự đồng bộ' : 'Nhận bài chạy từ Garmin, COROS, Apple Watch…'}</p>
         </div>
         {profile.strava_connected
           ? <Button size="sm" variant="secondary" loading={busy} onClick={disconnect}>Ngắt</Button>
-          : <a href="/api/connect/strava"><Button size="sm">Kết nối</Button></a>}
+          : <StravaConnectButton href="/api/connect/strava" size="sm" className="shrink-0" />}
       </li>
       {['Garmin Connect', 'COROS', 'Apple Health'].map((n) => (
         <li key={n} className="flex items-center gap-3 py-3 opacity-60">

@@ -1,19 +1,20 @@
 'use client'
 
-import Link from 'next/link'
 import { Watch } from 'lucide-react'
-import { Button, Card } from '@/shared/ui'
+import { Card } from '@/shared/ui'
+import { StravaConnectButton } from '@/features/integrations'
 
 export function ConnectDeviceCard() {
   return (
-    <Card className="flex items-center gap-3 border-brand/30 bg-brand/5">
-      <Watch className="size-8 shrink-0 text-brand" aria-hidden />
-      <div className="flex-1">
-        <p className="font-semibold">Kết nối Strava</p>
-        <p className="text-sm text-fg-muted">Bài chạy từ Garmin, Coros, Apple Watch sẽ tự động tính vào thử thách.</p>
+    <Card className="space-y-3 border-brand/30 bg-brand/5">
+      <div className="flex items-center gap-3">
+        <Watch className="size-8 shrink-0 text-brand" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">Kết nối Strava</p>
+          <p className="text-sm text-fg-muted">Bài chạy từ Garmin, Coros, Apple Watch sẽ tự động tính vào tiến độ của bạn.</p>
+        </div>
       </div>
-      <Link href="/api/connect/strava"><Button size="sm">Kết nối</Button></Link>
+      <StravaConnectButton href="/api/connect/strava" size="lg" />
     </Card>
   )
 }
-
