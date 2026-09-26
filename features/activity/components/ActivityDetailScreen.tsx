@@ -58,6 +58,9 @@ export function ActivityDetailScreen({ id }: { id: string }) {
           <h1 className="text-xl font-bold leading-tight">{a.title}</h1>
           <p className="text-xs capitalize text-fg-subtle">{whenText}</p>
           <p className="text-xs text-fg-subtle">{[SOURCE_LABEL[a.source ?? ''] ?? a.source, a.device_name].filter(Boolean).join(' · ')}</p>
+          {a.is_mine && a.source === 'STRAVA' && a.shared === false && (
+            <p className="mt-1 text-xs text-fg-muted">Chỉ bạn thấy bài này (vẫn tính Xu, XP). Bật “Hiện bài chạy từ Strava” trong <Link href={routes.settings} className="font-semibold text-brand underline">Cài đặt</Link> để lên BXH CLB.</p>
+          )}
           {a.source === 'STRAVA' && (
             <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
               <PoweredByStrava />

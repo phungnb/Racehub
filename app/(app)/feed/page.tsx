@@ -5,7 +5,7 @@ import { useMyProfile } from '@/features/auth'
 import { ConnectDeviceCard, ExploreShortcuts } from '@/features/home'
 import { GameHub } from '@/features/game'
 import { ActivityList } from '@/features/activity'
-import { StravaSyncCard } from '@/features/integrations'
+import { StravaShareCard, StravaSyncCard } from '@/features/integrations'
 import { InstallCard } from '@/features/pwa'
 import { KnowledgeHomeSection } from '@/features/knowledge'
 import { EmptyState, SectionTitle, Skeleton } from '@/shared/ui'
@@ -25,6 +25,7 @@ export default function FeedPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <InstallCard />
+      {profile.strava_connected && <StravaShareCard mode="prompt" />}
       <GameHub profile={profile} />
       <ExploreShortcuts />
       <KnowledgeHomeSection />

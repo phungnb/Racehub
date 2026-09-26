@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Activity, BookOpen, ShieldAlert, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, type LucideIcon } from 'lucide-react'
+import { Activity, BookOpen, Link2, ShieldAlert, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, type LucideIcon } from 'lucide-react'
 import { ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { adminErrorMessage } from '../api/adminApi'
@@ -29,10 +29,11 @@ import { ChallengesTab } from './console/ChallengesTab'
 import { AuditTab } from './console/AuditTab'
 import { ReportsTab } from './console/ReportsTab'
 import { BibTab } from './console/BibTab'
+import { StravaTab } from './console/StravaTab'
 import { CmsScreen } from '@/features/knowledge'
 
 type Tab = 'overview' | 'metrics' | 'users' | 'review' | 'reports' | 'challenges' | 'clubs' | 'cups' | 'partners' | 'organizers' | 'content' | 'bib'
-  | 'orders' | 'plans' | 'promos' | 'quests' | 'gifts' | 'items' | 'grant' | 'passes' | 'policy' | 'system' | 'audit'
+  | 'orders' | 'plans' | 'promos' | 'quests' | 'gifts' | 'items' | 'grant' | 'passes' | 'policy' | 'system' | 'audit' | 'strava'
 type Badge = keyof AdminInbox
 const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; label: string; icon: LucideIcon; badge?: Badge }[] }[] = [
   { id: 'home', label: 'Tổng quan', icon: LayoutDashboard, tabs: [
@@ -50,7 +51,7 @@ const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; la
   { id: 'economy', label: 'Kinh tế', icon: Coins, tabs: [
     { id: 'grant', label: 'Cộng/Trừ Xu', icon: Coins }, { id: 'passes', label: 'Lượt tạo', icon: Ticket }, { id: 'policy', label: 'Chính sách', icon: ScrollText }] },
   { id: 'system', label: 'Hệ thống', icon: Activity, tabs: [
-    { id: 'system', label: 'Kiểm tra hệ thống', icon: Activity, badge: 'errors' }, { id: 'audit', label: 'Nhật ký quản trị', icon: History }] },
+    { id: 'system', label: 'Kiểm tra hệ thống', icon: Activity, badge: 'errors' }, { id: 'audit', label: 'Nhật ký quản trị', icon: History }, { id: 'strava', label: 'Strava', icon: Link2 }] },
 ]
 const ALL_TABS = GROUPS.flatMap((g) => g.tabs.map((t) => t.id))
 const groupOf = (t: Tab) => GROUPS.find((g) => g.tabs.some((x) => x.id === t)) ?? GROUPS[0]
@@ -111,6 +112,7 @@ export function AdminConsole() {
         : tab === 'users' ? <UsersTab />
         : tab === 'challenges' ? <ChallengesTab />
         : tab === 'audit' ? <AuditTab />
+        : tab === 'strava' ? <StravaTab />
         : tab === 'reports' ? <ReportsTab />
         : tab === 'content' ? <CmsScreen />
         : tab === 'bib' ? <BibTab />

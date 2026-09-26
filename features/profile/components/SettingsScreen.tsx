@@ -18,6 +18,7 @@ import {
   type Gender, type MyProfile, type ProfileDraft,
 } from '../model/profileForm'
 import PrivacySettings from './PrivacySettings'
+import { StravaShareCard } from '@/features/integrations'
 import { AvatarPicker } from './AvatarPicker'
 import { myProfileKey, useRefreshProfile } from '../hooks/useRefreshProfile'
 
@@ -45,6 +46,7 @@ export function SettingsScreen() {
 
       <SectionTitle>Quyền riêng tư</SectionTitle>
       {q.data && <PrivacySettings userId={q.data.id} />}
+      <StravaShareCard />
 
       <SectionTitle>Tài khoản</SectionTitle>
       <AccountCard />

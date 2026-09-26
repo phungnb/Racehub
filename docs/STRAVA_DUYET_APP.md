@@ -41,7 +41,10 @@ Email từ chối của Strava thường nêu một trong các lý do sau:
 | **Quãng đường từ Strava hiện trên BXH CLB, BXH thử thách, bảng tin, kết quả giải chạy ảo** | ❌ **Đây là điểm dễ bị từ chối nhất.** Xem mục 3 |
 | Không dùng dữ liệu Strava cho AI | ✅ (chưa có tính năng AI dùng dữ liệu bài chạy — giữ nguyên như vậy) |
 
-## 3. Quyết định trước khi nộp: bài Strava trên bảng xếp hạng
+## 3. Bài Strava trên bảng xếp hạng — ĐÃ CHỌN hướng B+ (migration 007000)
+
+> ✅ Đã làm: runner tự bật "Hiện bài chạy từ Strava cho CLB & bảng xếp hạng" (hỏi ở trang chủ khi đã kết nối Strava, đổi trong Cài đặt → Quyền riêng tư). Chưa đồng ý: bài chỉ tính Xu / XP / huy hiệu cho chính họ. Admin đổi chính sách chung ở **Quản trị → Hệ thống → Strava**: B+ (mặc định) · A (chỉ chủ bài) · B (luôn hiện).
+
 
 Theo điều khoản hiện hành, dữ liệu Strava của một người chỉ được hiển thị cho chính người đó. Bảng xếp hạng CLB hay thử thách có tổng km lấy từ Strava của thành viên khác là hiển thị dữ liệu cho người khác. Có 3 hướng:
 

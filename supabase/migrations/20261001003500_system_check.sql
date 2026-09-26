@@ -106,7 +106,11 @@ begin
     jsonb_build_object('file', '20261001006800', 'label', 'Xoá tài khoản trong app (Apple 5.1.1(v), Luật BVDLCN 2025): xoá dữ liệu cá nhân + ẩn danh',
       'ok', to_regprocedure('public.delete_my_account(text)') is not null),
     jsonb_build_object('file', '20261001006900', 'label', 'Thông báo / push lỗi không làm hỏng thao tác chính (gán Pro, nhập bài Strava…) + nhật ký lỗi',
-      'ok', to_regprocedure('public.admin_notify_errors()') is not null));
+      'ok', to_regprocedure('public.admin_notify_errors()') is not null),
+    jsonb_build_object('file', '20261001007000', 'label', 'Bài Strava chỉ hiện cho người khác khi runner đồng ý (hướng B+) + công tắc chính sách của admin',
+      'ok', to_regprocedure('public.set_strava_sharing(boolean)') is not null),
+    jsonb_build_object('file', '20261001007100', 'label', 'Admin hệ thống toàn quyền trong mọi CLB (duyệt, sửa, đăng tin, trao quyền, giải tán)',
+      'ok', exists (select 1 from pg_proc where proname = 'club_is_staff' and prosrc like '%is_system_admin%')));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

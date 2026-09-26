@@ -46,6 +46,8 @@ export interface ActivityDetail {
   strava_limited?: boolean
   /** Mã bài gốc trên Strava (chỉ chủ bài) — link "View on Strava" */
   strava_id?: string | null
+  /** Hiện cho người khác không (007000: bài Strava cần runner đồng ý) */
+  shared?: boolean
   polyline: string | null
   points: TrackPoint[] | null
   splits: Split[] | null

@@ -162,6 +162,7 @@ describe('CLB lõi (000500)', () => {
     await db.query(`select public.link_provider_connection($1, 'STRAVA', 'ath-m', 't', 'r', now() + interval '6 hours')`, [MEMBER])
     await db.exec('reset role')
     await db.query(`update public.connected_accounts set created_at = now() - interval '1 day' where user_id = $1`, [MEMBER])
+    await asUser(db, MEMBER, '/rpc', `select public.set_strava_sharing(true)`)       // 007000: đồng ý hiện bài Strava cho CLB
     await db.exec('set role service_role')
     await db.query(`select public.ingest_provider_activity($1, 'STRAVA', 'r-1', $2::jsonb)`, [MEMBER, JSON.stringify({
       title: 'Chạy Hồ Tây', sport_type: 'Run', started_at: new Date(Date.now() - 3600_000).toISOString(),

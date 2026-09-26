@@ -2,12 +2,12 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Bug, CheckCircle2, ChevronDown, Database, HardDrive, Megaphone, RefreshCw, Server, XCircle, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, BellOff, Bug, CheckCircle2, ChevronDown, Database, HardDrive, Megaphone, RefreshCw, Server, XCircle, type LucideIcon } from 'lucide-react'
 import { Button, Card, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatRelative } from '@/shared/lib/format'
 import { ClientErrorsPanel, SystemNoticeEditor } from '@/features/system'
-import { getServerCheck, getSystemCheck, type ServerCheckItem } from '../api/adminApi'
+import { getNotifyErrors, getServerCheck, getSystemCheck, type ServerCheckItem } from '../api/adminApi'
 
 type Status = 'ok' | 'warn' | 'fail'
 const ICON: Record<Status, LucideIcon> = { ok: CheckCircle2, warn: AlertTriangle, fail: XCircle }
@@ -104,7 +104,7 @@ export function SystemTab() {
       <Section icon={Server} title="Máy chủ (Vercel) & Strava">
         {server.isPending ? <Skeleton className="h-32" /> : server.isError ? (
           <Row status="warn" label="Không kiểm tra được máy chủ" detail={`Bản app đang chạy có thể chưa có trang này — gộp nhánh và triển khai lại. (${(server.error as Error).message})`} />
-        ) : server.data!.items.map((i) => <Row key={i.key} status={i.status} label={i.label} detail={i.detail} />)}
+        ) : (server.data?.items ?? []).map((i) => <Row key={i.key} status={i.status} label={i.label} detail={i.detail} />)}
       </Section>
 
       {d && (
@@ -122,6 +122,10 @@ export function SystemTab() {
 
       <Section icon={Bug} title="Lỗi người dùng gặp">
         <ClientErrorsPanel />
+      </Section>
+
+      <Section icon={BellOff} title="Lỗi gửi thông báo / push">
+        <NotifyErrorsPanel />
       </Section>
 
       <Section icon={CheckCircle2} title="Việc bạn tự xác nhận">
@@ -155,5 +159,23 @@ function Row({ status, label, detail }: { status: Status; label: string; detail:
         <p className="break-words text-xs text-fg-muted">{detail}</p>
       </div>
     </div>
+  )
+}
+
+/** Lỗi ở chuỗi thông báo → push (không còn chặn thao tác chính từ migration 006900) — để biết push có đang hỏng không */
+function NotifyErrorsPanel() {
+  const q = useQuery({ queryKey: ['admin', 'notify-errors'], queryFn: getNotifyErrors, retry: false })
+  if (q.isPending) return <Skeleton className="h-16" />
+  if (q.isError) return <Row status="warn" label="Chưa xem được" detail="Chạy migration 006900 (file gộp chay_tu_003700.sql) để bật nhật ký này." />
+  if (!q.data.length) return <Row status="ok" label="Không có lỗi" detail="Thông báo trong app và push đang gửi bình thường." />
+  return (
+    <ul className="space-y-1.5">
+      {q.data.slice(0, 15).map((e, i) => (
+        <li key={i} className="rounded-xl bg-surface-2 px-3 py-2 text-xs">
+          <p className="font-semibold">{e.stage}{e.kind ? ` · ${e.kind}` : ''} <span className="font-normal text-fg-subtle">· {formatRelative(e.at)}</span></p>
+          <p className="break-words font-mono text-fg-muted">{e.sqlstate ? `[${e.sqlstate}] ` : ''}{e.message}</p>
+        </li>
+      ))}
+    </ul>
   )
 }

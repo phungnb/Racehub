@@ -34,7 +34,11 @@ const fails = async (p: Promise<unknown>) => { try { await p } catch (e) { retur
 
 describe('duyệt bài chuyên nghiệp + nhịp tim (002400)', () => {
   let db: PGlite
-  beforeAll(async () => { db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed }) }, 240_000)
+  beforeAll(async () => {
+    db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed })
+    // 007000: runner đồng ý hiện bài Strava cho CLB (ban quản trị CLB mới thấy bài chờ duyệt, thử thách mới tính)
+    await db.query(`insert into public.profile_settings (user_id, strava_share) values ($1, true) on conflict (user_id) do update set strava_share = true`, [RUNNER])
+  }, 240_000)
 
   it('chạy chậm / đi bộ (pace 18:00) không còn bị chờ duyệt', async () => {
     const r = await ingest(db, 'slow', { moving_s: 5400, elapsed_s: 5400 })

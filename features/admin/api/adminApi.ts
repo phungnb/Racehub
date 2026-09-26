@@ -381,11 +381,21 @@ export interface ServerCheckItem { key: string; label: string; status: 'ok' | 'w
 export async function getSystemCheck(): Promise<SystemCheck> {
   const { data, error } = await supabase.rpc('admin_system_check')
   if (error) throw error
+  if (!data) throw new Error('NOT_DEPLOYED')
   return data as SystemCheck
+}
+
+export interface NotifyError { at: string; stage: string; kind: string | null; sqlstate: string | null; message: string | null }
+/** Lỗi trong chuỗi thông báo → push (migration 006900); thao tác chính vẫn thành công */
+export async function getNotifyErrors(): Promise<NotifyError[]> {
+  const { data, error } = await supabase.rpc('admin_notify_errors')
+  if (error) throw error
+  return (data as NotifyError[] | null) ?? []
 }
 
 export async function getServerCheck(): Promise<{ items: ServerCheckItem[]; origin: string }> {
   const res = await fetch('/api/admin/system-check', { cache: 'no-store' })
   if (!res.ok) throw new Error(`SERVER_CHECK_${res.status}`)
-  return res.json()
+  const j = (await res.json().catch(() => null)) as { items?: ServerCheckItem[]; origin?: string } | null
+  return { items: Array.isArray(j?.items) ? j.items : [], origin: j?.origin ?? '' }
 }

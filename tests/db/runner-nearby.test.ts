@@ -27,7 +27,7 @@ const near = (db: PGlite, u: string, p: object = {}) => rpc<Row>(db, u, `select 
 const runs = async (db: PGlite, u: string, n: number, pace: number) => {
   for (let k = 0; k < n; k++) await db.query(`
     insert into public.activities (user_id, title, source, started_at, ended_at, distance_m, moving_distance_m, moving_time_s, avg_pace_s, validation_status, status)
-    values ($1, 'Chạy', 'STRAVA', now() - make_interval(days => $2::int), now() - make_interval(days => $2::int) + interval '40 minutes', 5000, 5000, $3::int, $4::int, 'APPROVED', 'READY')`,
+    values ($1, 'Chạy', 'DIRECT_GPS', now() - make_interval(days => $2::int), now() - make_interval(days => $2::int) + interval '40 minutes', 5000, 5000, $3::int, $4::int, 'APPROVED', 'READY')`,
     [u, k + 1, pace * 5, pace])
 }
 
