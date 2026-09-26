@@ -111,6 +111,7 @@ function Row({ r, cat, onOpen }: { r: CmsRow; cat: string; onOpen: () => void })
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
         {waitExpert && <span className="inline-flex items-center gap-1 font-semibold text-warning"><ShieldCheck className="size-3" aria-hidden />Chờ duyệt chuyên môn</span>}
         {r.needs_expert_review && r.expert_reviewed_at && <span className="inline-flex items-center gap-1 text-brand"><ShieldCheck className="size-3" aria-hidden />Đã duyệt chuyên môn</span>}
+        {r.status === 'REVIEW' && <span className="font-semibold text-brand">Bấm để mở bài và duyệt →</span>}
         {r.review_note && <span className="text-warning">{r.review_note.slice(0, 60)}</span>}
         {r.live && <span className="text-fg-subtle">{r.views} xem · {r.reads} đọc xong · {r.saves} lưu · {r.cta_clicks} bấm hành động · 👍 {r.helpful_yes}</span>}
       </div>

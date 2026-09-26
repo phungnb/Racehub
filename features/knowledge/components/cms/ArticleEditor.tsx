@@ -116,7 +116,7 @@ function Editor({ initial, meta, onClose }: { initial: CmsArticle | null; meta: 
   const sources = f.sources ?? []
 
   return (
-    <div className="space-y-4 pb-28">
+    <div className="space-y-4 pb-48">
       <div className="flex items-center gap-2">
         <button type="button" onClick={onClose} className="-ml-1 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-fg-muted hover:text-fg">
           <ArrowLeft className="size-4" aria-hidden />Danh sách bài
@@ -281,12 +281,16 @@ function Editor({ initial, meta, onClose }: { initial: CmsArticle | null; meta: 
         </Card>
       )}
 
-      {/* Thanh thao tác */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-bg/95 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur">
+      {/* Thanh thao tác: nằm trên thanh tab dưới cùng (z-50, cao 3.5rem) — trước đây bị thanh tab che mất các nút Duyệt / Đăng */}
+      <div className="fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-2xl flex-wrap gap-2">
           <Button variant="secondary" loading={save.isPending && !sheet} disabled={locked} onClick={() => void saveThen()}>Lưu</Button>
           {expert && needsExpert && !reviewed && id && (
             <>
+              {meta.role === 'ADMIN' && status !== 'PUBLISHED' && (
+                <Button onClick={() => void saveThen(async (sid) => { await cmsExpertReview(sid, true, null); await cmsSetStatus(sid, 'PUBLISHED', null, null) }, 'Đã duyệt và đăng bài')
+                  .then((ok) => ok && onClose())}><ShieldCheck className="size-4" aria-hidden />Duyệt & đăng</Button>
+              )}
               <Button variant="secondary" onClick={() => saveThen((sid) => cmsExpertReview(sid, true, null), 'Đã duyệt chuyên môn').then((ok) => ok && onClose())}><ShieldCheck className="size-4" aria-hidden />Duyệt chuyên môn</Button>
               <Button variant="ghost" onClick={() => { setNote(''); setSheet('reject') }}>Góp ý</Button>
             </>
