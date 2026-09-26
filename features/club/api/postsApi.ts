@@ -2,7 +2,10 @@
 import { supabase } from '@/shared/lib/supabase'
 import type { MemberProfile } from './clubApi'
 
-export type PostKind = 'POST' | 'ANNOUNCEMENT' | 'AUTO_RUN' | 'AUTO_JOIN' | 'RECAP' | 'CHALLENGE'
+export type PostKind = 'POST' | 'ANNOUNCEMENT' | 'AUTO_RUN' | 'AUTO_JOIN' | 'RECAP' | 'CHALLENGE' | 'NEWS'
+/** Tin CLB (migration 006300): chuyên mục + link kèm theo */
+export type NewsCategory = 'NOTICE' | 'EVENT' | 'RACE' | 'RESULT' | 'TRAINING' | 'OTHER'
+export interface NewsMeta { category: NewsCategory; link: string | null; edited_at?: string }
 
 export interface RunMeta { distance_m: number; moving_s: number; avg_pace_s: number; elevation_gain_m?: number; source?: string; started_at?: string }
 export interface RecapMeta {
@@ -24,7 +27,7 @@ export interface ClubPost {
   body: string
   image_paths: string[]
   activity_id: string | null
-  meta: Partial<RunMeta & RecapMeta & ChallengeMeta>
+  meta: Partial<RunMeta & RecapMeta & ChallengeMeta & NewsMeta>
   is_pinned: boolean
   reaction_count: number
   comment_count: number
@@ -137,4 +140,20 @@ export async function addComment(postId: string, body: string) {
 export async function deleteComment(commentId: string) {
   const { error } = await supabase.rpc('delete_post_comment', { p_comment_id: commentId })
   if (error) throw error
+}
+
+/** Tin CLB + thông báo (bộ lọc "Tin CLB" trên bảng tin), mới nhất trước */
+export async function listNews(clubId: string, userId: string, limit = 40): Promise<ClubPost[]> {
+  const { data, error } = await supabase.from('club_posts').select(POST_SELECT)
+    .eq('club_id', clubId).in('kind', ['NEWS', 'ANNOUNCEMENT']).order('created_at', { ascending: false }).limit(limit)
+  if (error) throw error
+  return withMyReactions((data ?? []) as unknown as Row[], userId)
+}
+
+export interface NewsInput { id?: string; title: string; body: string; category: NewsCategory; link: string | null; image_paths: string[]; pin: boolean; notify?: boolean }
+/** Ban chủ nhiệm đăng / sửa Tin CLB */
+export async function publishNews(clubId: string, input: NewsInput): Promise<string> {
+  const { data, error } = await supabase.rpc('publish_club_news', { p_club_id: clubId, p: input })
+  if (error) throw error
+  return data as string
 }

@@ -3,17 +3,20 @@
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-import { ChevronRight, Newspaper, TrendingUp } from 'lucide-react'
+import { ChevronRight, Megaphone, Newspaper, TrendingUp } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { useMyProfile } from '@/features/auth'
-import { Button, EmptyState, ErrorState, Skeleton } from '@/shared/ui'
+import { Button, EmptyState, ErrorState, SegmentedControl, Skeleton } from '@/shared/ui'
 import { formatKm } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
-import type { ClubPost } from '../../api/postsApi'
+import { listNews, type ClubPost } from '../../api/postsApi'
+import { clubKeys } from '../../hooks/keys'
 import { useClub } from '../../hooks/useClub'
 import { useClubFeed } from '../../hooks/useClubFeed'
 import { useClubLeaderboard } from '../../hooks/useLeaderboard'
 import { CommentsSheet } from './CommentsSheet'
 import { Composer } from './Composer'
+import { NewsSheet } from './NewsSheet'
 import { PostCard } from './PostCard'
 
 export function ClubFeedScreen({ clubId }: { clubId: string }) {
@@ -23,6 +26,9 @@ export function ClubFeedScreen({ clubId }: { clubId: string }) {
   const [commentsFor, setCommentsFor] = useState<ClubPost | null>(null)
   const focus = useSearchParams().get('post')
   const more = useRef<HTMLDivElement>(null)
+  const [view, setView] = useState<'all' | 'news'>('all')
+  const [newsOpen, setNewsOpen] = useState(false)
+  const news = useQuery({ queryKey: clubKeys.news(clubId), queryFn: () => listNews(clubId, uid!), enabled: !!uid && view === 'news' })
 
   // Mở từ thông báo (?post=…): cuộn tới bài
   useEffect(() => {
@@ -46,9 +52,25 @@ export function ClubFeedScreen({ clubId }: { clubId: string }) {
   return (
     <div className="space-y-3">
       <WeekStrip clubId={clubId} meId={uid} />
+      {isStaff && (
+        <button type="button" onClick={() => setNewsOpen(true)}
+          className="flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-brand/40 bg-brand/8 p-3 text-left hover:border-brand/70">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand/20 text-brand"><Megaphone className="size-5" aria-hidden /></span>
+          <span className="min-w-0 flex-1"><span className="block font-semibold">Đăng tin CLB</span>
+            <span className="block text-xs text-fg-muted">Thông báo, sự kiện, giải chạy, kết quả — ghim & báo cả CLB</span></span>
+          <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+        </button>
+      )}
+      {newsOpen && <NewsSheet clubId={clubId} meId={uid} onClose={() => setNewsOpen(false)} />}
       <Composer clubId={clubId} me={me} canAnnounce={isStaff} />
+      <SegmentedControl value={view} onChange={setView} options={[{ value: 'all', label: 'Tất cả' }, { value: 'news', label: 'Tin CLB' }]} />
 
-      {loading ? (
+      {view === 'news' ? (
+        news.isPending ? <div className="space-y-3"><Skeleton className="h-40" /><Skeleton className="h-40" /></div>
+        : news.isError ? <ErrorState message="Không tải được tin CLB." error={news.error} onRetry={() => void news.refetch()} />
+        : news.data.length === 0 ? <EmptyState icon={Megaphone} title="Chưa có tin CLB" description={isStaff ? 'Bấm “Đăng tin CLB” để gửi thông báo, lịch giải, kết quả cho cả CLB.' : 'Tin và thông báo của ban chủ nhiệm sẽ hiện ở đây.'} />
+        : news.data.map((p) => <PostCard key={p.id} post={p} meId={uid} isStaff={isStaff} onComments={setCommentsFor} highlight={p.id === focus} />)
+      ) : loading ? (
         <div className="space-y-3">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-40" />)}</div>
       ) : posts.isError || pinned.isError ? (
         <ErrorState message="Không tải được bảng tin." error={posts.error} onRetry={() => { void posts.refetch(); void pinned.refetch() }} />

@@ -28,6 +28,7 @@ export function useClubFeed(clubId: string, userId: string | undefined) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'club_posts', filter: `club_id=eq.${clubId}` }, () => {
         void qc.invalidateQueries({ queryKey: clubKeys.posts(clubId) })
         void qc.invalidateQueries({ queryKey: clubKeys.pinned(clubId) })
+        void qc.invalidateQueries({ queryKey: clubKeys.news(clubId) })
       })
       .subscribe()
     return () => { void supabase.removeChannel(channel) }
@@ -41,6 +42,7 @@ function patchPost(qc: ReturnType<typeof useQueryClient>, clubId: string, postId
   qc.setQueryData<InfiniteData<ClubPost[]>>(clubKeys.posts(clubId), (d) =>
     d && { ...d, pages: d.pages.map((pg) => pg.map((p) => (p.id === postId ? patch(p) : p))) })
   qc.setQueryData<ClubPost[]>(clubKeys.pinned(clubId), (d) => d?.map((p) => (p.id === postId ? patch(p) : p)))
+  qc.setQueryData<ClubPost[]>(clubKeys.news(clubId), (d) => d?.map((p) => (p.id === postId ? patch(p) : p)))
 }
 
 export function usePostActions(clubId: string) {
@@ -48,6 +50,7 @@ export function usePostActions(clubId: string) {
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: clubKeys.posts(clubId) })
     void qc.invalidateQueries({ queryKey: clubKeys.pinned(clubId) })
+    void qc.invalidateQueries({ queryKey: clubKeys.news(clubId) })
   }
 
   const react = useMutation({

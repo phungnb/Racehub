@@ -344,6 +344,11 @@ const MESSAGES: Record<string, string> = {
   INVALID_DURATION: 'Trận đấu dài từ 1 ngày đến 2 tháng.',
   START_IN_PAST: 'Giờ bắt đầu đã qua.',
   INVALID_TIME_RANGE: 'Thời gian không hợp lệ.',
+  TITLE_REQUIRED: 'Tiêu đề cần 3–120 ký tự.',
+  INVALID_URL: 'Link phải bắt đầu bằng https:// (dán link album Google Photos, Drive, Facebook…).',
+  ALBUM_EXISTS: 'Link album này đã có trong kho ảnh CLB.',
+  ALBUM_NOT_FOUND: 'Album không còn tồn tại.',
+  INVALID_DATE: 'Ngày chụp không hợp lệ.',
 }
 
 export function clubErrorMessage(e: unknown): string {

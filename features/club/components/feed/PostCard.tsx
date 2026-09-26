@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { ChevronRight, Crown, Flame, Heart, Megaphone, MessageCircle, MoreHorizontal, Pin, PinOff, Trash2, Trophy, UserPlus } from 'lucide-react'
+import { ChevronRight, Crown, ExternalLink, Flame, Heart, Megaphone, MessageCircle, MoreHorizontal, Newspaper, Pencil, Pin, PinOff, Trash2, Trophy, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Card, ConfirmSheet, LevelBadge, Sheet } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -11,6 +11,8 @@ import { GiftButton } from '@/features/game'
 import { clubErrorMessage } from '../../api/clubApi'
 import { postImageUrl, type ClubPost } from '../../api/postsApi'
 import { usePostActions } from '../../hooks/useClubFeed'
+import { NEWS_CATEGORIES } from '../../model/media'
+import { NewsSheet } from './NewsSheet'
 
 export function PostCard({ post, meId, isStaff, onComments, highlight }: {
   post: ClubPost; meId: string; isStaff: boolean; onComments: (p: ClubPost) => void; highlight?: boolean
@@ -21,8 +23,11 @@ export function PostCard({ post, meId, isStaff, onComments, highlight }: {
 
   const isRun = post.kind === 'AUTO_RUN'
   const isAnnouncement = post.kind === 'ANNOUNCEMENT'
+  const isNews = post.kind === 'NEWS'
+  const cat = isNews ? NEWS_CATEGORIES[post.meta.category ?? 'OTHER'] ?? NEWS_CATEGORIES.OTHER : null
   return (
-    <Card id={`post-${post.id}`} className={cn('space-y-3 scroll-mt-40', isAnnouncement && post.is_pinned && 'border-coin/40 bg-coin/5',
+    <Card id={`post-${post.id}`} className={cn('space-y-3 scroll-mt-40', (isAnnouncement || isNews) && post.is_pinned && 'border-coin/40 bg-coin/5',
+      isNews && !post.is_pinned && 'border-brand/25',
       highlight && 'ring-2 ring-brand')}>
       <header className="flex items-center gap-3">
         <Avatar src={post.author?.avatar_url} name={post.author?.display_name} size="md" />
@@ -44,10 +49,22 @@ export function PostCard({ post, meId, isStaff, onComments, highlight }: {
           <Megaphone className="size-4" aria-hidden />Thông báo
         </p>
       )}
+      {cat && (
+        <p className="flex items-center gap-2 text-xs font-semibold">
+          <span className="inline-flex items-center gap-1 text-fg-muted"><Newspaper className="size-3.5" aria-hidden />Tin CLB</span>
+          <span className={cn('rounded-full px-2 py-0.5', cat.tone)}>{cat.label}</span>
+        </p>
+      )}
       {post.title && <h3 className="text-lg font-bold leading-snug">{post.title}</h3>}
       {isRun ? <RunStats post={post} /> : null}
       {post.body && !isRun && <p className="whitespace-pre-line break-words text-[15px] leading-relaxed">{post.body}</p>}
       {post.image_paths.length > 0 && <Images paths={post.image_paths} />}
+      {isNews && post.meta.link && (
+        <a href={post.meta.link} target="_blank" rel="noopener noreferrer nofollow"
+          className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface-2 px-3 text-sm font-semibold hover:border-fg-subtle">
+          <ExternalLink className="size-4 shrink-0 text-brand" aria-hidden /><span className="min-w-0 flex-1 truncate">{post.meta.link.replace(/^https?:\/\/(www\.)?/, '')}</span>
+        </a>
+      )}
 
       <PostActions post={post} onComments={onComments} />
     </Card>
@@ -130,6 +147,7 @@ function PostMenu({ post, meId, isStaff }: { post: ClubPost; meId: string; isSta
   const { remove, pin } = usePostActions(post.club_id)
   const [open, setOpen] = useState(false)
   const [confirm, setConfirm] = useState(false)
+  const [editing, setEditing] = useState(false)
   const canDelete = post.author_id === meId || isStaff
   if (!canDelete && !isStaff) return null
   return (
@@ -140,6 +158,7 @@ function PostMenu({ post, meId, isStaff }: { post: ClubPost; meId: string; isSta
       </button>
       <Sheet open={open} onClose={() => setOpen(false)} title="Bài đăng">
         <div className="space-y-1">
+          {isStaff && post.kind === 'NEWS' && <MenuItem icon={Pencil} label="Sửa tin" onClick={() => { setOpen(false); setEditing(true) }} />}
           {isStaff && (
             <MenuItem icon={post.is_pinned ? PinOff : Pin} label={post.is_pinned ? 'Bỏ ghim' : 'Ghim lên đầu bảng tin'}
               onClick={() => pin.mutate({ id: post.id, pinned: !post.is_pinned }, {
@@ -150,6 +169,7 @@ function PostMenu({ post, meId, isStaff }: { post: ClubPost; meId: string; isSta
           {canDelete && <MenuItem icon={Trash2} label="Xóa bài" danger onClick={() => { setOpen(false); setConfirm(true) }} />}
         </div>
       </Sheet>
+      {editing && <NewsSheet clubId={post.club_id} meId={meId} post={post} onClose={() => setEditing(false)} />}
       <ConfirmSheet open={confirm} onClose={() => setConfirm(false)} title="Xóa bài đăng này?" confirmLabel="Xóa bài"
         description="Bài và bình luận sẽ bị ẩn khỏi bảng tin CLB." loading={remove.isPending}
         onConfirm={() => remove.mutate(post.id, {

@@ -2,15 +2,15 @@
 """Sinh icon + màn chờ cho app cài (android/, ios/) từ icon thương hiệu trong public/icons.
 
 Chạy lại mỗi khi đổi logo:  python3 scripts/make-app-icons.py [ảnh-nguồn-1024.png]
-Nên dùng ảnh nguồn vuông 1024×1024 (App Store yêu cầu icon 1024). Mặc định dùng rh4-maskable-512.png.
+Nên dùng ảnh nguồn vuông 1024×1024 (App Store yêu cầu icon 1024). Mặc định dùng rh5-maskable-512.png.
 """
 import os
 import sys
 from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, 'public/icons/rh4-maskable-512.png')
-MARK = os.path.join(ROOT, 'public/icons/rh4-mark-256.png')
+SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, 'public/icons/rh5-maskable-512.png')
+MARK = os.path.join(ROOT, 'public/icons/rh5-mark-256.png')
 BG = (10, 13, 18)          # --color-bg
 RES = os.path.join(ROOT, 'android/app/src/main/res')
 

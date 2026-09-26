@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import QRCode from 'qrcode'
 import {
-  ArrowLeft, Ban, CheckCircle2, Circle, MapPin, Navigation, Pencil, QrCode, RefreshCw, Route, ScanLine, Timer, Users,
+  ArrowLeft, Ban, Camera, ExternalLink, CheckCircle2, Circle, MapPin, Navigation, Pencil, QrCode, RefreshCw, Route, ScanLine, Timer, Users,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, EmptyState, ErrorState, Field, Input, SectionTitle, SegmentedControl, Sheet, Skeleton } from '@/shared/ui'
@@ -18,6 +18,8 @@ import {
 import { useClubMutation, useEvent } from '../../hooks/useEvents'
 import { eventCountdown, eventWhen, mapsUrl } from '../../model/events'
 import { EventFormSheet } from './EventFormSheet'
+import { listAlbums } from '../../api/albumsApi'
+import { providerOf } from '../../model/media'
 import { RSVP_LABEL } from './ClubEventsScreen'
 
 const METHOD_LABEL = { QR: 'quét QR', AUTO: 'tự động từ bài chạy', STAFF: 'ban tổ chức' } as const
@@ -105,6 +107,8 @@ function Detail({ clubId, e }: { clubId: string; e: ClubEventDetail }) {
           </div>
         )}
       </Card>
+
+      <EventAlbums clubId={clubId} eventId={e.id} />
 
       <section>
         <SectionTitle>Người tham gia · {e.attendees.length}</SectionTitle>
@@ -197,5 +201,29 @@ function CancelSheet({ clubId, eventId, onClose }: { clubId: string; eventId: st
         <Input id="cancel-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="Trời mưa lớn, dời sang tuần sau" />
       </Field>
     </Sheet>
+  )
+}
+
+/** Album ảnh gắn với sự kiện (từ tab Ảnh) + lối thêm link */
+function EventAlbums({ clubId, eventId }: { clubId: string; eventId: string }) {
+  const q = useQuery({ queryKey: ['club', clubId, 'albums', { event_id: eventId }], queryFn: () => listAlbums(clubId, { event_id: eventId }) })
+  const items = (q.data?.items ?? []).filter((a) => a.status === 'APPROVED')
+  return (
+    <section className="space-y-2">
+      <SectionTitle action={<Link href={routes.clubTab(clubId, 'photos')} className="text-sm font-semibold text-brand">Kho ảnh</Link>}>Ảnh buổi chạy</SectionTitle>
+      {items.length === 0 ? (
+        <Link href={routes.clubTab(clubId, 'photos')} className="flex items-center gap-3 rounded-xl border border-dashed border-border p-3 text-sm text-fg-muted hover:border-fg-subtle">
+          <Camera className="size-5 shrink-0" aria-hidden />Chưa có album. Có ảnh buổi này? Gửi link album ở tab Ảnh.
+        </Link>
+      ) : items.map((a) => (
+        <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer nofollow"
+          className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 hover:border-fg-subtle">
+          <span className="grid size-10 shrink-0 place-items-center rounded-lg text-white" style={{ background: providerOf(a.url).color }}><Camera className="size-5" aria-hidden /></span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{a.title}</span>
+            <span className="block text-xs text-fg-muted">{providerOf(a.url).name}{a.photographer ? ` · 📷 ${a.photographer}` : ''}</span></span>
+          <ExternalLink className="size-4 shrink-0 text-fg-subtle" aria-hidden />
+        </a>
+      ))}
+    </section>
   )
 }
