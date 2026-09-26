@@ -85,7 +85,9 @@ describe('Gói, lượt tạo, đơn hàng (003800)', () => {
     expect(st.credits.map((c: Row) => [c.capacity, c.remaining])).toEqual([[100, 2]])
     const r = await rpc<Row>(db, OWNER, `select public.create_challenge_v2($1::jsonb, 'pl-club-001') as r`,
       [JSON.stringify({ title: 'Tháng NBNR', format: 'RANKED', audience: 'CLUB_ONLY', club_id: CLUB, max_slots: 100, start_date: iso(1), end_date: iso(72) })])
-    expect(r).toMatchObject({ fee: 0, pass_used: true })
+    // 008200: thử thách nội bộ CLB Pro miễn phí trong hạn mức gói → giữ nguyên lượt tạo
+    expect(r).toMatchObject({ fee: 0, pass_used: false, club_free: 'PRO' })
+    expect((await rpc<Row>(db, MEMBER, `select public.club_plan_status($1) as r`, [CLUB])).credits[0].remaining).toBe(2)
   })
 
   it('nạp Xu: đơn gói Xu, admin xác nhận → Xu nạp (PAID) + Xu tặng thêm (BONUS); hủy đơn chờ', async () => {

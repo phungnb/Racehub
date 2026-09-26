@@ -3,6 +3,7 @@ import { supabase } from '@/shared/lib/supabase'
 import type { ClubRole, JoinPolicy, MemberStatus } from '../model/roles'
 import type { PendingRun } from '@/features/activity'
 import { systemErrorMessage } from '@/shared/lib/errors'
+import type { ClubChallengeQuota } from '@/features/challenge'
 
 export interface Club {
   id: string
@@ -246,6 +247,13 @@ export async function getClubPlan(clubId: string): Promise<ClubPlan> {
   const { data, error } = await supabase.rpc('club_plan', { p_club_id: clubId })
   if (error) throw error
   return data as ClubPlan
+}
+
+/** Hạn mức thử thách nội bộ miễn phí theo gói (migration 008200) */
+export async function getClubChallengeQuota(clubId: string): Promise<ClubChallengeQuota> {
+  const { data, error } = await supabase.rpc('club_challenge_quota', { p_club_id: clubId })
+  if (error) throw error
+  return data as ClubChallengeQuota
 }
 
 export async function setClubSlug(clubId: string, slug: string | null): Promise<string | null> {

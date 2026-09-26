@@ -33,7 +33,7 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
 > ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
-> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 008100** + chạy lại 003500),
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 008200** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
 >
@@ -127,6 +127,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001007900_club_shop.sql` | **Cửa hàng CLB**: đăng áo / BIB, thành viên đặt + VietQR chuyển thẳng vào tài khoản CLB (RaceHub không giữ tiền), ban quản trị xác nhận, tổng hợp size, CSV | Cần 1500; chạy lại 3500 |
 | `20261001008000_club_public_page.sql` | **Trang công khai CLB Pro** `/c/<link-riêng>`: logo, giới thiệu, số thành viên, số buổi chạy / thử thách, nút Tham gia (không có dữ liệu bài chạy) | Cần 2800; chạy lại 3500 |
 | `20261001008100_club_pro_wall_exchange.sql` | **Tường nhà CLB Pro** (ảnh bìa, vị trí ảnh, khẩu hiệu, 6 chủ đề màu — hiện ở đầu trang CLB và trang công khai) + **Thư mời giao lưu CLB**: BQT gửi lời mời chạy chung offline, CLB kia nhận lời → mỗi CLB có sự kiện trong tab Lịch + thông báo | Cần 1500, 2800, 8000; chạy lại 3500 |
+| `20261001008200_club_challenge_quota.sql` | **Hạn mức thử thách CLB theo gói** (tham khảo Tucana): thử thách nội bộ CLB **miễn phí** trong hạn mức — CLB miễn phí: 2 thử thách cùng lúc, ≤ 50 người, cần ≥ 5 thành viên có bài chạy hợp lệ trong 30 ngày (chặn "CLB một người"); CLB Pro: 20 thử thách cùng lúc, ≤ 1.000 người. Ngoài hạn mức vẫn tạo được, tính phí quy mô trừ quỹ CLB. Admin chỉnh con số ở **Quản trị → Chính sách** | Cần 0700, 2800, 3700, 3800, 7500; chạy lại 3500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

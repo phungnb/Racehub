@@ -214,8 +214,26 @@ export interface ChallengeQuote {
   custom: boolean                   // > mức lớn nhất: admin cấp riêng
   plan: { code: string; name: string } | null   // gói đang hiệu lực của bên trả phí (VIP / CLB Pro) — migration 007500
   bestPassSlots: number             // quy mô lớn nhất lượt miễn phí còn lại bao được (0 = không có lượt)
+  listFee: number                   // phí theo biểu phí trước khi áp hạn mức CLB
+  clubQuota: ClubChallengeQuota | null   // hạn mức thử thách nội bộ CLB (migration 008200)
   policy: EconomyPolicy
 }
+
+/** Hạn mức thử thách nội bộ CLB theo gói (club_challenge_quota, migration 008200) */
+export interface ClubChallengeQuota {
+  plan: 'FREE' | 'PRO'
+  eligible: boolean
+  reason: 'NEED_ACTIVE_MEMBERS' | 'OPEN_LIMIT' | 'SLOTS_LIMIT' | null
+  active_members: number
+  min_active_members: number
+  active_window_days: number
+  open: number
+  max_open: number
+  max_slots: number
+  free: { min_active_members: number; max_open: number; max_slots: number }
+  pro: { max_open: number; max_slots: number }
+}
+
 
 /** Báo giá tạo thử thách: phí, ai trả, vé miễn phí đang có (quote_challenge, migration 000700) */
 export async function quoteChallenge(d: ChallengeDraft): Promise<ChallengeQuote> {
@@ -226,13 +244,14 @@ export async function quoteChallenge(d: ChallengeDraft): Promise<ChallengeQuote>
   const q = data as {
     fee: number; payer: 'USER' | 'CLUB'; payer_balance: number; wallet_balance: number; pass: ChallengeQuote['pass']
     tier: ChallengeQuote['tier']; custom: boolean; xu_vnd: number; policy: unknown
-    plan?: ChallengeQuote['plan']; best_pass_slots?: number
+    plan?: ChallengeQuote['plan']; best_pass_slots?: number; list_fee?: number; club_quota?: ClubChallengeQuota | null
   }
   const policy = toPolicy(q.policy)
   return {
     fee: Number(q.fee ?? 0), payer: q.payer, payerBalance: Number(q.payer_balance ?? 0), walletBalance: Number(q.wallet_balance ?? 0),
     pass: q.pass, tier: q.tier ? { max: Number(q.tier.max), xu: Number(q.tier.xu) } : null, custom: Boolean(q.custom),
     plan: q.plan ?? null, bestPassSlots: Number(q.best_pass_slots ?? (q.pass?.max_slots ?? 0)),
+    listFee: Number(q.list_fee ?? q.fee ?? 0), clubQuota: q.club_quota ?? null,
     policy: q.xu_vnd ? { ...policy, xuVnd: Number(q.xu_vnd) } : policy,
   }
 }

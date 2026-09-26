@@ -13,7 +13,7 @@ import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { capacityTier, creationFee, DEFAULT_POLICY, runPolicyText, xuToVnd } from '@/shared/lib/economy'
 import { routes } from '@/shared/config/routes'
-import { challengeErrorMessage, createChallenge, hasRulesInfo, quoteChallenge, setChallengeOptions, setChallengePledge, setChallengeRecurrence, setChallengeRules, type ChallengeQuote } from '../../api/challengeApi'
+import { challengeErrorMessage, createChallenge, hasRulesInfo, quoteChallenge, setChallengeOptions, setChallengePledge, setChallengeRecurrence, setChallengeRules, type ChallengeQuote, type ClubChallengeQuota } from '../../api/challengeApi'
 import { RulesInfoForm } from '../detail/RulesInfo'
 import {
   AUDIENCE_LABEL, defaultDraft, draftFromTemplate, effectiveSlots, FORMAT_META, formatScore, OBJECTIVE_META, pledgePayload, pledgeSupported, rewardSummary,
@@ -686,6 +686,7 @@ function StepReview({ d, quote, bill, loading, failed, quoteError, onRetry, club
 function CostCard({ d, q, bill, clubName }: { d: ChallengeDraft; q: ChallengeQuote; bill: Bill; clubName?: string }) {
   const slots = effectiveSlots(d)
   const clubReward = d.rewardXu > 0 && d.audience === 'CLUB_ONLY' ? d.rewardXu : 0
+  const cq = q.clubQuota
   // Được gói bao / nhóm nhỏ / mục tiêu cá nhân, không treo thưởng: không bày bảng phí, ví, quỹ
   if (bill.fromWallet === 0 && bill.fromClub === 0) {
     return (
@@ -694,7 +695,9 @@ function CostCard({ d, q, bill, clubName }: { d: ChallengeDraft; q: ChallengeQuo
         <div className="min-w-0 text-sm">
           <p className="font-semibold">Tạo miễn phí</p>
           <p className="text-fg-muted">
-            {q.pass && q.fee > 0
+            {cq?.eligible && q.listFee > 0
+              ? `Trong hạn mức ${cq.plan === 'PRO' ? 'CLB Pro' : 'CLB miễn phí'}${clubName ? ` của ${clubName}` : ''} · thử thách đang diễn ra ${cq.open}/${cq.max_open}`
+              : q.pass && q.fee > 0
               ? `Dùng 1 lượt ${q.plan?.name ?? 'miễn phí'}${q.payer === 'CLUB' ? ` của ${clubName ?? 'CLB'}` : ''} · còn ${q.pass.remaining} lượt tháng này`
               : d.format === 'SOLO_GOAL' ? 'Mục tiêu cá nhân luôn miễn phí.' : `Quy mô ≤ ${formatNumber(q.tier?.max ?? slots)} người không mất phí.`}
           </p>
@@ -704,6 +707,7 @@ function CostCard({ d, q, bill, clubName }: { d: ChallengeDraft; q: ChallengeQuo
   }
   return (
     <Card className="space-y-2">
+      {cq && !cq.eligible && q.listFee > 0 && <QuotaHint q={cq} clubId={d.clubId} />}
       {!(q.pass && q.fee > 0) && <Row label={`Phí tạo (quy mô ≤ ${formatNumber(q.tier?.max ?? slots)} người)`} value={q.fee ? `${formatCoin(q.fee)} Xu` : 'Miễn phí'} />}
       {q.fee > 0 && !q.pass && <p className="-mt-1 text-right text-xs text-fg-subtle">{xuToVnd(q.fee, q.policy)}</p>}
       {q.pass && q.fee > 0 && (
@@ -751,6 +755,29 @@ function Suggestion({ title, text, action, onClick }: { title: string; text: str
     <div className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3">
       <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{title}</span><span className="block text-xs text-fg-muted">{text}</span></span>
       <Button size="sm" variant="secondary" onClick={onClick}>{action}</Button>
+    </div>
+  )
+}
+
+const QUOTA_WHY = {
+  NEED_ACTIVE_MEMBERS: (q: ClubChallengeQuota) =>
+    `CLB mới có ${q.active_members}/${q.min_active_members} thành viên có bài chạy trong ${q.active_window_days} ngày qua — chưa đủ để tạo miễn phí.`,
+  OPEN_LIMIT: (q: ClubChallengeQuota) => `CLB đang có ${q.open}/${q.max_open} thử thách diễn ra cùng lúc — đã hết lượt miễn phí.`,
+  SLOTS_LIMIT: (q: ClubChallengeQuota) => `Thử thách miễn phí tối đa ${formatNumber(q.max_slots)} người.`,
+} as const
+
+/** Vì sao thử thách CLB này mất phí + gợi ý nâng CLB Pro (migration 008200) */
+function QuotaHint({ q, clubId }: { q: ClubChallengeQuota; clubId?: string | null }) {
+  return (
+    <div className="rounded-xl border border-coin/40 bg-coin/10 p-2.5 text-sm">
+      <p className="font-semibold">Ngoài hạn mức miễn phí của CLB</p>
+      <p className="text-xs text-fg-muted">
+        {q.reason ? QUOTA_WHY[q.reason](q) : ''}
+        {q.plan === 'FREE' && ` CLB Pro: tới ${q.pro.max_open} thử thách cùng lúc, mỗi thử thách tới ${formatNumber(q.pro.max_slots)} người, không mất phí.`}
+      </p>
+      {q.plan === 'FREE' && clubId && (
+        <Link href={routes.clubTab(clubId, 'settings')} className="mt-1 inline-block text-xs font-semibold text-brand">Xem gói CLB Pro →</Link>
+      )}
     </div>
   )
 }

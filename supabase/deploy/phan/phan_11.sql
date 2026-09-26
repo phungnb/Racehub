@@ -138,7 +138,9 @@ begin
     jsonb_build_object('file', '20261001008000', 'label', 'Trang công khai của CLB Pro (/c/<link-riêng>)',
       'ok', to_regprocedure('public.club_public_page(text)') is not null),
     jsonb_build_object('file', '20261001008100', 'label', 'Tường nhà CLB Pro (ảnh bìa, khẩu hiệu, chủ đề) + thư mời giao lưu CLB',
-      'ok', to_regprocedure('public.send_club_exchange(uuid, uuid, jsonb)') is not null and private.sc_col('clubs', 'cover_url')));
+      'ok', to_regprocedure('public.send_club_exchange(uuid, uuid, jsonb)') is not null and private.sc_col('clubs', 'cover_url')),
+    jsonb_build_object('file', '20261001008200', 'label', 'Hạn mức thử thách CLB theo gói (Free / Pro), chặn CLB một người',
+      'ok', to_regprocedure('public.club_challenge_quota(uuid, integer)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
