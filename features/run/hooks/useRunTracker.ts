@@ -5,10 +5,11 @@ import { supabase } from '@/shared/lib/supabase'
 import { describeError } from '@/shared/lib/errors'
 import { canTrackLocation, tracksInBackground, watchLocation, type LocationError, type LocationFix } from '../model/location'
 import { buildPayload, clearSnapshot, enqueue, loadSnapshot, saveSnapshot, type RunSnapshot } from '../model/recovery'
-import { GPS, evaluatePoint, isStationary, nextSplit, rollingPace, segmentMovingS, smoothPoint, splitAnnouncement, type Split, type TrackPoint } from '../model/tracker'
+import { ENGINE, GPS, TrackEngine, nextSplit, rollingPace, splitAnnouncement, type GpsGap, type Split, type TrackPoint } from '../model/tracker'
+import { keepAwake, reacquireAwake, releaseAwake } from '@/shared/lib/keepAwake'
 
 export type RunPhase = 'IDLE' | 'LOCATING' | 'RUNNING' | 'PAUSED' | 'FINISHED' | 'SAVING' | 'SAVED' | 'QUEUED'
-export type GpsState = 'OFF' | 'SEARCHING' | 'GOOD' | 'WEAK' | 'DENIED' | 'UNSUPPORTED'
+export type GpsState = 'OFF' | 'SEARCHING' | 'GOOD' | 'WEAK' | 'LOST' | 'DENIED' | 'UNSUPPORTED'
 
 export interface SaveResult {
   activity_id?: string
@@ -19,8 +20,6 @@ export interface SaveResult {
   distance_m: number
 }
 
-type WakeLockSentinelLike = { release: () => Promise<void> }
-
 export function useRunTracker() {
   const [phase, setPhase] = useState<RunPhase>('IDLE')
   const [gps, setGps] = useState<GpsState>('OFF')
@@ -30,8 +29,11 @@ export function useRunTracker() {
   const [currentPace, setCurrentPace] = useState(0)
   /** Pace trung bình = thời gian di chuyển của các đoạn GPS / quãng đường GPS (cùng một nguồn → luôn khớp) */
   const [avgPace, setAvgPace] = useState(0)
-  const recentSpeed = useRef(2.8)
   const lastAcceptAt = useRef(0)
+  /** Lần cuối nhận được điểm GPS (bất kể chất lượng) — quá 15 giây → "Mất GPS" */
+  const lastFixAt = useRef(0)
+  const engine = useRef(new TrackEngine())
+  const [gaps, setGaps] = useState<GpsGap[]>([])
   const [autoPaused, setAutoPaused] = useState(false)
   const [splits, setSplits] = useState<Split[]>([])
   const [voiceOn, setVoiceOn] = useState(true)
@@ -39,11 +41,9 @@ export function useRunTracker() {
   const [error, setError] = useState<string | null>(null)
   /** App bị ẩn (tắt màn hình / chuyển app) bao nhiêu giây trong lúc chạy — iPhone dừng GPS khi đó */
   const [gapS, setGapS] = useState(0)
-  const raw = useRef<TrackPoint[]>([])
   const hiddenAt = useRef<number | null>(null)
 
   const points = useRef<TrackPoint[]>([])
-  const lastAccepted = useRef<TrackPoint | null>(null)
   const startedAt = useRef<number | null>(null)
   const lastTick = useRef<number | null>(null)
   const lastMoveAt = useRef<number>(0)
@@ -52,7 +52,6 @@ export function useRunTracker() {
   const splitsRef = useRef<Split[]>([])
   const phaseRef = useRef<RunPhase>('IDLE')
   const stopLocation = useRef<(() => void) | null>(null)
-  const wakeLock = useRef<WakeLockSentinelLike | null>(null)
   const voiceRef = useRef(true)
   const elapsedRef = useRef(0)
   const lastPersist = useRef(0)
@@ -82,17 +81,9 @@ export function useRunTracker() {
     })
   }, [])
 
-  const acquireWakeLock = useCallback(async () => {
-    if (tracksInBackground()) return   // app cài: GPS chạy nền, để màn hình tắt cho đỡ pin
-    try {
-      const wl = (navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<WakeLockSentinelLike> } }).wakeLock
-      if (wl) wakeLock.current = await wl.request('screen')
-    } catch { /* không hỗ trợ / bị từ chối: bỏ qua */ }
-  }, [])
-  const releaseWakeLock = useCallback(() => {
-    wakeLock.current?.release().catch(() => undefined)
-    wakeLock.current = null
-  }, [])
+  // App cài: GPS chạy nền, để màn hình tắt cho đỡ pin. Trình duyệt: giữ màn hình sáng (Wake Lock + video câm cho iPhone)
+  const acquireWakeLock = useCallback(() => { if (!tracksInBackground()) void keepAwake() }, [])
+  const releaseWakeLock = useCallback(() => releaseAwake(), [])
 
   const stopWatch = useCallback(() => {
     stopLocation.current?.()
@@ -105,9 +96,10 @@ export function useRunTracker() {
       latitude, longitude, accuracy, altitude: altitude ?? 0, speed: speed ?? null,
       recorded_at: new Date(fix.time).toISOString(),
     }
-    setGps(accuracy <= GPS.MAX_ACCURACY_M ? 'GOOD' : 'WEAK')
+    lastFixAt.current = Date.now()
+    setGps(accuracy <= ENGINE.GOOD_ACCURACY_M ? 'GOOD' : 'WEAK')
 
-    if (phaseRef.current === 'LOCATING' && accuracy <= GPS.MAX_ACCURACY_M) {
+    if (phaseRef.current === 'LOCATING' && accuracy <= ENGINE.GOOD_ACCURACY_M) {
       // Có tín hiệu tốt → bắt đầu tính giờ
       startedAt.current = Date.now()
       lastTick.current = Date.now()
@@ -117,40 +109,38 @@ export function useRunTracker() {
       speak('Bắt đầu chạy')
     }
     if (phaseRef.current !== 'RUNNING') return
-    if (accuracy > GPS.MAX_ACCURACY_M) return
 
-    // Đứng yên (vị trí đã làm mượt gần như không đổi trong 10 giây) → không cộng quãng đường
-    raw.current.push(p)
-    if (raw.current.length > 60) raw.current.splice(0, raw.current.length - 60)
-    if (isStationary(raw.current)) return
-    const sp = smoothPoint(raw.current)!
-    const anchor = lastAccepted.current
-    const v = evaluatePoint(anchor, sp)
-    if (!v.accept) return
-    if (anchor) {
-      const dt = (Date.parse(sp.recorded_at) - Date.parse(anchor.recorded_at)) / 1000
-      movingRef.current += segmentMovingS(dt, v.distance, recentSpeed.current)
-      if (dt <= GPS.SEGMENT_MAX_S) recentSpeed.current = 0.7 * recentSpeed.current + 0.3 * v.speed
+    const r = engine.current.push(p)
+    if (r.gap) {
+      setGaps([...engine.current.gaps])
+      setGapS((g) => g + r.gap!.seconds)
     }
+    if (!r.point) return
+    points.current.push(r.point)
+    if (r.distance === 0 && !r.gap) return      // điểm đầu đoạn
+    movingRef.current += r.moving
     lastAcceptAt.current = Date.now()
-    lastAccepted.current = sp
-    points.current.push(sp)
-    if (v.speed > GPS.AUTO_PAUSE_MPS || v.distance === 0) {
+    if (r.distance > 0 && (r.moving === 0 || r.distance / Math.max(r.moving, 1) > GPS.AUTO_PAUSE_MPS)) {
       lastMoveAt.current = Date.now()
       setAutoPaused(false)
     }
     const prev = distanceRef.current
-    distanceRef.current += v.distance
+    distanceRef.current += r.distance
     setDistanceM(distanceRef.current)
     setMovingS(movingRef.current)
     setCurrentPace(rollingPace(points.current))
     setAvgPace(distanceRef.current >= 50 ? movingRef.current / (distanceRef.current / 1000) : 0)
 
-    const split = nextSplit(prev, distanceRef.current, movingRef.current, splitsRef.current)
-    if (split) {
+    // Qua đoạn mất tín hiệu có thể vượt nhiều mốc km cùng lúc → ghi đủ từng km
+    const before = splitsRef.current.length
+    let split = nextSplit(prev, distanceRef.current, movingRef.current, splitsRef.current)
+    while (split) {
       splitsRef.current = [...splitsRef.current, split]
+      split = nextSplit(prev, distanceRef.current, movingRef.current, splitsRef.current)
+    }
+    if (splitsRef.current.length > before) {
       setSplits(splitsRef.current)
-      speak(splitAnnouncement(split, movingRef.current))
+      speak(splitAnnouncement(splitsRef.current[splitsRef.current.length - 1], movingRef.current))
     }
     persist()
   }, [speak, persist])
@@ -173,6 +163,7 @@ export function useRunTracker() {
       lastTick.current = now
       const idle = (now - lastMoveAt.current) / 1000 > GPS.AUTO_PAUSE_AFTER_S
       setAutoPaused(idle)
+      if (lastFixAt.current && now - lastFixAt.current > 15_000) setGps('LOST')
       elapsedRef.current += dt
       setElapsedS(elapsedRef.current)
       // Đồng hồ chạy mượt giữa hai điểm GPS; con số chính xác được chốt mỗi khi nhận điểm mới
@@ -190,22 +181,22 @@ export function useRunTracker() {
     setError(null)
     setResult(null)
     points.current = []
-    lastAccepted.current = null
+    engine.current = new TrackEngine()
+    setGaps([])
+    lastFixAt.current = 0
     distanceRef.current = 0
     movingRef.current = 0
     splitsRef.current = []
-    raw.current = []
     setGapS(0)
     elapsedRef.current = 0
     clearSnapshot()
     setRecovery(null)
     setDistanceM(0); setElapsedS(0); setMovingS(0); setCurrentPace(0); setAvgPace(0); setSplits([]); setAutoPaused(false)
-    recentSpeed.current = 2.8
     lastAcceptAt.current = 0
     setGps('SEARCHING')
     setPhase('LOCATING')
     phaseRef.current = 'LOCATING'
-    void acquireWakeLock()
+    acquireWakeLock()          // gọi ngay trong thao tác bấm: iPhone mới cho phát video giữ màn hình
     stopLocation.current?.()
     stopLocation.current = watchLocation(onPosition, onPositionError)
   }, [acquireWakeLock, onPosition, onPositionError])
@@ -225,9 +216,8 @@ export function useRunTracker() {
   const resume = useCallback(() => {
     lastTick.current = Date.now()
     lastMoveAt.current = Date.now()
-    lastAccepted.current = null           // không nối đoạn GPS qua quãng tạm dừng
+    engine.current.breakSegment()          // không nối đoạn GPS qua quãng tạm dừng
     lastAcceptAt.current = 0
-    raw.current = []
     setPhase('RUNNING')
     phaseRef.current = 'RUNNING'
     speak('Tiếp tục')
@@ -261,8 +251,7 @@ export function useRunTracker() {
     distanceRef.current = s.distanceM
     points.current = s.points
     splitsRef.current = s.splits
-    lastAccepted.current = null
-    raw.current = []
+    engine.current = new TrackEngine()
     setElapsedS(s.elapsedS); setMovingS(s.movingS); setDistanceM(s.distanceM); setSplits(s.splits)
     setAvgPace(s.distanceM >= 50 ? s.movingS / (s.distanceM / 1000) : 0)
     setRecovery(null)
@@ -270,7 +259,7 @@ export function useRunTracker() {
     setPhase('PAUSED')
     phaseRef.current = 'PAUSED'
     setGps('SEARCHING')
-    void acquireWakeLock()
+    acquireWakeLock()
     if (canTrackLocation()) {
       stopLocation.current?.()
       stopLocation.current = watchLocation(onPosition, onPositionError)
@@ -322,28 +311,24 @@ export function useRunTracker() {
       if (!active) return
       if (document.visibilityState === 'hidden') { hiddenAt.current = Date.now(); persist(true); return }
       if (tracksInBackground()) { hiddenAt.current = null; return }
-      void acquireWakeLock()
+      reacquireAwake()
       if (stopLocation.current) {
         stopLocation.current()
         stopLocation.current = watchLocation(onPosition, onPositionError)
       }
-      raw.current = []
-      if (hiddenAt.current && phaseRef.current === 'RUNNING') {
-        const gone = (Date.now() - hiddenAt.current) / 1000
-        if (gone > 15) setGapS((g) => g + Math.round(gone))
-      }
+      // Đoạn bị ẩn được bộ máy GPS ghi thành "mất tín hiệu" khi có điểm mới (gaps) — không nối âm thầm
       hiddenAt.current = null
     }
     document.addEventListener('visibilitychange', onVis)
     return () => document.removeEventListener('visibilitychange', onVis)
-  }, [acquireWakeLock, onPosition, onPositionError, persist])
+  }, [onPosition, onPositionError, persist])
 
   // Rời màn hình khi đang chạy: dọn GPS + wake lock
   useEffect(() => () => { stopWatch(); releaseWakeLock() }, [releaseWakeLock, stopWatch])
 
   return {
     background: tracksInBackground(),
-    phase, gps, distanceM, elapsedS, movingS, currentPace, avgPace, autoPaused, splits, voiceOn, result, error, gapS, recovery,
+    phase, gps, distanceM, elapsedS, movingS, currentPace, avgPace, autoPaused, splits, voiceOn, result, error, gapS, gaps, recovery,
     setVoiceOn, start, startAnyway, pause, resume, finish, discard, save, restore, dismissRecovery,
   }
 }

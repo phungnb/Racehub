@@ -19,6 +19,7 @@ const GPS_LABEL: Record<GpsState, { text: string; tone: string }> = {
   SEARCHING: { text: 'Đang tìm GPS…', tone: 'text-warning' },
   GOOD: { text: 'GPS tốt', tone: 'text-success' },
   WEAK: { text: 'GPS yếu', tone: 'text-warning' },
+  LOST: { text: 'Mất GPS', tone: 'text-danger' },
   DENIED: { text: 'Chưa cấp quyền vị trí', tone: 'text-danger' },
   UNSUPPORTED: { text: 'Thiết bị không hỗ trợ GPS', tone: 'text-danger' },
 }
@@ -173,11 +174,21 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
           </ol>
         )}
 
-        {t.gapS > 0 && (
+        {t.gps === 'LOST' && t.phase === 'RUNNING' && (
+          <p role="alert" className="mt-3 flex gap-2 rounded-xl bg-danger/10 px-3 py-2 text-xs text-danger">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+            Đang mất tín hiệu GPS (trong nhà, hầm, dưới mái che dày hoặc màn hình vừa tắt). Ra chỗ thoáng — app tự nối lại khi có tín hiệu.
+          </p>
+        )}
+        {t.gaps.length > 0 && (
           <p role="status" className="mt-3 flex gap-2 rounded-xl bg-warning/10 px-3 py-2 text-xs text-warning">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-            App bị ẩn {Math.round(t.gapS / 60) || 1} phút (tắt màn hình / chuyển app) nên điện thoại dừng GPS; đoạn đó được nối thẳng.
-            Lần sau hãy dùng nút Khóa màn hình.
+            <span>
+              Mất GPS {t.gaps.length} lần, tổng {Math.max(1, Math.round(t.gapS / 60))} phút.
+              {t.gaps.some((g) => g.counted) ? ' Đoạn đó tính theo đường thẳng nên có thể thiếu so với thực tế.' : ''}
+              {t.gaps.some((g) => !g.counted) ? ' Đoạn có tốc độ bất thường không được tính.' : ''}
+              {!t.background && ' Giữ màn hình sáng (nút Khoá màn hình), đừng bấm nút nguồn.'}
+            </span>
           </p>
         )}
 

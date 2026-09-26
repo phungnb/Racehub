@@ -6,6 +6,7 @@ import { LocateFixed, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Field, Input, SegmentedControl } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
+import { MAP_TILES } from '@/shared/config/map'
 import { toCell, TTL } from '../model/nearby'
 
 export interface PickedPlace { lat: number; lng: number; source: 'DEVICE' | 'AREA'; area: string | null; hours: 24 | 168 | 720 }
@@ -44,9 +45,8 @@ export function LocationPicker({ initialArea, onPick, busy, submitLabel = 'Dùng
     void import('leaflet').then((L) => {
       if (cancelled || !el.current || map.current) return
       map.current = L.map(el.current, { zoomControl: false, attributionControl: true }).setView([HANOI.lat, HANOI.lng], 11)
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        subdomains: 'abcd', maxZoom: 16,
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+      L.tileLayer(MAP_TILES.url, {
+        maxZoom: MAP_TILES.maxZoom, attribution: MAP_TILES.attribution, className: MAP_TILES.darken ? 'map-dark' : '',
       }).addTo(map.current)
       L.control.zoom({ position: 'bottomright' }).addTo(map.current)
       map.current.on('click', (e: import('leaflet').LeafletMouseEvent) => place(e.latlng.lat, e.latlng.lng, 'AREA'))

@@ -24,7 +24,7 @@ export interface PendingRun {
 
 const FLAG_LABEL: Record<string, string> = {
   MANUAL: 'Nhập tay', TREADMILL: 'Chạy máy', SUSTAINED_SPEED: 'Tốc độ duy trì', VEHICLE_BURST: 'Giống đi xe',
-  GPS_TELEPORT: 'GPS nhảy', STRIDE: 'Sải chân', HR_PACE: 'Tim thấp / pace nhanh', HISTORY: 'Khác thường ngày',
+  GPS_TELEPORT: 'GPS nhảy', GPS_GAP: 'Mất tín hiệu GPS', STRIDE: 'Sải chân', HR_PACE: 'Tim thấp / pace nhanh', HISTORY: 'Khác thường ngày',
 }
 export const RISK_LABEL = { LOW: 'Thấp', MEDIUM: 'Trung bình', HIGH: 'Cao', CRITICAL: 'Rất cao' } as const
 const RISK_TONE = { LOW: 'bg-surface-2 text-fg-muted', MEDIUM: 'bg-warning/15 text-warning', HIGH: 'bg-danger/15 text-danger', CRITICAL: 'bg-danger text-bg' } as const
