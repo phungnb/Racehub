@@ -8,6 +8,15 @@ export interface StreakReward { weeks: number; xu: number }
 export interface ReferralPolicy { inviterXu: number; refereeXu: number; monthlyCap: number; minKm: number }
 export interface ComebackPolicy { minRestDays: number; xu: number; cooldownDays: number }
 export interface GamePolicy { shieldPrice: number; maxShields: number; defaultWeeklyGoal: number }
+/** Hạn mức thử thách nội bộ CLB miễn phí theo gói (migration 008200) */
+export interface ClubChallengePolicy {
+  freeMinActiveMembers: number         // CLB Free cần ≥ N thành viên có bài chạy hợp lệ trong activeWindowDays ngày
+  activeWindowDays: number
+  freeMaxSlots: number                 // quy mô tối đa mỗi thử thách miễn phí (Free)
+  freeMaxOpen: number                  // số thử thách đang diễn ra cùng lúc (Free)
+  proMaxSlots: number
+  proMaxOpen: number
+}
 
 export interface EconomyPolicy {
   xuVnd: number                        // quy ước: 1 Xu = xuVnd đồng (không đổi ra tiền mặt)
@@ -22,6 +31,7 @@ export interface EconomyPolicy {
   levelUpXu: Record<string, number>    // "2": 20 …
   capacityTiers: CapacityTier[]        // phí tạo thử thách / giải theo quy mô
   game: GamePolicy
+  clubChallenge: ClubChallengePolicy
 }
 
 export const DEFAULT_POLICY: EconomyPolicy = {
@@ -40,6 +50,7 @@ export const DEFAULT_POLICY: EconomyPolicy = {
     { max: 200, xu: 1500 }, { max: 500, xu: 3500 }, { max: 1000, xu: 7000 },
   ],
   game: { shieldPrice: 200, maxShields: 2, defaultWeeklyGoal: 3 },
+  clubChallenge: { freeMinActiveMembers: 5, activeWindowDays: 30, freeMaxSlots: 50, freeMaxOpen: 2, proMaxSlots: 1000, proMaxOpen: 20 },
 }
 
 const n = (v: unknown, fallback: number) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? fallback : Number(v))
@@ -54,6 +65,8 @@ export function toPolicy(raw: unknown): EconomyPolicy {
   const ref = (r.referral ?? {}) as Record<string, unknown>
   const game = (r.game ?? {}) as Record<string, unknown>
   const cb = (r.comeback ?? {}) as Record<string, unknown>
+  const cc = (r.clubChallenge ?? {}) as Record<string, unknown>
+  const dc = d.clubChallenge
   return {
     xuVnd: n(r.xuVnd, d.xuVnd),
     xpPerKm: n(r.xpPerKm, d.xpPerKm),
@@ -75,6 +88,11 @@ export function toPolicy(raw: unknown): EconomyPolicy {
     capacityTiers: arr(r.capacityTiers, (t) => ({ max: n(t.max, 0), xu: n(t.xu, 0) }), d.capacityTiers).sort((a, b) => a.max - b.max),
     game: { shieldPrice: n(game.shieldPrice, d.game.shieldPrice), maxShields: n(game.maxShields, d.game.maxShields),
             defaultWeeklyGoal: n(game.defaultWeeklyGoal, d.game.defaultWeeklyGoal) },
+    clubChallenge: {
+      freeMinActiveMembers: n(cc.freeMinActiveMembers, dc.freeMinActiveMembers), activeWindowDays: n(cc.activeWindowDays, dc.activeWindowDays),
+      freeMaxSlots: n(cc.freeMaxSlots, dc.freeMaxSlots), freeMaxOpen: n(cc.freeMaxOpen, dc.freeMaxOpen),
+      proMaxSlots: n(cc.proMaxSlots, dc.proMaxSlots), proMaxOpen: n(cc.proMaxOpen, dc.proMaxOpen),
+    },
   }
 }
 
@@ -169,6 +187,9 @@ export function validatePolicy(p: EconomyPolicy): string | null {
   if (p.streakRewards.some((s) => !(Number.isInteger(s.weeks) && s.weeks >= 1 && s.xu >= 0))) return 'Mốc chuỗi tuần không hợp lệ.'
   if (!(p.referral.inviterXu >= 0 && p.referral.refereeXu >= 0 && p.referral.monthlyCap >= 0 && p.referral.minKm >= 0)) return 'Thưởng giới thiệu không hợp lệ.'
   if (!(p.game.shieldPrice >= 0)) return 'Giá khiên không hợp lệ.'
+  const cc = p.clubChallenge
+  if (![cc.freeMinActiveMembers, cc.freeMaxSlots, cc.freeMaxOpen, cc.proMaxSlots, cc.proMaxOpen].every((v) => Number.isInteger(v) && v >= 0 && v <= 10000)
+      || !(Number.isInteger(cc.activeWindowDays) && cc.activeWindowDays >= 1 && cc.activeWindowDays <= 365)) return 'Hạn mức thử thách CLB không hợp lệ.'
   if (!(p.comeback.minRestDays >= 7 && p.comeback.minRestDays <= 365 && p.comeback.xu >= 0 && p.comeback.cooldownDays >= 0)) return 'Thưởng quay lại không hợp lệ (nghỉ tối thiểu 7–365 ngày).'
   return null
 }

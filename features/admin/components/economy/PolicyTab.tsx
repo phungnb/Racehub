@@ -196,6 +196,28 @@ export function PolicyTab({ policy, raw }: { policy: EconomyPolicy; raw: Record<
         </div>
       </Section>
 
+      <Section title="Thử thách nội bộ CLB miễn phí theo gói"
+        hint="Trong hạn mức: tạo không mất phí. Ngoài hạn mức (CLB ít người chạy, quá số thử thách cùng lúc, quá quy mô): tính phí quy mô như thường, trừ quỹ CLB. Thử thách công khai / cá nhân không áp dụng.">
+        <p className="text-xs font-medium text-fg-muted">CLB miễn phí — chống &ldquo;CLB một người&rdquo;</p>
+        <div className="grid grid-cols-2 gap-3">
+          <Num id="pol-cc-min" label="Thành viên đang chạy tối thiểu" unit="người" value={p.clubChallenge.freeMinActiveMembers}
+            onChange={(v) => set({ clubChallenge: { ...p.clubChallenge, freeMinActiveMembers: v } })} />
+          <Num id="pol-cc-days" label="Có bài chạy hợp lệ trong" unit="ngày" value={p.clubChallenge.activeWindowDays}
+            onChange={(v) => set({ clubChallenge: { ...p.clubChallenge, activeWindowDays: v } })} />
+          <Num id="pol-cc-fopen" label="Thử thách cùng lúc" unit="cái" value={p.clubChallenge.freeMaxOpen}
+            onChange={(v) => set({ clubChallenge: { ...p.clubChallenge, freeMaxOpen: v } })} />
+          <Num id="pol-cc-fslots" label="Quy mô mỗi thử thách" unit="người" value={p.clubChallenge.freeMaxSlots}
+            onChange={(v) => set({ clubChallenge: { ...p.clubChallenge, freeMaxSlots: v } })} />
+        </div>
+        <p className="text-xs font-medium text-fg-muted">CLB Pro</p>
+        <div className="grid grid-cols-2 gap-3">
+          <Num id="pol-cc-popen" label="Thử thách cùng lúc" unit="cái" value={p.clubChallenge.proMaxOpen}
+            onChange={(v) => set({ clubChallenge: { ...p.clubChallenge, proMaxOpen: v } })} />
+          <Num id="pol-cc-pslots" label="Quy mô mỗi thử thách" unit="người" value={p.clubChallenge.proMaxSlots}
+            onChange={(v) => set({ clubChallenge: { ...p.clubChallenge, proMaxSlots: v } })} />
+        </div>
+      </Section>
+
       <Section title="Tiêu Xu khác">
         <div className="grid grid-cols-2 gap-3">
           <Num id="pol-gift" label="Trần tặng quà mỗi ngày" unit="Xu" value={p.giftDailyCapXu} onChange={(v) => set({ giftDailyCapXu: v })}
@@ -219,6 +241,7 @@ export function PolicyTab({ policy, raw }: { policy: EconomyPolicy; raw: Record<
           <li>Chạy: {runPolicyText(p.run)}</li>
           <li>Điểm danh +{formatNumber(p.checkinXu)} Xu (chạy ≥ {formatNumber(p.checkinMinKm)} km)</li>
           <li>Phí quy mô: {feePolicyText(p.capacityTiers)}</li>
+          <li>CLB miễn phí: {p.clubChallenge.freeMaxOpen} thử thách cùng lúc, ≤ {formatNumber(p.clubChallenge.freeMaxSlots)} người, cần {p.clubChallenge.freeMinActiveMembers} người chạy / {p.clubChallenge.activeWindowDays} ngày · Pro: {p.clubChallenge.proMaxOpen} cùng lúc, ≤ {formatNumber(p.clubChallenge.proMaxSlots)} người</li>
         </ul>
       </ConfirmSheet>
     </div>

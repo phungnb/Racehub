@@ -72,6 +72,12 @@ export interface Challenge {
   /** Thể lệ bổ sung do BTC điền (migration 005400) */
   rules_info?: ChallengeRulesInfo | null
   rules_updated_at?: string | null
+  /** Tự lặp lại (migration 007600) */
+  recurrence?: 'NONE' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
+  occurrence?: number
+  series_id?: string | null
+  recur_next_id?: string | null
+  recur_error?: string | null
 }
 
 /** Thể lệ bổ sung: thưởng, phạt, lệ phí / đóng góp, điều kiện, liên hệ BTC, tối đa 5 mục tự đặt */
@@ -208,8 +214,26 @@ export interface ChallengeQuote {
   custom: boolean                   // > mức lớn nhất: admin cấp riêng
   plan: { code: string; name: string } | null   // gói đang hiệu lực của bên trả phí (VIP / CLB Pro) — migration 007500
   bestPassSlots: number             // quy mô lớn nhất lượt miễn phí còn lại bao được (0 = không có lượt)
+  listFee: number                   // phí theo biểu phí trước khi áp hạn mức CLB
+  clubQuota: ClubChallengeQuota | null   // hạn mức thử thách nội bộ CLB (migration 008200)
   policy: EconomyPolicy
 }
+
+/** Hạn mức thử thách nội bộ CLB theo gói (club_challenge_quota, migration 008200) */
+export interface ClubChallengeQuota {
+  plan: 'FREE' | 'PRO'
+  eligible: boolean
+  reason: 'NEED_ACTIVE_MEMBERS' | 'OPEN_LIMIT' | 'SLOTS_LIMIT' | null
+  active_members: number
+  min_active_members: number
+  active_window_days: number
+  open: number
+  max_open: number
+  max_slots: number
+  free: { min_active_members: number; max_open: number; max_slots: number }
+  pro: { max_open: number; max_slots: number }
+}
+
 
 /** Báo giá tạo thử thách: phí, ai trả, vé miễn phí đang có (quote_challenge, migration 000700) */
 export async function quoteChallenge(d: ChallengeDraft): Promise<ChallengeQuote> {
@@ -220,15 +244,22 @@ export async function quoteChallenge(d: ChallengeDraft): Promise<ChallengeQuote>
   const q = data as {
     fee: number; payer: 'USER' | 'CLUB'; payer_balance: number; wallet_balance: number; pass: ChallengeQuote['pass']
     tier: ChallengeQuote['tier']; custom: boolean; xu_vnd: number; policy: unknown
-    plan?: ChallengeQuote['plan']; best_pass_slots?: number
+    plan?: ChallengeQuote['plan']; best_pass_slots?: number; list_fee?: number; club_quota?: ClubChallengeQuota | null
   }
   const policy = toPolicy(q.policy)
   return {
     fee: Number(q.fee ?? 0), payer: q.payer, payerBalance: Number(q.payer_balance ?? 0), walletBalance: Number(q.wallet_balance ?? 0),
     pass: q.pass, tier: q.tier ? { max: Number(q.tier.max), xu: Number(q.tier.xu) } : null, custom: Boolean(q.custom),
     plan: q.plan ?? null, bestPassSlots: Number(q.best_pass_slots ?? (q.pass?.max_slots ?? 0)),
+    listFee: Number(q.list_fee ?? q.fee ?? 0), clubQuota: q.club_quota ?? null,
     policy: q.xu_vnd ? { ...policy, xuVnd: Number(q.xu_vnd) } : policy,
   }
+}
+
+/** Bật / tắt tự lặp lại (migration 007600) */
+export async function setChallengeRecurrence(id: string, recurrence: string) {
+  const { error } = await supabase.rpc('set_challenge_recurrence', { p_challenge_id: id, p_recurrence: recurrence })
+  if (error) throw error
 }
 
 /** Thử thách mình đã tạo, dùng làm mẫu (VIP2 — migration 004000) */
@@ -361,6 +392,9 @@ const MESSAGES: Record<string, string> = {
   INVALID_MAX_SLOTS: 'Số người tối đa không hợp lệ.',
   INSUFFICIENT_BALANCE: 'Số Xu trong ví không đủ cho phí tạo và tiền treo thưởng.',
   INSUFFICIENT_TREASURY: 'Quỹ CLB không đủ cho phí tạo và tiền treo thưởng.',
+  INVALID_RECURRENCE: 'Chu kỳ lặp không hợp lệ.',
+  RECURRENCE_NOT_SUPPORTED: 'Kèo 1-1 không lặp lại được.',
+  RECURRENCE_TOO_SHORT: 'Mỗi kỳ dài hơn chu kỳ lặp — rút ngắn thời gian hoặc chọn chu kỳ dài hơn.',
   INVALID_AMOUNT: 'Số Xu thưởng không hợp lệ.',
   FORBIDDEN: 'Bạn không có quyền làm việc này.',
   RATE_LIMITED: 'Bạn thao tác hơi nhanh, thử lại sau ít phút.',

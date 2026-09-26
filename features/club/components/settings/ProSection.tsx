@@ -2,20 +2,22 @@
 
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BarChart3, Check, Crown, Download, Link2, Ticket, Users } from 'lucide-react'
+import { BarChart3, Check, Crown, Download, Link2, Sparkles, Ticket, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, ErrorState, Input, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatNumber } from '@/shared/lib/format'
-import { clubErrorMessage, getAttendanceReport, getClubPlan, setClubSlug, type AttendanceRow, type Club } from '../../api/clubApi'
+import { clubErrorMessage, getAttendanceReport, getClubChallengeQuota, getClubPlan, setClubSlug, type AttendanceRow, type Club } from '../../api/clubApi'
 import { clubKeys } from '../../hooks/keys'
 import { ClubProPurchase } from '@/features/billing'
+import { BrandingEditor } from './BrandingEditor'
 
 const BENEFITS = [
   { icon: Users, text: 'Không giới hạn Quản trị viên (gói miễn phí: 2)' },
-  { icon: Link2, text: 'Link mời riêng dễ nhớ: racehub…/c/ten-clb' },
+  { icon: Link2, text: 'Trang công khai + link mời dễ nhớ: racehub…/c/ten-clb' },
   { icon: BarChart3, text: 'Báo cáo chuyên cần: buổi chạy, km, điểm danh sự kiện, đóng quỹ — xuất CSV' },
-  { icon: Ticket, text: '2 lượt tạo thử thách CLB ≤100 người mỗi tháng (trừ quỹ CLB 0 Xu)' },
+  { icon: Sparkles, text: 'Tường nhà nổi bật: ảnh bìa, khẩu hiệu, chủ đề màu, huy hiệu ✦ PRO' },
+  { icon: Ticket, text: 'Thử thách nội bộ miễn phí: tới 20 thử thách cùng lúc, mỗi thử thách tới 1.000 người' },
 ]
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('vi-VN')
 
@@ -53,13 +55,47 @@ export function ProSection({ club }: { club: Club }) {
         {p.active ? (
           <>
             <SlugEditor clubId={club.id} current={p.slug} />
+            {p.slug && <a href={`/c/${p.slug}`} target="_blank" rel="noopener noreferrer" className="inline-block text-sm font-semibold text-brand">Xem trang công khai của CLB →</a>}
             <Button block variant="secondary" onClick={() => setReport(true)}><BarChart3 className="size-4" aria-hidden />Báo cáo chuyên cần</Button>
           </>
         ) : null}
+        <QuotaCard clubId={club.id} />
+        <BrandingEditor club={club} active={p.active} />
         <ClubProPurchase clubId={club.id} active={p.active} />
       </Card>
       {report && <ReportSheet club={club} onClose={() => setReport(false)} />}
     </section>
+  )
+}
+
+/** Hạn mức thử thách nội bộ miễn phí đang dùng (migration 008200) */
+function QuotaCard({ clubId }: { clubId: string }) {
+  const q = useQuery({ queryKey: ['club', clubId, 'challenge-quota'], queryFn: () => getClubChallengeQuota(clubId) })
+  if (!q.data) return null
+  const d = q.data
+  const rows = [
+    { label: 'Thử thách đang diễn ra', value: `${d.open}/${d.max_open}`, ok: d.open < d.max_open },
+    { label: 'Quy mô mỗi thử thách', value: `≤ ${formatNumber(d.max_slots)} người`, ok: true },
+    ...(d.plan === 'FREE' ? [{ label: `Thành viên có bài chạy trong ${d.active_window_days} ngày`, value: `${d.active_members}/${d.min_active_members}`,
+                               ok: d.active_members >= d.min_active_members }] : []),
+  ]
+  return (
+    <div className="space-y-2 rounded-xl border border-border p-3">
+      <p className="text-sm font-semibold">Thử thách nội bộ miễn phí</p>
+      <ul className="space-y-1 text-sm">
+        {rows.map((r) => (
+          <li key={r.label} className="flex items-center justify-between gap-2">
+            <span className="text-fg-muted">{r.label}</span>
+            <span className={cn('font-mono font-semibold', r.ok ? 'text-brand' : 'text-danger')}>{r.value}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-fg-subtle">
+        {d.plan === 'FREE'
+          ? `Ngoài hạn mức vẫn tạo được, phí tính theo quy mô và trừ quỹ CLB. CLB Pro: ${d.pro.max_open} thử thách cùng lúc, tới ${formatNumber(d.pro.max_slots)} người, không cần điều kiện thành viên.`
+          : 'Ngoài hạn mức: phí theo quy mô, trừ quỹ CLB.'}
+      </p>
+    </div>
   )
 }
 

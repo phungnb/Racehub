@@ -5,7 +5,7 @@ import { shineTier } from '@/shared/lib/shine'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
-import { BarChart3, ChevronRight, Crown, Gift, Pencil, Settings, Sparkles, Watch, Ticket, Store } from 'lucide-react'
+import { BarChart3, ChevronRight, Crown, Gift, Pencil, Settings, Sparkles, Watch, Ticket, Store, Building2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, LevelBadge, ProgressBar, SegmentedControl, Skeleton } from '@/shared/ui'
 import { StravaConnectButton } from '@/features/integrations'
@@ -167,6 +167,12 @@ export function MeScreen({ profile }: { profile: Profile }) {
               <span className="grid size-10 place-items-center rounded-xl bg-brand/15 text-brand"><Store className="size-5" aria-hidden /></span>
               <span className="min-w-0 flex-1"><span className="block font-semibold">Chợ Runner</span>
                 <span className="block text-xs text-fg-muted">HLV, cửa hàng, dịch vụ đã xác minh · đăng ký hồ sơ đối tác</span></span>
+              <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+            </Link>
+            <Link href={routes.orgs} className="flex items-center gap-3 p-4">
+              <span className="grid size-10 place-items-center rounded-xl bg-brand/15 text-brand"><Building2 className="size-5" aria-hidden /></span>
+              <span className="min-w-0 flex-1"><span className="block font-semibold">Tổ chức của tôi</span>
+                <span className="block text-xs text-fg-muted">Công ty, liên đoàn, trường học · chiến dịch và bảng xếp hạng</span></span>
               <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
             </Link>
             <Link href={routes.plan} className="flex items-center gap-3 p-4">

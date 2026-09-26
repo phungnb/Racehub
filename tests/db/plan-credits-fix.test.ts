@@ -35,9 +35,9 @@ describe('báo giá thử thách cho CLB Pro bật tay (007500)', () => {
       expect(q).toMatchObject({ payer: 'CLUB', plan: { code: 'CLUB_PRO' } })
       expect(Number(q.best_pass_slots)).toBeGreaterThan(0)
     }
+    // 008200: thử thách nội bộ của CLB Pro miễn phí trong hạn mức gói → không cần dùng lượt
     const q = await quote(db, OWN, 20, CLUB)
-    expect(q.pass).not.toBeNull()
-    expect(q.pass.note).toContain('CLB Pro')
+    expect(q).toMatchObject({ fee: 0, pass: null, club_quota: { plan: 'PRO', eligible: true } })
     expect((await quote(db, OWN, 1, CLUB, 'SOLO_GOAL')).fee).toBe(0)
   })
 

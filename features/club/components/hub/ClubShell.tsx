@@ -11,6 +11,7 @@ import { cn } from '@/shared/lib/cn'
 import { formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import { clubErrorMessage, joinClub, leaveClub } from '../../api/clubApi'
+import { CLUB_THEMES, isProActive } from '../../model/theme'
 import { accentOf, JOIN_POLICY_LABEL } from '../../model/roles'
 import { useClub, useClubInbox, useClubMembers } from '../../hooks/useClub'
 import { clubKeys } from '../../hooks/keys'
@@ -19,7 +20,7 @@ import { ClubAvatar } from './ClubAvatar'
 /** Khung chung cho mọi tab của một CLB: đầu trang có màu CLB + thanh tab dính khi cuộn. */
 export function ClubShell({ clubId, children }: { clubId: string; children: ReactNode }) {
   const pathname = usePathname()
-  const { club, membership, isMember, isStaff, isLoading, isError, error, refetch } = useClub(clubId)
+  const { club, membership, isMember, isStaff, isRealMember, isAdmin, isLoading, isError, error, refetch } = useClub(clubId)
   const inbox = useClubInbox()
   const members = useClubMembers(clubId, isStaff)
   const unread = inbox.data?.find((c) => c.club_id === clubId)?.unread_count ?? 0
@@ -29,6 +30,8 @@ export function ClubShell({ clubId, children }: { clubId: string; children: Reac
   if (isError || !club) return <ErrorState message="Không tải được CLB." error={error} onRetry={refetch} />
 
   const accent = accentOf(club)
+  const pro = isProActive(club)
+  const theme = club.theme ? CLUB_THEMES[club.theme] : null
   const base = routes.club(clubId)
   const tabs = [
     { href: base, label: 'Bảng tin' },
@@ -37,34 +40,45 @@ export function ClubShell({ clubId, children }: { clubId: string; children: Reac
     { href: `${base}/photos`, label: 'Ảnh' },
     { href: `${base}/challenges`, label: 'Thử thách' },
     { href: `${base}/leaderboard`, label: 'BXH' },
+    { href: `${base}/hall`, label: 'Đại sảnh' },
     { href: `${base}/members`, label: 'Thành viên', badge: pending },
     { href: `${base}/treasury`, label: 'Quỹ' },
+    { href: `${base}/shop`, label: 'Cửa hàng' },
   ]
 
   return (
     <div className="-mx-4 -mt-4">
       <header className="relative overflow-hidden border-b border-border"
-        style={{ background: `linear-gradient(160deg, color-mix(in srgb, ${accent} 28%, transparent), transparent 70%)` }}>
-        <div className="flex items-center justify-between px-2 pt-2">
+        style={{ background: pro && theme ? theme.bg : `linear-gradient(160deg, color-mix(in srgb, ${accent} 28%, transparent), transparent 70%)` }}>
+        {/* Tường nhà CLB Pro (migration 008100): ảnh bìa + lớp phủ để chữ luôn đọc được */}
+        {pro && club.cover_url && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element -- ảnh bìa CLB */}
+            <img src={club.cover_url} alt="" className="absolute inset-0 size-full object-cover" style={{ objectPosition: `50% ${club.cover_position ?? 50}%` }} />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/25 to-bg" aria-hidden />
+          </>
+        )}
+        <div className="relative flex items-center justify-between px-2 pt-2">
           <Link href={routes.clubs} aria-label="Về danh sách CLB"
-            className="grid size-11 place-items-center rounded-full text-fg-muted hover:bg-surface-2 hover:text-fg">
+            className={cn('grid size-11 place-items-center rounded-full hover:bg-surface-2 hover:text-fg', pro && (club.cover_url || theme) ? 'bg-black/30 text-white' : 'text-fg-muted')}>
             <ArrowLeft className="size-5" aria-hidden />
           </Link>
           {isMember && (
             <Link href={`${base}/settings`} aria-label="Cài đặt CLB"
-              className="grid size-11 place-items-center rounded-full text-fg-muted hover:bg-surface-2 hover:text-fg">
+              className={cn('grid size-11 place-items-center rounded-full hover:bg-surface-2 hover:text-fg', pro && (club.cover_url || theme) ? 'bg-black/30 text-white' : 'text-fg-muted')}>
               <Settings className="size-5" aria-hidden />
             </Link>
           )}
         </div>
-        <div className="flex items-end gap-4 px-4 pb-4">
-          <ClubAvatar club={club} size="lg" className="shadow-lg" />
+        <div className={cn('relative flex items-end gap-4 px-4 pb-4', pro && club.cover_url && 'pt-16')}>
+          <ClubAvatar club={club} size="lg" className={cn('shadow-lg', pro && 'ring-2 ring-coin ring-offset-2 ring-offset-bg')} />
           <div className="min-w-0 pb-1">
-            <h1 className="flex items-center gap-2 text-xl font-bold leading-tight sm:text-2xl">
+            <h1 className={cn('flex items-center gap-2 text-xl font-bold leading-tight sm:text-2xl', pro && (club.cover_url || theme) && 'text-white drop-shadow')}>
               <span className="line-clamp-2 break-words">{club.name}</span>
-              {club.plan === 'PRO' && <span className="shrink-0 rounded-full bg-coin/20 px-2 py-0.5 text-[11px] font-bold text-coin">PRO</span>}
+              {pro && <span className="shrink-0 rounded-full bg-gradient-to-r from-coin to-amber-300 px-2 py-0.5 text-[11px] font-black text-bg shadow">✦ PRO</span>}
             </h1>
-            <p className="mt-1 flex items-center gap-1.5 text-sm text-fg-muted">
+            {pro && club.tagline && <p className={cn('mt-0.5 text-sm font-medium italic', club.cover_url || theme ? 'text-white/90 drop-shadow' : 'text-fg-muted')}>“{club.tagline}”</p>}
+            <p className={cn('mt-1 flex items-center gap-1.5 text-sm', pro && (club.cover_url || theme) ? 'text-white/80' : 'text-fg-muted')}>
               <Users className="size-4" aria-hidden />
               <span className="font-mono tabular">{formatNumber(club.member_count)}</span> thành viên
             </p>
@@ -93,10 +107,40 @@ export function ClubShell({ clubId, children }: { clubId: string; children: Reac
               )
             })}
           </nav>
+          {/* Admin hệ thống xem hộ (toàn quyền, 007100) nhưng chưa là thành viên thật: vẫn cho tham gia như runner */}
+          {isAdmin && !isRealMember && <AdminJoinBar clubId={clubId} status={membership?.status ?? null} />}
           <div className="px-4 pt-4">{children}</div>
         </>
       ) : (
         <div className="px-4 pt-4"><JoinGate clubId={clubId} status={membership?.status ?? null} /></div>
+      )}
+    </div>
+  )
+}
+
+function AdminJoinBar({ clubId, status }: { clubId: string; status: string | null }) {
+  const qc = useQueryClient()
+  const { club, uid } = useClub(clubId)
+  const join = useMutation({
+    mutationFn: () => joinClub(clubId),
+    onSuccess: (m) => {
+      toast.success(m.status === 'APPROVED' ? 'Bạn đã là thành viên CLB' : 'Đã gửi yêu cầu — bạn tự duyệt được ở tab Thành viên')
+      void qc.invalidateQueries({ queryKey: clubKeys.membership(clubId, uid) })
+      void qc.invalidateQueries({ queryKey: clubKeys.club(clubId) })
+      void qc.invalidateQueries({ queryKey: clubKeys.inbox })
+    },
+    onError: (e) => toast.error(clubErrorMessage(e)),
+  })
+  if (!club) return null
+  return (
+    <div className="mx-4 mt-3 flex items-center gap-3 rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm">
+      <span className="min-w-0 flex-1 text-fg-muted">
+        {status === 'PENDING' ? 'Yêu cầu tham gia đang chờ duyệt (tự duyệt ở tab Thành viên).' : 'Bạn đang xem với quyền admin, chưa là thành viên.'}
+      </span>
+      {status !== 'PENDING' && status !== 'BANNED' && (
+        <Button size="sm" onClick={() => join.mutate()} loading={join.isPending}>
+          {club.join_policy === 'OPEN' ? 'Tham gia CLB' : 'Xin gia nhập'}
+        </Button>
       )}
     </div>
   )

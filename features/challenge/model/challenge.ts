@@ -130,7 +130,18 @@ export interface ChallengeDraft {
   pledge: PledgeDraft
   /** Thể lệ bổ sung (migration 005400): thưởng, phạt, lệ phí, điều kiện, liên hệ */
   rules: RulesInfoDraft
+  /** Tự lặp lại (migration 007600): hết kỳ, hệ thống tự tạo kỳ kế tiếp cùng luật */
+  recurrence: Recurrence
 }
+
+export type Recurrence = 'NONE' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
+export const RECURRENCE_LABEL: Record<Recurrence, string> = {
+  NONE: 'Không lặp', WEEKLY: 'Hằng tuần', MONTHLY: 'Hằng tháng', QUARTERLY: 'Hằng quý', YEARLY: 'Hằng năm',
+}
+/** Số ngày tối đa của một kỳ để còn lặp được theo chu kỳ đó */
+export const RECURRENCE_MAX_DAYS: Record<Exclude<Recurrence, 'NONE'>, number> = { WEEKLY: 7, MONTHLY: 28, QUARTERLY: 90, YEARLY: 365 }
+export const recurrenceAllowed = (d: Pick<ChallengeDraft, 'format' | 'start' | 'end'>, r: Recurrence) =>
+  r === 'NONE' || (d.format !== 'DUEL' && (Date.parse(d.end) - Date.parse(d.start)) / DAY <= RECURRENCE_MAX_DAYS[r] + 1e-6)
 
 export interface RulesInfoDraft {
   prizes?: string
@@ -250,6 +261,7 @@ export function defaultDraft(now = new Date(), clubId: string | null = null): Ch
     rewardXu: 0, rewardSource: clubId ? 'CLUB' : 'NONE', rewardSplit: 'WINNER',
     pledge: { ...DEFAULT_PLEDGE },
     rules: {},
+    recurrence: 'NONE',
   }
 }
 

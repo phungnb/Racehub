@@ -118,7 +118,25 @@ begin
     jsonb_build_object('file', '20261001007400', 'label', 'Kết nối Strava = đồng ý hiện bài cho CLB & BXH (bỏ bước hỏi; runner tắt được trong Cài đặt)',
       'ok', exists (select 1 from pg_proc where proname = 'activity_shared' and prosrc like '%strava_share from public.profile_settings s where s.user_id = p_user), true)%')),
     jsonb_build_object('file', '20261001007500', 'label', 'Sửa lỗi "Không tính được phí" khi tạo thử thách / giải cho CLB Pro + báo giá biết gói VIP / Pro',
-      'ok', exists (select 1 from pg_proc where proname = 'issue_credits' and prosrc like '%r_credit%')));
+      'ok', exists (select 1 from pg_proc where proname = 'issue_credits' and prosrc like '%r_credit%')),
+    jsonb_build_object('file', '20261001007600', 'label', 'Thử thách tự lặp lại hằng tuần / tháng / quý / năm (tạo kỳ mới như tạo tay: quyền, phí, lượt)',
+      'ok', to_regprocedure('public.spawn_recurring_challenges()') is not null),
+    jsonb_build_object('file', '20261001007700', 'label', 'Ngày vàng ×1,5 / ×2 / ×3 của CLB (nhân km thử thách CLB + BXH CLB, không nhân XP / Xu)',
+      'ok', to_regprocedure('public.club_leaderboard_v2(uuid, text)') is not null),
+    jsonb_build_object('file', '20261001007800', 'label', 'Đại sảnh danh vọng CLB + cột mốc km / Half / Full Marathon tự đăng bảng tin',
+      'ok', to_regprocedure('public.club_hall_of_fame(uuid)') is not null),
+    jsonb_build_object('file', '20261001007900', 'label', 'Cửa hàng CLB: đặt áo / BIB, VietQR vào tài khoản CLB (RaceHub không giữ tiền)',
+      'ok', to_regprocedure('public.place_club_order(uuid, jsonb, text)') is not null),
+    jsonb_build_object('file', '20261001008000', 'label', 'Trang công khai của CLB Pro (/c/<link-riêng>)',
+      'ok', to_regprocedure('public.club_public_page(text)') is not null),
+    jsonb_build_object('file', '20261001008100', 'label', 'Tường nhà CLB Pro (ảnh bìa, khẩu hiệu, chủ đề) + thư mời giao lưu CLB',
+      'ok', to_regprocedure('public.send_club_exchange(uuid, uuid, jsonb)') is not null and private.sc_col('clubs', 'cover_url')),
+    jsonb_build_object('file', '20261001008200', 'label', 'Hạn mức thử thách CLB theo gói (Free / Pro), chặn CLB một người',
+      'ok', to_regprocedure('public.club_challenge_quota(uuid, integer)') is not null),
+    jsonb_build_object('file', '20261001008300', 'label', 'RaceHub Doanh nghiệp / Liên CLB (tổ chức, chiến dịch, báo cáo, báo giá)',
+      'ok', to_regprocedure('public.org_campaign_board(uuid)') is not null),
+    jsonb_build_object('file', '20261001008400', 'label', 'Quản lý doanh nghiệp (email công ty, nhập danh sách, đơn vị nhiều cấp, chốt kết quả, chứng nhận, bảng tin) + quay thưởng',
+      'ok', to_regprocedure('public.run_lucky_draw(uuid)') is not null and to_regprocedure('public.org_import_members(uuid, jsonb, jsonb)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

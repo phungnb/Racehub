@@ -23,5 +23,12 @@ export async function GET(req: NextRequest) {
   // Lượt tạo thử thách tháng mới cho gói VIP / CLB Pro (migration 003800)
   const credits = await admin.rpc('issue_due_credits')
   if (credits.error) console.error('[cron/challenges] credits', credits.error.message)
-  return NextResponse.json({ settled: data, battles: battles.data ?? null, cups: cups.data ?? null, credits: credits.data ?? null })
+  // Thử thách tự lặp lại: tạo kỳ kế tiếp trước khi kỳ hiện tại kết thúc (migration 007600) — sau khi đã cấp lượt tháng mới
+  const recurring = await admin.rpc('spawn_recurring_challenges')
+  if (recurring.error) console.error('[cron/challenges] recurring', recurring.error.message)
+  // Hợp đồng tổ chức hết hạn → trả gói cũ cho CLB được tài trợ Pro (migration 008300)
+  const orgs = await admin.rpc('expire_org_plans')
+  if (orgs.error) console.error('[cron/challenges] orgs', orgs.error.message)
+  return NextResponse.json({ settled: data, battles: battles.data ?? null, cups: cups.data ?? null, credits: credits.data ?? null,
+    recurring: recurring.data ?? null, orgs: orgs.data ?? null })
 }

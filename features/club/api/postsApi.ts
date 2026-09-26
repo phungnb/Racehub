@@ -2,7 +2,7 @@
 import { supabase } from '@/shared/lib/supabase'
 import type { MemberProfile } from './clubApi'
 
-export type PostKind = 'POST' | 'ANNOUNCEMENT' | 'AUTO_RUN' | 'AUTO_JOIN' | 'RECAP' | 'CHALLENGE' | 'NEWS'
+export type PostKind = 'POST' | 'ANNOUNCEMENT' | 'AUTO_RUN' | 'AUTO_JOIN' | 'RECAP' | 'CHALLENGE' | 'NEWS' | 'MILESTONE'
 /** Tin CLB (migration 006300): chuyên mục + link kèm theo */
 export type NewsCategory = 'NOTICE' | 'EVENT' | 'RACE' | 'RESULT' | 'TRAINING' | 'OTHER'
 export interface NewsMeta { category: NewsCategory; link: string | null; edited_at?: string }

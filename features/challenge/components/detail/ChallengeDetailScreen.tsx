@@ -3,23 +3,26 @@
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
+import { DrawPanel } from '@/features/draw'
 import {
   ArrowLeft, CalendarDays, Check, CircleSlash, Clock, Coins, Copy, Crown, Gauge, Hourglass, Info, Lock, LogOut, MoreHorizontal,
-  Route, Share2, Shield, Timer, Trophy, Users, UsersRound, HeartPulse } from 'lucide-react'
+  Repeat, Route, Share2, Shield, Timer, Trophy, Users, UsersRound, HeartPulse } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Field, LevelBadge, ProgressRing, RankSearch, scrollToRow, SegmentedControl, Sheet, Skeleton, Textarea } from '@/shared/ui'
 import { filterSearch } from '@/shared/lib/search'
 import { routes } from '@/shared/config/routes'
 import { cn } from '@/shared/lib/cn'
 import { formatNumber, formatPace } from '@/shared/lib/format'
-import { challengeErrorMessage, type ChallengeDetail, type LeaderboardEntry, type TeamStanding } from '../../api/challengeApi'
+import { challengeErrorMessage, setChallengeRecurrence, type ChallengeDetail, type LeaderboardEntry, type TeamStanding } from '../../api/challengeApi'
 import {
-  AUDIENCE_LABEL, challengePhase, FORMAT_META, formatScore, OBJECTIVE_META, planStatus, rewardSummary, TEAM_MODE_META, timeLabel,
-  type TeamMode,
+  AUDIENCE_LABEL, challengePhase, FORMAT_META, formatScore, OBJECTIVE_META, planStatus, RECURRENCE_LABEL, rewardSummary, TEAM_MODE_META, timeLabel,
+  type Recurrence, type TeamMode,
 } from '../../model/challenge'
 import { useChallenge, useChallengeActions } from '../../hooks/useChallenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
 import { PledgePanel } from './PledgePanel'
+import { DoneFilter, useDoneFilter } from './DoneFilter'
 import { RulesInfoCard } from './RulesInfo'
 import { TopSupported } from '@/features/game'
 import { HonorPanel, useHonor } from '../honor/HonorPanel'
@@ -82,6 +85,7 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
         {c.description && <p className="whitespace-pre-line text-[15px] leading-relaxed text-fg-muted">{c.description}</p>}
       </header>
 
+      <RecurrenceBar d={d} />
       <StatusBanner d={d} phase={phase} />
       <ProgressHero d={d} phase={phase} standings={standings} />
 
@@ -105,6 +109,7 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
               canEdit={d.can_manage && (phase === 'UPCOMING' || phase === 'LIVE')} /></div>}
       {tab !== 'RULES' && tab !== 'HONOR' && <TopSupported challengeId={c.id} />}
       {tab === 'RANK' && <ChallengeVouchers challengeId={c.id} canManage={d.can_manage} />}
+      {tab === 'RANK' && <DrawPanel scope="CHALLENGE" refId={c.id} canManage={d.can_manage} />}
 
       <ActionBar d={d} phase={phase} code={code ?? null} />
     </div>
@@ -256,10 +261,16 @@ function Leaderboard({ d, rows, loading, error, standings }: {
 }) {
   const [team, setTeam] = useState<string | 'ALL'>('ALL')
   const [q, setQ] = useState('')
+  const [doneMode, setDoneMode] = useDoneFilter()
+  const [now] = useState(() => Date.now())
   const c = d.challenge
   if (loading) return <div className="space-y-2">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-14" />)}</div>
   if (error) return <ErrorState message="Không tải được bảng xếp hạng." />
-  const inTeam = (rows ?? []).filter((r) => team === 'ALL' || r.team_id === team)
+  // Có mục tiêu thì mới có "hoàn thành": lọc được người chưa / không hoàn thành
+  const hasGoal = c.target_value > 0 || (rows ?? []).some((r) => r.completed_at)
+  const ended = now >= Date.parse(c.end_date)
+  const inTeamAll = (rows ?? []).filter((r) => team === 'ALL' || r.team_id === team)
+  const inTeam = !hasGoal || doneMode === 'ALL' ? inTeamAll : inTeamAll.filter((r) => (doneMode === 'DONE') === !!r.completed_at)
   const list = filterSearch(inTeam, q, (r) => [r.display_name])
   const meRow = d.me ? (rows ?? []).find((r) => r.participant_id === d.me?.id) : undefined
   const teamOf = new Map(standings.map((t) => [t.team_id, t]))
@@ -276,12 +287,17 @@ function Leaderboard({ d, rows, loading, error, standings }: {
           ))}
         </div>
       )}
+      {hasGoal && (
+        <DoneFilter mode={doneMode} onChange={setDoneMode} ended={ended} total={inTeamAll.length}
+          done={inTeamAll.filter((r) => r.completed_at).length} />
+      )}
       {(rows?.length ?? 0) > 5 && (
         <RankSearch value={q} onChange={setQ} total={inTeam.length} matched={list.length}
           onFindMe={meRow ? () => { setTeam('ALL'); requestAnimationFrame(() => scrollToRow(`lb-${meRow.participant_id}`)) } : undefined} />
       )}
       {list.length === 0 ? (
-        q.trim() ? null : <EmptyState icon={Trophy} title="Chưa có ai trên bảng" description="Hãy tham gia và chạy bài đầu tiên để lên bảng xếp hạng." />
+        q.trim() ? null : doneMode === 'NOT' && hasGoal ? <EmptyState icon={Check} title="Ai cũng đã hoàn thành!" description="Không còn vận động viên nào chưa đạt mục tiêu." />
+          : <EmptyState icon={Trophy} title="Chưa có ai trên bảng" description="Hãy tham gia và chạy bài đầu tiên để lên bảng xếp hạng." />
       ) : (
         <ol className="space-y-1.5">
           {list.map((r) => {
@@ -299,7 +315,8 @@ function Leaderboard({ d, rows, loading, error, standings }: {
                     <LevelBadge level={r.level} />
                     {r.completed_at && <Check className="size-4 shrink-0 text-coin" aria-label="Đã hoàn thành" />}
                   </span>
-                  <span className="text-xs text-fg-subtle">{r.run_count} buổi{t ? ` · ${t.name}` : ''}{r.reward_xu > 0 ? ` · +${formatNumber(r.reward_xu)} Xu` : ''}</span>
+                  <span className="text-xs text-fg-subtle">{r.run_count} buổi{t ? ` · ${t.name}` : ''}{r.reward_xu > 0 ? ` · +${formatNumber(r.reward_xu)} Xu` : ''}
+                    {hasGoal && !r.completed_at && c.target_value > 0 && <span className="text-danger"> · {ended ? 'thiếu' : 'còn'} {formatScore(c.objective, Math.max(c.target_value - r.score, 0))}</span>}</span>
                 </span>
                 <span className="font-mono tabular font-bold">{formatScore(c.objective, r.score)}</span>
               </li>
@@ -474,5 +491,46 @@ function DetailSkeleton() {
       <div className="grid grid-cols-3 gap-2"><Skeleton className="h-16" /><Skeleton className="h-16" /><Skeleton className="h-16" /></div>
       <Skeleton className="h-48" />
     </div>
+  )
+}
+
+/** Chuỗi thử thách tự lặp lại (migration 007600): kỳ hiện tại, kỳ kế tiếp, bật / tắt cho ban tổ chức */
+function RecurrenceBar({ d }: { d: ChallengeDetail }) {
+  const qc = useQueryClient()
+  const c = d.challenge
+  const rec = c.recurrence ?? 'NONE'
+  const [picking, setPicking] = useState(false)
+  const set = useMutation({
+    mutationFn: (r: string) => setChallengeRecurrence(c.id, r),
+    onSuccess: (_, r) => { toast.success(r === 'NONE' ? 'Đã tắt tự lặp lại — kỳ này vẫn diễn ra bình thường' : `Đã bật lặp ${RECURRENCE_LABEL[r as Recurrence].toLowerCase()}`); setPicking(false); void qc.invalidateQueries({ queryKey: ['challenge'] }) },
+    onError: (e) => toast.error(challengeErrorMessage(e)),
+  })
+  const closed = c.status === 'CANCELLED'
+  if (rec === 'NONE' && (!d.can_manage || closed || c.format === 'DUEL' || c.recur_next_id)) return null
+  return (
+    <Card className="space-y-2 text-sm">
+      <div className="flex items-center gap-2">
+        <Repeat className={cn('size-4 shrink-0', rec === 'NONE' ? 'text-fg-subtle' : 'text-brand')} aria-hidden />
+        <p className="min-w-0 flex-1">
+          {rec === 'NONE' ? <span className="text-fg-muted">Không tự lặp lại</span>
+            : <><span className="font-semibold">Lặp {RECURRENCE_LABEL[rec].toLowerCase()}</span><span className="text-fg-muted"> · kỳ {c.occurrence ?? 1}</span></>}
+        </p>
+        {c.recur_next_id && <Link href={`/challenges/${c.recur_next_id}`} className="font-semibold text-brand">Kỳ sau →</Link>}
+        {d.can_manage && !closed && !c.recur_next_id && (
+          <Button size="sm" variant="secondary" onClick={() => setPicking((v) => !v)}>{rec === 'NONE' ? 'Bật lặp lại' : 'Đổi'}</Button>
+        )}
+      </div>
+      {c.recur_error && d.can_manage && !c.recur_next_id && (
+        <p className="rounded-lg bg-warning/15 p-2 text-xs text-warning">Chưa tạo được kỳ mới: {challengeErrorMessage({ message: c.recur_error })} Hệ thống thử lại mỗi ngày.</p>
+      )}
+      {picking && (
+        <div className="flex flex-wrap gap-1.5">
+          {(Object.keys(RECURRENCE_LABEL) as Recurrence[]).map((r) => (
+            <Button key={r} size="sm" variant={r === rec ? 'primary' : 'secondary'} loading={set.isPending && set.variables === r}
+              onClick={() => set.mutate(r)}>{RECURRENCE_LABEL[r]}</Button>
+          ))}
+        </div>
+      )}
+    </Card>
   )
 }
