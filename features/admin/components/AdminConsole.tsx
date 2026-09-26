@@ -28,9 +28,10 @@ import { UsersTab } from './console/UsersTab'
 import { ChallengesTab } from './console/ChallengesTab'
 import { AuditTab } from './console/AuditTab'
 import { ReportsTab } from './console/ReportsTab'
+import { BibTab } from './console/BibTab'
 import { CmsScreen } from '@/features/knowledge'
 
-type Tab = 'overview' | 'metrics' | 'users' | 'review' | 'reports' | 'challenges' | 'clubs' | 'cups' | 'partners' | 'organizers' | 'content'
+type Tab = 'overview' | 'metrics' | 'users' | 'review' | 'reports' | 'challenges' | 'clubs' | 'cups' | 'partners' | 'organizers' | 'content' | 'bib'
   | 'orders' | 'plans' | 'promos' | 'quests' | 'gifts' | 'items' | 'grant' | 'passes' | 'policy' | 'system' | 'audit'
 type Badge = keyof AdminInbox
 const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; label: string; icon: LucideIcon; badge?: Badge }[] }[] = [
@@ -41,7 +42,7 @@ const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; la
     { id: 'reports', label: 'Báo cáo', icon: ShieldAlert, badge: 'reports' }] },
   { id: 'community', label: 'Cộng đồng', icon: Trophy, tabs: [
     { id: 'challenges', label: 'Thử thách', icon: Trophy }, { id: 'clubs', label: 'CLB Pro', icon: Crown }, { id: 'cups', label: 'Thách đấu CLB', icon: Swords, badge: 'cups' },
-    { id: 'partners', label: 'Đối tác', icon: Store, badge: 'partners' }, { id: 'organizers', label: 'Tổ chức giải', icon: Flag },
+    { id: 'partners', label: 'Đối tác', icon: Store, badge: 'partners' }, { id: 'bib', label: 'Chợ BIB', icon: Ticket }, { id: 'organizers', label: 'Tổ chức giải', icon: Flag },
     { id: 'content', label: 'Nội dung', icon: BookOpen, badge: 'content' }] },
   { id: 'sales', label: 'Kinh doanh', icon: Receipt, tabs: [
     { id: 'orders', label: 'Đơn hàng', icon: Receipt, badge: 'orders' }, { id: 'plans', label: 'Gói & giá', icon: Tags }, { id: 'promos', label: 'Khuyến mãi', icon: Megaphone },
@@ -112,6 +113,7 @@ export function AdminConsole() {
         : tab === 'audit' ? <AuditTab />
         : tab === 'reports' ? <ReportsTab />
         : tab === 'content' ? <CmsScreen />
+        : tab === 'bib' ? <BibTab />
         : tab === 'metrics' ? <MetricsTab />
         : tab === 'orders' ? <OrdersTab />
         : tab === 'promos' ? <PromotionsTab />
