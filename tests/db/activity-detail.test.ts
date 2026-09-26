@@ -62,6 +62,9 @@ describe('Chi tiết bài chạy (001900)', () => {
   })
 
   it('người khác: bản đồ mặc định riêng tư; bài riêng tư thì không thấy', async () => {
+    // 007000: bài Strava chưa được chủ bài đồng ý chia sẻ → người khác không thấy
+    expect(await fails(db, OTHER, `select public.activity_detail($1)`, [STRAVA_RUN])).toContain('ACTIVITY_NOT_FOUND')
+    await asUser(db, ME, '/rpc', `select public.set_strava_sharing(true)`)
     const d = await detail(db, OTHER, STRAVA_RUN)
     expect(d).toMatchObject({ is_mine: false, map_allowed: false, polyline: null, validation_reason: null, needs_detail: false })
     // 006700 (quy định API Strava): bài Strava của người khác chỉ có số tổng — không từng km, nhịp tim
@@ -72,7 +75,8 @@ describe('Chi tiết bài chạy (001900)', () => {
     const g = await detail(db, OTHER, GPS_RUN)                                     // bài ghi bằng app: xem bình thường
     expect(g).toMatchObject({ strava_limited: false, map_allowed: true })
     expect(g.points!.length).toBeGreaterThan(500)
-    expect((await detail(db, ME, STRAVA_RUN))).toMatchObject({ strava_limited: false, polyline: 'full_line', max_heartrate: 172 })
+    expect((await detail(db, ME, STRAVA_RUN))).toMatchObject({ strava_limited: false, polyline: 'full_line', max_heartrate: 172, strava_id: '901' })
+    expect(d.strava_id).toBeNull()
     await db.query(`update public.profile_settings set activity_visibility = 'PRIVATE' where user_id = $1`, [ME])
     expect(await fails(db, OTHER, `select public.activity_detail($1)`, [STRAVA_RUN])).toContain('ACTIVITY_NOT_FOUND')
     expect(await fails(db, OTHER, `select public.activity_detail($1)`, [OTHER])).toContain('ACTIVITY_NOT_FOUND')

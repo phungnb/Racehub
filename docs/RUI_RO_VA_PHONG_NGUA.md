@@ -67,7 +67,7 @@ Mức độ:
 
 | # | Rủi ro | Mức | Trạng thái / phòng ngừa |
 |---|---|---|---|
-| B1 | **Vi phạm Thoả thuận API Strava (từ 11/11/2024)**: dữ liệu Strava của một người chỉ được hiển thị cho chính người đó ([Strava](https://press.strava.com/articles/updates-to-stravas-api-agreement), [Help Center](https://support.strava.com/hc/en-us/articles/31798729397773-API-Agreement-Update-How-Data-Appears-on-3rd-Party-Apps)); cấm đưa dữ liệu vào AI. Hậu quả: bị thu hồi API, mất đồng bộ Strava của mọi người dùng | **Cao** | ✅ 006700: bài Strava của người khác chỉ còn số tổng (ẩn bản đồ, từng km, nhịp tim, thiết bị). 🔴 **Chủ sản phẩm quyết định**: quãng đường từ Strava vẫn hiện trên BXH / bảng tin CLB. Cách an toàn: (1) liên hệ Strava xin duyệt đối tác (developers.strava.com), (2) đẩy người dùng ghi bằng app RaceHub, (3) kết nối trực tiếp Garmin / COROS (API riêng, điều khoản khác). Không dùng dữ liệu Strava cho tính năng AI |
+| B1 | **Vi phạm Thoả thuận API Strava (từ 11/11/2024)**: dữ liệu Strava của một người chỉ được hiển thị cho chính người đó ([Strava](https://press.strava.com/articles/updates-to-stravas-api-agreement), [Help Center](https://support.strava.com/hc/en-us/articles/31798729397773-API-Agreement-Update-How-Data-Appears-on-3rd-Party-Apps)); cấm đưa dữ liệu vào AI. Hậu quả: bị thu hồi API, mất đồng bộ Strava của mọi người dùng | **Cao** | ✅ 006700: bài Strava của người khác chỉ còn số tổng (ẩn bản đồ, từng km, nhịp tim, thiết bị). ✅ **Đã được Strava duyệt (999 người, 09/2026).** ✅ Nút / ghi nguồn đúng chuẩn thương hiệu Strava. Hướng dẫn nộp duyệt: `docs/STRAVA_DUYET_APP.md`. ✅ **Hướng B+ (007000)**: bài Strava chỉ lên bảng tin CLB / BXH / thử thách / giải chạy / league khi runner bật đồng ý; admin chuyển ngay sang hướng A (chỉ chủ bài thấy) ở Quản trị → Hệ thống → Strava. 🟡 Rủi ro còn lại: điều khoản vẫn ghi "chỉ hiển thị cho chính người dùng" — nên email developers@strava.com mô tả mô hình đồng ý để xin xác nhận. Không dùng dữ liệu Strava cho AI |
 | B2 | **Giới hạn API Strava**: 200 lượt / 15 phút, 2.000 lượt / ngày (đọc: 100 / 1.000) ([Strava](https://developers.strava.com/docs/rate-limits/)). Mỗi bài tốn 1–3 lượt → quá ~500–1.000 người dùng tích cực là nghẽn | Cao | ✅ Nhận bài qua webhook (không quét liên tục). Chặn đồng bộ tay dưới 1 phút. Báo lỗi 429 rõ ràng. 🔴 Xin nâng hạn mức khi có ~300 người kết nối |
 | B3 | **App Store từ chối vì thiếu xoá tài khoản** (Apple 5.1.1(v)) | **Cao** | ✅ 006800 + `/api/account/delete` + nút "Xoá tài khoản" trong Cài đặt |
 | B4 | **App Store từ chối vì app "chỉ là trang web"** (Apple 4.2 — vỏ Capacitor mở `server.url`) ([tham khảo](https://www.mobiloud.com/blog/app-store-review-guidelines-webview-wrapper/)) | Cao | 🟡 Có tính năng native thật (GPS nền, thông báo, chia sẻ, quét QR, trang offline). 🔴 Khi nộp: ghi chú cho người duyệt nhấn mạnh GPS nền + thông báo; quay video demo ghi bài chạy khi khoá màn hình; cung cấp tài khoản demo có dữ liệu |
@@ -91,7 +91,7 @@ Mức độ:
 
 | # | Rủi ro | Mức | Trạng thái / phòng ngừa |
 |---|---|---|---|
-| D1 | Lộ khoá bí mật (Strava secret, VAPID private key đã từng lộ) | **Cao** | 🔴 **Đổi ngay** Strava Client Secret và cặp khoá VAPID; không chụp màn hình `.env.local`; khoá service role chỉ nằm trên Vercel |
+| D1 | Lộ khoá bí mật (Strava secret, VAPID private key đã từng lộ) | **Cao** | ✅ Đã đổi Strava Client Secret + cặp khoá VAPID (09/2026). Tiếp tục: không chụp màn hình `.env.local`; khoá service role chỉ nằm trên Vercel |
 | D2 | Người dùng tự sửa số dư / quãng đường qua API | Cao | ✅ Mọi ghi tài sản qua RPC `security definer`; RLS chặn ghi trực tiếp; máy chủ tự tính lại quãng đường; test tự động bảo mật |
 | D3 | Clickjacking, XSS, nhúng iframe | TB | ✅ CSP `frame-ancestors 'none'`, X-Frame-Options, nosniff, HSTS; Markdown bài viết qua bộ phân tích an toàn |
 | D4 | Webhook Strava giả mạo | TB | ✅ Kiểm tra `verify_token` + `subscription_id` |
@@ -117,7 +117,7 @@ Mức độ:
 
 ## Việc chủ sản phẩm cần làm ngay (theo thứ tự)
 
-1. Đổi Strava Client Secret + cặp khoá VAPID (D1).
+1. ~~Đổi Strava Client Secret + cặp khoá VAPID (D1)~~ — đã làm.
 2. Cấu hình SMTP riêng cho Supabase (C1).
 3. Chạy `supabase/deploy/chay_tu_003700.sql` (gồm 006600–006800).
 4. Quyết định về dữ liệu Strava trên BXH / bảng tin (B1): liên hệ Strava, hoặc chuyển trọng tâm sang ghi bằng app / Garmin.

@@ -21,9 +21,9 @@ begin
   if coalesce(upper(trim(p_confirm)), '') not in ('XOÁ', 'XÓA', 'XOA') then raise exception 'CONFIRM_REQUIRED'; end if;
   if v_p.id is null then raise exception 'PROFILE_NOT_FOUND'; end if;
   if v_p.deleted_at is not null then return jsonb_build_object('ok', true, 'already', true); end if;
-  if coalesce(v_p.is_admin, false) or coalesce(v_p.role, '') in ('ADMIN', 'SUPER_ADMIN') then raise exception 'ADMIN_CANNOT_DELETE'; end if;
+  if coalesce(v_p.is_admin, false) or coalesce(v_p.role, '') in ('SYSTEM_ADMIN', 'ADMIN', 'SUPER_ADMIN') then raise exception 'ADMIN_CANNOT_DELETE'; end if;
   if exists (select 1 from public.clubs c where c.owner_id = v_uid
-               and exists (select 1 from public.club_members m where m.club_id = c.id and m.user_id <> v_uid and m.status = 'ACTIVE')) then
+               and exists (select 1 from public.club_members m where m.club_id = c.id and m.user_id <> v_uid and m.status = 'APPROVED')) then
     raise exception 'TRANSFER_CLUB_FIRST';
   end if;
 

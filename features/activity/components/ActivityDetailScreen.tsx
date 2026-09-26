@@ -7,6 +7,7 @@ import {
   ArrowLeft, Coins, Flame, Footprints, Gauge, Heart, HeartPulse, Loader2, Lock, MapPinOff, Mountain, Share2, Sparkles, Timer, Trophy, Zap,
 } from 'lucide-react'
 import { Avatar, Button, Card, ErrorState, SectionTitle, Skeleton } from '@/shared/ui'
+import { PoweredByStrava, ViewOnStrava } from '@/features/integrations'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatDuration, formatKm, formatNumber, formatPace, paceFrom } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
@@ -57,6 +58,15 @@ export function ActivityDetailScreen({ id }: { id: string }) {
           <h1 className="text-xl font-bold leading-tight">{a.title}</h1>
           <p className="text-xs capitalize text-fg-subtle">{whenText}</p>
           <p className="text-xs text-fg-subtle">{[SOURCE_LABEL[a.source ?? ''] ?? a.source, a.device_name].filter(Boolean).join(' · ')}</p>
+          {a.is_mine && a.source === 'STRAVA' && a.shared === false && (
+            <p className="mt-1 text-xs text-fg-muted">Chỉ bạn thấy bài này (vẫn tính Xu, XP). Bật “Hiện bài chạy từ Strava” trong <Link href={routes.settings} className="font-semibold text-brand underline">Cài đặt</Link> để lên BXH CLB.</p>
+          )}
+          {a.source === 'STRAVA' && (
+            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <PoweredByStrava />
+              {a.strava_id && <ViewOnStrava activityId={a.strava_id} className="text-xs" />}
+            </p>
+          )}
         </div>
         {a.is_mine && (
           <Button size="sm" onClick={() => setSharing(true)} className="mt-1 shrink-0"><Share2 className="size-4" aria-hidden />Chia sẻ</Button>

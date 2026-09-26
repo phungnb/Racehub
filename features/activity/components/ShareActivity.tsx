@@ -34,7 +34,7 @@ export function ShareActivitySheet({ activity: a, route, onClose }: { activity: 
         paceS: a.avg_pace_s || paceFrom(a.distance_m, a.moving_s), elevationM: a.elevation_gain_m,
         name: profile?.display_name ?? a.owner.display_name ?? 'Runner', level: (profile?.level as number | null) ?? a.owner.level,
         route: showMap ? route : [], character: showChar && charCanvas.current ? await charCanvas.current : null,
-        site: location.host,
+        site: location.host, fromStrava: a.source === 'STRAVA',
       }, format)
       const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'))
       if (!alive || !blob) return
