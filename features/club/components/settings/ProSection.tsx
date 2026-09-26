@@ -9,7 +9,9 @@ import { cn } from '@/shared/lib/cn'
 import { formatNumber } from '@/shared/lib/format'
 import { clubErrorMessage, getAttendanceReport, getClubChallengeQuota, getClubPlan, setClubSlug, type AttendanceRow, type Club } from '../../api/clubApi'
 import { clubKeys } from '../../hooks/keys'
-import { ClubProPurchase } from '@/features/billing'
+import Link from 'next/link'
+import { ClubProPurchase, getPlanCompare } from '@/features/billing'
+import { routes } from '@/shared/config/routes'
 import { BrandingEditor } from './BrandingEditor'
 
 const BENEFITS = [
@@ -59,7 +61,7 @@ export function ProSection({ club }: { club: Club }) {
             <Button block variant="secondary" onClick={() => setReport(true)}><BarChart3 className="size-4" aria-hidden />Báo cáo chuyên cần</Button>
           </>
         ) : null}
-        <QuotaCard clubId={club.id} />
+        <QuotaCard club={club} />
         <BrandingEditor club={club} active={p.active} />
         <ClubProPurchase clubId={club.id} active={p.active} />
       </Card>
@@ -69,11 +71,16 @@ export function ProSection({ club }: { club: Club }) {
 }
 
 /** Hạn mức thử thách nội bộ miễn phí đang dùng (migration 008200) */
-function QuotaCard({ clubId }: { clubId: string }) {
-  const q = useQuery({ queryKey: ['club', clubId, 'challenge-quota'], queryFn: () => getClubChallengeQuota(clubId) })
+function QuotaCard({ club }: { club: Club }) {
+  const q = useQuery({ queryKey: ['club', club.id, 'challenge-quota'], queryFn: () => getClubChallengeQuota(club.id) })
+  // Số thành viên tối đa của CLB miễn phí (008500) — cùng nguồn với bảng so sánh gói
+  const compare = useQuery({ queryKey: ['billing', 'compare'], queryFn: getPlanCompare, staleTime: 10 * 60_000 })
   if (!q.data) return null
   const d = q.data
+  const maxMembers = compare.data?.club.freeMaxMembers ?? 0
   const rows = [
+    ...(d.plan === 'FREE' && maxMembers > 0 ? [{ label: 'Thành viên (gói miễn phí)', value: `${formatNumber(club.member_count)}/${formatNumber(maxMembers)}`,
+                                                  ok: club.member_count < maxMembers }] : []),
     { label: 'Thử thách đang diễn ra', value: `${d.open}/${d.max_open}`, ok: d.open < d.max_open },
     { label: 'Quy mô mỗi thử thách', value: `≤ ${formatNumber(d.max_slots)} người`, ok: true },
     ...(d.plan === 'FREE' ? [{ label: `Thành viên có bài chạy trong ${d.active_window_days} ngày`, value: `${d.active_members}/${d.min_active_members}`,
@@ -94,6 +101,7 @@ function QuotaCard({ clubId }: { clubId: string }) {
         {d.plan === 'FREE'
           ? `Ngoài hạn mức vẫn tạo được, phí tính theo quy mô và trừ quỹ CLB. CLB Pro: ${d.pro.max_open} thử thách cùng lúc, tới ${formatNumber(d.pro.max_slots)} người, không cần điều kiện thành viên.`
           : 'Ngoài hạn mức: phí theo quy mô, trừ quỹ CLB.'}
+        {' '}<Link href={routes.plans} className="font-semibold text-brand">So sánh Miễn phí và Pro →</Link>
       </p>
     </div>
   )

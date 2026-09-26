@@ -33,7 +33,16 @@ export const STATIC_POLICIES: HelpMenuItem[] = [
   { slug: 'terms', section: 'POLICY', title: 'Điều khoản sử dụng', icon: '📄', summary: null },
   { slug: 'privacy', section: 'POLICY', title: 'Chính sách quyền riêng tư', icon: '🛡️', summary: null },
 ]
-export const staticHref = (slug: string) => (slug === 'terms' ? '/terms' : slug === 'privacy' ? '/privacy' : `/help/${slug}`)
+/** Trang có giao diện riêng (bảng giá, trang doanh nghiệp, pháp lý): mục menu mở trang đó, nội dung admin soạn hiện bên trong */
+const ROUTED: Record<string, string> = { terms: '/terms', privacy: '/privacy', 'vip-pro': '/goi', 'doanh-nghiep': '/doanh-nghiep' }
+export const staticHref = (slug: string) => ROUTED[slug] ?? `/help/${slug}`
+/** Hai mục nổi bật đầu menu (thẻ lớn) — không lặp lại trong danh sách bên dưới */
+export const FEATURED: HelpMenuItem[] = [
+  { slug: 'vip-pro', section: 'GUIDE', title: 'Gói & quyền lợi', icon: '👑', summary: 'So sánh Miễn phí · VIP · CLB Pro' },
+  { slug: 'doanh-nghiep', section: 'GUIDE', title: 'RaceHub cho doanh nghiệp', icon: '🏢', summary: 'Chiến dịch, xếp hạng phòng ban, báo cáo nhân sự' },
+]
+/** Mục nổi bật: lấy tiêu đề / mô tả admin đã sửa nếu có */
+export const featuredMenu = (pages: HelpMenuItem[]) => FEATURED.map((f) => ({ ...f, ...pages.find((p) => p.slug === f.slug) }))
 
 export const MISSING = 'đang cập nhật'
 
@@ -47,9 +56,12 @@ export function fillSiteInfo(body: string, site: SiteInfo): string {
 /** Nhóm các trang theo mục, thêm trang pháp lý tĩnh vào đầu nhóm Chính sách */
 export function groupMenu(pages: HelpMenuItem[]): { section: HelpSection; items: HelpMenuItem[] }[] {
   const order: HelpSection[] = ['GUIDE', 'POLICY', 'SUPPORT']
+  const featured = new Set(FEATURED.map((f) => f.slug))
+  // Điều khoản / Quyền riêng tư: bản admin soạn (008500) nếu có, không thì bản viết sẵn trong code
+  const statics = STATIC_POLICIES.filter((s) => !pages.some((p) => p.slug === s.slug))
   return order.map((section) => ({
     section,
-    items: [...(section === 'POLICY' ? STATIC_POLICIES : []), ...pages.filter((p) => p.section === section)],
+    items: [...(section === 'POLICY' ? statics : []), ...pages.filter((p) => p.section === section && !featured.has(p.slug))],
   })).filter((g) => g.items.length > 0)
 }
 

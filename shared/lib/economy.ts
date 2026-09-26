@@ -16,6 +16,7 @@ export interface ClubChallengePolicy {
   freeMaxOpen: number                  // số thử thách đang diễn ra cùng lúc (Free)
   proMaxSlots: number
   proMaxOpen: number
+  freeMaxMembers: number               // CLB Free nhận tối đa N thành viên, 0 = không giới hạn (migration 008500)
 }
 
 export interface EconomyPolicy {
@@ -50,7 +51,7 @@ export const DEFAULT_POLICY: EconomyPolicy = {
     { max: 200, xu: 1500 }, { max: 500, xu: 3500 }, { max: 1000, xu: 7000 },
   ],
   game: { shieldPrice: 200, maxShields: 2, defaultWeeklyGoal: 3 },
-  clubChallenge: { freeMinActiveMembers: 5, activeWindowDays: 30, freeMaxSlots: 50, freeMaxOpen: 2, proMaxSlots: 1000, proMaxOpen: 20 },
+  clubChallenge: { freeMinActiveMembers: 5, activeWindowDays: 30, freeMaxSlots: 50, freeMaxOpen: 2, proMaxSlots: 1000, proMaxOpen: 20, freeMaxMembers: 50 },
 }
 
 const n = (v: unknown, fallback: number) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? fallback : Number(v))
@@ -92,6 +93,7 @@ export function toPolicy(raw: unknown): EconomyPolicy {
       freeMinActiveMembers: n(cc.freeMinActiveMembers, dc.freeMinActiveMembers), activeWindowDays: n(cc.activeWindowDays, dc.activeWindowDays),
       freeMaxSlots: n(cc.freeMaxSlots, dc.freeMaxSlots), freeMaxOpen: n(cc.freeMaxOpen, dc.freeMaxOpen),
       proMaxSlots: n(cc.proMaxSlots, dc.proMaxSlots), proMaxOpen: n(cc.proMaxOpen, dc.proMaxOpen),
+      freeMaxMembers: n(cc.freeMaxMembers, dc.freeMaxMembers),
     },
   }
 }
@@ -190,6 +192,7 @@ export function validatePolicy(p: EconomyPolicy): string | null {
   const cc = p.clubChallenge
   if (![cc.freeMinActiveMembers, cc.freeMaxSlots, cc.freeMaxOpen, cc.proMaxSlots, cc.proMaxOpen].every((v) => Number.isInteger(v) && v >= 0 && v <= 10000)
       || !(Number.isInteger(cc.activeWindowDays) && cc.activeWindowDays >= 1 && cc.activeWindowDays <= 365)) return 'Hạn mức thử thách CLB không hợp lệ.'
+  if (!(Number.isInteger(cc.freeMaxMembers) && cc.freeMaxMembers >= 0 && cc.freeMaxMembers <= 1_000_000)) return 'Số thành viên tối đa của CLB miễn phí không hợp lệ (0 = không giới hạn).'
   if (!(p.comeback.minRestDays >= 7 && p.comeback.minRestDays <= 365 && p.comeback.xu >= 0 && p.comeback.cooldownDays >= 0)) return 'Thưởng quay lại không hợp lệ (nghỉ tối thiểu 7–365 ngày).'
   return null
 }

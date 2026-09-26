@@ -1,10 +1,15 @@
 import type { Metadata } from 'next'
+import { HelpArticle, HelpShell, type HelpPage } from '@/features/help'
+import { loadHelpPage } from '@/shared/lib/help-page-server'
 import Link from 'next/link'
 import { Contact, LegalPage } from '@/shared/ui/legal/LegalPage'
 
 export const metadata: Metadata = { title: 'Điều khoản sử dụng' }
 
-export default function TermsPage() {
+// Bản admin soạn trong Quản trị → Hướng dẫn & chính sách (008500) nếu có; chưa có thì dùng bản viết sẵn dưới đây
+export default async function TermsPage() {
+  const page = await loadHelpPage<HelpPage>('terms')
+  if (page?.body?.trim()) return <HelpShell back={null}><HelpArticle page={page} /></HelpShell>
   return (
     <LegalPage title="Điều khoản sử dụng">
       <p>Khi tạo tài khoản hoặc sử dụng RaceHub, bạn đồng ý với các điều khoản dưới đây và <Link href="/privacy" className="text-brand underline">Chính sách quyền riêng tư</Link>.</p>
@@ -19,7 +24,7 @@ export default function TermsPage() {
         <h2>2. Bài chạy và chống gian lận</h2>
         <ul>
           <li>Chỉ ghi nhận bài <strong>chạy bộ / đi bộ do chính bạn thực hiện</strong>. Bài đi xe, GPS giả, bài của người khác không được chấp nhận.</li>
-          <li>Hệ thống tự kiểm tra bài chạy; bài nghi vấn có thể chờ duyệt, bị từ chối, và phần thưởng liên quan có thể bị thu hồi.</li>
+          <li>Bài chạy thường ngày được ghi nhận tự động. Khi bạn tham gia thử thách, giải chạy hoặc chiến dịch, bài có dấu hiệu bất thường chờ Ban tổ chức duyệt, có thể bị từ chối và phần thưởng liên quan có thể bị thu hồi.</li>
           <li>Kết quả thử thách / giải chạy được chốt sau thời gian khiếu nại do hệ thống hoặc Ban tổ chức quy định.</li>
         </ul>
       </section>

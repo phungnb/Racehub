@@ -46,7 +46,7 @@ describe('Phân tích VIP + chỉ số kinh tế (004000)', () => {
   it('xu hướng: đủ 12 tuần + 12 tháng, chỉ tính bài hợp lệ', async () => {
     await run(db, V1, 0, 10)
     await run(db, V1, 0, 5)
-    await run(db, V1, 0, 42, 'PENDING')          // chờ duyệt: không tính
+    await run(db, V1, 0, 42, 'REJECTED')         // bị từ chối: không tính
     await run(db, V1, 21, 8)
     const t = await rpc<Row>(db, V1, `select public.my_trends() as r`)
     expect(t.weeks).toHaveLength(12)

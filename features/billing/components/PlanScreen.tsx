@@ -114,6 +114,10 @@ export function PlanScreen() {
         )}
       </Card>
 
+      <Link href={routes.plans} className="flex items-center justify-between rounded-xl border border-coin/40 bg-coin/10 px-4 py-3 text-sm font-semibold">
+        So sánh Miễn phí · VIP · CLB Pro — gói nào hợp với bạn?<ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+      </Link>
+
       {plan?.plan_code.startsWith('VIP') && (
         <Link href={routes.insights} className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-3 text-sm font-semibold">
           Mở Phân tích của tôi (quyền lợi VIP)<ChevronRight className="size-4 text-fg-subtle" aria-hidden />

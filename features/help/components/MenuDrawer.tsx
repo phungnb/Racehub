@@ -13,7 +13,7 @@ import { routes } from '@/shared/config/routes'
 import { ICONS } from '@/shared/config/brand'
 import type { Profile } from '@/shared/types/profile'
 import { helpMenu } from '../api/helpApi'
-import { companyLine, groupMenu, SECTION_LABEL, STATIC_POLICIES, staticHref } from '../model/help'
+import { companyLine, featuredMenu, groupMenu, SECTION_LABEL, STATIC_POLICIES, staticHref } from '../model/help'
 
 /**
  * Nút ☰ + menu trượt từ trái: Hướng dẫn chơi · Chính sách & quy định · Hỗ trợ · tài khoản.
@@ -46,6 +46,7 @@ function Drawer({ profile, onSignOut, onClose }: { profile: Profile | null; onSi
   // Chưa chạy migration 007300 / mất mạng: vẫn luôn có Điều khoản + Quyền riêng tư
   const groups = menu.data ? groupMenu(menu.data.pages) : [{ section: 'POLICY' as const, items: STATIC_POLICIES }]
   const company = companyLine(menu.data?.site ?? {})
+  const featured = featuredMenu(menu.data?.pages ?? [])
 
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null
@@ -113,6 +114,23 @@ function Drawer({ profile, onSignOut, onClose }: { profile: Profile | null; onSi
         </div>
 
         <nav aria-label="Hướng dẫn và chính sách" className="flex-1 overflow-y-auto px-2 py-3">
+          {/* Nổi bật: gói trả phí và doanh nghiệp — tiêu đề / mô tả admin sửa được (trang menu vip-pro, doanh-nghiep) */}
+          <ul className="mb-4 grid gap-2 px-1">
+            {featured.map((f, i) => (
+              <li key={f.slug}>
+                <Link href={staticHref(f.slug)} onClick={onClose}
+                  className={cn('flex items-center gap-3 rounded-2xl border p-3',
+                    i === 0 ? 'border-coin/40 bg-gradient-to-br from-coin/15 to-surface' : 'border-brand/40 bg-gradient-to-br from-brand/15 to-surface')}>
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-bg/60 text-xl" aria-hidden>{f.icon}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-bold">{f.title}</span>
+                    {f.summary && <span className="block text-xs text-fg-muted">{f.summary}</span>}
+                  </span>
+                  <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+                </Link>
+              </li>
+            ))}
+          </ul>
           {groups.map((g) => (
             <section key={g.section} className="mb-3">
               <h2 className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-fg-subtle">{SECTION_LABEL[g.section]}</h2>
@@ -132,21 +150,17 @@ function Drawer({ profile, onSignOut, onClose }: { profile: Profile | null; onSi
           ))}
           {menu.isPending && <p className="px-3 text-xs text-fg-subtle">Đang tải hướng dẫn…</p>}
 
-          <section className="mb-3">
-            <h2 className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-fg-subtle">Tổ chức</h2>
-            <ul>
-              {profile && (
+          {profile && (
+            <section className="mb-3">
+              <h2 className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-fg-subtle">Tổ chức</h2>
+              <ul>
                 <li><Link href={routes.orgs} onClick={onClose} className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 hover:bg-surface-2">
                   <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-base" aria-hidden>🏢</span>
-                  <span className="min-w-0 flex-1 text-sm font-medium">Tổ chức của tôi</span><ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+                  <span className="min-w-0 flex-1 text-sm font-medium">Tổ chức của tôi (nhập mã mời)</span><ChevronRight className="size-4 text-fg-subtle" aria-hidden />
                 </Link></li>
-              )}
-              <li><Link href={routes.enterprise} onClick={onClose} className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 hover:bg-surface-2">
-                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-base" aria-hidden>🤝</span>
-                <span className="min-w-0 flex-1 text-sm font-medium">RaceHub cho doanh nghiệp</span><ChevronRight className="size-4 text-fg-subtle" aria-hidden />
-              </Link></li>
-            </ul>
-          </section>
+              </ul>
+            </section>
+          )}
 
           {profile && (
             <section className="mt-2 border-t border-border pt-3">

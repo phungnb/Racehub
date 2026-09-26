@@ -1,6 +1,6 @@
 // Gói VIP / CLB Pro / Nạp Xu (migration 003800). Chưa có cổng thanh toán: tạo đơn → chuyển khoản VietQR → admin xác nhận.
 import { supabase } from '@/shared/lib/supabase'
-import type { CapacityTier } from '@/shared/lib/economy'
+import type { CapacityTier, ClubChallengePolicy } from '@/shared/lib/economy'
 import type { Sale } from '../model/sale'
 import { systemErrorMessage } from '@/shared/lib/errors'
 
@@ -102,3 +102,17 @@ export function billingErrorMessage(e: unknown): string {
 }
 
 export const MONTH_LABEL: Record<number, string> = { 1: '1 tháng', 3: '3 tháng', 6: '6 tháng', 12: '12 tháng' }
+
+/** Bảng so sánh gói (migration 008500) — xem được khi chưa đăng nhập, không có thông tin tài khoản nhận tiền */
+export interface ComparePlan {
+  code: string; name: string; owner_type: 'USER' | 'CLUB'; tier: number; description: string | null
+  perks: string[]; prices: { months: number; price_vnd: number }[]; credits: PlanCredit[]
+}
+export interface PlanCompareData { plans: ComparePlan[]; club: ClubChallengePolicy; free_captains: number }
+
+export async function getPlanCompare(): Promise<PlanCompareData> {
+  const { data, error } = await supabase.rpc('plan_compare')
+  if (error) throw error
+  if (!data) throw new Error('NOT_DEPLOYED')
+  return data as PlanCompareData
+}

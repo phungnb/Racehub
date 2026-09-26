@@ -9,6 +9,10 @@ async function seed(db: PGlite) {
   await db.exec(`
     insert into auth.users (id, email) values ('${U}', 'ac@x.vn');
     insert into public.profiles (id, display_name, xu, xp, level, created_at) values ('${U}', 'AC', 0, 0, 1, now());
+    -- 008500: chỉ kiểm tra gian lận khi đang thi đấu → người chạy tham gia một thử thách bao trùm các bài test
+    insert into public.challenges (id, title, start_date, end_date, target_value, target_km, min_km, status, created_by, target_audience)
+      values ('00000000-0000-0000-0000-0000000003c9', 'Thử thách', now() - interval '10 days', now() + interval '10 days', 50, 50, 1, 'ACTIVE', '${U}', 'PUBLIC');
+    insert into public.challenge_participants (challenge_id, profile_id, status) values ('00000000-0000-0000-0000-0000000003c9', '${U}', 'JOINED');
   `)
 }
 

@@ -17,6 +17,7 @@ export const routes = {
   orgCampaign: (orgId: string, id: string) => `/orgs/${encodeURIComponent(orgId)}/campaigns/${encodeURIComponent(id)}`,
   orgJoin: (code: string) => `/orgs/join/${encodeURIComponent(code)}`,
   enterprise: '/doanh-nghiep',
+  plans: '/goi',
   me: '/me',
   settings: '/me/settings',
   wallet: '/wallet',

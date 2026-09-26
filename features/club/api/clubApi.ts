@@ -332,6 +332,7 @@ const MESSAGES: Record<string, string> = {
   DESC_TOO_LONG: 'Mô tả tối đa 300 ký tự.',
   CLUB_NOT_FOUND: 'CLB không còn tồn tại.',
   CLUB_FULL: 'CLB đã đủ số thành viên tối đa.',
+  CLUB_FREE_FULL: 'CLB gói miễn phí đã đủ số thành viên tối đa. Nâng CLB Pro để nhận thêm người (xem Gói & quyền lợi).',
   ALREADY_MEMBER: 'Bạn đã ở trong CLB này hoặc đang chờ duyệt.',
   BANNED: 'Bạn đã bị hạn chế tham gia CLB này.',
   INVITE_ONLY: 'CLB này chỉ nhận thành viên qua link mời.',
