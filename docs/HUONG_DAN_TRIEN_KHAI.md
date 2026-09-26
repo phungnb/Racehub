@@ -33,13 +33,13 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
 > ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
-> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 007500** + chạy lại 003500),
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 008000** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
 >
 > 📦 **File gộp quá dài, copy không hết?** Dùng bản **chia nhỏ** [`supabase/deploy/phan/`](../supabase/deploy/phan/README.md): 10 phần, mỗi phần ≤ ~90 KB.
-> Chạy **lần lượt** `phan_01.sql` → `phan_10.sql` (mỗi phần: SQL Editor → New query → dán → Run). Đã chạy một số rồi thì bắt đầu từ phần chứa
-> migration đầu tiên bị ✗ trong **Kiểm tra hệ thống**, và **luôn chạy phần cuối** (`phan_10.sql`). Mẹo copy trên GitHub: mở file → nút **Raw** → Ctrl+A → Ctrl+C.
+> Chạy **lần lượt** `phan_01.sql` → `phan_11.sql` (mỗi phần: SQL Editor → New query → dán → Run). Đã chạy một số rồi thì bắt đầu từ phần chứa
+> migration đầu tiên bị ✗ trong **Kiểm tra hệ thống**, và **luôn chạy phần cuối** (`phan_11.sql`, chạy lại kiểm tra hệ thống). Mẹo copy trên GitHub: mở file → nút **Raw** → Ctrl+A → Ctrl+C.
 > File gộp tạo bằng `npm run db:bundle` (hoặc `node scripts/db-bundle.mjs <mốc>` để gộp từ mốc khác); test tự động bảo đảm file luôn khớp migration.
 
 Chạy các file trong `supabase/migrations/`, đúng thứ tự:
@@ -121,6 +121,11 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001007300_help_center.sql` | **Menu ☰ Hướng dẫn & Chính sách**: 19 trang mẫu (hướng dẫn chơi, quy tắc cộng đồng, quy định Xu & quà, chống gian lận, Chợ BIB, thanh toán, sức khoẻ, hỗ trợ, dữ liệu của tôi) đọc được khi chưa đăng nhập; admin soạn ở Quản trị → Cộng đồng → Hướng dẫn & chính sách, nhập thông tin pháp nhân (tên công ty, MST, địa chỉ, email hỗ trợ…) | Cần 000300; chạy lại 3500 |
 | `20261001007400_strava_share_default_on.sql` | **Bỏ bước hỏi chia sẻ Strava**: kết nối Strava = đồng ý hiện bài (quãng đường, thời gian) trên bảng tin CLB, BXH, thử thách; runner tắt ở Cài đặt → Quyền riêng tư. Bài Strava cũ đang ẩn của người chưa từng chọn tắt được hiện lại ngay | Cần 7000; chạy lại 3500 |
 | `20261001007500_plan_credits_fix.sql` | **Sửa lỗi "Không tính được phí"** khi tạo thử thách / giải chạy cho CLB được admin bật Pro (lỗi biến trùng tên trong hàm cấp lượt tạo); báo giá trả thêm gói đang dùng để ẩn phần phí khi đã được gói bao | Cần 3800; chạy lại 3500 |
+| `20261001007600_recurring_challenges.sql` | **Thử thách tự lặp lại** hằng tuần / tháng / quý / năm: cron hằng ngày tạo kỳ kế tiếp ~1,5 ngày trước khi kỳ cũ kết thúc, như chính người tạo bấm tạo (quyền, phí, lượt VIP / Pro, quỹ); không đủ Xu → báo người tạo, thử lại mỗi ngày | Cần 0700, 7100; chạy lại 3500 |
+| `20261001007700_club_boost_days.sql` | **Ngày vàng ×1,5 / ×2 / ×3** của CLB: nhân km trong ngày cho thử thách nội bộ CLB + BXH CLB (km thật + km thưởng), không nhân XP / Xu; đặt trước, tối đa 4 ngày / tháng | Cần 7000; chạy lại 3500 |
+| `20261001007800_hall_of_fame_milestones.sql` | **Đại sảnh danh vọng** (Full / Half Marathon, kỷ lục CLB, km năm) + **cột mốc** 100…10.000 km, HM / FM / Ultra đầu tiên tự đăng bảng tin CLB (mốc cũ ghi nhận lặng lẽ) | Cần 6900, 7000; chạy lại 3500 |
+| `20261001007900_club_shop.sql` | **Cửa hàng CLB**: đăng áo / BIB, thành viên đặt + VietQR chuyển thẳng vào tài khoản CLB (RaceHub không giữ tiền), ban quản trị xác nhận, tổng hợp size, CSV | Cần 1500; chạy lại 3500 |
+| `20261001008000_club_public_page.sql` | **Trang công khai CLB Pro** `/c/<link-riêng>`: logo, giới thiệu, số thành viên, số buổi chạy / thử thách, nút Tham gia (không có dữ liệu bài chạy) | Cần 2800; chạy lại 3500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

@@ -5,17 +5,18 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import {
   ArrowLeft, CalendarDays, Check, CircleSlash, Clock, Coins, Copy, Crown, Gauge, Hourglass, Info, Lock, LogOut, MoreHorizontal,
-  Route, Share2, Shield, Timer, Trophy, Users, UsersRound, HeartPulse } from 'lucide-react'
+  Repeat, Route, Share2, Shield, Timer, Trophy, Users, UsersRound, HeartPulse } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Field, LevelBadge, ProgressRing, RankSearch, scrollToRow, SegmentedControl, Sheet, Skeleton, Textarea } from '@/shared/ui'
 import { filterSearch } from '@/shared/lib/search'
 import { routes } from '@/shared/config/routes'
 import { cn } from '@/shared/lib/cn'
 import { formatNumber, formatPace } from '@/shared/lib/format'
-import { challengeErrorMessage, type ChallengeDetail, type LeaderboardEntry, type TeamStanding } from '../../api/challengeApi'
+import { challengeErrorMessage, setChallengeRecurrence, type ChallengeDetail, type LeaderboardEntry, type TeamStanding } from '../../api/challengeApi'
 import {
-  AUDIENCE_LABEL, challengePhase, FORMAT_META, formatScore, OBJECTIVE_META, planStatus, rewardSummary, TEAM_MODE_META, timeLabel,
-  type TeamMode,
+  AUDIENCE_LABEL, challengePhase, FORMAT_META, formatScore, OBJECTIVE_META, planStatus, RECURRENCE_LABEL, rewardSummary, TEAM_MODE_META, timeLabel,
+  type Recurrence, type TeamMode,
 } from '../../model/challenge'
 import { useChallenge, useChallengeActions } from '../../hooks/useChallenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
@@ -82,6 +83,7 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
         {c.description && <p className="whitespace-pre-line text-[15px] leading-relaxed text-fg-muted">{c.description}</p>}
       </header>
 
+      <RecurrenceBar d={d} />
       <StatusBanner d={d} phase={phase} />
       <ProgressHero d={d} phase={phase} standings={standings} />
 
@@ -474,5 +476,46 @@ function DetailSkeleton() {
       <div className="grid grid-cols-3 gap-2"><Skeleton className="h-16" /><Skeleton className="h-16" /><Skeleton className="h-16" /></div>
       <Skeleton className="h-48" />
     </div>
+  )
+}
+
+/** Chuỗi thử thách tự lặp lại (migration 007600): kỳ hiện tại, kỳ kế tiếp, bật / tắt cho ban tổ chức */
+function RecurrenceBar({ d }: { d: ChallengeDetail }) {
+  const qc = useQueryClient()
+  const c = d.challenge
+  const rec = c.recurrence ?? 'NONE'
+  const [picking, setPicking] = useState(false)
+  const set = useMutation({
+    mutationFn: (r: string) => setChallengeRecurrence(c.id, r),
+    onSuccess: (_, r) => { toast.success(r === 'NONE' ? 'Đã tắt tự lặp lại — kỳ này vẫn diễn ra bình thường' : `Đã bật lặp ${RECURRENCE_LABEL[r as Recurrence].toLowerCase()}`); setPicking(false); void qc.invalidateQueries({ queryKey: ['challenge'] }) },
+    onError: (e) => toast.error(challengeErrorMessage(e)),
+  })
+  const closed = c.status === 'CANCELLED'
+  if (rec === 'NONE' && (!d.can_manage || closed || c.format === 'DUEL' || c.recur_next_id)) return null
+  return (
+    <Card className="space-y-2 text-sm">
+      <div className="flex items-center gap-2">
+        <Repeat className={cn('size-4 shrink-0', rec === 'NONE' ? 'text-fg-subtle' : 'text-brand')} aria-hidden />
+        <p className="min-w-0 flex-1">
+          {rec === 'NONE' ? <span className="text-fg-muted">Không tự lặp lại</span>
+            : <><span className="font-semibold">Lặp {RECURRENCE_LABEL[rec].toLowerCase()}</span><span className="text-fg-muted"> · kỳ {c.occurrence ?? 1}</span></>}
+        </p>
+        {c.recur_next_id && <Link href={`/challenges/${c.recur_next_id}`} className="font-semibold text-brand">Kỳ sau →</Link>}
+        {d.can_manage && !closed && !c.recur_next_id && (
+          <Button size="sm" variant="secondary" onClick={() => setPicking((v) => !v)}>{rec === 'NONE' ? 'Bật lặp lại' : 'Đổi'}</Button>
+        )}
+      </div>
+      {c.recur_error && d.can_manage && !c.recur_next_id && (
+        <p className="rounded-lg bg-warning/15 p-2 text-xs text-warning">Chưa tạo được kỳ mới: {challengeErrorMessage({ message: c.recur_error })} Hệ thống thử lại mỗi ngày.</p>
+      )}
+      {picking && (
+        <div className="flex flex-wrap gap-1.5">
+          {(Object.keys(RECURRENCE_LABEL) as Recurrence[]).map((r) => (
+            <Button key={r} size="sm" variant={r === rec ? 'primary' : 'secondary'} loading={set.isPending && set.variables === r}
+              onClick={() => set.mutate(r)}>{RECURRENCE_LABEL[r]}</Button>
+          ))}
+        </div>
+      )}
+    </Card>
   )
 }

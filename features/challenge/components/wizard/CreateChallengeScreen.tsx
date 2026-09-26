@@ -13,12 +13,12 @@ import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { capacityTier, creationFee, DEFAULT_POLICY, runPolicyText, xuToVnd } from '@/shared/lib/economy'
 import { routes } from '@/shared/config/routes'
-import { challengeErrorMessage, createChallenge, hasRulesInfo, quoteChallenge, setChallengeOptions, setChallengePledge, setChallengeRules, type ChallengeQuote } from '../../api/challengeApi'
+import { challengeErrorMessage, createChallenge, hasRulesInfo, quoteChallenge, setChallengeOptions, setChallengePledge, setChallengeRecurrence, setChallengeRules, type ChallengeQuote } from '../../api/challengeApi'
 import { RulesInfoForm } from '../detail/RulesInfo'
 import {
   AUDIENCE_LABEL, defaultDraft, draftFromTemplate, effectiveSlots, FORMAT_META, formatScore, OBJECTIVE_META, pledgePayload, pledgeSupported, rewardSummary,
-  isTeamPledge, TEAM_MODE_META, validateDraft, weeklyPreset,
-  type Audience, type ChallengeDraft, type ChallengeFormat, type DraftErrors, type Objective, type TeamMode,
+  isTeamPledge, RECURRENCE_LABEL, recurrenceAllowed, TEAM_MODE_META, validateDraft, weeklyPreset,
+  type Audience, type ChallengeDraft, type ChallengeFormat, type DraftErrors, type Objective, type Recurrence, type TeamMode,
 } from '../../model/challenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
 import { TemplatePicker } from './TemplatePicker'
@@ -96,6 +96,10 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
       if (hasRulesInfo(d.rules)) {
         await setChallengeRules(r.challenge_id, d.rules)
           .catch((e) => toast.error(`Đã tạo thử thách nhưng chưa lưu được thể lệ (sửa lại ở tab Luật chơi): ${challengeErrorMessage(e)}`))
+      }
+      if (d.recurrence !== 'NONE' && recurrenceAllowed(d, d.recurrence)) {
+        await setChallengeRecurrence(r.challenge_id, d.recurrence)
+          .catch((e) => toast.error(`Đã tạo thử thách nhưng chưa bật được tự lặp lại: ${challengeErrorMessage(e)}`))
       }
       toast.success(d.audience === 'CLUB_ONLY' ? 'Đã tạo và báo cho cả CLB!' : 'Đã tạo thử thách!')
       router.replace(`/challenges/${r.challenge_id}${r.invite_code ? `?code=${r.invite_code}` : ''}`)
@@ -506,6 +510,17 @@ function StepTime({ d, set, errors, balance, quote }: StepProps & { balance: num
         <Field label="Kết thúc" htmlFor="c-end" error={errors.end}>
           <Input id="c-end" type="datetime-local" value={toLocalInput(d.end)} onChange={(e) => set({ end: fromLocalInput(e.target.value) })} />
         </Field>
+        {d.format !== 'DUEL' && (
+          <Field label="Tự lặp lại" htmlFor="c-recur"
+            hint={d.recurrence === 'NONE' ? 'Hết kỳ, hệ thống tự mở kỳ mới cùng luật — không phải tạo lại mỗi tuần'
+              : `Mỗi kỳ tự tạo trước khi kỳ cũ kết thúc 1 ngày; phí / lượt tính như tạo mới${d.audience === 'CLUB_ONLY' ? ' (trừ quỹ CLB)' : ''}. Tắt được bất cứ lúc nào.`}
+            error={!recurrenceAllowed(d, d.recurrence) ? 'Mỗi kỳ dài hơn chu kỳ lặp — rút ngắn thời gian hoặc chọn chu kỳ dài hơn' : undefined}>
+            <select id="c-recur" value={d.recurrence} onChange={(e) => set({ recurrence: e.target.value as Recurrence })}
+              className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm">
+              {(Object.keys(RECURRENCE_LABEL) as Recurrence[]).map((r) => <option key={r} value={r}>{RECURRENCE_LABEL[r]}</option>)}
+            </select>
+          </Field>
+        )}
       </section>
 
       {d.format !== 'DUEL' && (d.format !== 'SOLO_GOAL' || d.pledge.enabled) && (
@@ -604,6 +619,7 @@ function StepReview({ d, quote, bill, loading, failed, quoteError, onRetry, club
             <li><span className="text-fg-subtle">Tính theo: </span>{OBJECTIVE_META[d.objective].label}{d.targetValue > 0 ? ` · mục tiêu ${formatScore(d.objective, d.targetValue)}` : ''}</li>
           )}
           <li><span className="text-fg-subtle">Thời gian: </span>{fmtWhen(d.start)} → {fmtWhen(d.end)} ({days} ngày)</li>
+          {d.recurrence !== 'NONE' && <li><span className="text-fg-subtle">Lặp lại: </span>{RECURRENCE_LABEL[d.recurrence].toLowerCase()} · kỳ mới tự mở cùng luật</li>}
           {perDay > 0 && <li><span className="text-fg-subtle">Trung bình cần: </span>{formatScore(d.objective, perDay)}/ngày</li>}
           <li><span className="text-fg-subtle">Phạm vi: </span>{d.audience === 'CLUB_ONLY' ? `Nội bộ ${clubName ?? 'CLB'}` : AUDIENCE_LABEL[d.format === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience]}</li>
           {d.requireHr && <li><span className="text-fg-subtle">Nhịp tim: </span>Bắt buộc — bài không có nhịp tim không được tính</li>}

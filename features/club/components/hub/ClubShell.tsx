@@ -37,8 +37,10 @@ export function ClubShell({ clubId, children }: { clubId: string; children: Reac
     { href: `${base}/photos`, label: 'Ảnh' },
     { href: `${base}/challenges`, label: 'Thử thách' },
     { href: `${base}/leaderboard`, label: 'BXH' },
+    { href: `${base}/hall`, label: 'Đại sảnh' },
     { href: `${base}/members`, label: 'Thành viên', badge: pending },
     { href: `${base}/treasury`, label: 'Quỹ' },
+    { href: `${base}/shop`, label: 'Cửa hàng' },
   ]
 
   return (

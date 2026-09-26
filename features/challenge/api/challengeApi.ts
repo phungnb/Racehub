@@ -72,6 +72,12 @@ export interface Challenge {
   /** Thể lệ bổ sung do BTC điền (migration 005400) */
   rules_info?: ChallengeRulesInfo | null
   rules_updated_at?: string | null
+  /** Tự lặp lại (migration 007600) */
+  recurrence?: 'NONE' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
+  occurrence?: number
+  series_id?: string | null
+  recur_next_id?: string | null
+  recur_error?: string | null
 }
 
 /** Thể lệ bổ sung: thưởng, phạt, lệ phí / đóng góp, điều kiện, liên hệ BTC, tối đa 5 mục tự đặt */
@@ -231,6 +237,12 @@ export async function quoteChallenge(d: ChallengeDraft): Promise<ChallengeQuote>
   }
 }
 
+/** Bật / tắt tự lặp lại (migration 007600) */
+export async function setChallengeRecurrence(id: string, recurrence: string) {
+  const { error } = await supabase.rpc('set_challenge_recurrence', { p_challenge_id: id, p_recurrence: recurrence })
+  if (error) throw error
+}
+
 /** Thử thách mình đã tạo, dùng làm mẫu (VIP2 — migration 004000) */
 export interface ChallengeTemplate {
   id: string; title: string; description: string | null; format: string; objective: string | null; game_mode: string | null
@@ -361,6 +373,9 @@ const MESSAGES: Record<string, string> = {
   INVALID_MAX_SLOTS: 'Số người tối đa không hợp lệ.',
   INSUFFICIENT_BALANCE: 'Số Xu trong ví không đủ cho phí tạo và tiền treo thưởng.',
   INSUFFICIENT_TREASURY: 'Quỹ CLB không đủ cho phí tạo và tiền treo thưởng.',
+  INVALID_RECURRENCE: 'Chu kỳ lặp không hợp lệ.',
+  RECURRENCE_NOT_SUPPORTED: 'Kèo 1-1 không lặp lại được.',
+  RECURRENCE_TOO_SHORT: 'Mỗi kỳ dài hơn chu kỳ lặp — rút ngắn thời gian hoặc chọn chu kỳ dài hơn.',
   INVALID_AMOUNT: 'Số Xu thưởng không hợp lệ.',
   FORBIDDEN: 'Bạn không có quyền làm việc này.',
   RATE_LIMITED: 'Bạn thao tác hơi nhanh, thử lại sau ít phút.',

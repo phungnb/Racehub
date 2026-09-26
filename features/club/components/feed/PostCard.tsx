@@ -24,9 +24,11 @@ export function PostCard({ post, meId, isStaff, onComments, highlight }: {
   const isRun = post.kind === 'AUTO_RUN'
   const isAnnouncement = post.kind === 'ANNOUNCEMENT'
   const isNews = post.kind === 'NEWS'
+  const milestone = post.kind === 'MILESTONE' ? milestoneOf(post) : null
   const cat = isNews ? NEWS_CATEGORIES[post.meta.category ?? 'OTHER'] ?? NEWS_CATEGORIES.OTHER : null
   return (
     <Card id={`post-${post.id}`} className={cn('space-y-3 scroll-mt-40', (isAnnouncement || isNews) && post.is_pinned && 'border-coin/40 bg-coin/5',
+      milestone && 'border-coin/40 bg-gradient-to-br from-coin/15 to-transparent',
       isNews && !post.is_pinned && 'border-brand/25',
       highlight && 'ring-2 ring-brand')}>
       <header className="flex items-center gap-3">
@@ -37,7 +39,7 @@ export function PostCard({ post, meId, isStaff, onComments, highlight }: {
             {post.author && <LevelBadge level={post.author.level} />}
           </p>
           <p className="text-xs text-fg-subtle">
-            {isRun ? 'đã hoàn thành một buổi chạy · ' : ''}{formatRelative(post.created_at)}
+            {isRun ? 'đã hoàn thành một buổi chạy · ' : milestone ? 'chạm cột mốc mới · ' : ''}{formatRelative(post.created_at)}
           </p>
         </div>
         {post.is_pinned && <Pin className="size-4 text-coin" aria-label="Đã ghim" />}
@@ -55,7 +57,15 @@ export function PostCard({ post, meId, isStaff, onComments, highlight }: {
           <span className={cn('rounded-full px-2 py-0.5', cat.tone)}>{cat.label}</span>
         </p>
       )}
-      {post.title && <h3 className="text-lg font-bold leading-snug">{post.title}</h3>}
+      {milestone ? (
+        <div className="flex items-center gap-3 rounded-xl bg-bg/60 p-3">
+          <span className="text-4xl" aria-hidden>{milestone.emoji}</span>
+          <div className="min-w-0">
+            <p className="text-lg font-bold leading-snug">{post.title}</p>
+            <p className="text-sm text-fg-muted">{milestone.detail}</p>
+          </div>
+        </div>
+      ) : post.title && <h3 className="text-lg font-bold leading-snug">{post.title}</h3>}
       {isRun ? <RunStats post={post} /> : null}
       {post.body && !isRun && <p className="whitespace-pre-line break-words text-[15px] leading-relaxed">{post.body}</p>}
       {post.image_paths.length > 0 && <Images paths={post.image_paths} />}
@@ -69,6 +79,19 @@ export function PostCard({ post, meId, isStaff, onComments, highlight }: {
       <PostActions post={post} onComments={onComments} />
     </Card>
   )
+}
+
+/** Bài cột mốc (migration 007800): 100 / 500 / 1.000 km…, Half / Full Marathon, Ultra đầu tiên */
+function milestoneOf(post: ClubPost) {
+  const m = post.meta as { code?: string; total_km?: number; distance_m?: number; moving_s?: number }
+  const code = m.code ?? ''
+  const single = code === 'FIRST_HM' || code === 'FIRST_FM' || code === 'FIRST_ULTRA'
+  return {
+    emoji: code === 'FIRST_FM' ? '🏅' : code === 'FIRST_HM' ? '🥈' : code === 'FIRST_ULTRA' ? '🦾' : '🎉',
+    detail: single
+      ? `${formatKm(Number(m.distance_m ?? 0))} km${m.moving_s ? ` trong ${formatDuration(Number(m.moving_s))}` : ''} — vào Đại sảnh CLB!`
+      : `Tổng ${formatNumber(Number(m.total_km ?? 0))} km cùng RaceHub. Cổ vũ một câu nào!`,
+  }
 }
 
 function RunStats({ post }: { post: ClubPost }) {

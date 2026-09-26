@@ -13,7 +13,7 @@ import { ClubProPurchase } from '@/features/billing'
 
 const BENEFITS = [
   { icon: Users, text: 'Không giới hạn Quản trị viên (gói miễn phí: 2)' },
-  { icon: Link2, text: 'Link mời riêng dễ nhớ: racehub…/c/ten-clb' },
+  { icon: Link2, text: 'Trang công khai + link mời dễ nhớ: racehub…/c/ten-clb' },
   { icon: BarChart3, text: 'Báo cáo chuyên cần: buổi chạy, km, điểm danh sự kiện, đóng quỹ — xuất CSV' },
   { icon: Ticket, text: '2 lượt tạo thử thách CLB ≤100 người mỗi tháng (trừ quỹ CLB 0 Xu)' },
 ]
@@ -53,6 +53,7 @@ export function ProSection({ club }: { club: Club }) {
         {p.active ? (
           <>
             <SlugEditor clubId={club.id} current={p.slug} />
+            {p.slug && <a href={`/c/${p.slug}`} target="_blank" rel="noopener noreferrer" className="inline-block text-sm font-semibold text-brand">Xem trang công khai của CLB →</a>}
             <Button block variant="secondary" onClick={() => setReport(true)}><BarChart3 className="size-4" aria-hidden />Báo cáo chuyên cần</Button>
           </>
         ) : null}
