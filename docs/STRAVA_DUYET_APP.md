@@ -2,6 +2,8 @@
 
 Cập nhật: 26/09/2026.
 
+> ✅ **Trạng thái: đã được Strava duyệt, giới hạn 999 người kết nối (09/2026).** Các mục dưới giữ lại để tham khảo khi xin nâng tiếp và để giữ đúng điều khoản (vi phạm sau duyệt vẫn có thể bị thu hồi).
+
 > "Duyệt đối tác" ở đây là **Developer Program Review**: vòng duyệt bắt buộc để app được kết nối với nhiều người dùng Strava. Strava còn có chương trình **đối tác kinh doanh** riêng (hợp tác thương mại, quảng bá). Chương trình đó đàm phán qua email, chỉ nên liên hệ sau khi app đã qua duyệt và có người dùng.
 
 ## 1. Các mức truy cập
