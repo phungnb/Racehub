@@ -28,6 +28,8 @@ export const routes = {
   welcome: '/welcome',
   privacy: '/privacy',
   terms: '/terms',
+  help: '/help',
+  helpPage: (slug: string) => `/help/${encodeURIComponent(slug)}`,
   activity: (id: string) => `/activities/${encodeURIComponent(id)}`,
   learn: '/learn',
   learnArticle: (slug: string) => `/learn/${encodeURIComponent(slug)}`,

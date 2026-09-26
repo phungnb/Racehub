@@ -1,8 +1,10 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/shared/lib/supabase-server'
 import { routes } from '@/shared/config/routes'
+import { IntroScreen } from '@/features/onboarding'
 
-// Trang gốc: chuyển tới Trang chủ hoặc Đăng nhập.
+// Trang gốc: đã đăng nhập → Trang chủ; chưa đăng nhập → màn giới thiệu (lần sau vào thẳng Đăng nhập).
 // Hỗ trợ link cũ dạng /?tab=profile&strava_success=true và /?tab=club&clubId=...
 export default async function RootPage({ searchParams }: PageProps<'/'>) {
   const params = await searchParams
@@ -16,7 +18,7 @@ export default async function RootPage({ searchParams }: PageProps<'/'>) {
 
   const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect(routes.login)
+  if (!user) return <Suspense fallback={null}><IntroScreen /></Suspense>
 
   if (tab === 'profile') redirect(`${routes.me}${qs}`)
   if (tab === 'club') {

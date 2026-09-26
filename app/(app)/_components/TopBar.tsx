@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { ShieldCheck } from 'lucide-react'
 import { isSystemAdmin } from '@/features/admin'
-import { NotificationBell } from '@/features/notification'
+import { NotificationBell, unsubscribeThisDevice } from '@/features/notification'
+import { MenuDrawer } from '@/features/help'
 import { CoinAmount } from '@/shared/ui'
 import { routes } from '@/shared/config/routes'
 import { ICONS } from '@/shared/config/brand'
@@ -14,11 +15,15 @@ export function TopBar({ profile }: { profile: Profile | null }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
       <div className="flex h-16 items-center justify-between gap-2 px-4">
+        <div className="flex min-w-0 items-center gap-1">
+        {/* ☰ Hướng dẫn chơi + Chính sách + Hỗ trợ (migration 007300) */}
+        <MenuDrawer profile={profile} onSignOut={unsubscribeThisDevice} className="-ml-2" />
         <Link href={routes.home} className="flex items-center gap-2 text-lg font-extrabold tracking-wide">
           {/* eslint-disable-next-line @next/next/no-img-element -- biểu tượng tĩnh nhỏ */}
           <img src={ICONS.mark} alt="" width={28} height={28} className="size-7" />
           <span>RACE<span className="text-brand">HUB</span></span>
         </Link>
+        </div>
         {profile && (
           <div className="flex items-center gap-1">
             {isSystemAdmin(profile) && (

@@ -17,7 +17,8 @@ function LoginInner() {
 
   return (
     <div className="mx-auto min-h-dvh max-w-md">
-      <AuthScreen onAuthSuccess={() => router.replace(next)} next={next} callbackError={params.get('error')} />
+      <AuthScreen onAuthSuccess={() => router.replace(next)} next={next} callbackError={params.get('error')}
+        initialMode={params.get('mode') === 'register' ? 'register' : 'login'} />
     </div>
   )
 }

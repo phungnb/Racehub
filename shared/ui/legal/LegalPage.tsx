@@ -18,6 +18,7 @@ export function LegalPage({ title, children }: { title: string; children: ReactN
       <nav className="mb-6 flex items-center justify-between text-sm">
         <Link href="/" className="font-black tracking-tight text-brand">RACEHUB</Link>
         <span className="flex gap-4 text-fg-muted">
+          <Link href="/help" className="hover:text-fg">Hướng dẫn</Link>
           <Link href="/privacy" className="hover:text-fg">Quyền riêng tư</Link>
           <Link href="/terms" className="hover:text-fg">Điều khoản</Link>
         </span>
