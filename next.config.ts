@@ -1,5 +1,19 @@
 import type { NextConfig } from "next";
 
+// Chẩn đoán khi build (Vercel): chỉ in TÊN biến công khai còn trống + môi trường đang build, không in giá trị.
+// Biến NEXT_PUBLIC_* được nhúng lúc build, nên thiếu ở môi trường nào (Production / Preview) thì bản đó không kết nối được Supabase.
+{
+  const required = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "NEXT_PUBLIC_STRAVA_CLIENT_ID"];
+  const missing = required.filter((k) => !(process.env[k] ?? "").trim());
+  if (missing.length) {
+    console.warn(
+      `[RaceHub] THIẾU biến môi trường: ${missing.join(", ")}` +
+        ` | VERCEL_ENV=${process.env.VERCEL_ENV ?? "-"} | nhánh=${process.env.VERCEL_GIT_COMMIT_REF ?? "-"}` +
+        ` | dự án=${process.env.VERCEL_PROJECT_PRODUCTION_URL ?? "-"}`,
+    );
+  }
+}
+
 const nextConfig: NextConfig = {
   // Chỉ có tác dụng khi chạy `next dev`: cho phép mở app qua địa chỉ GitHub Codespaces
   // (https://<tên>-3000.app.github.dev), nếu không trình duyệt không tải được tài nguyên dev.
