@@ -14,8 +14,10 @@ const CALLBACK_ERROR: Record<string, string> = {
 
 type Mode = 'login' | 'register' | 'forgot'
 
-export default function AuthScreen({ onAuthSuccess, next = '/feed', callbackError }: { onAuthSuccess: () => void; next?: string; callbackError?: string | null }) {
-  const [mode, setMode] = useState<Mode>(() => (peekPendingReferral() ? 'register' : 'login'))
+export default function AuthScreen({ onAuthSuccess, next = '/feed', callbackError, initialMode }: {
+  onAuthSuccess: () => void; next?: string; callbackError?: string | null; initialMode?: 'login' | 'register'
+}) {
+  const [mode, setMode] = useState<Mode>(() => (peekPendingReferral() ? 'register' : initialMode ?? 'login'))
   const [referral, setReferral] = useState(() => peekPendingReferral() ?? '')
   const [social, setSocial] = useState<OAuthProvider | null>(null)
   const providers = enabledProviders()
