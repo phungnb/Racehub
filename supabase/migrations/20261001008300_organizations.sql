@@ -1,11 +1,3 @@
--- RaceHub — PHẦN 11/12 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 008300
--- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
--- Xong thì chạy phần tiếp theo.
-begin;
--- ===================================================================
--- 20261001008300_organizations.sql
--- ===================================================================
 -- 008300: RaceHub Doanh nghiệp / Liên CLB (gói Enterprise — báo giá riêng, tham khảo Tucana Free → Pro → Enterprise).
 -- Khách hàng: doanh nghiệp (phong trào sức khoẻ nhân viên), liên đoàn / hệ thống nhiều CLB, trường học.
 -- • Tổ chức (organizations): thương hiệu riêng (logo, ảnh bìa, chủ đề), đơn vị con (phòng ban / chi nhánh / lớp),
@@ -838,5 +830,3 @@ grant execute on function public.org_is_admin(uuid), public.org_is_member(uuid),
   public.org_campaigns(uuid), public.org_campaign_board(uuid), public.org_report(uuid, timestamptz, timestamptz) to authenticated;
 
 notify pgrst, 'reload schema';
-
-commit;

@@ -1,3 +1,11 @@
+-- RaceHub — PHẦN 12/12 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- Gồm: 003500
+-- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
+-- PHẦN CUỐI: luôn chạy phần này sau cùng (cập nhật trang Quản trị → Kiểm tra hệ thống).
+begin;
+-- ===================================================================
+-- 20261001003500_system_check.sql
+-- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
 -- admin_system_check() dò từng migration đã chạy chưa (qua một đối tượng đặc trưng của file đó),
 -- kho ảnh, pg_net / cấu hình push, và dữ liệu bất thường (thử thách / trận CLB quá hạn chưa tất toán,
@@ -181,3 +189,5 @@ revoke all on function public.admin_system_check() from public, anon;
 grant execute on function public.admin_system_check() to authenticated;
 
 notify pgrst, 'reload schema';
+
+commit;

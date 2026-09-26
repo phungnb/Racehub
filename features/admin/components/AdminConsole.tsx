@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Activity, BookOpen, Link2, LifeBuoy, ShieldAlert, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, type LucideIcon } from 'lucide-react'
+import { Activity, BookOpen, Link2, LifeBuoy, ShieldAlert, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, Building2, type LucideIcon } from 'lucide-react'
 import { ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { adminErrorMessage } from '../api/adminApi'
@@ -32,9 +32,10 @@ import { BibTab } from './console/BibTab'
 import { StravaTab } from './console/StravaTab'
 import { CmsScreen } from '@/features/knowledge'
 import { HelpAdminTab } from '@/features/help'
+import { EnterpriseAdminTab } from '@/features/org'
 
 type Tab = 'overview' | 'metrics' | 'users' | 'review' | 'reports' | 'challenges' | 'clubs' | 'cups' | 'partners' | 'organizers' | 'content' | 'help' | 'bib'
-  | 'orders' | 'plans' | 'promos' | 'quests' | 'gifts' | 'items' | 'grant' | 'passes' | 'policy' | 'system' | 'audit' | 'strava'
+  | 'enterprise' | 'orders' | 'plans' | 'promos' | 'quests' | 'gifts' | 'items' | 'grant' | 'passes' | 'policy' | 'system' | 'audit' | 'strava'
 type Badge = keyof AdminInbox
 const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; label: string; icon: LucideIcon; badge?: Badge }[] }[] = [
   { id: 'home', label: 'Tổng quan', icon: LayoutDashboard, tabs: [
@@ -47,7 +48,7 @@ const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; la
     { id: 'partners', label: 'Đối tác', icon: Store, badge: 'partners' }, { id: 'bib', label: 'Chợ BIB', icon: Ticket }, { id: 'organizers', label: 'Tổ chức giải', icon: Flag },
     { id: 'content', label: 'Nội dung', icon: BookOpen, badge: 'content' }, { id: 'help', label: 'Hướng dẫn & chính sách', icon: LifeBuoy }] },
   { id: 'sales', label: 'Kinh doanh', icon: Receipt, tabs: [
-    { id: 'orders', label: 'Đơn hàng', icon: Receipt, badge: 'orders' }, { id: 'plans', label: 'Gói & giá', icon: Tags }, { id: 'promos', label: 'Khuyến mãi', icon: Megaphone },
+    { id: 'orders', label: 'Đơn hàng', icon: Receipt, badge: 'orders' }, { id: 'enterprise', label: 'Doanh nghiệp', icon: Building2 }, { id: 'plans', label: 'Gói & giá', icon: Tags }, { id: 'promos', label: 'Khuyến mãi', icon: Megaphone },
     { id: 'quests', label: 'Nhiệm vụ', icon: Target }, { id: 'gifts', label: 'Quà tặng', icon: Gift }, { id: 'items', label: 'Vật phẩm', icon: Shirt }] },
   { id: 'economy', label: 'Kinh tế', icon: Coins, tabs: [
     { id: 'grant', label: 'Cộng/Trừ Xu', icon: Coins }, { id: 'passes', label: 'Lượt tạo', icon: Ticket }, { id: 'policy', label: 'Chính sách', icon: ScrollText }] },
@@ -120,6 +121,7 @@ export function AdminConsole() {
         : tab === 'bib' ? <BibTab />
         : tab === 'metrics' ? <MetricsTab />
         : tab === 'orders' ? <OrdersTab />
+        : tab === 'enterprise' ? <EnterpriseAdminTab />
         : tab === 'promos' ? <PromotionsTab />
         : tab === 'quests' ? <QuestsTab />
         : tab === 'plans' ? <PlansTab />

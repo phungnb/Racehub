@@ -132,6 +132,22 @@ function Drawer({ profile, onSignOut, onClose }: { profile: Profile | null; onSi
           ))}
           {menu.isPending && <p className="px-3 text-xs text-fg-subtle">Đang tải hướng dẫn…</p>}
 
+          <section className="mb-3">
+            <h2 className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-fg-subtle">Tổ chức</h2>
+            <ul>
+              {profile && (
+                <li><Link href={routes.orgs} onClick={onClose} className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 hover:bg-surface-2">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-base" aria-hidden>🏢</span>
+                  <span className="min-w-0 flex-1 text-sm font-medium">Tổ chức của tôi</span><ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+                </Link></li>
+              )}
+              <li><Link href={routes.enterprise} onClick={onClose} className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 hover:bg-surface-2">
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-base" aria-hidden>🤝</span>
+                <span className="min-w-0 flex-1 text-sm font-medium">RaceHub cho doanh nghiệp</span><ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+              </Link></li>
+            </ul>
+          </section>
+
           {profile && (
             <section className="mt-2 border-t border-border pt-3">
               <button type="button" onClick={() => void signOut()} disabled={leaving}
