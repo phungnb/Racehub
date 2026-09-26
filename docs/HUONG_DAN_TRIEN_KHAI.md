@@ -36,6 +36,10 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 007100** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
+>
+> 📦 **File gộp quá dài, copy không hết?** Dùng bản **chia nhỏ** [`supabase/deploy/phan/`](../supabase/deploy/phan/README.md): 10 phần, mỗi phần ≤ ~90 KB.
+> Chạy **lần lượt** `phan_01.sql` → `phan_10.sql` (mỗi phần: SQL Editor → New query → dán → Run). Đã chạy một số rồi thì bắt đầu từ phần chứa
+> migration đầu tiên bị ✗ trong **Kiểm tra hệ thống**, và **luôn chạy phần cuối** (`phan_10.sql`). Mẹo copy trên GitHub: mở file → nút **Raw** → Ctrl+A → Ctrl+C.
 > File gộp tạo bằng `npm run db:bundle` (hoặc `node scripts/db-bundle.mjs <mốc>` để gộp từ mốc khác); test tự động bảo đảm file luôn khớp migration.
 
 Chạy các file trong `supabase/migrations/`, đúng thứ tự:
