@@ -8,7 +8,7 @@ import { Avatar, BarChart, Button, Card, EmptyState, ErrorState, Field, Input, S
 import { cn } from '@/shared/lib/cn'
 import { supabase } from '@/shared/lib/supabase'
 import {
-  cmsList, cmsMeta, cmsSaveAuthor, cmsSetStaff, cmsStats, knowledgeErrorMessage, uploadContentImage,
+  cmsExpertReview, cmsList, cmsMeta, cmsSaveAuthor, cmsSetStatus, cmsSetStaff, cmsStats, knowledgeErrorMessage, uploadContentImage,
   type ArticleStatus, type CmsAuthor, type CmsMeta, type CmsRow,
 } from '../../api/knowledgeApi'
 import { AUTHOR_KIND, formatDate, ROLE_LABEL, STATUS_LABEL, STATUS_TONE } from '../../model/knowledge'
@@ -88,7 +88,7 @@ function Articles({ meta, onOpen }: { meta: CmsMeta; onOpen: (id: string) => voi
         : rows.length === 0 ? <EmptyState icon={FileText} title="Không có bài" description="Đổi bộ lọc hoặc tạo bài mới." />
         : (
           <ul className="space-y-2">
-            {rows.map((r) => <li key={r.id}><Row r={r} cat={catName(r.category_id)} onOpen={() => onOpen(r.id)} /></li>)}
+            {rows.map((r) => <li key={r.id}><Row r={r} role={meta.role} cat={catName(r.category_id)} onOpen={() => onOpen(r.id)} /></li>)}
           </ul>
         )}
       {list.hasNextPage && <Button block variant="secondary" loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>Xem thêm</Button>}
@@ -96,26 +96,52 @@ function Articles({ meta, onOpen }: { meta: CmsMeta; onOpen: (id: string) => voi
   )
 }
 
-function Row({ r, cat, onOpen }: { r: CmsRow; cat: string; onOpen: () => void }) {
+function Row({ r, role, cat, onOpen }: { r: CmsRow; role: CmsMeta['role']; cat: string; onOpen: () => void }) {
+  const qc = useQueryClient()
   const waitExpert = r.needs_expert_review && !r.expert_reviewed_at
+  const editor = role === 'ADMIN' || role === 'EDITOR'
+  const expert = role === 'ADMIN' || role === 'EXPERT'
+  // Duyệt ngay trong danh sách: admin duyệt chuyên môn + đăng một bước; biên tập đăng bài đã qua chuyên môn; chuyên gia duyệt chuyên môn
+  const canPublish = editor && r.status === 'REVIEW' && (!waitExpert || role === 'ADMIN')
+  const canExpert = expert && waitExpert && !canPublish && ['DRAFT', 'REVIEW'].includes(r.status)
+  const approve = useMutation({
+    mutationFn: async () => {
+      if (waitExpert) await cmsExpertReview(r.id, true, null)
+      if (canPublish) await cmsSetStatus(r.id, 'PUBLISHED', null, null)
+    },
+    onSuccess: () => {
+      toast.success(canPublish ? `Đã duyệt và đăng: ${r.title}` : `Đã duyệt chuyên môn: ${r.title}`)
+      void qc.invalidateQueries({ queryKey: ['cms'] }); void qc.invalidateQueries({ queryKey: ['knowledge'] })
+    },
+    onError: (e) => toast.error(knowledgeErrorMessage(e)),
+  })
   return (
-    <button type="button" onClick={onOpen} className="w-full rounded-[var(--radius-card)] border border-border bg-surface p-3 text-left hover:border-fg-subtle">
-      <div className="flex items-start gap-2">
-        <p className="min-w-0 flex-1 font-semibold leading-snug">{r.content_type === 'NEWS' && '📰 '}{r.title}</p>
-        <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold', STATUS_TONE[r.status as ArticleStatus])}>{STATUS_LABEL[r.status as ArticleStatus]}</span>
-      </div>
-      <p className="mt-1 text-xs text-fg-muted">
-        {cat} · {r.author_name ?? r.created_by_name ?? '—'} · {r.status === 'SCHEDULED' ? `đăng ${formatDate(r.published_at)}` : `sửa ${formatDate(r.updated_at)}`}
-        {r.is_featured && ' · ⭐ nổi bật'}
-      </p>
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-        {waitExpert && <span className="inline-flex items-center gap-1 font-semibold text-warning"><ShieldCheck className="size-3" aria-hidden />Chờ duyệt chuyên môn</span>}
-        {r.needs_expert_review && r.expert_reviewed_at && <span className="inline-flex items-center gap-1 text-brand"><ShieldCheck className="size-3" aria-hidden />Đã duyệt chuyên môn</span>}
-        {r.status === 'REVIEW' && <span className="font-semibold text-brand">Bấm để mở bài và duyệt →</span>}
-        {r.review_note && <span className="text-warning">{r.review_note.slice(0, 60)}</span>}
-        {r.live && <span className="text-fg-subtle">{r.views} xem · {r.reads} đọc xong · {r.saves} lưu · {r.cta_clicks} bấm hành động · 👍 {r.helpful_yes}</span>}
-      </div>
-    </button>
+    <div className="rounded-[var(--radius-card)] border border-border bg-surface hover:border-fg-subtle">
+      <button type="button" onClick={onOpen} className="w-full p-3 text-left">
+        <div className="flex items-start gap-2">
+          <p className="min-w-0 flex-1 font-semibold leading-snug">{r.content_type === 'NEWS' && '📰 '}{r.title}</p>
+          <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold', STATUS_TONE[r.status as ArticleStatus])}>{STATUS_LABEL[r.status as ArticleStatus]}</span>
+        </div>
+        <p className="mt-1 text-xs text-fg-muted">
+          {cat} · {r.author_name ?? r.created_by_name ?? '—'} · {r.status === 'SCHEDULED' ? `đăng ${formatDate(r.published_at)}` : `sửa ${formatDate(r.updated_at)}`}
+          {r.is_featured && ' · ⭐ nổi bật'}
+        </p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+          {waitExpert && <span className="inline-flex items-center gap-1 font-semibold text-warning"><ShieldCheck className="size-3" aria-hidden />Chờ duyệt chuyên môn</span>}
+          {r.needs_expert_review && r.expert_reviewed_at && <span className="inline-flex items-center gap-1 text-brand"><ShieldCheck className="size-3" aria-hidden />Đã duyệt chuyên môn</span>}
+          {r.review_note && <span className="text-warning">{r.review_note.slice(0, 60)}</span>}
+          {r.live && <span className="text-fg-subtle">{r.views} xem · {r.reads} đọc xong · {r.saves} lưu · {r.cta_clicks} bấm hành động · 👍 {r.helpful_yes}</span>}
+        </div>
+      </button>
+      {(canPublish || canExpert) && (
+        <div className="flex gap-2 border-t border-border px-3 py-2">
+          <Button size="sm" loading={approve.isPending} onClick={() => approve.mutate()}>
+            <BadgeCheck className="size-4" aria-hidden />{canPublish ? (waitExpert ? 'Duyệt & đăng' : 'Đăng bài') : 'Duyệt chuyên môn'}
+          </Button>
+          <Button size="sm" variant="secondary" onClick={onOpen}>Xem & sửa</Button>
+        </div>
+      )}
+    </div>
   )
 }
 
