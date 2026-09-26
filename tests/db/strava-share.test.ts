@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import { createDb, asUser } from './load-schema'
 
-// Migration 007000 (hướng B+): bài Strava chỉ hiện cho người khác khi runner đồng ý; admin đổi chính sách chung
+// Migration 007000 + 007400: kết nối Strava = đồng ý hiện bài cho CLB / BXH; runner tắt được; admin đổi chính sách chung
 const OWN = '00000000-0000-0000-0000-0000000070a1'      // chủ nhiệm CLB, không dùng Strava
 const RUN = '00000000-0000-0000-0000-0000000070a2'      // runner dùng Strava
 const ADM = '00000000-0000-0000-0000-0000000070a3'
@@ -22,7 +22,7 @@ async function seed(db: PGlite) {
 const rpc = async <T,>(db: PGlite, uid: string, sql: string, params: unknown[] = []) => (await asUser<{ r: T }>(db, uid, '/rpc', sql, params)).rows[0].r
 const fails = async (p: Promise<unknown>) => { try { await p } catch (e) { return (e as Error).message } return 'OK' }
 
-describe('chia sẻ bài Strava có đồng ý (007000)', () => {
+describe('chia sẻ bài Strava (007000, 007400)', () => {
   let db: PGlite
   let stravaRun: string
   const ingest = async (ext: string, hoursAgo: number) => {
@@ -47,43 +47,41 @@ describe('chia sẻ bài Strava có đồng ý (007000)', () => {
     await db.query(`update public.connected_accounts set created_at = now() - interval '1 day' where user_id = $1`, [RUN])
   }, 240_000)
 
-  it('chưa đồng ý: bài vẫn thưởng cho chính runner nhưng không lên bảng tin / BXH, người khác không xem được', async () => {
+  it('kết nối Strava = đồng ý (007400): bài lên bảng tin + BXH ngay, người khác chỉ xem số tổng', async () => {
     stravaRun = await ingest('s-1', 2)
     const a = (await db.query<{ shared: boolean; earned_xp: string; validation_status: string }>(
       `select shared, earned_xp, validation_status from public.activities where id = $1`, [stravaRun])).rows[0]
-    expect(a).toMatchObject({ shared: false, validation_status: 'APPROVED' })
+    expect(a).toMatchObject({ shared: true, validation_status: 'APPROVED' })
     expect(Number(a.earned_xp)).toBeGreaterThan(0)
+    expect(await posts()).toBe(1)
+    expect(Number((await board())?.distance_m)).toBe(6000)
+    expect(await rpc(db, OWN, `select public.activity_detail($1) as r`, [stravaRun])).toMatchObject({ shared: true, strava_limited: true })
+    expect(await rpc(db, RUN, `select public.my_strava_sharing() as r`)).toMatchObject({ policy: 'OPT_IN', consent: true, connected: true, hidden_runs: 0 })
+  })
+
+  it('runner TẮT → gỡ khỏi bảng tin, BXH, người khác không xem được (vẫn thưởng cho chính runner); bật lại → hiện lại', async () => {
+    expect(await rpc(db, RUN, `select public.set_strava_sharing(false) as r`)).toMatchObject({ consent: false, hidden_runs: 1, changed: 1 })
     expect(await posts()).toBe(0)
     expect(Number((await board())?.distance_m ?? 0)).toBe(0)
     expect(await fails(rpc(db, OWN, `select public.activity_detail($1) as r`, [stravaRun]))).toContain('ACTIVITY_NOT_FOUND')
     expect(await rpc<unknown[]>(db, OWN, `select public.list_athlete_activities($1) as r`, [RUN])).toHaveLength(0)
     expect(await rpc<unknown[]>(db, RUN, `select public.list_athlete_activities($1) as r`, [RUN])).toHaveLength(1)   // chính mình vẫn thấy
     expect((await asUser(db, OWN, '/activities', `select 1 from public.activities where id = $1`, [stravaRun])).rows).toHaveLength(0)
-    expect(await rpc(db, RUN, `select public.my_strava_sharing() as r`)).toMatchObject({ policy: 'OPT_IN', consent: null, connected: true, hidden_runs: 1 })
-  })
-
-  it('bật đồng ý → bài lên bảng tin + BXH ngay; tắt → gỡ khỏi bảng tin, BXH', async () => {
-    expect(await rpc(db, RUN, `select public.set_strava_sharing(true) as r`)).toMatchObject({ consent: true, hidden_runs: 0, changed: 1 })
-    expect(await posts()).toBe(1)
-    expect(Number((await board())?.distance_m)).toBe(6000)
-    expect(await rpc(db, OWN, `select public.activity_detail($1) as r`, [stravaRun])).toMatchObject({ shared: true, strava_limited: true })
-    // bài mới khi đã đồng ý → chia sẻ ngay
+    // bài mới khi đang tắt → cũng ẩn
     const second = await ingest('s-2', 1)
-    expect((await db.query<{ shared: boolean }>(`select shared from public.activities where id = $1`, [second])).rows[0].shared).toBe(true)
-    expect(await posts()).toBe(2)
+    expect((await db.query<{ shared: boolean }>(`select shared from public.activities where id = $1`, [second])).rows[0].shared).toBe(false)
 
-    await rpc(db, RUN, `select public.set_strava_sharing(false) as r`)
-    expect(await posts()).toBe(0)
-    expect(Number((await board())?.distance_m ?? 0)).toBe(0)
+    expect(await rpc(db, RUN, `select public.set_strava_sharing(true) as r`)).toMatchObject({ consent: true, hidden_runs: 0, changed: 2 })
+    expect(await posts()).toBe(2)
+    expect(Number((await board())?.distance_m)).toBe(12000)
   })
 
-  it('admin đổi chính sách chung: OWNER_ONLY (hướng A) ẩn cả người đã đồng ý; người thường không đổi được', async () => {
-    await rpc(db, RUN, `select public.set_strava_sharing(true) as r`)
+  it('admin đổi chính sách chung: OWNER_ONLY (hướng A) ẩn tất cả; người thường không đổi được', async () => {
     expect(await fails(rpc(db, OWN, `select public.admin_set_strava_policy('ALL', 'thử') as r`))).toMatch(/FORBIDDEN|ADMIN/)
     expect(await rpc(db, ADM, `select public.admin_set_strava_policy('OWNER_ONLY', 'Strava yêu cầu') as r`)).toMatchObject({ policy: 'OWNER_ONLY', changed: 2 })
     expect(await posts()).toBe(0)
-    expect(await rpc(db, ADM, `select public.admin_strava_sharing_stats() as r`)).toMatchObject({ policy: 'OWNER_ONLY', opted_in: 1, hidden_runs: 2 })
-    await rpc(db, ADM, `select public.admin_set_strava_policy('OPT_IN', 'quay lại B+') as r`)
+    expect(await rpc(db, ADM, `select public.admin_strava_sharing_stats() as r`)).toMatchObject({ policy: 'OWNER_ONLY', connected: 1, opted_in: 1, opted_out: 0, hidden_runs: 2 })
+    await rpc(db, ADM, `select public.admin_set_strava_policy('OPT_IN', 'quay lại mặc định') as r`)
     expect(await posts()).toBe(2)
   })
 

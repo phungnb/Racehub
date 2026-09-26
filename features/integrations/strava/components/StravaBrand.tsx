@@ -29,6 +29,16 @@ export function StravaConnectButton({ href, className, size = 'md' }: { href: st
   )
 }
 
+/** Dòng thông báo ngay dưới nút kết nối: kết nối = đồng ý hiện bài cho CLB & BXH (migration 007400), tắt được trong Cài đặt */
+export function StravaShareNotice({ className }: { className?: string }) {
+  return (
+    <p className={cn('text-[11px] leading-relaxed text-fg-subtle', className)}>
+      Khi kết nối, quãng đường và thời gian bài chạy Strava của bạn hiện trên bảng tin CLB và bảng xếp hạng (bản đồ, nhịp tim chỉ bạn xem).
+      Tắt bất cứ lúc nào ở Cài đặt → Quyền riêng tư.
+    </p>
+  )
+}
+
 /** Ghi nguồn ở mọi nơi hiện dữ liệu lấy từ Strava */
 export function PoweredByStrava({ className }: { className?: string }) {
   if (OFFICIAL) {

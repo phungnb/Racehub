@@ -182,9 +182,9 @@ Bài nghi ngờ sẽ **chờ duyệt**, không bị xoá. Xem chi tiết tại [
 - Đợi GPS ổn định 10–20 giây trước khi bấm bắt đầu.
 - Chạy nơi thoáng, tránh hầm và toà nhà cao.
 
-## Bài Strava không hiện cho người khác?
+## Bài Strava có hiện cho CLB không?
 
-Theo quy định API của Strava, bài từ Strava chỉ hiện trên bảng tin / BXH khi **bạn đồng ý chia sẻ** (Cài đặt → Quyền riêng tư). Chưa đồng ý, bài vẫn tính Xu / XP / huy hiệu cho chính bạn.
+Khi kết nối Strava, bài chạy của bạn tự hiện trên bảng tin CLB và bảng xếp hạng (chỉ quãng đường, thời gian; bản đồ và nhịp tim chỉ bạn xem). Muốn ẩn: **Cài đặt → Quyền riêng tư → Tắt**. Bài đã ẩn vẫn tính Xu / XP / huy hiệu cho chính bạn.
 $md$),
 
 ('xp-level', 'GUIDE', 'XP & Level', '⭐', 'XP chỉ đến từ km chạy thật', 30, false, date '2026-10-01', $md$

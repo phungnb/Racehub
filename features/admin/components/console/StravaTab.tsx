@@ -11,7 +11,7 @@ import { adminSetStravaPolicy, adminStravaSharingStats, type StravaSharePolicy }
 import { adminErrorMessage } from '../../api/adminApi'
 
 const OPTIONS: { value: StravaSharePolicy; title: string; desc: string }[] = [
-  { value: 'OPT_IN', title: 'B+ — runner đồng ý mới hiện (khuyên dùng)', desc: 'Bài Strava lên bảng tin CLB, BXH, thử thách, giải chạy chỉ khi runner bật đồng ý. Chưa đồng ý: chỉ tính cho riêng họ.' },
+  { value: 'OPT_IN', title: 'Mặc định hiện — runner tự tắt được (đang dùng)', desc: 'Kết nối Strava = đồng ý: bài lên bảng tin CLB, BXH, thử thách, giải chạy. Runner tắt ở Cài đặt → Quyền riêng tư thì chỉ tính cho riêng họ.' },
   { value: 'OWNER_ONLY', title: 'A — chỉ chủ bài thấy', desc: 'Tuân thủ chặt nhất Thoả thuận API Strava. Bài Strava không bao giờ hiện cho người khác; muốn lên BXH phải ghi bằng app RaceHub.' },
   { value: 'ALL', title: 'B — luôn hiện (rủi ro cao)', desc: 'Như trước đây. Có thể vi phạm Thoả thuận API Strava và bị thu hồi quyền truy cập.' },
 ]
@@ -37,7 +37,7 @@ export function StravaTab() {
   return (
     <div className="space-y-4">
       <Card className="grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
-        {[['Đã kết nối Strava', s.connected], ['Đồng ý hiện', s.opted_in], ['Chỉ mình tôi', s.opted_out], ['Bài Strava đang ẩn', s.hidden_runs]].map(([l, v]) => (
+        {[['Đã kết nối Strava', s.connected], ['Đang hiện', s.opted_in], ['Đã tắt (chỉ mình tôi)', s.opted_out], ['Bài Strava đang ẩn', s.hidden_runs]].map(([l, v]) => (
           <div key={l as string}><p className="text-xs text-fg-subtle">{l}</p><p className="font-mono tabular text-xl font-bold">{formatNumber(v as number)}</p></div>
         ))}
       </Card>

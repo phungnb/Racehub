@@ -2,7 +2,7 @@
 
 import { Watch } from 'lucide-react'
 import { Card } from '@/shared/ui'
-import { StravaConnectButton } from '@/features/integrations'
+import { StravaConnectButton, StravaShareNotice } from '@/features/integrations'
 
 export function ConnectDeviceCard() {
   return (
@@ -15,6 +15,7 @@ export function ConnectDeviceCard() {
         </div>
       </div>
       <StravaConnectButton href="/api/connect/strava" size="lg" />
+      <StravaShareNotice />
     </Card>
   )
 }

@@ -33,7 +33,7 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
 > ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
-> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 007300** + chạy lại 003500),
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 007400** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
 >
@@ -119,6 +119,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001007100_admin_full_power.sql` | **Admin hệ thống toàn quyền trong mọi CLB**: tính là ban quản trị + thành viên ở mọi CLB (duyệt thành viên, sửa cài đặt, đăng tin, sự kiện, quỹ, thử thách, trao quyền chủ nhiệm, giải tán CLB — có nhật ký) | Cần 5000; chạy lại 3500 |
 | `20261001007200_restore_admin_set_club_plan.sql` | **Sửa lỗi gán CLB Pro** ("Chỉ quản trị viên hệ thống…" dù đúng admin): khôi phục hàm gán gói về bản chuẩn, lỗi thông báo không làm hỏng việc gán | Cần 2800, 6900; chạy lại 3500 |
 | `20261001007300_help_center.sql` | **Menu ☰ Hướng dẫn & Chính sách**: 19 trang mẫu (hướng dẫn chơi, quy tắc cộng đồng, quy định Xu & quà, chống gian lận, Chợ BIB, thanh toán, sức khoẻ, hỗ trợ, dữ liệu của tôi) đọc được khi chưa đăng nhập; admin soạn ở Quản trị → Cộng đồng → Hướng dẫn & chính sách, nhập thông tin pháp nhân (tên công ty, MST, địa chỉ, email hỗ trợ…) | Cần 000300; chạy lại 3500 |
+| `20261001007400_strava_share_default_on.sql` | **Bỏ bước hỏi chia sẻ Strava**: kết nối Strava = đồng ý hiện bài (quãng đường, thời gian) trên bảng tin CLB, BXH, thử thách; runner tắt ở Cài đặt → Quyền riêng tư. Bài Strava cũ đang ẩn của người chưa từng chọn tắt được hiện lại ngay | Cần 7000; chạy lại 3500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 
