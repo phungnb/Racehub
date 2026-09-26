@@ -19,7 +19,7 @@ import { ClubAvatar } from './ClubAvatar'
 /** Khung chung cho mọi tab của một CLB: đầu trang có màu CLB + thanh tab dính khi cuộn. */
 export function ClubShell({ clubId, children }: { clubId: string; children: ReactNode }) {
   const pathname = usePathname()
-  const { club, membership, isMember, isStaff, isLoading, isError, error, refetch } = useClub(clubId)
+  const { club, membership, isMember, isStaff, isRealMember, isAdmin, isLoading, isError, error, refetch } = useClub(clubId)
   const inbox = useClubInbox()
   const members = useClubMembers(clubId, isStaff)
   const unread = inbox.data?.find((c) => c.club_id === clubId)?.unread_count ?? 0
@@ -93,10 +93,40 @@ export function ClubShell({ clubId, children }: { clubId: string; children: Reac
               )
             })}
           </nav>
+          {/* Admin hệ thống xem hộ (toàn quyền, 007100) nhưng chưa là thành viên thật: vẫn cho tham gia như runner */}
+          {isAdmin && !isRealMember && <AdminJoinBar clubId={clubId} status={membership?.status ?? null} />}
           <div className="px-4 pt-4">{children}</div>
         </>
       ) : (
         <div className="px-4 pt-4"><JoinGate clubId={clubId} status={membership?.status ?? null} /></div>
+      )}
+    </div>
+  )
+}
+
+function AdminJoinBar({ clubId, status }: { clubId: string; status: string | null }) {
+  const qc = useQueryClient()
+  const { club, uid } = useClub(clubId)
+  const join = useMutation({
+    mutationFn: () => joinClub(clubId),
+    onSuccess: (m) => {
+      toast.success(m.status === 'APPROVED' ? 'Bạn đã là thành viên CLB' : 'Đã gửi yêu cầu — bạn tự duyệt được ở tab Thành viên')
+      void qc.invalidateQueries({ queryKey: clubKeys.membership(clubId, uid) })
+      void qc.invalidateQueries({ queryKey: clubKeys.club(clubId) })
+      void qc.invalidateQueries({ queryKey: clubKeys.inbox })
+    },
+    onError: (e) => toast.error(clubErrorMessage(e)),
+  })
+  if (!club) return null
+  return (
+    <div className="mx-4 mt-3 flex items-center gap-3 rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm">
+      <span className="min-w-0 flex-1 text-fg-muted">
+        {status === 'PENDING' ? 'Yêu cầu tham gia đang chờ duyệt (tự duyệt ở tab Thành viên).' : 'Bạn đang xem với quyền admin, chưa là thành viên.'}
+      </span>
+      {status !== 'PENDING' && status !== 'BANNED' && (
+        <Button size="sm" onClick={() => join.mutate()} loading={join.isPending}>
+          {club.join_policy === 'OPEN' ? 'Tham gia CLB' : 'Xin gia nhập'}
+        </Button>
       )}
     </div>
   )
