@@ -33,7 +33,7 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
 > ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
-> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 006800** + chạy lại 003500),
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 006900** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
 > File gộp tạo bằng `npm run db:bundle` (hoặc `node scripts/db-bundle.mjs <mốc>` để gộp từ mốc khác); test tự động bảo đảm file luôn khớp migration.
@@ -110,6 +110,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001006600_gps_track_distance.sql` | **Quãng đường đúng như app đo**: mỗi điểm tuyến mang quãng đường tích luỹ (`distance_m`) đã hiệu chỉnh bằng vận tốc Doppler; máy chủ dùng số này nhưng **kẹp theo tuyến** (≤ 1,1 × đoạn thẳng + 3 m, tổng ≤ tổng đoạn thẳng — không khai khống được). Trước đây cộng điểm-điểm nên dư 2–11 %. Kèm **từng km** tính trên máy chủ | Cần 6500; chạy lại 3500 |
 | `20261001006700_strava_display_compliance.sql` | **Tuân thủ Thoả thuận API Strava (11/2024)**: bài đồng bộ từ Strava của người khác chỉ hiện số tổng — ẩn bản đồ, từng km, nhịp tim, nhịp bước, calo, thiết bị. Chủ bài xem đủ; bài ghi bằng app không ảnh hưởng | Cần 1900; chạy lại 3500 |
 | `20261001006800_account_deletion.sql` | **Xoá tài khoản trong app** (bắt buộc với App Store / Google Play; quyền xoá dữ liệu theo Luật BVDLCN 2025): xoá tuyến GPS, dữ liệu cá nhân, vị trí, kết nối; ẩn bài chạy; ẩn danh hồ sơ; giữ giao dịch ẩn danh. Route `/api/account/delete` thu hồi Strava, xoá ảnh, xoá mềm tài khoản đăng nhập | Cần 6400; chạy lại 3500 |
+| `20261001006900_notify_never_blocks.sql` | **Sửa sự cố**: lỗi trong chuỗi thông báo → push (vd lỗi quyền pg_net / hàng đợi) không còn làm hỏng thao tác chính (gán CLB Pro, nhập bài Strava, đăng tin…). Lỗi được ghi vào `private.notify_errors`, admin xem qua `admin_notify_errors()` | Cần 1700; chạy lại 3500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

@@ -333,7 +333,8 @@ export function adminErrorMessage(e: unknown): string {
   const raw = err?.message ?? ''
   const key = Object.keys(MESSAGES).find((k) => raw.includes(k))
   if (key) return MESSAGES[key]
-  if (err?.code === '42501') return MESSAGES.FORBIDDEN
+  // Lỗi quyền của chính cơ sở dữ liệu (không phải luật "chỉ admin"): hiện nguyên văn để biết bảng / hàm nào bị chặn
+  if (err?.code === '42501') return `Lỗi quyền trong cơ sở dữ liệu: ${raw || 'permission denied'}. Gửi nguyên văn dòng này cho đội kỹ thuật.`
   return systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')
 }
 
