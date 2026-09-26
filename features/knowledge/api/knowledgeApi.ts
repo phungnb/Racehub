@@ -1,6 +1,6 @@
 // RaceHub Knowledge (migration 006200, docs/KNOWLEDGE.md): đọc bài, tiến độ, lưu, phản hồi + CMS cho ban nội dung. Mọi thao tác qua RPC.
 import { supabase } from '@/shared/lib/supabase'
-import { systemErrorMessage } from '@/shared/lib/errors'
+import { must, systemErrorMessage } from '@/shared/lib/errors'
 
 export type ContentType = 'ARTICLE' | 'NEWS'
 export type ArticleStatus = 'DRAFT' | 'REVIEW' | 'SCHEDULED' | 'PUBLISHED' | 'ARCHIVED'
@@ -36,9 +36,9 @@ async function call<T>(fn: string, args: Record<string, unknown> = {}): Promise<
   return data as T
 }
 
-export const knowledgeHome = () => call<KnowledgeHome>('knowledge_home')
-export const knowledgeList = (f: ListFilters, offset = 0) => call<{ items: ArticleCard[]; total: number }>('knowledge_list', { p: { ...f, offset } })
-export const knowledgeArticle = (slug: string) => call<Article>('knowledge_article', { p_slug: slug })
+export const knowledgeHome = () => call<KnowledgeHome>('knowledge_home').then(must<KnowledgeHome>('NOT_DEPLOYED'))
+export const knowledgeList = (f: ListFilters, offset = 0) => call<{ items: ArticleCard[]; total: number } | null>('knowledge_list', { p: { ...f, offset } }).then((x) => x ?? { items: [], total: 0 })
+export const knowledgeArticle = (slug: string) => call<Article>('knowledge_article', { p_slug: slug }).then(must<Article>('ARTICLE_NOT_FOUND'))
 export const knowledgeProgress = (id: string, progress: number, seconds: number) =>
   call<{ progress: number; completed: boolean; just_completed: boolean; badge: string | null }>('knowledge_progress', { p_id: id, p_progress: progress, p_seconds: seconds })
 export const knowledgeBookmark = (id: string, on: boolean) => call<boolean>('knowledge_bookmark', { p_id: id, p_on: on })

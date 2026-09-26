@@ -1,6 +1,6 @@
 // Web Push: đăng ký thiết bị và cài đặt loại thông báo đẩy (migration 001700)
 import { supabase } from '@/shared/lib/supabase'
-import { systemErrorMessage } from '@/shared/lib/errors'
+import { systemErrorMessage, must } from '@/shared/lib/errors'
 
 export interface PushSettings {
   club: boolean
@@ -22,7 +22,7 @@ async function rpc<T>(fn: string, args?: Record<string, unknown>): Promise<T> {
   return data as T
 }
 
-export const getPushSettings = () => rpc<PushSettings>('my_push_settings')
+export const getPushSettings = () => rpc<PushSettings>('my_push_settings').then(must<PushSettings>('NOT_DEPLOYED'))
 export const updatePushSettings = (p: PushPrefs) => rpc<PushSettings>('update_push_settings', { p })
 export const sendTestPush = () => rpc<void>('send_test_push')
 export const deletePushSubscription = (endpoint: string) => rpc<void>('delete_push_subscription', { p_endpoint: endpoint })

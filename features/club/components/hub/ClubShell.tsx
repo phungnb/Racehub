@@ -125,7 +125,7 @@ function JoinGate({ clubId, status }: { clubId: string; status: string | null })
     onError: (e) => toast.error(clubErrorMessage(e)),
   })
   if (!club) return null
-  const policy = JOIN_POLICY_LABEL[club.join_policy]
+  const policy = JOIN_POLICY_LABEL[club.join_policy] ?? JOIN_POLICY_LABEL.OPEN
 
   if (status === 'BANNED') {
     return <Notice icon={ShieldOff} title="Bạn không thể tham gia CLB này" text="Ban quản trị đã hạn chế tài khoản của bạn trong CLB." />

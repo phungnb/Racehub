@@ -1,6 +1,6 @@
 // Runner Nearby (migration 006100, docs/RUNNER_NEARBY.md): mọi thao tác qua RPC; máy chủ chỉ lưu ô lưới ~1 km, không toạ độ gốc.
 import { supabase } from '@/shared/lib/supabase'
-import { systemErrorMessage } from '@/shared/lib/errors'
+import { must, systemErrorMessage } from '@/shared/lib/errors'
 
 export type Visibility = 'VERIFIED' | 'SAME_GENDER' | 'CLUBS'
 export type Purpose = 'BUDDY' | 'CLUB' | 'COACH'
@@ -88,27 +88,27 @@ async function call<T>(fn: string, args: Record<string, unknown> = {}): Promise<
   return data as T
 }
 
-export const getDiscovery = () => call<Discovery>('my_discovery')
+export const getDiscovery = () => call<Discovery>('my_discovery').then(must<Discovery>('NOT_DEPLOYED'))
 export const setDiscovery = (p: DiscoveryInput) => call<Discovery>('set_discovery', { p })
 export const setPresence = (lat: number, lng: number, source: 'DEVICE' | 'AREA', area: string | null, hours: 24 | 168 | 720) =>
   call<Discovery>('set_presence', { p_lat: lat, p_lng: lng, p_source: source, p_area: area, p_hours: hours })
 export const clearPresence = () => call<void>('clear_presence')
 export const nearbyRunners = (f: NearbyFilters, offset = 0) =>
-  call<{ items: NearbyRunner[]; total: number; nearby_total: number }>('nearby_runners', { p: { ...f, offset } })
+  call<{ items: NearbyRunner[]; total: number; nearby_total: number } | null>('nearby_runners', { p: { ...f, offset } }).then((x) => x ?? { items: [], total: 0, nearby_total: 0 })
 export const nearbyEvents = (radius: number) => call<NearbyEvent[]>('nearby_events', { p_radius_km: radius }).then((x) => x ?? [])
 export const nearbyClubs = (radius: number) => call<NearbyClub[]>('nearby_clubs', { p_radius_km: radius }).then((x) => x ?? [])
 export const sendConnection = (to: string, message: string | null) => call<{ id: string; status: string }>('send_connection', { p_to: to, p_message: message })
 export const respondConnection = (id: string, action: 'ACCEPT' | 'DECLINE') => call<{ status: string }>('respond_connection', { p_id: id, p_action: action })
 export const cancelRequest = (id: string) => call<void>('cancel_connection_request', { p_id: id })
 export const removeConnection = (user: string) => call<void>('remove_connection', { p_user: user })
-export const myConnections = () => call<Connections>('my_connections')
+export const myConnections = () => call<Connections | null>('my_connections').then((x) => x ?? { connections: [], incoming: [], outgoing: [], blocked: [] })
 export const inviteToRun = (user: string, target: { eventId?: string; clubId?: string }, note: string | null) =>
   call<void>('invite_to_run', { p_user: user, p_event_id: target.eventId ?? null, p_club_id: target.clubId ?? null, p_note: note })
 export const blockUser = (user: string) => call<void>('block_user', { p_user: user })
 export const unblockUser = (user: string) => call<void>('unblock_user', { p_user: user })
 export const reportUser = (user: string, reason: string, note: string | null) =>
   call<void>('report_user', { p_user: user, p_reason: reason, p_note: note, p_context: 'NEARBY' })
-export const getPublicEvent = (id: string) => call<NearbyEvent & { attendees: unknown[]; can_manage: boolean }>('club_event', { p_event_id: id })
+export const getPublicEvent = (id: string) => call<NearbyEvent & { attendees: unknown[]; can_manage: boolean }>('club_event', { p_event_id: id }).then(must<NearbyEvent & { attendees: unknown[]; can_manage: boolean }>('EVENT_NOT_FOUND'))
 export const rsvpPublicEvent = (id: string, status: 'GOING' | 'MAYBE' | 'NOT_GOING') => call<NearbyEvent>('rsvp_public_event', { p_event_id: id, p_status: status })
 export const setClubLocation = (clubId: string, lat: number | null, lng: number | null, area: string | null) =>
   call<void>('set_club_location', { p_club_id: clubId, p_lat: lat, p_lng: lng, p_area: area })

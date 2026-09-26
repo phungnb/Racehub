@@ -62,6 +62,7 @@ export const CLUB_COLUMNS = 'id, name, description, avatar_url, accent_color, ow
 export async function getClub(clubId: string): Promise<Club> {
   const { data, error } = await supabase.from('clubs').select(CLUB_COLUMNS).eq('id', clubId).single()
   if (error) throw error
+  if (!data || Array.isArray(data)) throw new Error('CLUB_NOT_FOUND')
   return data as Club
 }
 

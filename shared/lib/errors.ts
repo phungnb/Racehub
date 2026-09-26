@@ -90,3 +90,12 @@ export function errorMessage(err: unknown, fallback?: string) {
   const code = Object.keys(MESSAGES).find((k) => raw.includes(k))
   return code ? MESSAGES[code] : fallback ?? systemErrorMessage(err)
 }
+
+/**
+ * Bắt buộc có dữ liệu: RPC trả `null` (không tìm thấy, migration chưa chạy đủ…) → ném lỗi có mã,
+ * để màn hình hiện "không tìm thấy / thử lại" thay vì sập vì đọc thuộc tính của null.
+ */
+export const must = <T,>(code = 'NOT_FOUND') => (x: T | null | undefined): T => {
+  if (x === null || x === undefined) throw new Error(code)
+  return x
+}

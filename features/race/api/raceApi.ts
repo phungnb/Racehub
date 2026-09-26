@@ -3,7 +3,7 @@ import { prepareImage } from '@/shared/lib/image'
 import { supabase } from '@/shared/lib/supabase'
 import type { BibDesign, StoredDesign } from '../model/bib'
 import type { CertDesign, StoredCert } from '../model/certificate'
-import { systemErrorMessage } from '@/shared/lib/errors'
+import { systemErrorMessage, must } from '@/shared/lib/errors'
 
 export type RaceScope = 'UPCOMING' | 'MINE' | 'PAST'
 
@@ -92,10 +92,10 @@ async function call<T>(fn: string, args: Record<string, unknown> = {}): Promise<
   return data as T
 }
 
-export const listRaces = (scope: RaceScope) => call<Race[]>('list_races', { p_scope: scope })
-export const getRace = (id: string) => call<Race>('race_detail', { p_race_id: id })
-export const getRaceResults = (id: string, km: number) => call<RaceResult[]>('race_results', { p_race_id: id, p_distance_km: km })
-export const getRaceDashboard = (id: string) => call<DashboardRow[]>('race_dashboard', { p_race_id: id })
+export const listRaces = (scope: RaceScope) => call<Race[]>('list_races', { p_scope: scope }).then((x) => x ?? [])
+export const getRace = (id: string) => call<Race>('race_detail', { p_race_id: id }).then(must<Race>('RACE_NOT_FOUND'))
+export const getRaceResults = (id: string, km: number) => call<RaceResult[]>('race_results', { p_race_id: id, p_distance_km: km }).then((x) => x ?? [])
+export const getRaceDashboard = (id: string) => call<DashboardRow[]>('race_dashboard', { p_race_id: id }).then((x) => x ?? [])
 export const createRace = (p: NewRace) => call<string>('create_virtual_race', { p })
 export interface OrganizerRights { admin: boolean; personal: boolean; clubs: string[] }
 export const getOrganizerRights = () => call<OrganizerRights>('can_organize_race')
