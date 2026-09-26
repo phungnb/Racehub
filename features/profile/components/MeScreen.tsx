@@ -94,7 +94,7 @@ function Devices({ profile }: { profile: Profile }) {
         <span className="grid size-9 place-items-center rounded-lg bg-[#fc4c02]/15 font-black text-[#fc4c02]" aria-hidden>S</span>
         <div className="min-w-0 flex-1">
           <p className="font-semibold">Strava</p>
-          <p className="text-xs text-fg-muted">{profile.strava_connected ? 'Đã kết nối · bài chạy tự đồng bộ' : 'Nhận bài chạy từ Garmin, COROS, Apple Watch…'}</p>
+          <p className="text-xs text-fg-muted">{profile.strava_connected ? 'Đã kết nối · bài chạy tự đồng bộ' : 'Nhận bài chạy từ Garmin, COROS, Apple Watch… Bài hiện cho CLB & BXH (tắt được trong Cài đặt).'}</p>
         </div>
         {profile.strava_connected
           ? <Button size="sm" variant="secondary" loading={busy} onClick={disconnect}>Ngắt</Button>

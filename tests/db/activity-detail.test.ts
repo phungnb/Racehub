@@ -62,7 +62,8 @@ describe('Chi tiết bài chạy (001900)', () => {
   })
 
   it('người khác: bản đồ mặc định riêng tư; bài riêng tư thì không thấy', async () => {
-    // 007000: bài Strava chưa được chủ bài đồng ý chia sẻ → người khác không thấy
+    // 007000 + 007400: chủ bài TẮT chia sẻ bài Strava → người khác không thấy
+    await asUser(db, ME, '/rpc', `select public.set_strava_sharing(false)`)
     expect(await fails(db, OTHER, `select public.activity_detail($1)`, [STRAVA_RUN])).toContain('ACTIVITY_NOT_FOUND')
     await asUser(db, ME, '/rpc', `select public.set_strava_sharing(true)`)
     const d = await detail(db, OTHER, STRAVA_RUN)

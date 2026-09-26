@@ -114,7 +114,9 @@ begin
     jsonb_build_object('file', '20261001007200', 'label', 'Hàm gán gói CLB Pro đúng bản chuẩn (sửa lỗi "chỉ quản trị viên…" khi gán Pro)',
       'ok', exists (select 1 from pg_proc where proname = 'admin_set_club_plan' and prosrc like '%log_notify_error(''club_plan''%')),
     jsonb_build_object('file', '20261001007300', 'label', 'Menu Hướng dẫn & Chính sách (trang admin soạn được, đọc khi chưa đăng nhập) + thông tin pháp nhân',
-      'ok', to_regprocedure('public.help_menu()') is not null));
+      'ok', to_regprocedure('public.help_menu()') is not null),
+    jsonb_build_object('file', '20261001007400', 'label', 'Kết nối Strava = đồng ý hiện bài cho CLB & BXH (bỏ bước hỏi; runner tắt được trong Cài đặt)',
+      'ok', exists (select 1 from pg_proc where proname = 'activity_shared' and prosrc like '%strava_share from public.profile_settings s where s.user_id = p_user), true)%')));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

@@ -1,7 +1,7 @@
--- RaceHub: gộp 38 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 39 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -10558,9 +10558,9 @@ Bài nghi ngờ sẽ **chờ duyệt**, không bị xoá. Xem chi tiết tại [
 - Đợi GPS ổn định 10–20 giây trước khi bấm bắt đầu.
 - Chạy nơi thoáng, tránh hầm và toà nhà cao.
 
-## Bài Strava không hiện cho người khác?
+## Bài Strava có hiện cho CLB không?
 
-Theo quy định API của Strava, bài từ Strava chỉ hiện trên bảng tin / BXH khi **bạn đồng ý chia sẻ** (Cài đặt → Quyền riêng tư). Chưa đồng ý, bài vẫn tính Xu / XP / huy hiệu cho chính bạn.
+Khi kết nối Strava, bài chạy của bạn tự hiện trên bảng tin CLB và bảng xếp hạng (chỉ quãng đường, thời gian; bản đồ và nhịp tim chỉ bạn xem). Muốn ẩn: **Cài đặt → Quyền riêng tư → Tắt**. Bài đã ẩn vẫn tính Xu / XP / huy hiệu cho chính bạn.
 $md$),
 
 ('xp-level', 'GUIDE', 'XP & Level', '⭐', 'XP chỉ đến từ km chạy thật', 30, false, date '2026-10-01', $md$
@@ -10845,6 +10845,73 @@ on conflict (slug) do nothing;
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001007400_strava_share_default_on.sql
+-- ===================================================================
+-- 007400: Bài Strava hiện cho CLB & bảng xếp hạng NGAY khi runner kết nối Strava — không hỏi riêng nữa.
+-- Quyết định sản phẩm (09/2026): bấm "Connect with Strava" (có dòng thông báo ngay dưới nút) được coi là đồng ý chia sẻ
+-- quãng đường / thời gian bài chạy trong RaceHub. Runner vẫn TẮT được bất cứ lúc nào ở Cài đặt → Quyền riêng tư
+-- (quyền rút lại đồng ý theo Luật Bảo vệ dữ liệu cá nhân) — chỉ lựa chọn TẮT rõ ràng (strava_share = false) mới ẩn bài.
+-- Bản đồ tuyến, từng km, nhịp tim bài Strava vẫn chỉ chủ bài xem (006700). Admin vẫn chuyển được chính sách chung
+-- (Quản trị → Hệ thống → Strava) sang "chỉ chủ bài" nếu Strava yêu cầu.
+-- Áp dụng ngay cho bài cũ: bài Strava của người chưa từng trả lời được chia sẻ lại → trigger tự đưa vào bảng tin CLB,
+-- thử thách, giải chạy đang diễn ra.
+-- Cần 007000. Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT. Chạy lại nhiều lần vẫn an toàn.
+
+create or replace function private.activity_shared(p_user uuid, p_source text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select case
+    when coalesce(p_source, '') <> 'STRAVA' then true
+    when private.strava_share_policy() = 'ALL' then true
+    when private.strava_share_policy() = 'OWNER_ONLY' then false
+    else coalesce((select s.strava_share from public.profile_settings s where s.user_id = p_user), true) end
+$$;
+
+create or replace function public.my_strava_sharing() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_uid uuid := private.require_uid();
+begin
+  return jsonb_build_object(
+    'policy', private.strava_share_policy(),
+    'consent', coalesce((select s.strava_share from public.profile_settings s where s.user_id = v_uid), true),
+    'connected', exists (select 1 from public.connected_accounts c where c.user_id = v_uid and c.provider = 'STRAVA'),
+    'strava_runs', (select count(*) from public.activities a where a.user_id = v_uid and a.source = 'STRAVA'),
+    'hidden_runs', (select count(*) from public.activities a where a.user_id = v_uid and a.source = 'STRAVA' and not a.shared));
+end $$;
+
+create or replace function public.admin_strava_sharing_stats() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_connected integer := (select count(*) from public.connected_accounts c where c.provider = 'STRAVA');
+  v_out integer := (select count(*) from public.profile_settings s where s.strava_share is false
+                      and exists (select 1 from public.connected_accounts c where c.user_id = s.user_id and c.provider = 'STRAVA'));
+begin
+  if not public.is_system_admin() then raise exception 'FORBIDDEN'; end if;
+  return jsonb_build_object(
+    'policy', private.strava_share_policy(),
+    'connected', v_connected,
+    'opted_in', v_connected - v_out,
+    'opted_out', v_out,
+    'hidden_runs', (select count(*) from public.activities a where a.source = 'STRAVA' and not a.shared));
+end $$;
+
+revoke all on function private.activity_shared(uuid, text) from public, anon, authenticated;
+revoke all on function public.my_strava_sharing(), public.admin_strava_sharing_stats() from public, anon;
+grant execute on function public.my_strava_sharing(), public.admin_strava_sharing_stats() to authenticated;
+
+-- Trang hướng dẫn "Chạy & ghi bài" (007300): đổi đoạn giải thích cũ nếu admin chưa sửa đoạn này
+update public.help_pages
+   set body = replace(replace(body, '## Bài Strava không hiện cho người khác?', '## Bài Strava có hiện cho CLB không?'),
+     'Theo quy định API của Strava, bài từ Strava chỉ hiện trên bảng tin / BXH khi **bạn đồng ý chia sẻ** (Cài đặt → Quyền riêng tư). Chưa đồng ý, bài vẫn tính Xu / XP / huy hiệu cho chính bạn.',
+     'Khi kết nối Strava, bài chạy của bạn tự hiện trên bảng tin CLB và bảng xếp hạng (chỉ quãng đường, thời gian; bản đồ và nhịp tim chỉ bạn xem). Muốn ẩn: **Cài đặt → Quyền riêng tư → Tắt**. Bài đã ẩn vẫn tính Xu / XP / huy hiệu cho chính bạn.'),
+       updated_at = now()
+ where slug = 'chay-va-ghi-bai' and body like '%khi **bạn đồng ý chia sẻ**%';
+
+-- Chia sẻ lại bài Strava của người chưa từng chọn TẮT → trigger phía sau đưa vào CLB / thử thách / giải chạy
+select private.strava_reshare(null);
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -10963,7 +11030,9 @@ begin
     jsonb_build_object('file', '20261001007200', 'label', 'Hàm gán gói CLB Pro đúng bản chuẩn (sửa lỗi "chỉ quản trị viên…" khi gán Pro)',
       'ok', exists (select 1 from pg_proc where proname = 'admin_set_club_plan' and prosrc like '%log_notify_error(''club_plan''%')),
     jsonb_build_object('file', '20261001007300', 'label', 'Menu Hướng dẫn & Chính sách (trang admin soạn được, đọc khi chưa đăng nhập) + thông tin pháp nhân',
-      'ok', to_regprocedure('public.help_menu()') is not null));
+      'ok', to_regprocedure('public.help_menu()') is not null),
+    jsonb_build_object('file', '20261001007400', 'label', 'Kết nối Strava = đồng ý hiện bài cho CLB & BXH (bỏ bước hỏi; runner tắt được trong Cài đặt)',
+      'ok', exists (select 1 from pg_proc where proname = 'activity_shared' and prosrc like '%strava_share from public.profile_settings s where s.user_id = p_user), true)%')));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

@@ -30,7 +30,9 @@ export default function PrivacyPage() {
             thử thách, giải chạy và phần thưởng.</li>
           <li>Dữ liệu Strava chỉ dùng để phục vụ chính bạn trong RaceHub. Chúng tôi <strong>không bán</strong>, không chia sẻ cho bên thứ ba vì mục đích
             quảng cáo, và <strong>không dùng để huấn luyện mô hình AI</strong>.</li>
-          <li>Bài chạy của bạn chỉ hiện cho người khác theo cài đặt quyền riêng tư của bạn (mặc định bản đồ tuyến chạy là riêng tư).</li>
+          <li>Khi bạn kết nối Strava, <strong>quãng đường và thời gian</strong> bài chạy từ Strava hiện trên bảng tin CLB, bảng xếp hạng, thử thách và giải chạy
+            bạn tham gia. <strong>Bản đồ tuyến, từng km, nhịp tim chỉ bạn xem.</strong> Bạn tắt chia sẻ bất cứ lúc nào ở Cài đặt → Quyền riêng tư;
+            khi tắt, bài vẫn tính Xu, XP, huy hiệu cho riêng bạn.</li>
           <li>Bạn có thể <strong>ngắt kết nối Strava</strong> bất cứ lúc nào trong Cài đặt; khi đó RaceHub thu hồi quyền truy cập và ngừng nhận dữ liệu mới.
             Nếu bạn xóa bài trên Strava, bài tương ứng trên RaceHub cũng bị gỡ.</li>
         </ul>

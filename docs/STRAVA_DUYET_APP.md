@@ -43,7 +43,9 @@ Email từ chối của Strava thường nêu một trong các lý do sau:
 
 ## 3. Bài Strava trên bảng xếp hạng — ĐÃ CHỌN hướng B+ (migration 007000)
 
-> ✅ Đã làm: runner tự bật "Hiện bài chạy từ Strava cho CLB & bảng xếp hạng" (hỏi ở trang chủ khi đã kết nối Strava, đổi trong Cài đặt → Quyền riêng tư). Chưa đồng ý: bài chỉ tính Xu / XP / huy hiệu cho chính họ. Admin đổi chính sách chung ở **Quản trị → Hệ thống → Strava**: B+ (mặc định) · A (chỉ chủ bài) · B (luôn hiện).
+> ✅ Đã làm (007000, cập nhật 007400): **kết nối Strava = đồng ý** hiện quãng đường / thời gian bài Strava cho CLB & bảng xếp hạng — có dòng thông báo ngay dưới nút "Connect with Strava", không hỏi thêm. Runner **tắt** được bất cứ lúc nào ở Cài đặt → Quyền riêng tư (khi tắt: bài chỉ tính Xu / XP / huy hiệu cho chính họ). Bản đồ, từng km, nhịp tim luôn chỉ chủ bài xem. Admin đổi chính sách chung ở **Quản trị → Hệ thống → Strava**: Mặc định hiện, tắt được (đang dùng) · A (chỉ chủ bài) · B (luôn hiện).
+>
+> ⚠️ Rủi ro: Strava có thể coi "đồng ý ngầm khi kết nối" là chưa đủ. Nếu Strava yêu cầu, chuyển ngay sang **A (chỉ chủ bài)** trong Quản trị — áp dụng tức thì cho mọi bài.
 
 
 Theo điều khoản hiện hành, dữ liệu Strava của một người chỉ được hiển thị cho chính người đó. Bảng xếp hạng CLB hay thử thách có tổng km lấy từ Strava của thành viên khác là hiển thị dữ liệu cho người khác. Có 3 hướng:
