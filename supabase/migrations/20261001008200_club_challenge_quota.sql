@@ -256,19 +256,19 @@ begin
   if v_need_user > private.balance(v_uid) then raise exception 'INSUFFICIENT_BALANCE'; end if;
   if v_club is not null and v_need_club > private.balance(v_club) then raise exception 'INSUFFICIENT_TREASURY'; end if;
 
-  insert into public.challenges (
+  v_id := gen_random_uuid();
+  insert into public.challenges (id, 
     title, description, format, objective, challenge_type, game_mode, target_type, target_value, target_km,
     min_km, min_pace, max_pace, daily_cap_km, fixed_team_size, min_members, target_audience, target_club_id,
     creator_role, start_date, end_date, reg_deadline, max_slots, calculated_fee, fee_charged,
     reward_xu, reward_source, reward_split, status, created_by)
-  values (
+  values (v_id, 
     v_title, v_desc, v_format, v_objective, case when v_format = 'TEAM' then 'TEAM' else 'INDIVIDUAL' end, v_mode,
     v_objective, v_target, case when v_objective = 'DISTANCE' then v_target else 0 end,
     v_min_km, v_min_pace, v_max_pace, v_cap, v_team_size, 1, v_audience, v_club,
     case when v_club is not null then 'CLUB' else 'MEMBER' end, v_start, v_end,
     case when v_format in ('TEAM') then v_start else v_end end, v_slots, v_fee, v_fee,
-    v_reward, v_source, v_split, 'ACTIVE', v_uid)
-  returning id into v_id;
+    v_reward, v_source, v_split, 'ACTIVE', v_uid);
 
   -- Phí + dấu idempotency (cùng khóa → trả lại thử thách này)
   if v_fee > 0 then

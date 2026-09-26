@@ -349,9 +349,9 @@ begin
   end if;
   if p_id is null and (select count(*) from public.org_units u where u.org_id = p_org) >= 500 then raise exception 'UNIT_LIMIT'; end if;
   if v_id is null then
-    insert into public.org_units (org_id, name, parent_id, sort)
-    values (p_org, v_name, p_parent, coalesce((select max(u.sort) from public.org_units u where u.org_id = p_org), 0) + 1)
-    returning id into v_id;
+    v_id := gen_random_uuid();
+    insert into public.org_units (id, org_id, name, parent_id, sort)
+    values (v_id, p_org, v_name, p_parent, coalesce((select max(u.sort) from public.org_units u where u.org_id = p_org), 0) + 1);
   else
     update public.org_units set name = v_name, parent_id = p_parent where id = p_id and org_id = p_org;
     if not found then raise exception 'NOT_FOUND'; end if;
@@ -436,9 +436,9 @@ begin
                and lower(u.name) = lower(left(seg, 80)));
     if v_id is null then
       if not p_create then return null; end if;
-      insert into public.org_units (org_id, name, parent_id, sort)
-      values (p_org, left(seg, 80), v_parent, coalesce((select max(u.sort) from public.org_units u where u.org_id = p_org), 0) + 1)
-      returning id into v_id;
+      v_id := gen_random_uuid();
+      insert into public.org_units (id, org_id, name, parent_id, sort)
+      values (v_id, p_org, left(seg, 80), v_parent, coalesce((select max(u.sort) from public.org_units u where u.org_id = p_org), 0) + 1);
     end if;
     v_parent := v_id;
   end loop;
@@ -614,13 +614,13 @@ begin
   v_boost := private.org_clean_boost(p->'boost_days', v_start, v_end);
   if jsonb_array_length(v_boost) > 20 then raise exception 'TOO_MANY_BOOST_DAYS'; end if;
   if v_id is null then
-    insert into public.org_campaigns (org_id, title, description, metric, starts_at, ends_at, goal_total, goal_per_person, min_run_km,
+    v_id := gen_random_uuid();
+    insert into public.org_campaigns (id, org_id, title, description, metric, starts_at, ends_at, goal_total, goal_per_person, min_run_km,
                                       daily_cap_km, review_top, boost_days, cert_enabled, created_by)
-    values (p_org, v_title, nullif(left(trim(coalesce(p->>'description', '')), 2000), ''), v_metric, v_start, v_end,
+    values (v_id, p_org, v_title, nullif(left(trim(coalesce(p->>'description', '')), 2000), ''), v_metric, v_start, v_end,
             nullif(p->>'goal_total', '')::numeric, nullif(p->>'goal_per_person', '')::numeric,
             coalesce(nullif(p->>'min_run_km', '')::numeric, 1), nullif(p->>'daily_cap_km', '')::numeric,
-            coalesce(nullif(p->>'review_top', '')::int, 0), v_boost, coalesce((p->>'cert_enabled')::boolean, false), v_uid)
-    returning id into v_id;
+            coalesce(nullif(p->>'review_top', '')::int, 0), v_boost, coalesce((p->>'cert_enabled')::boolean, false), v_uid);
     insert into public.org_posts (org_id, author_id, kind, body, meta, is_pinned)
     values (p_org, v_uid, 'CAMPAIGN', 'Chiến dịch mới: ' || v_title || coalesce(E'\n' || nullif(left(trim(coalesce(p->>'description', '')), 400), ''), ''),
             jsonb_build_object('campaign_id', v_id), false);
@@ -847,6 +847,7 @@ end $$;
 create or replace function public.create_org_post(p_org uuid, p_body text, p_image_url text default null, p_announce boolean default false) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
+  v_new_id uuid;
   v_uid uuid := private.require_uid();
   v_manage boolean := private.org_can_manage(p_org);
   v_post public.org_posts;
@@ -856,9 +857,10 @@ begin
   if char_length(trim(coalesce(p_body, ''))) not between 1 and 2000 then raise exception 'EMPTY_POST'; end if;
   if p_image_url is not null and position('/storage/v1/object/public/org-media/' || p_org::text || '/' in p_image_url) = 0 then raise exception 'INVALID_IMAGE_PATH'; end if;
   if (select count(*) from public.org_posts x where x.author_id = v_uid and x.created_at > now() - interval '1 day') >= 20 then raise exception 'RATE_LIMITED'; end if;
-  insert into public.org_posts (org_id, author_id, kind, body, image_url, is_pinned)
-  values (p_org, v_uid, case when p_announce and v_manage then 'ANNOUNCEMENT' else 'POST' end, trim(p_body), p_image_url, p_announce and v_manage)
-  returning * into v_post;
+  v_new_id := gen_random_uuid();
+  insert into public.org_posts (id, org_id, author_id, kind, body, image_url, is_pinned)
+  values (v_new_id, p_org, v_uid, case when p_announce and v_manage then 'ANNOUNCEMENT' else 'POST' end, trim(p_body), p_image_url, p_announce and v_manage);
+  v_post := (select t from public.org_posts t where t.id = v_new_id);
   return private.org_post_json(v_post);
 end $$;
 
@@ -1015,6 +1017,7 @@ end $$;
 create or replace function public.create_lucky_draw(p_scope text, p_ref uuid, p jsonb) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
+  v_new_id uuid;
   v_uid uuid := private.require_uid();
   v_title text := trim(coalesce(p->>'title', ''));
   v_prizes jsonb;
@@ -1031,11 +1034,12 @@ begin
   if (select count(*) from public.lucky_draws x where x.scope = p_scope and x.ref_id is not distinct from p_ref and x.status = 'READY') >= 5 then
     raise exception 'TOO_MANY_DRAWS';
   end if;
-  insert into public.lucky_draws (scope, ref_id, title, rule, prizes, exclude_winners, created_by)
-  values (p_scope, case when p_scope = 'SYSTEM' then null else p_ref end, v_title,
+  v_new_id := gen_random_uuid();
+  insert into public.lucky_draws (id, scope, ref_id, title, rule, prizes, exclude_winners, created_by)
+  values (v_new_id, p_scope, case when p_scope = 'SYSTEM' then null else p_ref end, v_title,
           case when p->>'rule' in ('COMPLETED', 'ACTIVE', 'ALL') then p->>'rule' else 'COMPLETED' end, v_prizes,
-          coalesce((p->>'exclude_winners')::boolean, true), v_uid)
-  returning * into d;
+          coalesce((p->>'exclude_winners')::boolean, true), v_uid);
+  d := (select t from public.lucky_draws t where t.id = v_new_id);
   return private.draw_json(d, true);
 end $$;
 
@@ -1082,7 +1086,8 @@ begin
     from (select u, row_number() over (order by md5(v_seed || u::text)) as rn from unnest(v_pool) u) t
    where t.rn <= cardinality(v_slots);
   update public.lucky_draws set status = 'DONE', seed = v_seed, entrant_count = v_count, entrants_hash = v_hash, run_by = v_uid, run_at = now()
-   where id = d.id returning * into d;
+   where id = d.id;
+  d := (select t from public.lucky_draws t where t.id = d.id);
   for w in select lw.user_id, lw.prize from public.lucky_draw_winners lw where lw.draw_id = d.id loop
     perform private.notify(w.user_id, case when d.scope = 'CLUB' then d.ref_id end, 'LUCKY_DRAW_WIN', 'Chúc mừng! Bạn trúng ' || w.prize,
       d.title, case d.scope when 'ORG_CAMPAIGN' then '/orgs/' || (select c.org_id from public.org_campaigns c where c.id = d.ref_id) || '/campaigns/' || d.ref_id

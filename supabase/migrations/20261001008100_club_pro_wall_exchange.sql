@@ -108,6 +108,7 @@ $$;
 create or replace function public.send_club_exchange(p_from_club uuid, p_to_club uuid, p jsonb) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
+  v_new_id uuid;
   v_uid uuid := private.require_uid();
   v_start timestamptz := nullif(p->>'starts_at', '')::timestamptz;
   v_from text := (select c.name from public.clubs c where c.id = p_from_club);
@@ -122,13 +123,14 @@ begin
   if (select count(*) from public.club_exchange_invites e where e.from_club = p_from_club and e.status = 'PENDING') >= 5 then
     raise exception 'EXCHANGE_LIMIT';
   end if;
-  insert into public.club_exchange_invites (from_club, to_club, created_by, title, message, starts_at, duration_min, location_name,
+  v_new_id := gen_random_uuid();
+  insert into public.club_exchange_invites (id, from_club, to_club, created_by, title, message, starts_at, duration_min, location_name,
                                             lat, lng, distance_km, pace_text, guest_capacity)
-  values (p_from_club, p_to_club, v_uid, trim(coalesce(p->>'title', '')), nullif(trim(coalesce(p->>'message', '')), ''), v_start,
+  values (v_new_id, p_from_club, p_to_club, v_uid, trim(coalesce(p->>'title', '')), nullif(trim(coalesce(p->>'message', '')), ''), v_start,
           coalesce(nullif(p->>'duration_min', '')::int, 90), trim(coalesce(p->>'location_name', '')),
           nullif(p->>'lat', '')::double precision, nullif(p->>'lng', '')::double precision,
-          nullif(p->>'distance_km', '')::numeric, nullif(trim(coalesce(p->>'pace_text', '')), ''), nullif(p->>'guest_capacity', '')::int)
-  returning * into x;
+          nullif(p->>'distance_km', '')::numeric, nullif(trim(coalesce(p->>'pace_text', '')), ''), nullif(p->>'guest_capacity', '')::int);
+  x := (select t from public.club_exchange_invites t where t.id = v_new_id);
   perform private.notify_club(p_to_club, true, 'CLUB_EXCHANGE', v_from || ' mời CLB giao lưu: ' || x.title,
     to_char(x.starts_at at time zone 'Asia/Ho_Chi_Minh', 'HH24:MI DD/MM') || ' · ' || x.location_name || '. Mở thư mời để nhận lời.',
     '/clubs/' || p_to_club || '/exchange', v_uid);
@@ -154,28 +156,30 @@ begin
   v_to := (select c.name from public.clubs c where c.id = x.to_club);
   if not p_accept then
     update public.club_exchange_invites set status = 'DECLINED', responded_by = v_uid, responded_at = now(),
-           response_note = nullif(left(trim(coalesce(p_note, '')), 300), '') where id = x.id returning * into x;
+           response_note = nullif(left(trim(coalesce(p_note, '')), 300), '') where id = x.id;
+    x := (select t from public.club_exchange_invites t where t.id = x.id);
     perform private.notify_club(x.from_club, true, 'CLUB_EXCHANGE', v_to || ' chưa nhận lời giao lưu',
       coalesce(x.response_note, x.title), '/clubs/' || x.from_club || '/exchange', v_uid);
     return private.exchange_json(x);
   end if;
 
   v_desc := coalesce(x.message || E'\n\n', '') || 'Buổi giao lưu ' || v_from || ' × ' || v_to || '.';
-  insert into public.club_events (club_id, created_by, title, description, starts_at, duration_min, location_name, lat, lng,
+  v_host := gen_random_uuid();
+  insert into public.club_events (id, club_id, created_by, title, description, starts_at, duration_min, location_name, lat, lng,
                                   distance_km, pace_text, capacity, exchange_id)
-  values (x.from_club, x.created_by, left('Giao lưu × ' || v_to, 80), left(v_desc, 1000), x.starts_at, x.duration_min, x.location_name,
-          x.lat, x.lng, x.distance_km, x.pace_text, null, x.id)
-  returning id into v_host;
-  insert into public.club_events (club_id, created_by, title, description, starts_at, duration_min, location_name, lat, lng,
+  values (v_host, x.from_club, x.created_by, left('Giao lưu × ' || v_to, 80), left(v_desc, 1000), x.starts_at, x.duration_min, x.location_name,
+          x.lat, x.lng, x.distance_km, x.pace_text, null, x.id);
+  v_guest := gen_random_uuid();
+  insert into public.club_events (id, club_id, created_by, title, description, starts_at, duration_min, location_name, lat, lng,
                                   distance_km, pace_text, capacity, exchange_id)
-  values (x.to_club, v_uid, left('Giao lưu × ' || v_from, 80), left(v_desc, 1000), x.starts_at, x.duration_min, x.location_name,
-          x.lat, x.lng, x.distance_km, x.pace_text, x.guest_capacity, x.id)
-  returning id into v_guest;
+  values (v_guest, x.to_club, v_uid, left('Giao lưu × ' || v_from, 80), left(v_desc, 1000), x.starts_at, x.duration_min, x.location_name,
+          x.lat, x.lng, x.distance_km, x.pace_text, x.guest_capacity, x.id);
   insert into private.club_event_secrets (event_id, secret) values (v_host, encode(extensions.gen_random_bytes(24), 'hex')), (v_guest, encode(extensions.gen_random_bytes(24), 'hex'))
   on conflict (event_id) do nothing;
   update public.club_exchange_invites set status = 'ACCEPTED', responded_by = v_uid, responded_at = now(),
          response_note = nullif(left(trim(coalesce(p_note, '')), 300), ''), host_event_id = v_host, guest_event_id = v_guest
-   where id = x.id returning * into x;
+   where id = x.id;
+  x := (select t from public.club_exchange_invites t where t.id = x.id);
 
   insert into public.club_posts (club_id, author_id, kind, title, body, is_pinned)
   values (x.from_club, x.created_by, 'ANNOUNCEMENT', 'Giao lưu với ' || v_to || ' — ' || x.title,
@@ -202,7 +206,8 @@ begin
   if char_length(v_reason) < 3 then raise exception 'REASON_REQUIRED'; end if;
   update public.club_events set status = 'CANCELLED', cancel_reason = left('Huỷ giao lưu: ' || v_reason, 300)
    where id in (x.host_event_id, x.guest_event_id) and status <> 'CANCELLED';
-  update public.club_exchange_invites set status = 'CANCELLED', response_note = left(v_reason, 300) where id = x.id returning * into x;
+  update public.club_exchange_invites set status = 'CANCELLED', response_note = left(v_reason, 300) where id = x.id;
+  x := (select t from public.club_exchange_invites t where t.id = x.id);
   perform private.notify_club(case when public.club_is_staff(x.from_club) then x.to_club else x.from_club end, true, 'CLUB_EXCHANGE',
     'Đã huỷ giao lưu: ' || x.title, v_reason, '/clubs/' || case when public.club_is_staff(x.from_club) then x.to_club else x.from_club end || '/exchange', v_uid);
   return private.exchange_json(x);

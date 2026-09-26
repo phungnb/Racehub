@@ -253,12 +253,12 @@ begin
   if (select count(*) from public.org_leads l where l.phone = v_phone and l.created_at > now() - interval '1 day') >= 3 then
     raise exception 'RATE_LIMITED';
   end if;
-  insert into public.org_leads (user_id, contact_name, org_name, kind, size, phone, email, note)
-  values (auth.uid(), left(trim(p->>'contact_name'), 80), left(trim(p->>'org_name'), 120),
+  v_id := gen_random_uuid();
+  insert into public.org_leads (id, user_id, contact_name, org_name, kind, size, phone, email, note)
+  values (v_id, auth.uid(), left(trim(p->>'contact_name'), 80), left(trim(p->>'org_name'), 120),
           case when p->>'kind' in ('COMPANY', 'FEDERATION', 'SCHOOL', 'OTHER') then p->>'kind' else 'OTHER' end,
           case when coalesce(p->>'size', '') ~ '^[0-9]{1,7}$' then greatest((p->>'size')::int, 1) end, v_phone,
-          nullif(left(trim(coalesce(p->>'email', '')), 120), ''), nullif(left(trim(coalesce(p->>'note', '')), 1000), ''))
-  returning id into v_id;
+          nullif(left(trim(coalesce(p->>'email', '')), 120), ''), nullif(left(trim(coalesce(p->>'note', '')), 1000), ''));
   for a in select pr.id from public.profiles pr where pr.role = 'SYSTEM_ADMIN' loop
     perform private.notify(a.id, null, 'ENTERPRISE_LEAD', 'Yêu cầu báo giá Doanh nghiệp: ' || left(trim(p->>'org_name'), 80),
       left(trim(p->>'contact_name'), 80) || ' · ' || v_phone, '/admin?tab=enterprise', auth.uid(), true);
@@ -313,15 +313,15 @@ declare
 begin
   if char_length(v_name) < 2 then raise exception 'ORG_NAME_REQUIRED'; end if;
   if v_owner is null then raise exception 'OWNER_NOT_FOUND'; end if;
-  insert into public.organizations (name, kind, seat_limit, club_limit, include_club_pro, active_until, invite_code,
+  v_id := gen_random_uuid();
+  insert into public.organizations (id, name, kind, seat_limit, club_limit, include_club_pro, active_until, invite_code,
                                     legal_name, tax_code, contact_name, contact_phone, contact_email, created_by)
-  values (left(v_name, 120), case when p->>'kind' in ('COMPANY', 'FEDERATION', 'SCHOOL', 'OTHER') then p->>'kind' else 'COMPANY' end,
+  values (v_id, left(v_name, 120), case when p->>'kind' in ('COMPANY', 'FEDERATION', 'SCHOOL', 'OTHER') then p->>'kind' else 'COMPANY' end,
           coalesce(nullif(p->>'seat_limit', '')::int, 50), coalesce(nullif(p->>'club_limit', '')::int, 0),
           coalesce((p->>'include_club_pro')::boolean, false), nullif(p->>'active_until', '')::timestamptz, v_code,
           nullif(trim(coalesce(p->>'legal_name', '')), ''), nullif(trim(coalesce(p->>'tax_code', '')), ''),
           nullif(trim(coalesce(p->>'contact_name', '')), ''), nullif(trim(coalesce(p->>'contact_phone', '')), ''),
-          nullif(trim(coalesce(p->>'contact_email', '')), ''), v_admin)
-  returning id into v_id;
+          nullif(trim(coalesce(p->>'contact_email', '')), ''), v_admin);
   insert into public.org_members (org_id, user_id, role, status) values (v_id, v_owner, 'OWNER', 'APPROVED');
   if nullif(p->>'lead_id', '') is not null then
     update public.org_leads set status = 'WON', org_id = v_id where id = (p->>'lead_id')::uuid;
@@ -510,9 +510,9 @@ begin
   end if;
   if (select count(*) from public.org_units u where u.org_id = p_org) >= 500 and p_id is null then raise exception 'UNIT_LIMIT'; end if;
   if v_id is null then
-    insert into public.org_units (org_id, name, sort)
-    values (p_org, v_name, coalesce((select max(u.sort) from public.org_units u where u.org_id = p_org), 0) + 1)
-    returning id into v_id;
+    v_id := gen_random_uuid();
+    insert into public.org_units (id, org_id, name, sort)
+    values (v_id, p_org, v_name, coalesce((select max(u.sort) from public.org_units u where u.org_id = p_org), 0) + 1);
   else
     update public.org_units set name = v_name where id = p_id and org_id = p_org;
     if not found then raise exception 'NOT_FOUND'; end if;
@@ -673,11 +673,11 @@ begin
   if v_metric not in ('DISTANCE', 'RUNS', 'ACTIVE_DAYS') then raise exception 'INVALID_METRIC'; end if;
   if v_start is null or v_end is null or v_end <= v_start or v_end - v_start > interval '366 days' then raise exception 'INVALID_TIME_RANGE'; end if;
   if v_id is null then
-    insert into public.org_campaigns (org_id, title, description, metric, starts_at, ends_at, goal_total, goal_per_person, min_run_km, created_by)
-    values (p_org, v_title, nullif(left(trim(coalesce(p->>'description', '')), 2000), ''), v_metric, v_start, v_end,
+    v_id := gen_random_uuid();
+    insert into public.org_campaigns (id, org_id, title, description, metric, starts_at, ends_at, goal_total, goal_per_person, min_run_km, created_by)
+    values (v_id, p_org, v_title, nullif(left(trim(coalesce(p->>'description', '')), 2000), ''), v_metric, v_start, v_end,
             nullif(p->>'goal_total', '')::numeric, nullif(p->>'goal_per_person', '')::numeric,
-            coalesce(nullif(p->>'min_run_km', '')::numeric, 1), v_uid)
-    returning id into v_id;
+            coalesce(nullif(p->>'min_run_km', '')::numeric, 1), v_uid);
     for r in select pp.user_id from private.org_people(p_org) pp loop
       perform private.notify(r.user_id, null, 'ORG_CAMPAIGN', coalesce(v_org, 'Tổ chức') || ': ' || v_title,
         'Chiến dịch mới — bài chạy hợp lệ của bạn được tính tự động.', '/orgs/' || p_org || '/campaigns/' || v_id, v_uid, false);

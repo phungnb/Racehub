@@ -103,11 +103,11 @@ begin
   if coalesce((p->>'price_vnd')::bigint, -1) not between 0 and 50000000 then raise exception 'INVALID_PRICE'; end if;
   if coalesce(p->>'status', 'OPEN') not in ('OPEN', 'CLOSED', 'HIDDEN') then raise exception 'INVALID_STATUS'; end if;
   if v_id is null then
-    insert into public.club_products (club_id, title, description, image_url, price_vnd, sizes, stock, max_per_order, order_deadline, status, created_by)
-    values (v_club, trim(p->>'title'), nullif(trim(coalesce(p->>'description', '')), ''), nullif(p->>'image_url', ''), (p->>'price_vnd')::int,
+    v_id := gen_random_uuid();
+    insert into public.club_products (id, club_id, title, description, image_url, price_vnd, sizes, stock, max_per_order, order_deadline, status, created_by)
+    values (v_id, v_club, trim(p->>'title'), nullif(trim(coalesce(p->>'description', '')), ''), nullif(p->>'image_url', ''), (p->>'price_vnd')::int,
             v_sizes, nullif(p->>'stock', '')::int, coalesce(nullif(p->>'max_per_order', '')::int, 5), nullif(p->>'order_deadline', '')::timestamptz,
-            coalesce(p->>'status', 'OPEN'), v_uid)
-    returning id into v_id;
+            coalesce(p->>'status', 'OPEN'), v_uid);
     if coalesce(p->>'status', 'OPEN') = 'OPEN' then
       perform private.notify_club(v_club, false, 'CLUB_SHOP', 'Cửa hàng CLB: ' || trim(p->>'title'),
         'Mở đặt hàng' || case when nullif(p->>'order_deadline', '') is not null
@@ -127,6 +127,7 @@ end $$;
 create or replace function public.place_club_order(p_product_id uuid, p_items jsonb, p_note text default null) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
+  v_new_id uuid;
   v_uid uuid := private.require_uid();
   pr public.club_products := (select x from public.club_products x where x.id = p_product_id for update);
   v_items jsonb;
@@ -150,9 +151,10 @@ begin
     v_code := 'RH' || upper(substr(md5(gen_random_uuid()::text), 1, 6));
     exit when not exists (select 1 from public.club_orders x where x.code = v_code);
   end loop;
-  insert into public.club_orders (club_id, product_id, user_id, items, quantity, amount_vnd, note, code)
-  values (pr.club_id, pr.id, v_uid, v_items, v_qty, pr.price_vnd::bigint * v_qty, nullif(left(trim(coalesce(p_note, '')), 200), ''), v_code)
-  returning * into o;
+  v_new_id := gen_random_uuid();
+  insert into public.club_orders (id, club_id, product_id, user_id, items, quantity, amount_vnd, note, code)
+  values (v_new_id, pr.club_id, pr.id, v_uid, v_items, v_qty, pr.price_vnd::bigint * v_qty, nullif(left(trim(coalesce(p_note, '')), 200), ''), v_code);
+  o := (select t from public.club_orders t where t.id = v_new_id);
   return private.club_order_json(o) || jsonb_build_object('bank', private.club_bank(pr.club_id));
 end $$;
 
@@ -164,7 +166,8 @@ declare
 begin
   if o.id is null or o.user_id is distinct from v_uid then raise exception 'ORDER_NOT_FOUND'; end if;
   if o.status <> 'PENDING' then raise exception 'ORDER_LOCKED'; end if;
-  update public.club_orders set status = 'CANCELLED', status_note = 'Người đặt huỷ' where id = o.id returning * into o;
+  update public.club_orders set status = 'CANCELLED', status_note = 'Người đặt huỷ' where id = o.id;
+  o := (select t from public.club_orders t where t.id = o.id);
   return private.club_order_json(o);
 end $$;
 
@@ -203,7 +206,8 @@ begin
   update public.club_orders set status = v_to, status_note = nullif(left(trim(coalesce(p_note, '')), 200), ''),
     paid_at = case when v_to = 'PAID' then coalesce(paid_at, now()) when v_to = 'PENDING' then null else paid_at end,
     delivered_at = case when v_to = 'DELIVERED' then now() when v_to = 'PAID' then null else delivered_at end
-  where id = o.id returning * into o;
+  where id = o.id;
+  o := (select t from public.club_orders t where t.id = o.id);
   if o.user_id is not null and v_to in ('PAID', 'DELIVERED', 'CANCELLED') then
     perform private.notify(o.user_id, o.club_id, 'CLUB_SHOP',
       case v_to when 'PAID' then 'CLB đã nhận tiền đơn ' || o.code when 'DELIVERED' then 'Đơn ' || o.code || ' đã giao'

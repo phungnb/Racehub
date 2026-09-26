@@ -51,7 +51,7 @@ describe('ngày vàng của CLB (007700)', () => {
   })
 
   it('km trong ngày vàng nhân ×2 ở thử thách CLB + BXH v2 (km thật giữ nguyên), XP không nhân', async () => {
-    await db.query(`insert into public.club_boost_days (club_id, day, multiplier, title) values ($1, $2::date, 2, 'Hôm nay vàng')`, [CLUB, await today(db)])
+    await db.query(`insert into public.club_boost_days (club_id, day, multiplier, title) values ($1, ((now() - interval '50 minutes') at time zone 'Asia/Ho_Chi_Minh')::date, 2, 'Hôm nay vàng')`, [CLUB])   // ngày của bài chạy bên dưới (không lệch khi chạy test lúc nửa đêm)
     await db.query(`insert into public.activities (user_id, title, source, started_at, ended_at, distance_m, moving_time_s, validation_status, status)
                     values ($1, 'Chạy ngày vàng', 'DIRECT_GPS', now() - interval '50 minutes', now() - interval '20 minutes', 5000, 1800, 'APPROVED', 'READY')`, [RUN])
     const p = (await db.query<{ current_progress: string }>(`select current_progress from public.challenge_participants where challenge_id = $1 and profile_id = $2`, [ch, RUN])).rows[0]
