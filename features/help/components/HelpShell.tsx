@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
+import { CloseButton } from '@/shared/ui/legal/CloseButton'
 import { MenuDrawer } from './MenuDrawer'
 
 /** Khung trang Hướng dẫn & Chính sách: đọc được khi chưa đăng nhập, có nút ☰ mở menu */
@@ -10,6 +11,7 @@ export function HelpShell({ children, back = '/help', backLabel = 'Hướng dẫ
       <nav className="mb-4 flex items-center gap-1">
         <MenuDrawer className="-ml-2" />
         <Link href="/" className="text-lg font-extrabold tracking-wide">RACE<span className="text-brand">HUB</span></Link>
+        <CloseButton className="ml-auto" />
       </nav>
       {back && (
         <Link href={back} className="mb-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-fg-muted hover:text-fg">

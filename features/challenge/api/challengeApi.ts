@@ -206,6 +206,8 @@ export interface ChallengeQuote {
   pass: { id: string; remaining: number; max_slots: number; expires_at: string | null; note?: string | null } | null
   tier: { max: number; xu: number } | null   // mức quy mô áp dụng; null = vượt mức lớn nhất
   custom: boolean                   // > mức lớn nhất: admin cấp riêng
+  plan: { code: string; name: string } | null   // gói đang hiệu lực của bên trả phí (VIP / CLB Pro) — migration 007500
+  bestPassSlots: number             // quy mô lớn nhất lượt miễn phí còn lại bao được (0 = không có lượt)
   policy: EconomyPolicy
 }
 
@@ -218,11 +220,13 @@ export async function quoteChallenge(d: ChallengeDraft): Promise<ChallengeQuote>
   const q = data as {
     fee: number; payer: 'USER' | 'CLUB'; payer_balance: number; wallet_balance: number; pass: ChallengeQuote['pass']
     tier: ChallengeQuote['tier']; custom: boolean; xu_vnd: number; policy: unknown
+    plan?: ChallengeQuote['plan']; best_pass_slots?: number
   }
   const policy = toPolicy(q.policy)
   return {
     fee: Number(q.fee ?? 0), payer: q.payer, payerBalance: Number(q.payer_balance ?? 0), walletBalance: Number(q.wallet_balance ?? 0),
     pass: q.pass, tier: q.tier ? { max: Number(q.tier.max), xu: Number(q.tier.xu) } : null, custom: Boolean(q.custom),
+    plan: q.plan ?? null, bestPassSlots: Number(q.best_pass_slots ?? (q.pass?.max_slots ?? 0)),
     policy: q.xu_vnd ? { ...policy, xuVnd: Number(q.xu_vnd) } : policy,
   }
 }

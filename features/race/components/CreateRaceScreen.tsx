@@ -151,8 +151,7 @@ export function CreateRaceScreen() {
           {q && slots >= 2 && (
             <p className="flex flex-wrap items-center gap-1.5 text-sm">
               {q.custom ? <span className="font-semibold text-danger">Trên mức lớn nhất: liên hệ admin để được cấp riêng</span>
-                : q.pass ? <><Ticket className="size-4 text-brand" aria-hidden /><span className="font-semibold text-brand">Dùng 1 lượt tạo miễn phí</span>
-                    <span className="text-fg-subtle line-through">{formatCoin(q.fee)} Xu</span></>
+                : q.pass ? <><Ticket className="size-4 text-brand" aria-hidden /><span className="font-semibold text-brand">Miễn phí · dùng 1 lượt trong gói (còn {q.pass.remaining})</span></>
                 : <><Coins className="size-4 text-coin" aria-hidden /><span className="text-fg-muted">Phí tạo:</span>
                     <span className={cn('font-semibold', q.fee ? 'text-coin' : 'text-brand')}>{q.fee ? `${formatCoin(q.fee)} Xu (${xuToVnd(q.fee)})` : 'Miễn phí'}</span>
                     {q.fee > 0 && <span className={cn('text-xs', short ? 'text-danger' : 'text-fg-subtle')}>
