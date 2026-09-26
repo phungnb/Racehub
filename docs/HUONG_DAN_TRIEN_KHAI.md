@@ -33,9 +33,13 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
 > ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
-> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 007100** + chạy lại 003500),
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 007200** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
+>
+> 📦 **File gộp quá dài, copy không hết?** Dùng bản **chia nhỏ** [`supabase/deploy/phan/`](../supabase/deploy/phan/README.md): 10 phần, mỗi phần ≤ ~90 KB.
+> Chạy **lần lượt** `phan_01.sql` → `phan_10.sql` (mỗi phần: SQL Editor → New query → dán → Run). Đã chạy một số rồi thì bắt đầu từ phần chứa
+> migration đầu tiên bị ✗ trong **Kiểm tra hệ thống**, và **luôn chạy phần cuối** (`phan_10.sql`). Mẹo copy trên GitHub: mở file → nút **Raw** → Ctrl+A → Ctrl+C.
 > File gộp tạo bằng `npm run db:bundle` (hoặc `node scripts/db-bundle.mjs <mốc>` để gộp từ mốc khác); test tự động bảo đảm file luôn khớp migration.
 
 Chạy các file trong `supabase/migrations/`, đúng thứ tự:
@@ -113,6 +117,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001006900_notify_never_blocks.sql` | **Sửa sự cố**: lỗi trong chuỗi thông báo → push (vd lỗi quyền pg_net / hàng đợi) không còn làm hỏng thao tác chính (gán CLB Pro, nhập bài Strava, đăng tin…). Lỗi được ghi vào `private.notify_errors`, admin xem qua `admin_notify_errors()` | Cần 1700; chạy lại 3500 |
 | `20261001007000_strava_share_consent.sql` | **Hướng B+ (Strava)**: bài từ Strava chỉ hiện cho người khác (bảng tin CLB, BXH, thử thách, giải chạy ảo, league, hồ sơ) khi runner bật đồng ý; vẫn tính Xu/XP/huy hiệu cho chính runner. Admin chọn chính sách chung: OPT_IN (mặc định) / OWNER_ONLY (hướng A) / ALL. ⚠️ Khi chạy: bài Strava của người **chưa đồng ý** sẽ rời khỏi BXH / thử thách đang diễn ra cho tới khi họ bật đồng ý | Cần 6700; chạy lại 3500 |
 | `20261001007100_admin_full_power.sql` | **Admin hệ thống toàn quyền trong mọi CLB**: tính là ban quản trị + thành viên ở mọi CLB (duyệt thành viên, sửa cài đặt, đăng tin, sự kiện, quỹ, thử thách, trao quyền chủ nhiệm, giải tán CLB — có nhật ký) | Cần 5000; chạy lại 3500 |
+| `20261001007200_restore_admin_set_club_plan.sql` | **Sửa lỗi gán CLB Pro** ("Chỉ quản trị viên hệ thống…" dù đúng admin): khôi phục hàm gán gói về bản chuẩn, lỗi thông báo không làm hỏng việc gán | Cần 2800, 6900; chạy lại 3500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

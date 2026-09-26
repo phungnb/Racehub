@@ -138,4 +138,13 @@ describe('RaceHub Knowledge (006200)', () => {
     expect(await fails(put(WRITER, `${EDITOR}/bia.jpg`))).toMatch(/row-level security|policy/i)
     expect(await fails(put(READER, `${READER}/bia.jpg`))).toMatch(/row-level security|policy/i)
   })
+  it('admin duyệt ngay trong danh sách: bài mẫu Chờ duyệt (không có người tạo) → duyệt chuyên môn + đăng một bước', async () => {
+    const a = await artId(db, 'lo-trinh-0-den-5-km')
+    await db.query(`update public.content_articles set status = 'REVIEW', expert_reviewed_at = null, expert_reviewed_by = null, published_at = null, created_by = null where id = $1`, [a])
+    expect((await rpc<Row>(db, ADM, `select public.cms_get($1) as r`, [a]))).toMatchObject({ status: 'REVIEW', expert_reviewed_at: null })
+    expect(await fails(status(db, ADM, a, 'PUBLISHED'))).toContain('EXPERT_REVIEW_REQUIRED')
+    await approve(db, ADM, a)
+    await status(db, ADM, a, 'PUBLISHED')
+    expect((await article(db, READER, 'lo-trinh-0-den-5-km')).slug).toBe('lo-trinh-0-den-5-km')
+  })
 })
