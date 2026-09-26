@@ -13,7 +13,9 @@ const FEATURES = [
   { icon: Trophy, title: 'Xếp hạng theo đơn vị', text: 'Phòng ban, chi nhánh, lớp hoặc CLB thi đua với nhau — tính cả tổng và bình quân đầu người cho công bằng.' },
   { icon: Network, title: 'Quản lý nhiều CLB', text: 'Liên đoàn mời CLB tham gia; thành viên CLB tự được tính vào chiến dịch. Có thể tài trợ CLB Pro cho cả hệ thống.' },
   { icon: FileSpreadsheet, title: 'Báo cáo cho nhân sự', text: 'km, số buổi, số ngày chạy của từng người theo khoảng ngày; mã nhân viên, đơn vị; xuất Excel (CSV).' },
-  { icon: Palette, title: 'Thương hiệu riêng', text: 'Logo, ảnh bìa, màu chủ đề, khẩu hiệu — nhân viên thấy đây là sân chơi của chính công ty.' },
+  { icon: Palette, title: 'Thương hiệu riêng', text: 'Logo, ảnh bìa, màu chủ đề, khẩu hiệu; bảng tin nội bộ như một CLB lớn; chứng nhận hoàn thành thiết kế theo mẫu công ty.' },
+  { icon: Users, title: 'Quản lý như phòng nhân sự', text: 'Tự duyệt theo email công ty, nhập danh sách từ Excel, đơn vị nhiều cấp, trưởng đơn vị tự quản lý người của mình.' },
+  { icon: Trophy, title: 'Trao giải minh bạch', text: 'Chốt kết quả, duyệt top trước khi trao, ngày hội ×2 / ×3, quay thưởng may mắn có mã kiểm chứng.' },
   { icon: ShieldCheck, title: 'Chống gian lận, tôn trọng riêng tư', text: 'Chỉ tính bài chạy hợp lệ (GPS, pace, duyệt); người chạy tắt chia sẻ bài nào thì bài đó không vào bảng.' },
 ]
 

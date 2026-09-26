@@ -6,6 +6,8 @@ import { Avatar, Card, EmptyState, ErrorState, SectionTitle, Skeleton } from '@/
 import { cn } from '@/shared/lib/cn'
 import { formatDuration, formatKm, formatNumber, formatRelative } from '@/shared/lib/format'
 import { getHallOfFame, type HallOfFame } from '../../api/hubApi'
+import { useClub } from '../../hooks/useClub'
+import { DrawPanel } from '@/features/draw'
 
 const MEDAL = ['text-medal-gold', 'text-medal-silver', 'text-medal-bronze']
 const DIST_LABEL: Record<string, string> = { '5K': '5 km', '10K': '10 km', '21K': 'Half Marathon', '42K': 'Full Marathon' }
@@ -13,13 +15,20 @@ const DIST_LABEL: Record<string, string> = { '5K': '5 km', '10K': '10 km', '21K'
 /** Tab Đại sảnh (migration 007800): Full / Half Marathon, kỷ lục CLB, BXH năm, cột mốc gần đây */
 export function HallOfFameScreen({ clubId }: { clubId: string }) {
   const q = useQuery({ queryKey: ['club', clubId, 'hall'], queryFn: () => getHallOfFame(clubId), staleTime: 5 * 60_000 })
+  const { isStaff } = useClub(clubId)
   if (q.isPending) return <div className="space-y-3"><Skeleton className="h-40" /><Skeleton className="h-56" /></div>
   if (q.isError) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />
   const h = q.data
   const empty = !h.marathon.length && !h.half.length && !h.records.length && !h.year.length
-  if (empty) return <EmptyState icon={Trophy} title="Đại sảnh còn trống" description="Bài chạy hợp lệ của thành viên sẽ tự ghi danh: Half / Full Marathon, kỷ lục CLB, cột mốc km." />
+  if (empty) return (
+    <div className="space-y-6">
+      <EmptyState icon={Trophy} title="Đại sảnh còn trống" description="Bài chạy hợp lệ của thành viên sẽ tự ghi danh: Half / Full Marathon, kỷ lục CLB, cột mốc km." />
+      <DrawPanel scope="CLUB" refId={clubId} canManage={isStaff} />
+    </div>
+  )
   return (
     <div className="space-y-6 pb-8">
+      <DrawPanel scope="CLUB" refId={clubId} canManage={isStaff} />
       <Finishers title="Full Marathon" emoji="🏅" rows={h.marathon} />
       <Finishers title="Half Marathon" emoji="🥈" rows={h.half} />
       {h.records.length > 0 && <Records rows={h.records} />}

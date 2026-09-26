@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
+import { DrawPanel } from '@/features/draw'
 import {
   ArrowLeft, CalendarDays, Check, CircleSlash, Clock, Coins, Copy, Crown, Gauge, Hourglass, Info, Lock, LogOut, MoreHorizontal,
   Repeat, Route, Share2, Shield, Timer, Trophy, Users, UsersRound, HeartPulse } from 'lucide-react'
@@ -108,6 +109,7 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
               canEdit={d.can_manage && (phase === 'UPCOMING' || phase === 'LIVE')} /></div>}
       {tab !== 'RULES' && tab !== 'HONOR' && <TopSupported challengeId={c.id} />}
       {tab === 'RANK' && <ChallengeVouchers challengeId={c.id} canManage={d.can_manage} />}
+      {tab === 'RANK' && <DrawPanel scope="CHALLENGE" refId={c.id} canManage={d.can_manage} />}
 
       <ActionBar d={d} phase={phase} code={code ?? null} />
     </div>

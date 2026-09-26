@@ -1,13 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Crown, Network, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, ConfirmSheet, EmptyState, Input, SectionTitle, Sheet } from '@/shared/ui'
 import { useDebounced } from '@/shared/lib/search'
+import { cn } from '@/shared/lib/cn'
 import { formatNumber } from '@/shared/lib/format'
 import { searchClubs } from '@/features/club'
+import { unitOptions } from '../../model/org'
 import { deleteOrgUnit, inviteClubToOrg, orgErrorMessage, removeOrgClub, saveOrgUnit, setMyOrgUnit, type OrgClub, type OrgDetail } from '../../api/orgApi'
 
 /** Đơn vị (phòng ban / chi nhánh / lớp) và CLB thuộc tổ chức */
@@ -15,12 +17,14 @@ export function UnitsTab({ org }: { org: OrgDetail }) {
   const qc = useQueryClient()
   const refresh = () => void qc.invalidateQueries({ queryKey: ['org', org.id] })
   const [name, setName] = useState('')
-  const [editing, setEditing] = useState<{ id: string; name: string } | null>(null)
+  const [parent, setParent] = useState('')
+  const [editing, setEditing] = useState<{ id: string; name: string; parent: string } | null>(null)
+  const tree = useMemo(() => unitOptions(org.units), [org.units])
   const [del, setDel] = useState<{ id: string; name: string } | null>(null)
   const [inviting, setInviting] = useState(false)
   const [removing, setRemoving] = useState<OrgClub | null>(null)
   const saveUnit = useMutation({
-    mutationFn: ({ id, n }: { id: string | null; n: string }) => saveOrgUnit(org.id, id, n),
+    mutationFn: ({ id, n, parent: pid }: { id: string | null; n: string; parent: string }) => saveOrgUnit(org.id, id, n, pid || null),
     onSuccess: () => { setName(''); setEditing(null); refresh() },
     onError: (e) => toast.error(orgErrorMessage(e)),
   })
@@ -51,7 +55,7 @@ export function UnitsTab({ org }: { org: OrgDetail }) {
             <select value={org.my_unit_id ?? ''} onChange={(e) => mine.mutate(e.target.value || null)} disabled={mine.isPending}
               className="mt-1 h-11 w-full rounded-xl border border-border bg-surface px-3 text-[15px]">
               <option value="">— Chưa chọn —</option>
-              {org.units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              {tree.map((u) => <option key={u.id} value={u.id}>{u.path}</option>)}
             </select>
           </label>
         )}
@@ -59,13 +63,13 @@ export function UnitsTab({ org }: { org: OrgDetail }) {
           <p className="text-sm text-fg-muted">{org.is_admin ? `Thêm ${org.unit_label.toLowerCase()} để xếp hạng theo nhóm trong chiến dịch.` : 'Chưa có đơn vị.'}</p>
         ) : (
           <ul className="divide-y divide-border rounded-2xl border border-border bg-surface">
-            {org.units.map((u) => (
-              <li key={u.id} className="flex items-center gap-2 px-3 py-2.5">
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold">{u.name}</span>
+            {tree.map((u) => (
+              <li key={u.id} className="flex items-center gap-2 px-3 py-2.5" style={{ paddingLeft: `${0.75 + u.depth * 1.1}rem` }}>
+                <span className={cn('min-w-0 flex-1 truncate text-sm', u.depth === 0 ? 'font-semibold' : 'text-fg-muted')}>{u.depth > 0 && '└ '}{u.name}</span>
                 <span className="text-xs text-fg-muted">{u.members} người</span>
                 {org.is_admin && (
                   <>
-                    <Button size="sm" variant="ghost" aria-label={`Đổi tên ${u.name}`} onClick={() => setEditing({ id: u.id, name: u.name })}><Pencil className="size-4" aria-hidden /></Button>
+                    <Button size="sm" variant="ghost" aria-label={`Đổi tên ${u.name}`} onClick={() => setEditing({ id: u.id, name: u.name, parent: u.parent_id ?? '' })}><Pencil className="size-4" aria-hidden /></Button>
                     <Button size="sm" variant="ghost" aria-label={`Xoá ${u.name}`} onClick={() => setDel({ id: u.id, name: u.name })}><Trash2 className="size-4" aria-hidden /></Button>
                   </>
                 )}
@@ -74,9 +78,18 @@ export function UnitsTab({ org }: { org: OrgDetail }) {
           </ul>
         )}
         {org.is_admin && (
-          <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (name.trim()) saveUnit.mutate({ id: null, n: name }) }}>
-            <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} placeholder={`Thêm ${org.unit_label.toLowerCase()}, vd: Phòng Kinh doanh`} aria-label={`Tên ${org.unit_label}`} />
-            <Button type="submit" className="shrink-0" loading={saveUnit.isPending && !editing} disabled={!name.trim()}><Plus className="size-4" aria-hidden />Thêm</Button>
+          <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); if (name.trim()) saveUnit.mutate({ id: null, n: name, parent }) }}>
+            {tree.length > 0 && (
+              <select value={parent} onChange={(e) => setParent(e.target.value)} aria-label="Thuộc đơn vị" className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm">
+                <option value="">Cấp cao nhất</option>
+                {tree.filter((u) => u.depth < 3).map((u) => <option key={u.id} value={u.id}>Thuộc: {u.path}</option>)}
+              </select>
+            )}
+            <div className="flex gap-2">
+              <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} placeholder={`Thêm ${org.unit_label.toLowerCase()}, vd: Phòng Kinh doanh`} aria-label={`Tên ${org.unit_label}`} />
+              <Button type="submit" className="shrink-0" loading={saveUnit.isPending && !editing} disabled={!name.trim()}><Plus className="size-4" aria-hidden />Thêm</Button>
+            </div>
+            <p className="text-xs text-fg-subtle">Tối đa 4 cấp (vd: Vùng → Chi nhánh → Phòng → Tổ). BXH đơn vị cộng dồn cả đơn vị con.</p>
           </form>
         )}
       </section>
@@ -107,11 +120,18 @@ export function UnitsTab({ org }: { org: OrgDetail }) {
 
       {editing && (
         <Sheet open onClose={() => setEditing(null)} title={`Đổi tên ${org.unit_label.toLowerCase()}`}
-          footer={<Button block loading={saveUnit.isPending} disabled={!editing.name.trim()} onClick={() => saveUnit.mutate({ id: editing.id, n: editing.name })}>Lưu</Button>}>
-          <Input value={editing.name} maxLength={80} onChange={(e) => setEditing({ ...editing, name: e.target.value })} aria-label="Tên mới" />
+          footer={<Button block loading={saveUnit.isPending} disabled={!editing.name.trim()} onClick={() => saveUnit.mutate({ id: editing.id, n: editing.name, parent: editing.parent })}>Lưu</Button>}>
+          <div className="space-y-2">
+            <Input value={editing.name} maxLength={80} onChange={(e) => setEditing({ ...editing, name: e.target.value })} aria-label="Tên mới" />
+            <select value={editing.parent} onChange={(e) => setEditing({ ...editing, parent: e.target.value })} aria-label="Thuộc đơn vị"
+              className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm">
+              <option value="">Cấp cao nhất</option>
+              {tree.filter((u) => u.id !== editing.id && !u.path.startsWith(`${tree.find((x) => x.id === editing.id)?.path} /`)).map((u) => <option key={u.id} value={u.id}>Thuộc: {u.path}</option>)}
+            </select>
+          </div>
         </Sheet>
       )}
-      <ConfirmSheet open={!!del} onClose={() => setDel(null)} title={`Xoá “${del?.name}”?`} description="Thành viên trong đơn vị này trở về “chưa gán”, không bị xoá khỏi tổ chức."
+      <ConfirmSheet open={!!del} onClose={() => setDel(null)} title={`Xoá “${del?.name}”?`} description="Đơn vị con cũng bị xoá. Thành viên trở về “chưa gán”, không bị xoá khỏi tổ chức."
         confirmLabel="Xoá" loading={delUnit.isPending} onConfirm={() => del && delUnit.mutate(del.id)} />
       <ConfirmSheet open={!!removing} onClose={() => setRemoving(null)} title={`Bỏ ${removing?.name} khỏi tổ chức?`}
         description={removing?.pro_granted ? 'CLB trở về gói trước khi được tổ chức tài trợ Pro.' : 'Thành viên CLB không còn được tính vào chiến dịch.'}

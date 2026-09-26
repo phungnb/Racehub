@@ -40,3 +40,48 @@ export const toDayInput = (iso: string) => {
   const d = new Date(new Date(iso).getTime() + 7 * 3600_000)
   return d.toISOString().slice(0, 10)
 }
+
+/** Cây đơn vị → danh sách phẳng có độ sâu + đường dẫn "Miền Bắc / Hà Nội" (cho ô chọn, BXH) */
+export interface UnitNode { id: string; name: string; parent_id?: string | null }
+export function unitOptions<T extends UnitNode>(units: T[], only?: string[] | null): (T & { depth: number; path: string })[] {
+  const kids = new Map<string | null, T[]>()
+  for (const u of units) {
+    const k = u.parent_id && units.some((x) => x.id === u.parent_id) ? u.parent_id : null
+    kids.set(k, [...(kids.get(k) ?? []), u])
+  }
+  const out: (T & { depth: number; path: string })[] = []
+  const walk = (parent: string | null, depth: number, prefix: string) => {
+    for (const u of kids.get(parent) ?? []) {
+      const path = prefix ? `${prefix} / ${u.name}` : u.name
+      if (!only || only.includes(u.id)) out.push({ ...u, depth, path })
+      walk(u.id, depth + 1, path)
+    }
+  }
+  walk(null, 0, '')
+  return out
+}
+
+/** Đọc CSV (phẩy / chấm phẩy / tab, có ngoặc kép) → mảng dòng */
+export function parseCsv(text: string): string[][] {
+  const src = text.replace(/^\uFEFF/, '')
+  const first = src.split(/\r?\n/, 1)[0] ?? ''
+  const sep = [';', '\t', ','].reduce((best, s) => (first.split(s).length > first.split(best).length ? s : best), ',')
+  const rows: string[][] = []
+  let row: string[] = [], cell = '', q = false
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i]
+    if (q) {
+      if (ch === '"' && src[i + 1] === '"') { cell += '"'; i++ } else if (ch === '"') q = false; else cell += ch
+    } else if (ch === '"') q = true
+    else if (ch === sep) { row.push(cell.trim()); cell = '' }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && src[i + 1] === '\n') i++
+      row.push(cell.trim()); cell = ''
+      if (row.some((c) => c)) rows.push(row)
+      row = []
+    } else cell += ch
+  }
+  row.push(cell.trim())
+  if (row.some((c) => c)) rows.push(row)
+  return rows
+}

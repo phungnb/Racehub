@@ -1,11 +1,3 @@
--- RaceHub — PHẦN 12/13 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 008400
--- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
--- Xong thì chạy phần tiếp theo.
-begin;
--- ===================================================================
--- 20261001008400_org_management_draws.sql
--- ===================================================================
 -- 008400: Cơ chế quản lý Doanh nghiệp (học từ FoxSteps) + quay thưởng dùng chung toàn app.
 -- Doanh nghiệp = nhiều nhóm nhỏ gộp lại. Bổ sung:
 -- • Tên miền email công ty (tích chọn ở Cài đặt): email đúng tên miền → tự duyệt; tuỳ chọn "chỉ nhận email công ty".
@@ -1135,5 +1127,3 @@ grant execute on function public.save_org_unit(uuid, uuid, text, uuid), public.o
   to authenticated;
 
 notify pgrst, 'reload schema';
-
-commit;

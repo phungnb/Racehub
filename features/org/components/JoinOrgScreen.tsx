@@ -9,6 +9,7 @@ import { Button, Card, EmptyState, ErrorState, Field, Input, Skeleton } from '@/
 import { routes } from '@/shared/config/routes'
 import { joinOrg, orgErrorMessage, previewOrgInvite } from '../api/orgApi'
 import { OrgHeader } from './OrgHeader'
+import { unitOptions } from '../model/org'
 
 /** Vào tổ chức bằng mã mời: xem trước, chọn đơn vị, đồng ý chia sẻ số liệu chạy */
 export function JoinOrgScreen({ code }: { code: string }) {
@@ -39,9 +40,14 @@ export function JoinOrgScreen({ code }: { code: string }) {
           {o.my_status === 'APPROVED' ? 'Bạn đã là thành viên.' : 'Bạn đã gửi yêu cầu, đang chờ quản trị tổ chức duyệt.'}
           {o.my_status === 'APPROVED' && <Button className="mt-3" block onClick={() => router.push(routes.org(o.id))}>Mở tổ chức</Button>}
         </Card>
+      ) : o.blocked ? (
+        <Card className="space-y-1 text-sm">
+          <p className="font-semibold">Chỉ nhận tài khoản dùng email công ty</p>
+          <p className="text-fg-muted">Hãy đăng nhập RaceHub bằng email @{o.email_domains.join(', @')} rồi mở lại link này.</p>
+        </Card>
       ) : !o.active ? (
         <Card className="text-sm text-fg-muted">Gói của tổ chức đã hết hạn hoặc tạm dừng — chưa nhận thành viên mới.</Card>
-      ) : o.full && o.join_policy === 'OPEN' ? (
+      ) : o.full && o.auto_approve ? (
         <Card className="text-sm text-fg-muted">Tổ chức đã đủ số chỗ. Hãy báo quản trị tổ chức.</Card>
       ) : (
         <Card className="space-y-3">
@@ -49,7 +55,7 @@ export function JoinOrgScreen({ code }: { code: string }) {
             <Field label={o.unit_label} htmlFor="j-unit">
               <select id="j-unit" value={unit} onChange={(e) => setUnit(e.target.value)} className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-[15px]">
                 <option value="">— Chọn {o.unit_label.toLowerCase()} —</option>
-                {o.units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                {unitOptions(o.units).map((u) => <option key={u.id} value={u.id}>{u.path}</option>)}
               </select>
             </Field>
           )}
@@ -62,7 +68,7 @@ export function JoinOrgScreen({ code }: { code: string }) {
               Không thấy vị trí, bản đồ hay nhịp tim. Bài bạn tắt chia sẻ không được tính. Bạn rời tổ chức bất cứ lúc nào.</span>
           </p>
           <Button block size="lg" loading={join.isPending} onClick={() => join.mutate()}>
-            {o.join_policy === 'OPEN' ? 'Đồng ý & vào tổ chức' : 'Đồng ý & gửi yêu cầu'}
+            {o.auto_approve ? 'Đồng ý & vào tổ chức' : 'Đồng ý & gửi yêu cầu'}
           </Button>
         </Card>
       )}

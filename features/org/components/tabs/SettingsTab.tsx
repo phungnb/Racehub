@@ -21,6 +21,7 @@ export function SettingsTab({ org }: { org: OrgDetail }) {
       <InviteCard org={org} onChange={refresh} />
       <BrandCard org={org} onSaved={refresh} />
       <PolicyCard org={org} onSaved={refresh} />
+      <DomainCard org={org} onSaved={refresh} />
       <BillingCard org={org} onSaved={refresh} />
       <Card className="space-y-1 text-sm">
         <p className="font-semibold">Gói Doanh nghiệp</p>
@@ -136,6 +137,10 @@ function PolicyCard({ org, onSaved }: { org: OrgDetail; onSaved: () => void }) {
           label="Tự duyệt khi có mã mời" description="Tắt: mỗi người gửi yêu cầu, quản trị duyệt từng người." />
         <SwitchRow checked={org.allow_self_unit} onChange={(v) => save.mutate({ allow_self_unit: v })} disabled={save.isPending}
           label={`Thành viên tự chọn ${org.unit_label.toLowerCase()}`} description="Tắt: chỉ quản trị gán đơn vị." />
+        <SwitchRow checked={org.privacy_mode} onChange={(v) => save.mutate({ privacy_mode: v })} disabled={save.isPending}
+          label="Chế độ riêng tư" description="Thành viên chỉ thấy BXH theo đơn vị và thứ hạng của chính mình, không thấy tên người khác. Quản trị vẫn xem đủ để trao giải." />
+        <SwitchRow checked={org.member_posts} onChange={(v) => save.mutate({ member_posts: v })} disabled={save.isPending}
+          label="Thành viên được đăng bài lên bảng tin" description="Tắt: chỉ quản trị và trưởng đơn vị đăng." />
         <div className="flex items-end gap-2">
           <Field label="Tên gọi đơn vị" htmlFor="o-unit" hint="VD: Phòng ban, Chi nhánh, Lớp, Khoa">
             <Input id="o-unit" value={label} maxLength={30} onChange={(e) => setLabel(e.target.value)} />
@@ -168,6 +173,33 @@ function BillingCard({ org, onSaved }: { org: OrgDetail; onSaved: () => void }) 
         ))}
         <Button block variant="secondary" loading={save.isPending} onClick={() => save.mutate()}>Lưu</Button>
         <p className="text-xs text-fg-subtle">Chỉ quản trị tổ chức và RaceHub thấy thông tin này.</p>
+      </Card>
+    </section>
+  )
+}
+
+/** Tên miền email công ty: tự duyệt / chỉ nhận email công ty (008400) */
+function DomainCard({ org, onSaved }: { org: OrgDetail; onSaved: () => void }) {
+  const [text, setText] = useState(org.email_domains.join(', '))
+  const [auto, setAuto] = useState(org.domain_auto_approve)
+  const [only, setOnly] = useState(org.domain_only)
+  const domains = text.split(/[\s,;]+/).map((d) => d.trim().replace(/^@/, '').toLowerCase()).filter(Boolean)
+  const dirty = domains.join(',') !== org.email_domains.join(',') || auto !== org.domain_auto_approve || only !== org.domain_only
+  const save = useMutation({
+    mutationFn: () => updateOrg(org.id, { email_domains: domains, domain_auto_approve: auto, domain_only: only }),
+    onSuccess: () => { toast.success('Đã lưu tên miền'); onSaved() },
+    onError: (e) => toast.error(orgErrorMessage(e)),
+  })
+  return (
+    <section className="space-y-2">
+      <SectionTitle>Email công ty</SectionTitle>
+      <Card className="space-y-3">
+        <Field label="Tên miền email" htmlFor="o-dom" hint="Cách nhau bằng dấu phẩy, vd: congty.vn, congty.com.vn">
+          <Input id="o-dom" value={text} onChange={(e) => setText(e.target.value)} placeholder="congty.vn" autoCapitalize="none" />
+        </Field>
+        <SwitchRow checked={auto} onChange={setAuto} label="Tự duyệt email công ty" description="Người đăng nhập bằng email đúng tên miền vào ngay, không cần chờ duyệt." />
+        <SwitchRow checked={only} onChange={setOnly} label="Chỉ nhận email công ty" description="Người dùng email khác (gmail…) không vào được, trừ người có trong danh sách nhập." />
+        <Button block variant="secondary" disabled={!dirty || (only && !domains.length)} loading={save.isPending} onClick={() => save.mutate()}>Lưu</Button>
       </Card>
     </section>
   )

@@ -171,6 +171,8 @@ export interface CertificateData {
   verifyUrl?: string | null
   raceUrl?: string | null
   clubUrl?: string | null
+  /** Ghi đè chữ từng trường (chứng nhận chiến dịch tổ chức: "312 km", "Phòng Kỹ thuật"… — migration 008400) */
+  values?: Partial<Record<keyof typeof CERT_BINDS, string>>
 }
 
 export function certValues(d: CertificateData) {
@@ -178,6 +180,7 @@ export function certValues(d: CertificateData) {
     name: d.name, race: d.race, org: d.organizer, distance: distanceLabel(d.distanceKm), time: raceTime(d.timeS),
     pace: d.distanceKm > 0 && d.timeS > 0 ? racePace(d.timeS / d.distanceKm) : '—', rank: d.rank ? `${d.rank}/${d.finishers}` : '—',
     date: d.date, bib: `BIB ${bibNumber(d.bib)}`,
+    ...d.values,
   }
 }
 

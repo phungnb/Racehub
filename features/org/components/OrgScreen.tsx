@@ -14,8 +14,9 @@ import { MembersTab } from './tabs/MembersTab'
 import { UnitsTab } from './tabs/UnitsTab'
 import { ReportTab } from './tabs/ReportTab'
 import { SettingsTab } from './tabs/SettingsTab'
+import { FeedTab } from './tabs/FeedTab'
 
-type Tab = 'campaigns' | 'members' | 'units' | 'report' | 'settings'
+type Tab = 'feed' | 'campaigns' | 'members' | 'units' | 'report' | 'settings'
 export const orgKey = (id: string) => ['org', id] as const
 
 /** Không gian tổ chức: chiến dịch, thành viên, đơn vị & CLB, báo cáo, cài đặt */
@@ -29,13 +30,15 @@ export function OrgScreen({ orgId }: { orgId: string }) {
   if (q.isError) return <ErrorState message={orgErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   const o = q.data
   const tabs: { id: Tab; label: string; badge?: number | null }[] = [
+    { id: 'feed', label: 'Bảng tin' },
     { id: 'campaigns', label: 'Chiến dịch' },
     { id: 'members', label: 'Thành viên', badge: o.pending_members },
     { id: 'units', label: o.kind === 'FEDERATION' ? 'Đơn vị & CLB' : o.unit_label },
-    ...(o.is_admin ? [{ id: 'report' as Tab, label: 'Báo cáo' }, { id: 'settings' as Tab, label: 'Cài đặt' }] : []),
+    ...(o.is_admin || o.is_unit_admin ? [{ id: 'report' as Tab, label: 'Báo cáo' }] : []),
+    ...(o.is_admin ? [{ id: 'settings' as Tab, label: 'Cài đặt' }] : []),
   ]
   const raw = params.get('tab') as Tab | null
-  const tab: Tab = raw && tabs.some((t) => t.id === raw) ? raw : 'campaigns'
+  const tab: Tab = raw && tabs.some((t) => t.id === raw) ? raw : 'feed'
   const setTab = (t: Tab) => router.replace(`${path}?tab=${t}`, { scroll: false })
   const left = o.active_until ? daysLeft(o.active_until, now) : null
 
@@ -66,10 +69,11 @@ export function OrgScreen({ orgId }: { orgId: string }) {
           </button>
         ))}
       </div>
+      {tab === 'feed' && <FeedTab org={o} />}
       {tab === 'campaigns' && <CampaignsTab org={o} />}
       {tab === 'members' && <MembersTab org={o} />}
       {tab === 'units' && <UnitsTab org={o} />}
-      {tab === 'report' && o.is_admin && <ReportTab org={o} />}
+      {tab === 'report' && (o.is_admin || o.is_unit_admin) && <ReportTab org={o} />}
       {tab === 'settings' && o.is_admin && <SettingsTab org={o} />}
     </div>
   )

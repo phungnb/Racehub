@@ -77,3 +77,17 @@ Với một doanh nghiệp 300 người, mức 10.000 ₫ / người / tháng t�
 - Chiến dịch có giải thưởng từ nhà tài trợ (dùng lại voucher 004xxx).
 - Trang công khai của tổ chức: bảng xếp hạng chiến dịch để truyền thông nội bộ.
 - Đăng nhập SSO công ty (Google Workspace / Microsoft) cho khách hàng lớn.
+
+## 6. Cơ chế quản lý bổ sung (008400, học từ FoxSteps)
+
+- **Email công ty**: khai báo tên miền (vd `congty.vn`). Tuỳ chọn *tự duyệt* email đúng tên miền và *chỉ nhận email công ty* (chặn gmail…).
+- **Nhập danh sách** (Thành viên → Nhập danh sách): CSV UTF-8 từ Excel, cột Email · Đơn vị (`Miền Bắc / Hà Nội / Phòng KT`) · Mã NV · Vai trò (Trưởng đơn vị).
+  Người đã có tài khoản vào ngay; người chưa có vào mục *Lời mời chờ*, khi đăng ký + mở link mời thì tự duyệt đúng đơn vị.
+  Bật *Gỡ người không có trong tệp* khi tệp là danh sách nhân sự đầy đủ (người nghỉ việc tự bị gỡ, trả lại chỗ).
+- **Đơn vị nhiều cấp** (tối đa 4) + **trưởng đơn vị**: như ban quản trị CLB — duyệt, gán đơn vị, mời ra, xem báo cáo trong đơn vị mình.
+- **Chiến dịch**: trần km mỗi ngày, ngày hội ×2 / ×3, *chốt kết quả* sau khi kết thúc (bảng cố định) và *duyệt top N* (hợp lệ / loại có lý do) trước khi trao giải.
+- **Chứng nhận hoàn thành**: tích khi tạo chiến dịch; quản trị thiết kế mẫu (cùng trình thiết kế chứng nhận giải chạy ảo); người đạt mục tiêu tải ảnh.
+- **Bảng tin tổ chức**: như CLB (bài, ảnh, thích, bình luận, ghim thông báo); tuỳ chọn chỉ quản trị được đăng. Chiến dịch mới và kết quả quay thưởng tự lên bảng tin.
+- **Chế độ riêng tư**: thành viên chỉ thấy BXH đơn vị + thứ hạng của mình.
+- **Quay thưởng dùng chung toàn app**: chiến dịch tổ chức, thử thách, CLB, giải chạy ảo, toàn hệ thống (admin). Chọn đối tượng (hoàn thành / có chạy / tất cả),
+  nhiều giải, loại người đã trúng. Quay **một lần**; thứ tự trúng = md5(seed + mã người dùng), công bố seed + mã băm danh sách để ai cũng kiểm tra lại. Quà do ban tổ chức tự trao.
