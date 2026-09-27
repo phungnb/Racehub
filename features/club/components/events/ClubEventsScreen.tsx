@@ -58,7 +58,7 @@ export function ClubEventsScreen({ clubId }: { clubId: string }) {
       </section>
 
       <section>
-        <SectionTitle action={<Button size="sm" variant="secondary" onClick={() => setPolling(true)}><Vote className="size-4" aria-hidden />Tạo bình chọn</Button>}>
+        <SectionTitle action={isStaff ? <Button size="sm" variant="secondary" onClick={() => setPolling(true)}><Vote className="size-4" aria-hidden />Tạo bình chọn</Button> : undefined}>
           Bình chọn
         </SectionTitle>
         {polls.isPending ? <Skeleton className="h-40" />

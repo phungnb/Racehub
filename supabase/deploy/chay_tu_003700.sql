@@ -15323,7 +15323,7 @@ notify pgrst, 'reload schema';
 -- ===================================================================
 -- 20261001008900_club_rpc_auth_fix.sql
 -- ===================================================================
--- 008900: VÁ BẢO MẬT — các hàm quản lý CLB đời đầu (có sẵn trên production trước khi dùng migration) kiểm tra quyền kiểu
+-- 008900: VÁ BẢO MẬT + nguyên tắc "chỉ chủ nhiệm và người được phân quyền mới sửa CLB" — các hàm quản lý CLB đời đầu (có sẵn trên production trước khi dùng migration) kiểm tra quyền kiểu
 --   if public.club_role(club) not in ('OWNER','CAPTAIN') then raise ...
 -- club_role() trả về NULL khi người gọi KHÔNG thuộc CLB (hoặc chưa đăng nhập) → "NULL not in (...)" = NULL → KHÔNG báo lỗi →
 -- bất kỳ ai (kể cả chưa đăng nhập) đổi được tên / mô tả / ảnh / thông báo / chính sách tham gia của mọi CLB, đổi mã mời,
@@ -15484,6 +15484,46 @@ begin
   end if;
   delete from public.club_members where id = p_member_id;
 end $$;
+
+-- Nguyên tắc: trong một CLB chỉ CHỦ NHIỆM (OWNER) và người được chủ nhiệm PHÂN QUYỀN (Ban quản trị — CAPTAIN) được tạo /
+-- sửa / xoá nội dung và cài đặt của CLB (admin hệ thống vẫn toàn quyền — 007100). Thành viên chỉ tham gia: bình chọn,
+-- đăng ký sự kiện, bình luận, thả tim, nhắn tin, đặt hàng, báo đã nộp phí.
+-- Bình chọn: trước đây thành viên nào cũng tạo được → chỉ Ban quản trị.
+create or replace function public.create_club_poll(p_club_id uuid, p_question text, p_options text[], p_multi boolean,
+                                                   p_closes_at timestamptz, p_hide_results boolean) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := private.require_staff(p_club_id); v_id uuid := gen_random_uuid(); v_opts jsonb; m record;
+begin
+  if char_length(trim(coalesce(p_question, ''))) not between 3 and 200 then raise exception 'INVALID_QUESTION'; end if;
+  v_opts := (select coalesce(jsonb_agg(trim(o) order by i), '[]'::jsonb)
+               from unnest(p_options) with ordinality as t(o, i) where char_length(trim(coalesce(o, ''))) between 1 and 80);
+  if jsonb_array_length(v_opts) not between 2 and 10 or jsonb_array_length(v_opts) <> cardinality(p_options) then
+    raise exception 'INVALID_OPTIONS';
+  end if;
+  if p_closes_at is not null and p_closes_at <= now() then raise exception 'INVALID_TIME'; end if;
+  if (select count(*) from public.club_polls where created_by = v_uid and created_at > now() - interval '1 hour') >= 5 then
+    raise exception 'RATE_LIMITED';
+  end if;
+  insert into public.club_polls (id, club_id, created_by, question, options, multi, hide_results, closes_at)
+  values (v_id, p_club_id, v_uid, trim(p_question), v_opts, coalesce(p_multi, false), coalesce(p_hide_results, false), p_closes_at);
+  for m in select user_id from public.club_members where club_id = p_club_id and status = 'APPROVED' and user_id <> v_uid loop
+    perform private.notify(m.user_id, p_club_id, 'CLUB_POLL', private.display_name(v_uid) || ' tạo bình chọn', trim(p_question),
+      '/clubs/' || p_club_id || '/events', v_uid, false);
+  end loop;
+  return v_id;
+end $$;
+
+-- Ảnh đại diện CLB (bucket club-avatars, thư mục <club_id>/…): chỉ Ban quản trị CLB được tải lên / thay / xoá.
+-- Chính sách HẠN CHẾ (restrictive): cộng thêm điều kiện lên mọi chính sách sẵn có của bucket trên production.
+drop policy if exists club_avatars_staff_insert on storage.objects;
+create policy club_avatars_staff_insert on storage.objects as restrictive for insert to authenticated
+  with check (bucket_id <> 'club-avatars' or public.club_is_staff(public.safe_uuid((storage.foldername(name))[1])));
+drop policy if exists club_avatars_staff_update on storage.objects;
+create policy club_avatars_staff_update on storage.objects as restrictive for update to authenticated
+  using (bucket_id <> 'club-avatars' or public.club_is_staff(public.safe_uuid((storage.foldername(name))[1])));
+drop policy if exists club_avatars_staff_delete on storage.objects;
+create policy club_avatars_staff_delete on storage.objects as restrictive for delete to authenticated
+  using (bucket_id <> 'club-avatars' or public.club_is_staff(public.safe_uuid((storage.foldername(name))[1])));
 
 -- Khách chưa đăng nhập không có lý do gọi các hàm ghi / tra quyền này
 revoke execute on function public.rotate_invite_code(uuid), public.set_club_announcement(uuid, text),

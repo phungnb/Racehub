@@ -71,6 +71,33 @@ describe('quyền các hàm quản lý CLB (008900)', () => {
     expect(c).toMatchObject({ name: 'CLB Mới', announcement: 'Admin', join_policy: 'APPROVAL', owner_id: CAP })
   })
 
+  it('nguyên tắc: thành viên thường / người ngoài không sửa được bất cứ thứ gì của CLB; chủ nhiệm + Ban quản trị thì được', async () => {
+    const day = new Date(Date.now() + 5 * 86400_000).toISOString().slice(0, 10)
+    const cases: [string, string, unknown[]][] = [
+      ['bình chọn', `select public.create_club_poll($1, 'Chạy sáng mấy giờ?', array['5h','6h'], false, null, false) as r`, [CLUB]],
+      ['màu CLB', `select public.set_club_accent($1, '#22c55e') as r`, [CLUB]],
+      ['tài khoản nhận tiền', `select public.set_club_bank($1, '970436', '0123456789', 'CLB TEST') as r`, [CLUB]],
+      ['khoản thu', `select public.create_club_due($1, 'Phí tháng 10', 50000, null, null) as r`, [CLUB]],
+      ['sổ quỹ', `select public.add_cash_entry($1, 'EXPENSE', 20000, 'Nước uống', null, null) as r`, [CLUB]],
+      ['ngày hệ số', `select public.set_club_boost_day($1, $2::date, 2, 'Ngày hội') as r`, [CLUB, day]],
+      ['sự kiện', `select public.create_club_event($1, jsonb_build_object('title','Chạy nhóm','starts_at', (now() + interval '2 days')::text)) as r`, [CLUB]],
+      ['thông báo', `select public.set_club_announcement($1, 'x') as r`, [CLUB]],
+      ['mã mời', `select public.rotate_invite_code($1) as r`, [CLUB]],
+    ]
+    const OUT2 = '00000000-0000-0000-0000-0000000089a6'
+    await db.exec(`insert into auth.users (id, email) values ('${OUT2}', 'm2@c.vn');
+      insert into public.profiles (id, display_name, xu, xp, level, created_at) values ('${OUT2}', 'TV2', 0, 0, 1, now()) on conflict do nothing;
+      insert into public.club_members (club_id, user_id, role, status) values ('${CLUB}', '${OUT2}', 'MEMBER', 'APPROVED') on conflict do nothing;`)
+    for (const [label, sql, p] of cases) {
+      for (const who of [OUT2, '00000000-0000-0000-0000-0000000089a9']) {
+        const r = await call(db, who, sql, p)
+        expect(r, `${label} — ${who === OUT2 ? 'thành viên thường' : 'người ngoài'}`).toMatch(/FORBIDDEN|NOT_A_MEMBER|AUTH/)
+      }
+    }
+    // Ban quản trị tạo bình chọn được
+    expect(await call(db, CAP, `select public.create_club_poll($1, 'Chạy sáng mấy giờ?', array['5h','6h'], false, null, false) as r`, [CLUB])).toBe('OK')
+  })
+
   it('khách chưa đăng nhập không còn quyền gọi các hàm ghi / trang admin', async () => {
     const r = await db.query<{ f: string }>(`select p.proname f from pg_proc p join pg_namespace n on n.oid = p.pronamespace
       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
