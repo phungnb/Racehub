@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: 'Chính sách quyền riêng tư' }
 // Bản admin soạn trong Quản trị → Hướng dẫn & chính sách (008500) nếu có; chưa có thì dùng bản viết sẵn dưới đây
 export default async function PrivacyPage() {
   const page = await loadHelpPage<HelpPage>('privacy')
-  if (page?.body?.trim()) return <HelpShell back={null}><HelpArticle page={page} /></HelpShell>
+  if (page?.body?.trim()) return <HelpShell back={null} editSlug="privacy"><HelpArticle page={page} /></HelpShell>
   return (
     <LegalPage title="Chính sách quyền riêng tư">
       <p>
