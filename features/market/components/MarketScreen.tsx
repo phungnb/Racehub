@@ -1,5 +1,6 @@
 'use client'
 
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useDeferredValue, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -15,12 +16,12 @@ import { PartnerCard } from './PartnerBits'
 
 type KindTab = 'ALL' | PartnerKind
 type Section = 'partners' | 'bib'
-const param = (k: string) => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get(k) : null)
 
 /** Chợ Runner: (1) HLV / cửa hàng / dịch vụ đã xác minh, (2) Chợ BIB. RaceHub không thu tiền hộ. */
 export function MarketScreen() {
   // ?tab=bib (từ thông báo) · ?kind=COACH|SHOP|SERVICE (từ bài Knowledge)
-  const [section, setSection] = useState<Section>(() => (param('tab') === 'bib' ? 'bib' : 'partners'))
+  const params = useSearchParams()
+  const [section, setSection] = useState<Section>(() => (params.get('tab') === 'bib' ? 'bib' : 'partners'))
   return (
     <div className="space-y-4 animate-fade-in">
       <BackLink fallback={routes.me} className="-mb-2" />
@@ -50,8 +51,9 @@ export function MarketScreen() {
 }
 
 function Partners() {
+  const params = useSearchParams()
   const [kind, setKind] = useState<KindTab>(() => {
-    const k = param('kind')
+    const k = params.get('kind')
     return k === 'COACH' || k === 'SHOP' || k === 'SERVICE' ? k : 'ALL'
   })
   const [area, setArea] = useState('')

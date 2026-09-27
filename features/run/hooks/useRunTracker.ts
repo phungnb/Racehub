@@ -1,5 +1,6 @@
 'use client'
 
+import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { describeError } from '@/shared/lib/errors'
@@ -59,9 +60,10 @@ export function useRunTracker() {
    */
   const [autoPauseOn, setAutoPauseOnState] = useState(() => typeof window === 'undefined' || readFlag(AUTO_PAUSE_KEY, true))
   /** Chế độ kiểm thử GPS (bật bằng ?qa=1 hoặc nút của admin): nhập kịch bản + quãng chuẩn, xem chỉ số chất lượng */
+  const qaParam = useSearchParams().get('qa') === '1'
   const [qaOn, setQaOnState] = useState(() => {
     if (typeof window === 'undefined') return false
-    if (new URLSearchParams(window.location.search).get('qa') === '1') { writeFlag(QA_KEY, true); return true }
+    if (qaParam) { writeFlag(QA_KEY, true); return true }
     return readFlag(QA_KEY, false)
   })
   const [qa, setQa] = useState<QaInput>({ scenario: null, ref_m: null, note: '' })

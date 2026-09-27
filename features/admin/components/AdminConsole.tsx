@@ -1,5 +1,6 @@
 'use client'
 
+import { useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { Activity, BookOpen, Link2, LifeBuoy, ShieldAlert, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, Building2, FlaskConical, type LucideIcon } from 'lucide-react'
 import { ErrorState, Skeleton } from '@/shared/ui'
@@ -61,10 +62,13 @@ const ALL_TABS = GROUPS.flatMap((g) => g.tabs.map((t) => t.id))
 const groupOf = (t: Tab) => GROUPS.find((g) => g.tabs.some((x) => x.id === t)) ?? GROUPS[0]
 
 export function AdminConsole() {
+  // Đọc ?tab=…&edit=… qua router (không đọc window.location: khi chuyển trang trong app, lúc này địa chỉ vẫn là trang cũ)
+  const params = useSearchParams()
   const [tab, setTabState] = useState<Tab>(() => {
-    const t = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null
+    const t = params.get('tab')
     return t && (ALL_TABS as string[]).includes(t) ? (t as Tab) : 'overview'
   })
+  const [editSlug] = useState(() => params.get('edit'))
   // Giữ tab trên thanh địa chỉ (?tab=…) để tải lại / gửi link vẫn đúng chỗ
   const setTab = (t: string) => {
     if (!(ALL_TABS as string[]).includes(t)) return
@@ -120,7 +124,7 @@ export function AdminConsole() {
         : tab === 'gps' ? <GpsQaTab />
         : tab === 'reports' ? <ReportsTab />
         : tab === 'content' ? <CmsScreen />
-        : tab === 'help' ? <HelpAdminTab />
+        : tab === 'help' ? <HelpAdminTab initialEdit={editSlug} />
         : tab === 'bib' ? <BibTab />
         : tab === 'metrics' ? <MetricsTab />
         : tab === 'orders' ? <OrdersTab />

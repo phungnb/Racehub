@@ -15,14 +15,13 @@ const KEY = ['admin', 'help'] as const
 const EMPTY: HelpInput = { slug: '', section: 'GUIDE', title: '', icon: '', summary: '', body: '', version: '1.0', effective_at: null, sort: 100, is_published: true, needs_review: false }
 
 /** Quản trị → Cộng đồng → Hướng dẫn & chính sách: soạn trang menu ☰ + thông tin pháp nhân */
-export function HelpAdminTab() {
+export function HelpAdminTab({ initialEdit = null }: { initialEdit?: string | null } = {}) {
   const q = useQuery({ queryKey: KEY, queryFn: adminHelpList })
   const [editing, setEditing] = useState<HelpAdminPage | { preset: Partial<HelpInput> } | null>(null)
   // Mở từ nút "Sửa trang này" (?edit=slug): vào thẳng trình soạn trang đó; trang chưa có thì tạo mới với slug sẵn
-  const [wanted, setWanted] = useState(() => (typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('edit')))
+  const [wanted, setWanted] = useState(initialEdit)
   if (wanted && q.data) {
     setWanted(null)
-    window.history.replaceState(null, '', '?tab=help')
     setEditing(q.data.pages.find((p) => p.slug === wanted) ?? { preset: { slug: wanted, section: wanted === 'terms' || wanted === 'privacy' ? 'POLICY' : 'GUIDE' } })
   }
   if (q.isPending) return <div className="space-y-2"><Skeleton className="h-24" /><Skeleton className="h-64" /></div>

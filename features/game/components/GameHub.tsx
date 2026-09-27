@@ -1,5 +1,6 @@
 'use client'
 
+import { useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { CalendarCheck, Check, ChevronRight, ChevronUp, Flame, Gift, ShieldCheck, Trophy } from 'lucide-react'
 import { Avatar, Card, ErrorState, LevelBadge, ProgressBar, ProgressRing, Skeleton } from '@/shared/ui'
@@ -27,7 +28,8 @@ export function GameHub({ profile }: { profile: Profile }) {
 
 function Hub({ profile, s }: { profile: Profile; s: GameState }) {
   // ?goal=1 (từ bài Knowledge "Đặt mục tiêu tuần") → mở ngay sheet chuỗi ngày & mục tiêu
-  const [streakOpen, setStreakOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('goal'))
+  const params = useSearchParams()
+  const [streakOpen, setStreakOpen] = useState(() => params.has('goal'))
   const [leagueOpen, setLeagueOpen] = useState(false)
   const [showWeekly, setShowWeekly] = useState(false)
   const mq = useMyQuests()
@@ -176,7 +178,8 @@ function LeagueCard({ s, onOpen }: { s: GameState; onOpen: () => void }) {
 /** Phần thưởng chưa xem (vd. bài chạy Strava vừa về, kết quả league tuần): mở chuỗi phần thưởng */
 function UnseenRewards({ events }: { events: GameState['unseen'] }) {
   // Bài chạy mới về (mở từ thông báo "Bài chạy đã về", hoặc mở app lần đầu sau khi bài về) → tự bật màn nhận thưởng
-  const [open, setOpen] = useState(() => shouldAutoOpenRewards(events))
+  const fromLink = useSearchParams().has('rewards')
+  const [open, setOpen] = useState(() => shouldAutoOpenRewards(events, fromLink))
   const markSeen = useMarkSeen()
   if (!events.length) return null
   const close = () => {
@@ -205,10 +208,9 @@ function UnseenRewards({ events }: { events: GameState['unseen'] }) {
 const AUTO_KEY = 'rh-auto-rewards'
 
 /** Tự mở một lần cho mỗi bài chạy mới; mở từ link thông báo (?rewards=1) thì luôn mở */
-function shouldAutoOpenRewards(events: GameState['unseen']) {
+function shouldAutoOpenRewards(events: GameState['unseen'], fromLink: boolean) {
   if (!events.length || typeof window === 'undefined') return false
   const runs = events.filter((e) => e.kind === 'RUN').map((e) => e.id)
-  const fromLink = new URLSearchParams(location.search).has('rewards')
   let shown: string[] = []
   try { shown = JSON.parse(localStorage.getItem(AUTO_KEY) ?? '[]') } catch { /* trình duyệt chặn lưu */ }
   const fresh = runs.filter((id) => !shown.includes(id))
