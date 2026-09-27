@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Activity, BookOpen, Link2, LifeBuoy, ShieldAlert, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, Building2, type LucideIcon } from 'lucide-react'
+import { Activity, BookOpen, Link2, LifeBuoy, ShieldAlert, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, Building2, FlaskConical, type LucideIcon } from 'lucide-react'
 import { ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { adminErrorMessage } from '../api/adminApi'
@@ -30,13 +30,14 @@ import { AuditTab } from './console/AuditTab'
 import { ReportsTab } from './console/ReportsTab'
 import { BibTab } from './console/BibTab'
 import { StravaTab } from './console/StravaTab'
+import { GpsQaTab } from './console/GpsQaTab'
 import { CmsScreen } from '@/features/knowledge'
 import { HelpAdminTab } from '@/features/help'
 import { EnterpriseAdminTab } from '@/features/org'
 import { DrawPanel } from '@/features/draw'
 
 type Tab = 'overview' | 'metrics' | 'users' | 'review' | 'reports' | 'challenges' | 'clubs' | 'cups' | 'partners' | 'organizers' | 'content' | 'help' | 'bib'
-  | 'enterprise' | 'draws' | 'orders' | 'plans' | 'promos' | 'quests' | 'gifts' | 'items' | 'grant' | 'passes' | 'policy' | 'system' | 'audit' | 'strava'
+  | 'enterprise' | 'draws' | 'orders' | 'plans' | 'promos' | 'quests' | 'gifts' | 'items' | 'grant' | 'passes' | 'policy' | 'system' | 'audit' | 'strava' | 'gps'
 type Badge = keyof AdminInbox
 const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; label: string; icon: LucideIcon; badge?: Badge }[] }[] = [
   { id: 'home', label: 'Tổng quan', icon: LayoutDashboard, tabs: [
@@ -54,7 +55,7 @@ const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; la
   { id: 'economy', label: 'Kinh tế', icon: Coins, tabs: [
     { id: 'grant', label: 'Cộng/Trừ Xu', icon: Coins }, { id: 'passes', label: 'Lượt tạo', icon: Ticket }, { id: 'policy', label: 'Chính sách', icon: ScrollText }] },
   { id: 'system', label: 'Hệ thống', icon: Activity, tabs: [
-    { id: 'system', label: 'Kiểm tra hệ thống', icon: Activity, badge: 'errors' }, { id: 'audit', label: 'Nhật ký quản trị', icon: History }, { id: 'strava', label: 'Strava', icon: Link2 }] },
+    { id: 'system', label: 'Kiểm tra hệ thống', icon: Activity, badge: 'errors' }, { id: 'audit', label: 'Nhật ký quản trị', icon: History }, { id: 'strava', label: 'Strava', icon: Link2 }, { id: 'gps', label: 'Kiểm thử GPS', icon: FlaskConical }] },
 ]
 const ALL_TABS = GROUPS.flatMap((g) => g.tabs.map((t) => t.id))
 const groupOf = (t: Tab) => GROUPS.find((g) => g.tabs.some((x) => x.id === t)) ?? GROUPS[0]
@@ -116,6 +117,7 @@ export function AdminConsole() {
         : tab === 'challenges' ? <ChallengesTab />
         : tab === 'audit' ? <AuditTab />
         : tab === 'strava' ? <StravaTab />
+        : tab === 'gps' ? <GpsQaTab />
         : tab === 'reports' ? <ReportsTab />
         : tab === 'content' ? <CmsScreen />
         : tab === 'help' ? <HelpAdminTab />

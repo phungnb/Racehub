@@ -1,5 +1,5 @@
 -- RaceHub — PHẦN 13/14 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 008500, 008600, 008700
+-- Gồm: 008500, 008600, 008700, 008800, 008900
 -- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
 -- Xong thì chạy phần tiếp theo.
 begin;
@@ -914,6 +914,323 @@ end $$;
 
 revoke all on function public.org_overview(uuid, timestamptz, timestamptz) from public, anon;
 grant execute on function public.org_overview(uuid, timestamptz, timestamptz) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001008800_gps_quality.sql
+-- ===================================================================
+-- 008800: Chất lượng GPS của bài chạy ghi bằng app + kiểm thử thực địa.
+-- • public.activity_gps_quality: MỘT dòng tóm tắt nhỏ (≤ 8 KB) cho mỗi bài DIRECT_GPS — số điểm nhận / bị loại theo lý do,
+--   sai số trung bình, số lần + tổng giây mất tín hiệu, số lần ẩn app / tắt màn hình, tạm dừng, đứng nghỉ lâu, phần đứng yên
+--   cuối bài bị cắt, nhật ký sự kiện, thiết bị (web / ios / android) và phần kiểm thử (kịch bản, quãng đường chuẩn, ghi chú).
+--   KHÔNG lưu từng điểm bị loại (dữ liệu gấp 3–5 lần). Bảng riêng, không ai đọc trực tiếp: chủ bài + admin xem qua RPC.
+-- • activity_attach_gps_quality(started_at, q): app gửi sau khi lưu bài (cả bài gửi lại từ hàng chờ) — tìm bài theo giờ bắt đầu.
+-- • activity_gps_quality(activity): chủ bài / admin xem.
+-- • admin_gps_qa_list(days): admin — các bài kiểm thử thực địa + thống kê chất lượng mọi bài ghi bằng app.
+-- Không đổi submit_and_process_activity. Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT, không RETURNING INTO. Chạy lại an toàn.
+
+create table if not exists public.activity_gps_quality (
+  activity_id uuid primary key references public.activities(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  data jsonb not null,
+  is_qa boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists activity_gps_quality_qa_idx on public.activity_gps_quality (created_at desc) where is_qa;
+create index if not exists activity_gps_quality_created_idx on public.activity_gps_quality (created_at desc);
+alter table public.activity_gps_quality enable row level security;
+revoke all on public.activity_gps_quality from public, anon, authenticated;
+
+create or replace function public.activity_attach_gps_quality(p_started_at timestamptz, p_quality jsonb) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_act uuid := (select (array_agg(a.id order by a.created_at desc))[1] from public.activities a
+                  where a.user_id = v_uid and a.source = 'DIRECT_GPS' and a.started_at = p_started_at);
+begin
+  if p_quality is null or jsonb_typeof(p_quality) <> 'object' then raise exception 'INVALID_INPUT'; end if;
+  if octet_length(p_quality::text) > 8192 then raise exception 'PAYLOAD_TOO_LARGE'; end if;
+  if v_act is null then return false; end if;
+  insert into public.activity_gps_quality (activity_id, user_id, data, is_qa)
+  values (v_act, v_uid, p_quality, jsonb_typeof(p_quality->'qa') = 'object')
+  on conflict (activity_id) do nothing;
+  return true;
+end $$;
+
+create or replace function public.activity_gps_quality(p_activity_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_uid uuid := auth.uid();
+  q public.activity_gps_quality := (select x from public.activity_gps_quality x where x.activity_id = p_activity_id);
+begin
+  if q.activity_id is null then return null; end if;
+  if q.user_id is distinct from v_uid and not public.is_system_admin() then raise exception 'FORBIDDEN'; end if;
+  return q.data;
+end $$;
+
+create or replace function public.admin_gps_qa_list(p_days integer default 60) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_admin uuid := private.require_admin();
+  v_from timestamptz := now() - make_interval(days => least(greatest(coalesce(p_days, 60), 1), 365));
+begin
+  return jsonb_build_object(
+    'runs', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'activity_id', r.activity_id, 'user_id', r.user_id, 'name', private.display_name(r.user_id),
+               'started_at', a.started_at, 'distance_m', a.distance_m, 'moving_s', a.moving_time_s, 'elapsed_s', a.elapsed_time_s,
+               'validation_status', a.validation_status, 'data', r.data) order by r.created_at desc)
+        from (select x.*, row_number() over (order by x.created_at desc) as rn
+                from public.activity_gps_quality x where x.is_qa and x.created_at >= v_from) r
+        join public.activities a on a.id = r.activity_id
+       where r.rn <= 300), '[]'::jsonb),
+    'all', (select jsonb_build_object(
+              'runs', count(*)::int,
+              'fixes', coalesce(sum((x.data->>'fixes')::numeric), 0),
+              'accepted', coalesce(sum((x.data->>'accepted')::numeric), 0),
+              'with_gaps', count(*) filter (where coalesce((x.data->>'gaps')::int, 0) > 0)::int,
+              'gap_s', coalesce(sum((x.data->>'gap_s')::numeric), 0),
+              'trimmed', count(*) filter (where coalesce((x.data->>'trimmed_s')::int, 0) > 0)::int,
+              'auto_stopped', count(*) filter (where coalesce((x.data->>'auto_stopped')::int, 0) > 0)::int,
+              'acc_avg', round(avg((x.data->>'acc_avg')::numeric), 1),
+              'by_platform', coalesce((select jsonb_object_agg(pl, n) from (
+                  select coalesce(y.data->>'platform', 'web') as pl, count(*)::int as n
+                    from public.activity_gps_quality y where y.created_at >= v_from group by 1) z), '{}'::jsonb))
+              from public.activity_gps_quality x where x.created_at >= v_from),
+    'days', least(greatest(coalesce(p_days, 60), 1), 365));
+end $$;
+
+revoke all on function public.activity_attach_gps_quality(timestamptz, jsonb), public.activity_gps_quality(uuid),
+  public.admin_gps_qa_list(integer) from public, anon;
+grant execute on function public.activity_attach_gps_quality(timestamptz, jsonb), public.activity_gps_quality(uuid),
+  public.admin_gps_qa_list(integer) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001008900_club_rpc_auth_fix.sql
+-- ===================================================================
+-- 008900: VÁ BẢO MẬT + nguyên tắc "chỉ chủ nhiệm và người được phân quyền mới sửa CLB" — các hàm quản lý CLB đời đầu (có sẵn trên production trước khi dùng migration) kiểm tra quyền kiểu
+--   if public.club_role(club) not in ('OWNER','CAPTAIN') then raise ...
+-- club_role() trả về NULL khi người gọi KHÔNG thuộc CLB (hoặc chưa đăng nhập) → "NULL not in (...)" = NULL → KHÔNG báo lỗi →
+-- bất kỳ ai (kể cả chưa đăng nhập) đổi được tên / mô tả / ảnh / thông báo / chính sách tham gia của mọi CLB, đổi mã mời,
+-- đổi vai trò / duyệt / cấm thành viên, chuyển quyền chủ CLB (tự tham gia CLB mở rồi chuyển chủ cho mình).
+-- Sửa: so sánh với coalesce(club_role(...), '') (không phải thành viên = không có quyền); giữ nguyên chữ ký + kiểu trả về
+-- + hành vi với chủ / đội trưởng / admin hệ thống. Thu hồi quyền gọi của khách chưa đăng nhập (anon) với các hàm ghi.
+-- Không đổi club_role (chính sách club_treasury_select dùng "is not null"). Chạy được trong SQL Editor: không DO $$,
+-- không SELECT INTO, không LIMIT, không RETURNING INTO. Chạy lại an toàn.
+
+create or replace function public.rotate_invite_code(p_club_id uuid) returns text
+language plpgsql security definer set search_path = public as $$
+declare v_code text;
+begin
+  if coalesce(public.club_role(p_club_id), '') not in ('OWNER', 'CAPTAIN') then raise exception 'FORBIDDEN'; end if;
+  loop
+    v_code := encode(extensions.gen_random_bytes(6), 'hex');
+    exit when not exists (select 1 from public.clubs where invite_code = v_code);
+  end loop;
+  update public.clubs set invite_code = v_code where id = p_club_id;
+  return v_code;
+end $$;
+
+create or replace function public.set_club_announcement(p_club_id uuid, p_text text) returns public.clubs
+language plpgsql security definer set search_path = public as $$
+declare v_text text := nullif(trim(coalesce(p_text, '')), '');
+begin
+  if coalesce(public.club_role(p_club_id), '') not in ('OWNER', 'CAPTAIN') then raise exception 'FORBIDDEN'; end if;
+  if char_length(coalesce(p_text, '')) > 500 then raise exception 'ANNOUNCEMENT_TOO_LONG'; end if;
+  update public.clubs
+     set announcement = v_text,
+         announced_at = case when v_text is null then null else now() end,
+         announced_by = case when v_text is null then null else auth.uid() end
+   where id = p_club_id;
+  return (select c from public.clubs c where c.id = p_club_id);
+end $$;
+
+create or replace function public.update_club(p_club_id uuid, p_name text default null, p_description text default null,
+                                              p_avatar_url text default null, p_avatar_path text default null) returns public.clubs
+language plpgsql security definer set search_path = public as $$
+declare
+  v_old_path text;
+  v_club public.clubs;
+begin
+  if coalesce(public.club_role(p_club_id), '') not in ('OWNER', 'CAPTAIN') then raise exception 'FORBIDDEN'; end if;
+  v_old_path := (select c.avatar_path from public.clubs c where c.id = p_club_id);
+  if p_name is not null then
+    if trim(p_name) = '' then raise exception 'NAME_REQUIRED'; end if;
+    if char_length(trim(p_name)) > 60 then raise exception 'NAME_TOO_LONG'; end if;
+  end if;
+  if p_description is not null and char_length(p_description) > 300 then raise exception 'DESC_TOO_LONG'; end if;
+  begin
+    update public.clubs
+       set name        = coalesce(nullif(trim(coalesce(p_name, '')), ''), name),
+           description = case when p_description is null then description else nullif(trim(p_description), '') end,
+           avatar_url  = case when p_avatar_url is null then avatar_url else nullif(trim(p_avatar_url), '') end,
+           avatar_path = case when p_avatar_url is null then avatar_path else nullif(trim(coalesce(p_avatar_path, '')), '') end
+     where id = p_club_id;
+  exception when unique_violation then
+    raise exception 'NAME_TAKEN';
+  end;
+  v_club := (select c from public.clubs c where c.id = p_club_id);
+  if v_club.id is null then raise exception 'CLUB_NOT_FOUND'; end if;
+  -- Dọn file ảnh cũ để storage không phình
+  if p_avatar_url is not null and v_old_path is not null and v_old_path is distinct from v_club.avatar_path then
+    delete from storage.objects where bucket_id = 'club-avatars' and name = v_old_path;
+  end if;
+  return v_club;
+end $$;
+
+create or replace function public.update_club_policy(p_club_id uuid, p_join_policy text default null, p_member_limit integer default null)
+returns public.clubs
+language plpgsql security definer set search_path = public as $$
+declare v_club public.clubs;
+begin
+  if coalesce(public.club_role(p_club_id), '') <> 'OWNER' then raise exception 'FORBIDDEN'; end if;
+  if p_join_policy is not null and p_join_policy not in ('OPEN', 'APPROVAL', 'INVITE_ONLY') then raise exception 'INVALID_POLICY'; end if;
+  if p_member_limit is not null then
+    if p_member_limit < 2 or p_member_limit > 1000 then raise exception 'INVALID_LIMIT'; end if;
+    if p_member_limit < (select c.member_count from public.clubs c where c.id = p_club_id) then raise exception 'LIMIT_BELOW_CURRENT'; end if;
+  end if;
+  update public.clubs
+     set join_policy = coalesce(p_join_policy, join_policy), member_limit = coalesce(p_member_limit, member_limit)
+   where id = p_club_id;
+  v_club := (select c from public.clubs c where c.id = p_club_id);
+  -- Chuyển sang OPEN thì duyệt luôn hàng chờ, trong giới hạn còn trống
+  if p_join_policy = 'OPEN' then
+    update public.club_members m set status = 'APPROVED', joined_at = now()
+     where m.id in (select x.id from (
+             select pm.id, row_number() over (order by pm.joined_at) as rn
+               from public.club_members pm where pm.club_id = p_club_id and pm.status = 'PENDING') x
+             where x.rn <= greatest(v_club.member_limit - v_club.member_count, 0));
+    v_club := (select c from public.clubs c where c.id = p_club_id);
+  end if;
+  return v_club;
+end $$;
+
+create or replace function public.set_member_role(p_member_id uuid, p_role text) returns public.club_members
+language plpgsql security definer set search_path = public as $$
+declare v_row public.club_members := (select m from public.club_members m where m.id = p_member_id);
+begin
+  if p_role not in ('CAPTAIN', 'MEMBER') then raise exception 'INVALID_ROLE'; end if;
+  if v_row.id is null then raise exception 'MEMBER_NOT_FOUND'; end if;
+  if coalesce(public.club_role(v_row.club_id), '') <> 'OWNER' then raise exception 'FORBIDDEN'; end if;
+  if v_row.role = 'OWNER' then raise exception 'FORBIDDEN'; end if;
+  if v_row.status <> 'APPROVED' then raise exception 'TARGET_NOT_APPROVED'; end if;
+  update public.club_members set role = p_role where id = p_member_id;
+  return (select m from public.club_members m where m.id = p_member_id);
+end $$;
+
+create or replace function public.set_member_status(p_member_id uuid, p_status text) returns public.club_members
+language plpgsql security definer set search_path = public as $$
+declare
+  v_row public.club_members := (select m from public.club_members m where m.id = p_member_id);
+  v_me text;
+  v_club public.clubs;
+begin
+  if p_status not in ('APPROVED', 'REJECTED', 'BANNED') then raise exception 'INVALID_STATUS'; end if;
+  if v_row.id is null then raise exception 'MEMBER_NOT_FOUND'; end if;
+  v_me := coalesce(public.club_role(v_row.club_id), '');
+  if v_me not in ('OWNER', 'CAPTAIN') then raise exception 'FORBIDDEN'; end if;
+  if v_row.role = 'OWNER' then raise exception 'FORBIDDEN'; end if;
+  if public.club_rank(v_me) <= public.club_rank(v_row.role) then raise exception 'FORBIDDEN'; end if;
+  if p_status = 'APPROVED' then
+    v_club := (select c from public.clubs c where c.id = v_row.club_id);
+    if v_club.member_count >= v_club.member_limit then raise exception 'CLUB_FULL'; end if;
+  end if;
+  update public.club_members
+     set status = p_status, joined_at = case when p_status = 'APPROVED' then now() else joined_at end
+   where id = p_member_id;
+  return (select m from public.club_members m where m.id = p_member_id);
+end $$;
+
+create or replace function public.transfer_ownership(p_club_id uuid, p_to_user uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_target public.club_members := (select m from public.club_members m
+                                          where m.club_id = p_club_id and m.user_id = p_to_user and m.status = 'APPROVED');
+begin
+  if coalesce(public.club_role(p_club_id), '') <> 'OWNER' then raise exception 'FORBIDDEN'; end if;
+  if v_target.id is null then raise exception 'TARGET_NOT_APPROVED'; end if;
+  update public.club_members set role = 'CAPTAIN' where club_id = p_club_id and user_id = auth.uid();
+  update public.club_members set role = 'OWNER' where id = v_target.id;
+  update public.clubs set owner_id = p_to_user where id = p_club_id;
+end $$;
+
+create or replace function public.remove_member(p_member_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_row public.club_members := (select m from public.club_members m where m.id = p_member_id);
+  v_me text;
+begin
+  if auth.uid() is null then raise exception 'AUTH_REQUIRED'; end if;
+  if v_row.id is null then return; end if;
+  v_me := public.club_role(v_row.club_id);
+  if v_row.user_id = auth.uid() then
+    if v_row.role = 'OWNER' then raise exception 'OWNER_CANNOT_LEAVE'; end if;
+  elsif v_me is null or public.club_rank(v_me) <= public.club_rank(v_row.role) then
+    raise exception 'FORBIDDEN';
+  end if;
+  delete from public.club_members where id = p_member_id;
+end $$;
+
+-- Nguyên tắc: trong một CLB chỉ CHỦ NHIỆM (OWNER) và người được chủ nhiệm PHÂN QUYỀN (Ban quản trị — CAPTAIN) được tạo /
+-- sửa / xoá nội dung và cài đặt của CLB (admin hệ thống vẫn toàn quyền — 007100). Thành viên chỉ tham gia: bình chọn,
+-- đăng ký sự kiện, bình luận, thả tim, nhắn tin, đặt hàng, báo đã nộp phí.
+-- Bình chọn: trước đây thành viên nào cũng tạo được → chỉ Ban quản trị.
+create or replace function public.create_club_poll(p_club_id uuid, p_question text, p_options text[], p_multi boolean,
+                                                   p_closes_at timestamptz, p_hide_results boolean) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := private.require_staff(p_club_id); v_id uuid := gen_random_uuid(); v_opts jsonb; m record;
+begin
+  if char_length(trim(coalesce(p_question, ''))) not between 3 and 200 then raise exception 'INVALID_QUESTION'; end if;
+  v_opts := (select coalesce(jsonb_agg(trim(o) order by i), '[]'::jsonb)
+               from unnest(p_options) with ordinality as t(o, i) where char_length(trim(coalesce(o, ''))) between 1 and 80);
+  if jsonb_array_length(v_opts) not between 2 and 10 or jsonb_array_length(v_opts) <> cardinality(p_options) then
+    raise exception 'INVALID_OPTIONS';
+  end if;
+  if p_closes_at is not null and p_closes_at <= now() then raise exception 'INVALID_TIME'; end if;
+  if (select count(*) from public.club_polls where created_by = v_uid and created_at > now() - interval '1 hour') >= 5 then
+    raise exception 'RATE_LIMITED';
+  end if;
+  insert into public.club_polls (id, club_id, created_by, question, options, multi, hide_results, closes_at)
+  values (v_id, p_club_id, v_uid, trim(p_question), v_opts, coalesce(p_multi, false), coalesce(p_hide_results, false), p_closes_at);
+  for m in select user_id from public.club_members where club_id = p_club_id and status = 'APPROVED' and user_id <> v_uid loop
+    perform private.notify(m.user_id, p_club_id, 'CLUB_POLL', private.display_name(v_uid) || ' tạo bình chọn', trim(p_question),
+      '/clubs/' || p_club_id || '/events', v_uid, false);
+  end loop;
+  return v_id;
+end $$;
+
+-- Ảnh đại diện CLB (bucket club-avatars, thư mục <club_id>/…): chỉ Ban quản trị CLB được tải lên / thay / xoá.
+-- Chính sách HẠN CHẾ (restrictive): cộng thêm điều kiện lên mọi chính sách sẵn có của bucket trên production.
+drop policy if exists club_avatars_staff_insert on storage.objects;
+create policy club_avatars_staff_insert on storage.objects as restrictive for insert to authenticated
+  with check (bucket_id <> 'club-avatars' or public.club_is_staff(public.safe_uuid((storage.foldername(name))[1])));
+drop policy if exists club_avatars_staff_update on storage.objects;
+create policy club_avatars_staff_update on storage.objects as restrictive for update to authenticated
+  using (bucket_id <> 'club-avatars' or public.club_is_staff(public.safe_uuid((storage.foldername(name))[1])));
+drop policy if exists club_avatars_staff_delete on storage.objects;
+create policy club_avatars_staff_delete on storage.objects as restrictive for delete to authenticated
+  using (bucket_id <> 'club-avatars' or public.club_is_staff(public.safe_uuid((storage.foldername(name))[1])));
+
+-- Khách chưa đăng nhập không có lý do gọi các hàm ghi / tra quyền này
+revoke execute on function public.rotate_invite_code(uuid), public.set_club_announcement(uuid, text),
+  public.update_club(uuid, text, text, text, text), public.update_club_policy(uuid, text, integer),
+  public.set_member_role(uuid, text), public.set_member_status(uuid, text), public.transfer_ownership(uuid, uuid),
+  public.remove_member(uuid), public.join_club(uuid), public.delete_club(uuid), public.delete_club(uuid, text),
+  public.admin_help_delete(text), public.admin_help_list(), public.admin_help_save(jsonb),
+  public.admin_site_info_save(jsonb), public.get_challenge_fee(integer), public.validate_fee_tiers(jsonb)
+  from public, anon;
+grant execute on function public.rotate_invite_code(uuid), public.set_club_announcement(uuid, text),
+  public.update_club(uuid, text, text, text, text), public.update_club_policy(uuid, text, integer),
+  public.set_member_role(uuid, text), public.set_member_status(uuid, text), public.transfer_ownership(uuid, uuid),
+  public.remove_member(uuid), public.join_club(uuid), public.delete_club(uuid), public.delete_club(uuid, text),
+  public.admin_help_delete(text), public.admin_help_list(), public.admin_help_save(jsonb),
+  public.admin_site_info_save(jsonb), public.get_challenge_fee(integer), public.validate_fee_tiers(jsonb)
+  to authenticated;
+-- Hàm trigger: không ai gọi trực tiếp qua API
+revoke execute on function public.handle_new_user(), public.sync_club_member_count(), public.trigger_auto_reward_on_activity()
+  from public, anon, authenticated;
 
 notify pgrst, 'reload schema';
 

@@ -142,7 +142,12 @@ begin
     jsonb_build_object('file', '20261001008600', 'label', 'Tổ chức demo cho admin / khách dùng thử gói Doanh nghiệp',
       'ok', to_regprocedure('public.admin_create_demo_org(jsonb)') is not null),
     jsonb_build_object('file', '20261001008700', 'label', 'Tổng quan tổ chức: chỉ số, BXH phòng ban / CLB / cá nhân, km theo ngày',
-      'ok', to_regprocedure('public.org_overview(uuid, timestamp with time zone, timestamp with time zone)') is not null));
+      'ok', to_regprocedure('public.org_overview(uuid, timestamp with time zone, timestamp with time zone)') is not null),
+    jsonb_build_object('file', '20261001008800', 'label', 'Chất lượng GPS của bài chạy ghi bằng app + kiểm thử GPS thực địa',
+      'ok', to_regprocedure('public.admin_gps_qa_list(integer)') is not null and to_regclass('public.activity_gps_quality') is not null),
+    jsonb_build_object('file', '20261001008900', 'label', 'VÁ BẢO MẬT: chặn người ngoài CLB / khách sửa CLB, đổi mã mời, chuyển quyền chủ',
+      'ok', not has_function_privilege('anon', 'public.update_club(uuid, text, text, text, text)', 'execute')
+            and position('coalesce' in (select p.prosrc from pg_proc p where p.oid = 'public.transfer_ownership(uuid, uuid)'::regprocedure)) > 0));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

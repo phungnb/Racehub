@@ -197,8 +197,10 @@ describe('CLB: thu chi VND + bình chọn (001500)', () => {
   })
 
   it('bình chọn: một / nhiều lựa chọn, đổi phiếu, ẩn kết quả tới khi đóng', async () => {
-    const p = (await rpc<{ id: string }>(db, MEM, `select public.create_club_poll($1, 'Chạy ở đâu Chủ nhật?', array['Hồ Tây', 'Công viên Yên Sở', 'Cầu Long Biên'], false, null, true) as id`, [CLUB]))[0].id
-    expect(await fails(db, MEM, `select public.create_club_poll($1, 'Hỏi gì?', array['Một'], false, null, false)`, [CLUB])).toContain('INVALID_OPTIONS')
+    // 008900: chỉ chủ nhiệm / Ban quản trị tạo bình chọn; thành viên chỉ bỏ phiếu
+    expect(await fails(db, MEM, `select public.create_club_poll($1, 'Chạy ở đâu?', array['A', 'B'], false, null, false)`, [CLUB])).toContain('FORBIDDEN')
+    const p = (await rpc<{ id: string }>(db, OWNER, `select public.create_club_poll($1, 'Chạy ở đâu Chủ nhật?', array['Hồ Tây', 'Công viên Yên Sở', 'Cầu Long Biên'], false, null, true) as id`, [CLUB]))[0].id
+    expect(await fails(db, OWNER, `select public.create_club_poll($1, 'Hỏi gì?', array['Một'], false, null, false)`, [CLUB])).toContain('INVALID_OPTIONS')
     await rpc(db, MEM, `select public.vote_club_poll($1, array[0])`, [p])
     await rpc(db, MEM2, `select public.vote_club_poll($1, array[1])`, [p])
     await rpc(db, MEM2, `select public.vote_club_poll($1, array[0])`, [p])                        // đổi phiếu
@@ -209,7 +211,7 @@ describe('CLB: thu chi VND + bình chọn (001500)', () => {
     expect(polls[0]).toMatchObject({ counts: null, voters: 2, my_choices: [0], closed: false })     // ẩn kết quả
     expect((await one<Poll[]>(db, OWNER, `select public.club_polls($1) as r`, [CLUB]))[0].counts).toEqual([2, 0, 0])
     expect(await fails(db, MEM2, `select public.close_club_poll($1)`, [p])).toContain('FORBIDDEN')
-    await rpc(db, MEM, `select public.close_club_poll($1)`, [p])
+    await rpc(db, OWNER, `select public.close_club_poll($1)`, [p])
     polls = await one<Poll[]>(db, MEM2, `select public.club_polls($1) as r`, [CLUB])
     expect(polls[0]).toMatchObject({ counts: [2, 0, 0], closed: true })
     expect(await fails(db, MEM2, `select public.vote_club_poll($1, array[1])`, [p])).toContain('POLL_CLOSED')
