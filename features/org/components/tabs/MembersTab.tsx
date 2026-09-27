@@ -11,7 +11,8 @@ import {
   deletePendingInvite, importOrgMembers, listOrgMembers, listPendingInvites, orgErrorMessage, setOrgMember,
   type ImportResult, type ImportRow, type OrgDetail, type OrgMember,
 } from '../../api/orgApi'
-import { downloadCsv, parseCsv, unitOptions } from '../../model/org'
+import { parseCsv, unitOptions } from '../../model/org'
+import { downloadXlsx, readSpreadsheet, SPREADSHEET_ACCEPT } from '@/shared/lib/excel'
 
 export const ROLE_LABEL = { OWNER: 'Sở hữu', ADMIN: 'Quản trị', UNIT_ADMIN: 'Trưởng đơn vị', MEMBER: 'Thành viên' } as const
 
@@ -41,9 +42,10 @@ export function MembersTab({ org }: { org: OrgDetail }) {
   return (
     <div className="space-y-3">
       {org.is_admin && (
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="secondary" onClick={() => setImporting(true)}><FileUp className="size-4" aria-hidden />Nhập danh sách</Button>
-          <Button variant="secondary" onClick={() => setInvites(true)}><MailQuestion className="size-4" aria-hidden />Lời mời chờ{org.pending_invites ? ` (${org.pending_invites})` : ''}</Button>
+        <div className="grid grid-cols-3 gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setImporting(true)}><FileUp className="size-4" aria-hidden />Nhập Excel</Button>
+          <Button variant="secondary" size="sm" disabled={!q.data?.length} onClick={() => void exportMembers(org, q.data ?? [], units)}><Download className="size-4" aria-hidden />Xuất Excel</Button>
+          <Button variant="secondary" size="sm" onClick={() => setInvites(true)}><MailQuestion className="size-4" aria-hidden />Mời chờ{org.pending_invites ? ` (${org.pending_invites})` : ''}</Button>
         </div>
       )}
       {org.is_unit_admin && <p className="rounded-xl bg-surface-2 p-2.5 text-xs text-fg-muted">Bạn là trưởng đơn vị: duyệt, gán đơn vị và mời ra người trong đơn vị của mình.</p>}
@@ -165,24 +167,48 @@ function toRows(table: string[][]): ImportRow[] {
   })).filter((r) => r.email)
 }
 
-/** Nhập danh sách nhân viên từ Excel (lưu CSV) — email, đơn vị nhiều cấp, mã NV, vai trò */
+/** Xuất danh sách thành viên ra Excel: họ tên, đơn vị (đường dẫn đủ cấp), mã NV, vai trò, trạng thái, ngày vào */
+async function exportMembers(org: OrgDetail, members: OrgMember[], units: ReturnType<typeof unitOptions<OrgDetail['units'][number]>>) {
+  const path = new Map(units.map((u) => [u.id, u.path]))
+  await downloadXlsx(`thanh-vien-${org.name.slice(0, 30)}`, [{
+    name: 'Thành viên', head: ['Họ tên', org.unit_label, 'Mã NV', 'Vai trò', 'Trạng thái', 'Ngày vào'],
+    rows: members.map((m) => [m.name, (m.unit_id && path.get(m.unit_id)) || m.unit_name || '', m.employee_code ?? '', ROLE_LABEL[m.role],
+      m.status === 'APPROVED' ? 'Đã duyệt' : 'Chờ duyệt', new Date(m.joined_at).toLocaleDateString('vi-VN')]),
+  }]).catch(() => toast.error('Không tạo được file Excel, thử lại.'))
+}
+
+/** Nhập danh sách nhân viên từ Excel (.xlsx) hoặc CSV — email, đơn vị nhiều cấp, mã NV, vai trò */
 function ImportSheet({ org, onClose }: { org: OrgDetail; onClose: () => void }) {
   const qc = useQueryClient()
   const [text, setText] = useState('')
+  const [fileTable, setFileTable] = useState<string[][] | null>(null)
+  const [fileName, setFileName] = useState('')
   const [createUnits, setCreateUnits] = useState(true)
   const [removeMissing, setRemoveMissing] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
-  const rows = useMemo(() => toRows(parseCsv(text)), [text])
+  const rows = useMemo(() => toRows(fileTable ?? parseCsv(text)), [fileTable, text])
   const run = useMutation({
     mutationFn: () => importOrgMembers(org.id, rows, { create_units: createUnits, remove_missing: removeMissing }),
     onSuccess: (r) => { setResult(r); void qc.invalidateQueries({ queryKey: ['org', org.id] }) },
     onError: (e) => toast.error(orgErrorMessage(e)),
   })
-  const template = () => downloadCsv('mau-danh-sach.csv', ['Email', 'Đơn vị', 'Mã NV', 'Vai trò'], [
-    ['nguyen.an@congty.vn', 'Miền Bắc / Hà Nội / Phòng Kỹ thuật', 'NV001', 'Thành viên'],
-    ['tran.binh@congty.vn', 'Miền Bắc / Hà Nội / Phòng Kỹ thuật', 'NV002', 'Trưởng đơn vị']])
+  const template = () => void downloadXlsx('mau-danh-sach-thanh-vien', [
+    { name: 'Danh sách', head: ['Email', 'Đơn vị', 'Mã NV', 'Vai trò'], widths: [30, 42, 12, 16], rows: [
+      ['nguyen.an@congty.vn', 'Miền Bắc / Hà Nội / Phòng Kỹ thuật', 'NV001', 'Thành viên'],
+      ['tran.binh@congty.vn', 'Miền Bắc / Hà Nội / Phòng Kỹ thuật', 'NV002', 'Trưởng đơn vị'],
+      ['le.chi@congty.vn', 'Miền Nam / Phòng Kinh doanh', 'NV003', 'Thành viên']] },
+    { name: 'Hướng dẫn', head: ['Cột', 'Cách điền'], widths: [14, 90], rows: [
+      ['Email', 'Bắt buộc. Email tài khoản RaceHub của nhân viên (chưa có tài khoản → vào mục Lời mời chờ, tự duyệt khi họ đăng ký).'],
+      ['Đơn vị', 'Tên đơn vị, nhiều cấp cách nhau bằng dấu / (tối đa 4 cấp). Bật "Tự tạo đơn vị chưa có" để tạo mới.'],
+      ['Mã NV', 'Không bắt buộc. Hiện trong báo cáo cho nhân sự, thành viên khác không thấy.'],
+      ['Vai trò', 'Để trống / Thành viên, hoặc "Trưởng đơn vị" để quản lý người trong đơn vị.']] },
+  ]).catch(() => toast.error('Không tạo được file mẫu, thử lại.'))
+  const pick = async (f: File) => {
+    try { setFileTable(await readSpreadsheet(f)); setFileName(f.name) }
+    catch (e) { toast.error((e as Error).message === 'XLS_OLD' ? 'Tệp .xls đời cũ: mở bằng Excel rồi Lưu thành .xlsx.' : 'Không đọc được tệp. Dùng .xlsx hoặc .csv.') }
+  }
   return (
-    <Sheet open onClose={onClose} title="Nhập danh sách thành viên" description="Từ Excel: Tệp → Lưu thành → CSV UTF-8. Cột: Email, Đơn vị (nhiều cấp cách nhau bằng /), Mã NV, Vai trò."
+    <Sheet open onClose={onClose} title="Nhập danh sách thành viên" description="Chọn tệp Excel (.xlsx) hoặc CSV. Cột: Email, Đơn vị (nhiều cấp cách nhau bằng /), Mã NV, Vai trò — tải Tệp mẫu để xem."
       footer={result ? <Button block onClick={onClose}>Xong</Button>
         : <Button block loading={run.isPending} disabled={!rows.length} onClick={() => run.mutate()}>Nhập {rows.length} dòng</Button>}>
       {result ? (
@@ -205,13 +231,19 @@ function ImportSheet({ org, onClose }: { org: OrgDetail; onClose: () => void }) 
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-border bg-surface-2 text-sm font-semibold">
-              <FileUp className="size-4" aria-hidden />Chọn tệp CSV
-              <input type="file" accept=".csv,.txt,text/csv" hidden onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setText(await f.text()) }} />
+              <FileUp className="size-4" aria-hidden />Chọn tệp Excel
+              <input type="file" accept={SPREADSHEET_ACCEPT} hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void pick(f) }} />
             </label>
-            <Button variant="ghost" onClick={template}><Download className="size-4" aria-hidden />Tệp mẫu</Button>
+            <Button variant="ghost" onClick={template}><Download className="size-4" aria-hidden />Tệp mẫu (.xlsx)</Button>
           </div>
-          <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} placeholder={'Hoặc dán từ Excel:\nEmail\tĐơn vị\tMã NV\nan@congty.vn\tMiền Bắc / Hà Nội\tNV001'}
-            aria-label="Dán danh sách" className="font-mono text-xs" />
+          {fileTable && (
+            <p className="flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2 text-sm">
+              <span className="truncate">Đã đọc <b>{fileName}</b></span>
+              <button type="button" className="text-xs font-semibold text-brand" onClick={() => { setFileTable(null); setFileName('') }}>Bỏ tệp</button>
+            </p>
+          )}
+          {!fileTable && <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} placeholder={'Hoặc dán từ Excel:\nEmail\tĐơn vị\tMã NV\nan@congty.vn\tMiền Bắc / Hà Nội\tNV001'}
+            aria-label="Dán danh sách" className="font-mono text-xs" />}
           {rows.length > 0 && (
             <div className="rounded-xl border border-border text-xs">
               <p className="border-b border-border px-2 py-1.5 font-semibold">{rows.length} dòng · xem trước</p>

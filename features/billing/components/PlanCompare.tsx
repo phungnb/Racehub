@@ -3,162 +3,178 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Building2, Check, Crown, Minus, Users } from 'lucide-react'
-import { ErrorState, SegmentedControl, Skeleton } from '@/shared/ui'
+import { Building2, Check, Crown, Shield, Users } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button, ErrorState, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatVnd } from '@/shared/lib/economy'
 import { formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
-import { getPlanCompare, type ComparePlan, type PlanCompareData } from '../api/billingApi'
+import { billingErrorMessage, getManagedClubs, getPlanCompare, MONTH_LABEL, type ComparePlan, type Order, type PlanCompareData } from '../api/billingApi'
+import { useActiveSales, useCreateOrder, useMyPlan } from '../hooks/useBilling'
+import { bestSale, salePrice } from '../model/sale'
+import { OrderSheet } from './OrderSheet'
 
-type Tab = 'runner' | 'club' | 'org'
-/** Ô trong bảng: true = có, false = không, chuỗi = giá trị cụ thể */
-type Cell = boolean | string
-interface Row { label: string; cells: Cell[] }
+const creditLine = (p: ComparePlan) =>
+  p.credits.length ? `Lượt tạo thử thách miễn phí mỗi tháng: ${p.credits.map((c) => `${c.per_month} × ≤${formatNumber(c.capacity)} người`).join(', ')}` : null
 
-const monthly = (p: ComparePlan | undefined) => p?.prices.find((x) => x.months === 1)?.price_vnd
-const yearly = (p: ComparePlan | undefined) => p?.prices.find((x) => x.months === 12)?.price_vnd
-const priceCell = (p: ComparePlan | undefined): string => {
-  const m = monthly(p), y = yearly(p)
-  if (m != null) return `${formatVnd(m)}/tháng`
-  if (y != null) return `${formatVnd(y)}/năm`
-  return 'Liên hệ'
-}
-/** Lượt tạo thử thách mỗi tháng: "2 × ≤20 người, 1 × ≤50 người" */
-const creditsCell = (p: ComparePlan): Cell =>
-  p.credits.length ? p.credits.map((c) => `${c.per_month} × ≤${formatNumber(c.capacity)} người`).join(', ') : false
-
-function runnerRows(vip: ComparePlan[]): Row[] {
-  const all = (v: Cell) => [v, ...vip.map(() => v)]
-  return [
-    { label: 'Giá', cells: ['0 ₫', ...vip.map(priceCell)] },
-    { label: 'Ghi bài GPS / Strava, Xu, XP, cấp độ, huy hiệu', cells: all(true) },
-    { label: 'Tham gia thử thách, CLB, giải chạy ảo, tổ chức', cells: all(true) },
-    { label: 'Tạo thử thách (trả Xu theo quy mô)', cells: all(true) },
-    { label: 'Lượt tạo thử thách miễn phí mỗi tháng', cells: [false, ...vip.map(creditsCell)] },
-    { label: 'Phân tích nâng cao (xu hướng, kỷ lục, pace)', cells: [false, ...vip.map(() => true)] },
-    { label: 'Tăng km, XP hay thứ hạng', cells: all(false) },
-  ]
-}
-
-function clubRows(d: PlanCompareData, pro: ComparePlan | undefined): Row[] {
-  const c = d.club
-  return [
-    { label: 'Giá', cells: ['0 ₫', priceCell(pro)] },
-    { label: 'Số thành viên', cells: [c.freeMaxMembers ? `Tối đa ${formatNumber(c.freeMaxMembers)}` : 'Không giới hạn', 'Không giới hạn'] },
-    { label: 'Quản trị viên (ngoài chủ nhiệm)', cells: [`Tối đa ${d.free_captains}`, 'Không giới hạn'] },
-    { label: 'Thử thách nội bộ miễn phí cùng lúc', cells: [String(c.freeMaxOpen), String(c.proMaxOpen)] },
-    { label: 'Quy mô mỗi thử thách miễn phí', cells: [`≤ ${formatNumber(c.freeMaxSlots)} người`, `≤ ${formatNumber(c.proMaxSlots)} người`] },
-    { label: 'Điều kiện tạo miễn phí', cells: [`≥ ${c.freeMinActiveMembers} thành viên có bài chạy trong ${c.activeWindowDays} ngày`, 'Không cần'] },
-    { label: 'Bảng tin, chat, lịch, điểm danh QR, quỹ VietQR', cells: [true, true] },
-    { label: 'Bảng xếp hạng, ngày hội ×2/×3, đại sảnh danh vọng', cells: [true, true] },
-    { label: 'Cửa hàng CLB, giao lưu CLB', cells: [true, true] },
-    { label: 'Tường nhà: ảnh bìa, khẩu hiệu, chủ đề màu', cells: [false, true] },
-    { label: 'Link mời riêng + trang công khai /c/tên-clb', cells: [false, true] },
-    { label: 'Báo cáo chuyên cần xuất Excel', cells: [false, true] },
-    { label: 'Ảnh vinh danh thử thách theo mẫu CLB', cells: [false, true] },
-  ]
-}
-
-function CellView({ v }: { v: Cell }) {
-  if (v === true) return <Check className="mx-auto size-5 text-brand" aria-label="Có" />
-  if (v === false) return <Minus className="mx-auto size-4 text-fg-subtle" aria-label="Không" />
-  return <span className="text-xs font-semibold">{v}</span>
-}
-
-function Table({ heads, rows, highlight }: { heads: string[]; rows: Row[]; highlight: number }) {
+function Perks({ items }: { items: string[] }) {
   return (
-    <div className="-mx-4 overflow-x-auto px-4">
-      <table className="w-full min-w-[20rem] border-separate border-spacing-0 text-sm">
-        <thead>
-          <tr>
-            <th scope="col" className="sticky left-0 z-10 bg-bg p-2 text-left text-xs font-medium text-fg-muted">Quyền lợi</th>
-            {heads.map((h, i) => (
-              <th key={h} scope="col" className={cn('p-2 text-center text-xs font-bold', i === highlight && 'rounded-t-xl bg-coin/15 text-coin')}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.label}>
-              <th scope="row" className="sticky left-0 z-10 max-w-[11rem] border-t border-border bg-bg p-2 text-left text-xs font-medium leading-snug">{r.label}</th>
-              {r.cells.map((c, i) => (
-                <td key={i} className={cn('border-t border-border p-2 text-center align-middle', i === highlight && 'bg-coin/10')}><CellView v={c} /></td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <ul className="space-y-1.5">
+      {items.map((t) => <li key={t} className="flex gap-2 text-sm"><Check className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />{t}</li>)}
+    </ul>
+  )
+}
+
+function PlanCard({ title, badge, description, perks, tone, current, action }: {
+  title: string; badge?: string; description?: string | null; perks: string[]; tone: 'free' | 'vip' | 'pro' | 'org'; current?: boolean; action?: React.ReactNode
+}) {
+  const TONE = { free: 'border-border bg-surface', vip: 'border-coin/40 bg-gradient-to-br from-coin/10 to-surface', pro: 'border-brand/40 bg-gradient-to-br from-brand/10 to-surface', org: 'border-sky-500/40 bg-gradient-to-br from-sky-500/10 to-surface' }
+  return (
+    <div className={cn('space-y-3 rounded-2xl border p-4', TONE[tone])}>
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-1.5 text-base font-bold">{tone !== 'free' && <Crown className={cn('size-4', tone === 'vip' ? 'text-coin' : tone === 'pro' ? 'text-brand' : 'text-sky-400')} aria-hidden />}{title}
+            {badge && <span className="rounded bg-surface-2 px-1.5 text-[11px] font-semibold text-fg-muted">{badge}</span>}</p>
+          {description && <p className="text-xs text-fg-muted">{description}</p>}
+        </div>
+        {current && <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-bold text-brand">Đang dùng</span>}
+      </div>
+      <Perks items={perks} />
+      {action}
     </div>
   )
 }
 
-function Perks({ plan }: { plan: ComparePlan }) {
+/** Khung "Nâng cấp": giá theo kỳ hạn (admin sửa ở Quản trị → Gói), đang khuyến mãi thì gạch giá cũ — cùng cách máy chủ tính khi tạo đơn */
+function UpgradeSheet({ plan, clubMode, onClose }: { plan: ComparePlan; clubMode: boolean; onClose: () => void }) {
+  const sales = useActiveSales()
+  const create = useCreateOrder()
+  const clubs = useQuery({ queryKey: ['billing', 'managed-clubs'], queryFn: getManagedClubs, enabled: clubMode })
+  const prices = plan.prices
+  const [months, setMonths] = useState(() => prices.find((p) => p.months === 12)?.months ?? prices[0]?.months ?? 1)
+  const [clubId, setClubId] = useState<string | null>(null)
+  const [order, setOrder] = useState<Order | null>(null)
+  const sale = bestSale(sales.data ?? [], 'PLAN', plan.code)
+  const monthly = prices.find((p) => p.months === 1)?.price_vnd
+  const chosen = prices.find((p) => p.months === months)
+  const club = clubMode ? (clubs.data ?? []).find((c) => c.id === clubId) ?? (clubs.data?.length === 1 ? clubs.data[0] : undefined) : undefined
+  const buy = async () => {
+    if (!chosen || (clubMode && !club)) return
+    try { setOrder(await create.mutateAsync({ kind: 'PLAN', plan_code: plan.code, months: chosen.months, club_id: club?.id ?? null })) }
+    catch (e) { toast.error(billingErrorMessage(e)) }
+  }
+  if (order) return <OrderSheet order={order} onClose={() => { setOrder(null); onClose() }} />
   return (
-    <div className="rounded-2xl border border-border bg-surface p-3">
-      <p className="flex items-center gap-1.5 text-sm font-bold"><Crown className="size-4 text-coin" aria-hidden />{plan.name}
-        <span className="ml-auto font-mono text-xs font-semibold text-fg-muted">{priceCell(plan)}</span></p>
-      {plan.description && <p className="text-xs text-fg-muted">{plan.description}</p>}
-      <ul className="mt-2 space-y-1">
-        {plan.perks.map((p) => <li key={p} className="flex gap-2 text-xs"><Check className="mt-0.5 size-3.5 shrink-0 text-brand" aria-hidden />{p}</li>)}
-      </ul>
-      {yearly(plan) != null && monthly(plan) != null && (
-        <p className="mt-2 text-[11px] text-fg-subtle">Trả theo năm: {formatVnd(yearly(plan)!)} (≈ {formatVnd(Math.round(yearly(plan)! / 12))}/tháng)</p>
-      )}
-    </div>
+    <Sheet open onClose={onClose} title={`Nâng cấp ${plan.name}`} description="Chọn kỳ hạn. Thanh toán chuyển khoản VietQR, gói bật sau khi RaceHub xác nhận."
+      footer={<Button block variant="coin" loading={create.isPending} disabled={!chosen || (clubMode && !club)} onClick={() => void buy()}>
+        Thanh toán{chosen ? ` · ${formatVnd(salePrice(chosen.price_vnd, sale))}` : ''}</Button>}>
+      <div className="space-y-3">
+        {sale && (
+          <p className="rounded-xl border border-danger/40 bg-danger/10 p-2.5 text-sm"><b>{sale.title}</b>
+            {sale.discount_pct ? ` — giảm ${sale.discount_pct}%` : ''}{sale.ends_at ? ` · đến ${new Date(sale.ends_at).toLocaleDateString('vi-VN')}` : ''}</p>
+        )}
+        {clubMode && (
+          <div className="space-y-1.5">
+            <p className="text-sm font-semibold">CLB nâng cấp</p>
+            {clubs.isPending ? <Skeleton className="h-11" /> : !clubs.data?.length ? (
+              <p className="rounded-xl bg-surface-2 p-3 text-sm text-fg-muted">Bạn cần là chủ nhiệm hoặc quản trị viên của một CLB để nâng CLB Pro.</p>
+            ) : (
+              <div className="grid gap-1.5" role="radiogroup" aria-label="Chọn CLB">
+                {clubs.data.map((c) => (
+                  <button key={c.id} type="button" role="radio" aria-checked={club?.id === c.id} onClick={() => setClubId(c.id)}
+                    className={cn('flex min-h-11 items-center justify-between rounded-xl border px-3 text-left text-sm', club?.id === c.id ? 'border-brand bg-brand/10' : 'border-border')}>
+                    <span className="truncate font-semibold">{c.name}</span>
+                    {c.pro && <span className="text-[11px] font-semibold text-brand">Đang Pro · gia hạn</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {!prices.length ? <p className="text-sm text-fg-muted">Gói này đang tạm ngừng bán.</p> : (
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Kỳ hạn">
+            {prices.map((p) => {
+              const final = salePrice(p.price_vnd, sale)
+              const save = monthly && p.months > 1 ? Math.round((1 - p.price_vnd / (monthly * p.months)) * 100) : 0
+              return (
+                <button key={p.months} type="button" role="radio" aria-checked={months === p.months} onClick={() => setMonths(p.months)}
+                  className={cn('rounded-xl border p-2.5 text-left', months === p.months ? 'border-coin bg-coin/10' : 'border-border')}>
+                  <span className="block text-sm font-semibold">{MONTH_LABEL[p.months] ?? `${p.months} tháng`}</span>
+                  <span className="block font-mono text-sm font-bold">{formatVnd(final)}</span>
+                  {final < p.price_vnd && <span className="block font-mono text-xs text-fg-subtle line-through">{formatVnd(p.price_vnd)}</span>}
+                  {save > 0 && <span className="text-[11px] font-semibold text-brand">tiết kiệm {save}% so với trả tháng</span>}
+                </button>
+              )
+            })}
+          </div>
+        )}
+        <p className="text-xs text-fg-subtle">Gia hạn khi còn hạn được cộng nối tiếp. RaceHub không giữ tiền của thành viên; đơn hết hạn nếu chưa chuyển khoản.</p>
+      </div>
+    </Sheet>
   )
 }
 
-/** So sánh Miễn phí · VIP · CLB Pro · Doanh nghiệp — giá và hạn mức lấy từ cấu hình admin, không viết cứng */
+/** Gói & quyền lợi: thẻ xếp dọc Cá nhân → CLB → Doanh nghiệp, chỉ nêu quyền lợi; bấm Nâng cấp mới hiện giá (kèm khuyến mãi) */
 export function PlanCompare({ signedIn = true }: { signedIn?: boolean }) {
-  const [tab, setTab] = useState<Tab>('runner')
   const q = useQuery({ queryKey: ['billing', 'compare'], queryFn: getPlanCompare, staleTime: 10 * 60_000 })
+  const mine = useMyPlan()
+  const [upgrade, setUpgrade] = useState<{ plan: ComparePlan; club: boolean } | null>(null)
   if (q.isPending) return <Skeleton className="h-96" />
   if (q.isError) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />
-  const vip = q.data.plans.filter((p) => p.owner_type === 'USER').sort((a, b) => a.tier - b.tier)
-  const pro = q.data.plans.find((p) => p.code === 'CLUB_PRO')
-  const buy = signedIn ? routes.plan : `${routes.login}?next=${encodeURIComponent(routes.plan)}`
+  const d: PlanCompareData = q.data
+  const vip = d.plans.filter((p) => p.owner_type === 'USER').sort((a, b) => a.tier - b.tier)
+  const pro = d.plans.find((p) => p.code === 'CLUB_PRO')
+  const myCode = signedIn ? mine.data?.plan?.plan_code ?? null : null
+  const login = `${routes.login}?next=${encodeURIComponent(routes.plans)}`
+  const upgradeBtn = (plan: ComparePlan, club: boolean, label: string) => signedIn
+    ? <Button block variant={club ? 'primary' : 'coin'} onClick={() => setUpgrade({ plan, club })}>{label}</Button>
+    : <Link href={login} className="flex h-11 items-center justify-center rounded-xl bg-coin text-sm font-bold text-brand-fg">Đăng nhập để nâng cấp</Link>
+  const c = d.club
 
   return (
-    <div className="space-y-4">
-      <SegmentedControl value={tab} onChange={setTab}
-        options={[{ value: 'runner', label: 'Cá nhân' }, { value: 'club', label: 'CLB' }, { value: 'org', label: 'Doanh nghiệp' }]} />
+    <div className="space-y-6">
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-lg font-bold"><Crown className="size-5 text-coin" aria-hidden />Cá nhân</h2>
+        <PlanCard tone="free" title="Miễn phí" current={signedIn && !myCode} perks={[
+          'Ghi bài bằng GPS trong app hoặc tự động từ Strava', 'Xu, XP, cấp độ, huy hiệu, nhiệm vụ, nhân vật',
+          'Tham gia thử thách, CLB, giải chạy ảo, tổ chức không giới hạn', 'Tạo thử thách (trả Xu theo quy mô)',
+        ]} />
+        {vip.map((p) => (
+          <PlanCard key={p.code} tone="vip" title={p.name} badge={`VIP${p.tier}`} description={p.description} current={myCode === p.code}
+            perks={[...(creditLine(p) ? [creditLine(p)!] : []), ...p.perks.filter((x) => !/lượt tạo/i.test(x) || !p.credits.length)]}
+            action={upgradeBtn(p, false, myCode === p.code ? 'Gia hạn' : 'Nâng cấp')} />
+        ))}
+        <p className="text-xs text-fg-muted">VIP không tăng km, XP hay thứ hạng — mọi runner thi đấu công bằng.</p>
+      </section>
 
-      {tab === 'runner' && (
-        <>
-          <Table heads={['Miễn phí', ...vip.map((p) => p.name)]} rows={runnerRows(vip)} highlight={vip.length >= 2 ? 2 : 1} />
-          <p className="text-xs text-fg-muted">VIP không tăng km, XP hay thứ hạng — mọi runner thi đấu công bằng.</p>
-          <div className="grid gap-2 sm:grid-cols-2">{vip.map((p) => <Perks key={p.code} plan={p} />)}</div>
-          <Link href={buy} className="flex min-h-12 items-center justify-center rounded-2xl bg-coin font-bold text-brand-fg">Chọn gói VIP</Link>
-        </>
-      )}
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-lg font-bold"><Shield className="size-5 text-brand" aria-hidden />Câu lạc bộ</h2>
+        <PlanCard tone="free" title="CLB Miễn phí" perks={[
+          c.freeMaxMembers ? `Tối đa ${formatNumber(c.freeMaxMembers)} thành viên` : 'Không giới hạn thành viên',
+          `${c.freeMaxOpen} thử thách nội bộ miễn phí cùng lúc, mỗi thử thách ≤ ${formatNumber(c.freeMaxSlots)} người (cần ≥ ${c.freeMinActiveMembers} thành viên có bài chạy trong ${c.activeWindowDays} ngày)`,
+          `Tối đa ${d.free_captains} quản trị viên`, 'Bảng tin, chat, lịch, điểm danh QR, quỹ VietQR, bảng xếp hạng',
+          'Ngày hội ×2/×3, đại sảnh danh vọng, cửa hàng CLB, giao lưu CLB',
+        ]} />
+        {pro && (
+          <PlanCard tone="pro" title={pro.name} description={pro.description} perks={[
+            ...pro.perks,
+            ...(pro.perks.some((x) => /cùng lúc/.test(x)) ? [] : [`${c.proMaxOpen} thử thách nội bộ cùng lúc, mỗi thử thách ≤ ${formatNumber(c.proMaxSlots)} người`]),
+          ]} action={upgradeBtn(pro, true, 'Nâng cấp CLB Pro')} />
+        )}
+        <p className="flex items-start gap-1.5 text-xs text-fg-muted"><Users className="mt-0.5 size-3.5 shrink-0" aria-hidden />CLB miễn phí vượt số thành viên vẫn giữ đủ người, chỉ chưa duyệt thêm người mới cho tới khi nâng Pro.</p>
+      </section>
 
-      {tab === 'club' && (
-        <>
-          <Table heads={['CLB Miễn phí', pro?.name ?? 'CLB Pro']} rows={clubRows(q.data, pro)} highlight={1} />
-          <p className="text-xs text-fg-muted">
-            <Users className="mr-1 inline size-3.5" aria-hidden />CLB miễn phí đã vượt số thành viên vẫn giữ đủ người, chỉ chưa duyệt thêm người mới cho tới khi nâng Pro.
-          </p>
-          {pro && <Perks plan={pro} />}
-          <Link href={signedIn ? routes.clubs : buy} className="flex min-h-12 items-center justify-center rounded-2xl bg-coin font-bold text-brand-fg">
-            Nâng CLB Pro (Cài đặt CLB → Gói Pro)
-          </Link>
-        </>
-      )}
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-lg font-bold"><Building2 className="size-5 text-sky-400" aria-hidden />Doanh nghiệp · Liên đoàn · Trường học</h2>
+        <PlanCard tone="org" title="RaceHub Doanh nghiệp" description="Báo giá riêng theo số người và thời hạn" perks={[
+          'Chiến dịch sức khoẻ cho cả tổ chức (km, số buổi, số ngày chạy)', 'Bảng xếp hạng phòng ban / chi nhánh / CLB — tổng và bình quân đầu người',
+          'Nhập danh sách nhân viên từ Excel, tự duyệt email công ty, đơn vị nhiều cấp', 'Báo cáo theo mã nhân viên, xuất Excel',
+          'Chốt kết quả, chứng nhận hoàn thành, quay thưởng minh bạch', 'Quản lý nhiều CLB, tài trợ CLB Pro cho cả hệ thống',
+        ]} action={<Link href={routes.enterprise} className="flex h-11 items-center justify-center rounded-xl bg-sky-500 text-sm font-bold text-white">Xem chi tiết & nhận báo giá</Link>} />
+      </section>
 
-      {tab === 'org' && (
-        <div className="space-y-3 rounded-2xl border border-brand/30 bg-gradient-to-br from-brand/15 via-surface to-surface p-4">
-          <p className="flex items-center gap-2 font-bold"><Building2 className="size-5 text-brand" aria-hidden />RaceHub Doanh nghiệp · Báo giá riêng</p>
-          <ul className="space-y-1.5 text-sm">
-            {['Chiến dịch sức khoẻ cho cả tổ chức (km, số buổi, số ngày chạy)', 'Xếp hạng phòng ban / chi nhánh / CLB — tổng và bình quân đầu người',
-              'Tự duyệt email công ty, nhập danh sách từ Excel, đơn vị nhiều cấp', 'Báo cáo cho nhân sự theo mã nhân viên, xuất Excel',
-              'Chốt kết quả, chứng nhận hoàn thành, quay thưởng minh bạch', 'Quản lý nhiều CLB, tài trợ CLB Pro cho cả hệ thống'].map((t) => (
-              <li key={t} className="flex gap-2"><Check className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />{t}</li>
-            ))}
-          </ul>
-          <Link href={routes.enterprise} className="flex min-h-12 items-center justify-center rounded-2xl bg-brand font-bold text-brand-fg">Xem chi tiết & nhận báo giá</Link>
-        </div>
-      )}
+      {upgrade && <UpgradeSheet plan={upgrade.plan} clubMode={upgrade.club} onClose={() => setUpgrade(null)} />}
     </div>
   )
 }

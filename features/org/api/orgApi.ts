@@ -188,6 +188,18 @@ export const deleteOrgComment = (id: string) => call<void>('delete_org_post_comm
 
 export const getOrgReport = (orgId: string, from: string, to: string) => call<ReportRow[]>('org_report', { p_org: orgId, p_from: from, p_to: to })
 
+/** Tổng quan tổ chức (008700): KPI, số liệu từng đơn vị (cộng dồn lên cấp trên ở app), CLB, top 10, hạng của mình, km theo ngày */
+export interface OverviewGroup { id: string; name: string; parent_id?: string | null; avatar_url?: string | null; members: number; active: number; km: number }
+export interface OrgOverview {
+  kpi: { people: number; active: number; km: number; runs: number; avg_km: number }
+  units: OverviewGroup[]; clubs: OverviewGroup[]
+  top: { rank: number; user_id: string; name: string; avatar_url: string | null; unit_name: string | null; km: number; runs: number }[]
+  me: { rank: number; km: number; runs: number; active_days: number } | null
+  days: { day: string; km: number }[]
+  privacy_mode: boolean; hidden: boolean; is_admin: boolean; unit_label: string
+}
+export const getOrgOverview = (orgId: string, from: string, to: string) => call<OrgOverview>('org_overview', { p_org: orgId, p_from: from, p_to: to })
+
 // Admin hệ thống
 export const adminOrgLeads = (status?: OrgLead['status'] | null) => call<OrgLead[]>('admin_org_leads', { p_status: status ?? null })
 export const adminSetOrgLead = (id: string, status: OrgLead['status'], note?: string) => call<void>('admin_set_org_lead', { p_id: id, p_status: status, p_note: note ?? null })

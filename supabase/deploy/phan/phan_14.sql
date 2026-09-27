@@ -148,7 +148,9 @@ begin
     jsonb_build_object('file', '20261001008500', 'label', 'Chống gian lận chỉ khi thi đấu, CLB miễn phí tối đa 50 thành viên, bảng so sánh gói, Điều khoản / Quyền riêng tư sửa được',
       'ok', to_regprocedure('public.plan_compare()') is not null and private.sc_col('activities', 'review_skipped')),
     jsonb_build_object('file', '20261001008600', 'label', 'Tổ chức demo cho admin / khách dùng thử gói Doanh nghiệp',
-      'ok', to_regprocedure('public.admin_create_demo_org(jsonb)') is not null));
+      'ok', to_regprocedure('public.admin_create_demo_org(jsonb)') is not null),
+    jsonb_build_object('file', '20261001008700', 'label', 'Tổng quan tổ chức: chỉ số, BXH phòng ban / CLB / cá nhân, km theo ngày',
+      'ok', to_regprocedure('public.org_overview(uuid, timestamp with time zone, timestamp with time zone)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
