@@ -1,10 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
-import { ChevronLeft, Heart, Info, Lock, Shield, Shirt, Sparkles, Ticket, Users } from 'lucide-react'
+import { Heart, Info, Lock, Shield, Shirt, Sparkles, Ticket, Users } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, ConfirmSheet, ErrorState, ProgressBar, ShineBadge, Skeleton } from '@/shared/ui'
+import { Avatar, Button, Card, ConfirmSheet, ErrorState, ProgressBar, ShineBadge, Skeleton, BackLink } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber, formatRelative } from '@/shared/lib/format'
 import { SHINE_NAMES, shineProgress } from '@/shared/lib/shine'
@@ -42,7 +41,7 @@ export function ShineScreen() {
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <Link href={routes.me} className="inline-flex items-center gap-1 text-sm text-fg-muted"><ChevronLeft className="size-4" aria-hidden />Tôi</Link>
+      <BackLink fallback={routes.me} />
 
       <Card className="space-y-4 overflow-hidden bg-gradient-to-br from-coin/15 via-surface to-surface">
         <div className="flex items-center gap-4">

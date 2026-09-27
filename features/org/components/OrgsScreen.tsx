@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Building2, ChevronRight, KeyRound } from 'lucide-react'
-import { Button, Card, EmptyState, ErrorState, Input, SectionTitle, Skeleton } from '@/shared/ui'
+import { BackLink, Button, Card, EmptyState, ErrorState, Input, SectionTitle, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import { listMyOrgs, orgErrorMessage } from '../api/orgApi'
@@ -20,6 +20,7 @@ export function OrgsScreen() {
   return (
     <div className="space-y-6 pb-8">
       <div>
+        <BackLink fallback={routes.me} />
         <h1 className="text-2xl font-bold">Tổ chức</h1>
         <p className="text-sm text-fg-muted">Doanh nghiệp, liên đoàn, trường học bạn đang tham gia trên RaceHub.</p>
       </div>

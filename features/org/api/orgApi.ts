@@ -197,6 +197,11 @@ export interface AdminOrgInput {
   active_until: string | null; legal_name?: string; tax_code?: string; contact_name?: string; contact_phone?: string; contact_email?: string; lead_id?: string | null
 }
 export const adminCreateOrg = (p: AdminOrgInput) => call<{ id: string; invite_code: string }>('admin_create_org', { p })
+/** Tổ chức "[DEMO] …" có dữ liệu mẫu (008600): admin là chủ, khách (nếu nhập email) là quản trị viên */
+export const adminCreateDemoOrg = (p: { kind: OrgKind; name?: string; guest_email?: string; days?: number }) =>
+  call<{ id: string; invite_code: string; campaign_id: string }>('admin_create_demo_org', { p })
+export const adminDeleteDemoOrg = (orgId: string) => call<void>('admin_delete_demo_org', { p_org: orgId })
+export const isDemoOrg = (name: string) => name.startsWith('[DEMO]')
 export const adminUpdateOrg = (orgId: string, p: Partial<Pick<AdminOrgInput, 'seat_limit' | 'club_limit' | 'include_club_pro' | 'active_until' | 'kind'>> & { status?: 'ACTIVE' | 'SUSPENDED' }, reason: string) =>
   call<Org>('admin_update_org', { p_org: orgId, p, p_reason: reason })
 
@@ -224,6 +229,7 @@ const MESSAGES: Record<string, string> = {
   RATE_LIMITED: 'Bạn đã gửi nhiều yêu cầu hôm nay. Chúng tôi sẽ liên hệ sớm.',
   OWNER_NOT_FOUND: 'Không tìm thấy tài khoản với email này. Người quản trị cần đăng ký RaceHub trước.',
   ORG_NOT_FOUND: 'Không tìm thấy tổ chức.',
+  NOT_DEMO: 'Chỉ xoá được tổ chức demo.',
   NOT_A_MEMBER: 'Bạn chưa là thành viên tổ chức này.',
   INVALID_CODE: 'Mã mời không đúng hoặc đã được đổi.',
   ORG_INACTIVE: 'Gói của tổ chức đã hết hạn hoặc tạm dừng. Liên hệ quản trị tổ chức.',

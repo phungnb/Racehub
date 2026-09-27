@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useDeferredValue, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { BadgeCheck, ChevronRight, Clock, Handshake, Mail, Search, Store, UserRound } from 'lucide-react'
-import { EmptyState, ErrorState, Input, SegmentedControl, Skeleton } from '@/shared/ui'
+import { BackLink, EmptyState, ErrorState, Input, SegmentedControl, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import { PROVINCES } from '@/shared/lib/provinces'
@@ -23,6 +23,7 @@ export function MarketScreen() {
   const [section, setSection] = useState<Section>(() => (param('tab') === 'bib' ? 'bib' : 'partners'))
   return (
     <div className="space-y-4 animate-fade-in">
+      <BackLink fallback={routes.me} className="-mb-2" />
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold">Chợ Runner</h1>
@@ -110,11 +111,9 @@ function JoinCard() {
         <li className="flex gap-2"><span className="grid size-5 shrink-0 place-items-center rounded-full bg-brand text-[11px] font-bold text-brand-fg">2</span><span>RaceHub xác minh (giấy tờ / chứng chỉ nếu cần) và gắn dấu <b className="whitespace-nowrap text-brand"><BadgeCheck className="mb-0.5 inline size-4" aria-hidden /> Đã xác minh</b>.</span></li>
         <li className="flex gap-2"><span className="grid size-5 shrink-0 place-items-center rounded-full bg-brand text-[11px] font-bold text-brand-fg">3</span>Hiện trên Chợ Runner, bài Kiến thức; runner liên hệ trực tiếp với bạn.</li>
       </ol>
-      <div className="grid grid-cols-2 gap-2">
+      <div className={cn('grid gap-2', SUPPORT_EMAIL && 'grid-cols-2')}>
         <Link href={routes.marketMine} className="flex h-11 items-center justify-center rounded-xl bg-brand text-sm font-bold text-brand-fg">Đăng ký hồ sơ</Link>
-        {SUPPORT_EMAIL
-          ? <a href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Hợp tác Chợ Runner')}`} className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface-2 text-sm font-semibold"><Mail className="size-4" aria-hidden />Liên hệ hợp tác</a>
-          : <Link href={routes.learn} className="flex h-11 items-center justify-center rounded-xl border border-border bg-surface-2 text-sm font-semibold">Tìm hiểu thêm</Link>}
+        {SUPPORT_EMAIL && <a href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Hợp tác Chợ Runner')}`} className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface-2 text-sm font-semibold"><Mail className="size-4" aria-hidden />Liên hệ hợp tác</a>}
       </div>
     </div>
   )
