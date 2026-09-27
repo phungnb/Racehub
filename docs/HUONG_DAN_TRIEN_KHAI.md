@@ -232,6 +232,8 @@ File 500 đã tự thêm `club_messages`, `club_posts`, `notifications` vào Rea
 ## Bước 4 — Cấu hình Strava và đăng nhập Google / Apple
 
 ### 4a. Webhook Strava (bài chạy tự về, không cần bấm "Đồng bộ")
+**Cách nhanh (trên điện thoại):** thêm biến `STRAVA_WEBHOOK_VERIFY_TOKEN` (chuỗi ngẫu nhiên bất kỳ) trên Vercel → Redeploy → Quản trị → Hệ thống → Kiểm tra hệ thống → bấm **Đăng ký webhook Strava**. Cặp khóa VAPID cũng tạo được ngay ở đó (nút **Tạo cặp khóa VAPID**). Cách bằng lệnh bên dưới vẫn dùng được.
+
 Cần một địa chỉ **công khai** (domain production, hoặc cổng 3000 của Codespaces đặt *Public* trong tab Ports). Mỗi app Strava chỉ có **1** subscription, nên khi đổi domain phải xóa rồi tạo lại.
 
 ```bash

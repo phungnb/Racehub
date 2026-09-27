@@ -125,16 +125,30 @@ export interface SyncSummary {
   skipped: number
   duplicates: number
   earned_xu: number
+  /** Lý do bỏ qua → số bài (NOT_RUN, TOO_SHORT, OVERLAPS_EXISTING_ACTIVITY, FUTURE_START…) */
+  skip_reasons?: Record<string, number>
+}
+
+/** Lời giải thích cho người dùng khi bài Strava không được nhập */
+export const SKIP_REASON_LABEL: Record<string, string> = {
+  NOT_RUN: 'không phải chạy bộ (đạp xe, đi bộ, bơi…)',
+  TOO_SHORT: 'quá ngắn (< 200 m)',
+  OVERLAPS_EXISTING_ACTIVITY: 'trùng giờ với bài đã ghi bằng app RaceHub',
+  FUTURE_START: 'giờ bắt đầu ở tương lai',
 }
 
 export function summarize(results: Array<Record<string, unknown>>): SyncSummary {
-  const s: SyncSummary = { imported: 0, pending: 0, skipped: 0, duplicates: 0, earned_xu: 0 }
+  const s: SyncSummary = { imported: 0, pending: 0, skipped: 0, duplicates: 0, earned_xu: 0, skip_reasons: {} }
   for (const r of results) {
     if (r.result === 'IMPORTED') {
       s.imported++
       if (r.validation_status === 'PENDING') s.pending++
       s.earned_xu += Number(r.earned_xu ?? 0)
-    } else if (r.result === 'SKIPPED') s.skipped++
+    } else if (r.result === 'SKIPPED') {
+      s.skipped++
+      const why = String(r.reason ?? 'OTHER')
+      s.skip_reasons![why] = (s.skip_reasons![why] ?? 0) + 1
+    }
     else s.duplicates++
   }
   s.earned_xu = Math.round(s.earned_xu * 10) / 10

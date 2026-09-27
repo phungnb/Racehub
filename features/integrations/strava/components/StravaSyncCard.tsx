@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { Button, Card } from '@/shared/ui'
 import { formatCoin } from '@/shared/lib/format'
 import { useInvalidateProfile } from '@/features/auth'
-import type { SyncSummary } from '../mapping'
+import { SKIP_REASON_LABEL, type SyncSummary } from '../mapping'
 
 async function syncNow(): Promise<SyncSummary> {
   const res = await fetch('/api/strava/sync', { method: 'POST' })
@@ -23,13 +23,16 @@ export function StravaSyncCard() {
     onSuccess: (s) => {
       qc.invalidateQueries({ queryKey: ['activities'] })
       invalidateProfile()
+      const skipped = Object.entries(s.skip_reasons ?? {}).map(([k, n]) => `${n} bài ${SKIP_REASON_LABEL[k] ?? 'không hợp lệ'}`)
       if (s.imported === 0) {
-        toast.info('Không có bài chạy mới trên Strava.')
+        if (skipped.length) toast.warning(`Không nhập bài nào: ${skipped.join('; ')}.`, { duration: 10000 })
+        else toast.info('Không có bài chạy mới trên Strava. Bài vừa chạy có thể cần vài phút để Strava xử lý xong.')
       } else {
         toast.success(
           `Đã nhập ${s.imported} bài chạy` +
             (s.earned_xu > 0 ? ` · +${formatCoin(s.earned_xu)} Xu` : '') +
-            (s.pending > 0 ? ` · ${s.pending} bài chờ xác minh` : ''),
+            (s.pending > 0 ? ` · ${s.pending} bài chờ xác minh` : '') +
+            (skipped.length ? ` · bỏ qua ${skipped.join('; ')}` : ''),
         )
       }
     },
