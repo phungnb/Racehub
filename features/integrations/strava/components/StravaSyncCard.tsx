@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -15,14 +16,44 @@ async function syncNow(): Promise<SyncSummary> {
   return body as SyncSummary
 }
 
+/** Tự đồng bộ ngầm khi mở / quay lại app nếu lần trước đã quá khoảng này (dự phòng khi webhook Strava chậm hoặc lỗi) */
+const AUTO_SYNC_MS = 3 * 60_000
+const LAST_KEY = 'rh:strava:auto-sync'
+
 export function StravaSyncCard() {
   const qc = useQueryClient()
   const invalidateProfile = useInvalidateProfile()
+  const refresh = () => { qc.invalidateQueries({ queryKey: ['activities'] }); invalidateProfile() }
+  // Đồng bộ ngầm: chỉ báo khi có bài mới, lỗi thì im lặng (người dùng vẫn bấm Đồng bộ được)
+  const auto = useMutation({
+    mutationFn: syncNow,
+    onSuccess: (s) => {
+      if (s.imported > 0) {
+        refresh()
+        toast.success(`Đã nhận ${s.imported} bài chạy mới từ Strava` + (s.earned_xu > 0 ? ` · +${formatCoin(s.earned_xu)} Xu` : ''))
+      }
+    },
+  })
+  const autoRef = useRef(auto.mutate)
+  useEffect(() => { autoRef.current = auto.mutate })
+  useEffect(() => {
+    const maybeSync = () => {
+      if (document.visibilityState !== 'visible') return
+      let last = 0
+      try { last = Number(localStorage.getItem(LAST_KEY) ?? 0) } catch { /* chế độ riêng tư */ }
+      if (Date.now() - last < AUTO_SYNC_MS) return
+      try { localStorage.setItem(LAST_KEY, String(Date.now())) } catch { /* bỏ qua */ }
+      autoRef.current()
+    }
+    maybeSync()
+    document.addEventListener('visibilitychange', maybeSync)
+    return () => document.removeEventListener('visibilitychange', maybeSync)
+  }, [])
+
   const m = useMutation({
     mutationFn: syncNow,
     onSuccess: (s) => {
-      qc.invalidateQueries({ queryKey: ['activities'] })
-      invalidateProfile()
+      refresh()
       const skipped = Object.entries(s.skip_reasons ?? {}).map(([k, n]) => `${n} bài ${SKIP_REASON_LABEL[k] ?? 'không hợp lệ'}`)
       if (s.imported === 0) {
         if (skipped.length) toast.warning(`Không nhập bài nào: ${skipped.join('; ')}.`, { duration: 10000 })
@@ -44,10 +75,10 @@ export function StravaSyncCard() {
       <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#fc4c02]/15 text-sm font-black text-[#fc4c02]" aria-hidden>S</span>
       <div className="min-w-0 flex-1">
         <p className="font-semibold">Strava đã kết nối</p>
-        <p className="text-sm text-fg-muted">Bài chạy mới tự động về</p>
+        <p className="text-sm text-fg-muted">{auto.isPending ? 'Đang lấy bài mới…' : 'Bài mới tự về sau khi lưu trên Strava'}</p>
       </div>
-      <Button size="sm" variant="secondary" loading={m.isPending} onClick={() => m.mutate()}>
-        {!m.isPending && <RefreshCw className="size-4" aria-hidden />} Đồng bộ
+      <Button size="sm" variant="secondary" loading={m.isPending || auto.isPending} onClick={() => m.mutate()}>
+        {!(m.isPending || auto.isPending) && <RefreshCw className="size-4" aria-hidden />} Đồng bộ
       </Button>
     </Card>
   )
