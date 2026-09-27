@@ -10,7 +10,7 @@ import { cn } from '@/shared/lib/cn'
 import { formatVnd } from '@/shared/lib/economy'
 import { formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
-import { billingErrorMessage, getManagedClubs, getPlanCompare, MONTH_LABEL, type ComparePlan, type Order, type PlanCompareData } from '../api/billingApi'
+import { billingErrorMessage, getFreeChallengeSlots, getManagedClubs, getPlanCompare, MONTH_LABEL, type ComparePlan, type Order, type PlanCompareData } from '../api/billingApi'
 import { useActiveSales, useCreateOrder, useMyPlan } from '../hooks/useBilling'
 import { bestSale, salePrice } from '../model/sale'
 import { OrderSheet } from './OrderSheet'
@@ -119,6 +119,8 @@ function UpgradeSheet({ plan, clubMode, onClose }: { plan: ComparePlan; clubMode
 export function PlanCompare({ signedIn = true }: { signedIn?: boolean }) {
   const q = useQuery({ queryKey: ['billing', 'compare'], queryFn: getPlanCompare, staleTime: 10 * 60_000 })
   const mine = useMyPlan()
+  const free = useQuery({ queryKey: ['billing', 'free-slots', signedIn], queryFn: () => (signedIn ? getFreeChallengeSlots() : Promise.resolve(5)), staleTime: 10 * 60_000 })
+  const freeN = free.data ?? 5
   const [upgrade, setUpgrade] = useState<{ plan: ComparePlan; club: boolean } | null>(null)
   if (q.isPending) return <Skeleton className="h-96" />
   if (q.isError) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />
@@ -138,7 +140,9 @@ export function PlanCompare({ signedIn = true }: { signedIn?: boolean }) {
         <h2 className="flex items-center gap-2 text-lg font-bold"><Crown className="size-5 text-coin" aria-hidden />Cá nhân</h2>
         <PlanCard tone="free" title="Miễn phí" current={signedIn && !myCode} perks={[
           'Ghi bài bằng GPS trong app hoặc tự động từ Strava', 'Xu, XP, cấp độ, huy hiệu, nhiệm vụ, nhân vật',
-          'Tham gia thử thách, CLB, giải chạy ảo, tổ chức không giới hạn', 'Tạo thử thách (trả Xu theo quy mô)',
+          'Tham gia thử thách, CLB, giải chạy ảo, tổ chức không giới hạn',
+          ...(freeN > 0 ? [`Tạo miễn phí thử thách cá nhân và thử thách nhóm tới ${formatNumber(freeN)} người`] : []),
+          `Thử thách đông hơn${freeN > 0 ? ` ${formatNumber(freeN)} người` : ''}: trả Xu theo quy mô`,
         ]} />
         {vip.map((p) => (
           <PlanCard key={p.code} tone="vip" title={p.name} badge={`VIP${p.tier}`} description={p.description} current={myCode === p.code}

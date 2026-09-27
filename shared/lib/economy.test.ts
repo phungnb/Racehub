@@ -28,3 +28,12 @@ describe('kinh tế v2 (khớp migration 003700)', () => {
     expect(validatePolicy({ ...DEFAULT_POLICY, capacityTiers: [{ max: 5, xu: 0 }, { max: 5, xu: 10 }] })).toMatch(/trùng/)
   })
 })
+
+import { freeSlots as freeSlotsFn } from './economy'
+describe('thử thách miễn phí theo biểu phí', () => {
+  it('lấy mức cao nhất còn 0 Xu liên tiếp từ đầu', () => {
+    expect(freeSlotsFn()).toBe(5)
+    expect(freeSlotsFn([{ max: 20, xu: 150 }, { max: 5, xu: 0 }, { max: 10, xu: 0 }])).toBe(10)
+    expect(freeSlotsFn([{ max: 5, xu: 50 }])).toBe(0)
+  })
+})

@@ -126,6 +126,13 @@ export function creationFee(slots: number, tiers: CapacityTier[] = DEFAULT_POLIC
   return capacityTier(slots, tiers)?.xu ?? null
 }
 
+/** Số người tối đa tạo thử thách / giải miễn phí (các mức đầu có phí 0 Xu); 0 = không có mức miễn phí */
+export function freeSlots(tiers: CapacityTier[] = DEFAULT_POLICY.capacityTiers): number {
+  let max = 0
+  for (const t of [...tiers].sort((a, b) => a.max - b.max)) { if (t.xu > 0) break; max = t.max }
+  return max
+}
+
 /** Mô tả biểu phí ngắn gọn, ví dụ "≤5 người miễn phí · ≤20: 150 Xu · …" */
 export function feePolicyText(tiers: CapacityTier[]): string {
   return [...tiers].sort((a, b) => a.max - b.max)

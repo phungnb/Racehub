@@ -1,6 +1,6 @@
 // Gói VIP / CLB Pro / Nạp Xu (migration 003800). Chưa có cổng thanh toán: tạo đơn → chuyển khoản VietQR → admin xác nhận.
 import { supabase } from '@/shared/lib/supabase'
-import type { CapacityTier, ClubChallengePolicy } from '@/shared/lib/economy'
+import { freeSlots, toPolicy, type CapacityTier, type ClubChallengePolicy } from '@/shared/lib/economy'
 import type { Sale } from '../model/sale'
 import { systemErrorMessage } from '@/shared/lib/errors'
 
@@ -132,4 +132,11 @@ export async function getManagedClubs(): Promise<ManagedClub[]> {
     id: r.club!.id, name: r.club!.name,
     pro: r.club!.plan === 'PRO' && (!r.club!.pro_until || Date.parse(r.club!.pro_until) > now),
   }))
+}
+
+/** Số người tối đa của thử thách tạo miễn phí theo biểu phí admin đang đặt (mặc định 5); chưa đăng nhập → mặc định */
+export async function getFreeChallengeSlots(): Promise<number> {
+  const { data, error } = await supabase.rpc('economy_policy')
+  if (error || !data) return freeSlots()
+  return freeSlots(toPolicy(data).capacityTiers)
 }
