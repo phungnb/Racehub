@@ -1,11 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { SegmentedControl, Skeleton, ErrorState } from '@/shared/ui'
+import { toast } from 'sonner'
+import { Button, SegmentedControl, Skeleton, ErrorState } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatNumber, formatRelative } from '@/shared/lib/format'
 import type { ErrorKind } from '@/shared/lib/errors'
-import { useClientErrors } from '../hooks/useSystem'
+import { useClientErrors, useResolveClientError } from '../hooks/useSystem'
+import { systemApiErrorMessage } from '../api/systemApi'
 
 const KIND: Record<ErrorKind, { label: string; tone: string; hint?: string }> = {
   NOT_DEPLOYED: { label: 'Chưa cập nhật máy chủ', tone: 'bg-danger/15 text-danger', hint: 'Thường do chưa chạy migration — xem mục Database ở trên.' },
@@ -24,9 +26,18 @@ const DAYS = [{ value: '1', label: '24 giờ' }, { value: '7', label: '7 ngày' 
 export function ClientErrorsPanel() {
   const [days, setDays] = useState('7')
   const q = useClientErrors(Number(days))
+  const resolve = useResolveClientError()
+  const done = (code: string | null) => resolve.mutate(code, {
+    onSuccess: () => toast.success(code ? `Đã đánh dấu ${code} là đã xử lý` : 'Đã dọn toàn bộ nhật ký lỗi'),
+    onError: (e) => toast.error(systemApiErrorMessage(e)),
+  })
   return (
     <div className="space-y-3">
       <SegmentedControl value={days} onChange={setDays} options={DAYS} />
+      {!!q.data?.length && (
+        <p className="text-[11px] text-fg-subtle">Sửa xong nguyên nhân (vd. đã chạy migration còn thiếu) thì bấm <b>Đã xử lý</b> — lỗi được xoá khỏi nhật ký.
+          Nếu còn xảy ra, lần sau người dùng gặp sẽ được ghi lại.</p>
+      )}
       {q.isPending ? <Skeleton className="h-32" /> : q.isError ? <ErrorState error={q.error} message="Chưa đọc được nhật ký lỗi (cần migration 004400)." onRetry={() => void q.refetch()} />
         : !q.data.length ? <p className="py-4 text-center text-sm text-fg-muted">Không có lỗi nào được ghi nhận. 🎉</p>
         : (
@@ -41,12 +52,18 @@ export function ClientErrorsPanel() {
                     <span className="ml-auto text-xs text-fg-muted">{formatNumber(r.hits)} lần · {formatNumber(r.users)} người</span>
                   </div>
                   {r.message && <p className="break-words font-mono text-[11px] text-fg-muted">{r.message}</p>}
-                  <p className="text-[11px] text-fg-subtle">{r.path ?? '—'} · gần nhất {formatRelative(r.last_at)}{k.hint ? ` · ${k.hint}` : ''}</p>
+                  <div className="flex items-end gap-2">
+                    <p className="min-w-0 flex-1 text-[11px] text-fg-subtle">{r.path ?? '—'} · gần nhất {formatRelative(r.last_at)}{k.hint ? ` · ${k.hint}` : ''}</p>
+                    <Button size="sm" variant="secondary" disabled={resolve.isPending} onClick={() => done(r.code)}>Đã xử lý</Button>
+                  </div>
                 </li>
               )
             })}
           </ul>
         )}
+      {(q.data?.length ?? 0) > 1 && (
+        <Button block size="sm" variant="ghost" disabled={resolve.isPending} onClick={() => done(null)}>Đánh dấu tất cả đã xử lý</Button>
+      )}
     </div>
   )
 }

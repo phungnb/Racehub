@@ -1,5 +1,6 @@
 'use client'
 
+import { useOpsPolicy } from '@/features/system'
 import { useState } from 'react'
 import { shineTier } from '@/shared/lib/shine'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -135,6 +136,7 @@ export function MeScreen({ profile }: { profile: Profile }) {
   const tab: Tab = isTab(fromUrl) ? fromUrl : 'character'
   // Tab nằm trên URL để thông báo mở đúng chỗ (/me?tab=badges); mở trang Tôi là thấy nhân vật trước
   const setTab = (t: Tab) => router.replace(t === 'character' ? routes.me : `${routes.me}?tab=${t}`, { scroll: false })
+  const { features } = useOpsPolicy()
   return (
     <div className="space-y-4 animate-fade-in">
       <Header profile={profile} />
@@ -163,18 +165,18 @@ export function MeScreen({ profile }: { profile: Profile }) {
                 <span className="block text-xs text-fg-muted">Quà từ nhà tài trợ khi hoàn thành thử thách / nhiệm vụ</span></span>
               <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
             </Link>
-            <Link href={routes.market} className="flex items-center gap-3 p-4">
+            {features.market && <Link href={routes.market} className="flex items-center gap-3 p-4">
               <span className="grid size-10 place-items-center rounded-xl bg-brand/15 text-brand"><Store className="size-5" aria-hidden /></span>
               <span className="min-w-0 flex-1"><span className="block font-semibold">Chợ Runner</span>
                 <span className="block text-xs text-fg-muted">HLV, cửa hàng, dịch vụ đã xác minh · đăng ký hồ sơ đối tác</span></span>
               <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
-            </Link>
-            <Link href={routes.orgs} className="flex items-center gap-3 p-4">
+            </Link>}
+            {features.orgs && <Link href={routes.orgs} className="flex items-center gap-3 p-4">
               <span className="grid size-10 place-items-center rounded-xl bg-brand/15 text-brand"><Building2 className="size-5" aria-hidden /></span>
               <span className="min-w-0 flex-1"><span className="block font-semibold">Tổ chức của tôi</span>
                 <span className="block text-xs text-fg-muted">Công ty, liên đoàn, trường học · chiến dịch và bảng xếp hạng</span></span>
               <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
-            </Link>
+            </Link>}
             <Link href={routes.plan} className="flex items-center gap-3 p-4">
               <span className="grid size-10 place-items-center rounded-xl bg-coin/15 text-coin"><Crown className="size-5" aria-hidden /></span>
               <span className="min-w-0 flex-1"><span className="block font-semibold">Gói VIP & Nạp Xu</span>

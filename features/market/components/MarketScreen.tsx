@@ -1,5 +1,7 @@
 'use client'
 
+import { useSearchParams } from 'next/navigation'
+import { useFeature } from '@/features/system'
 import Link from 'next/link'
 import { useDeferredValue, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -15,12 +17,14 @@ import { PartnerCard } from './PartnerBits'
 
 type KindTab = 'ALL' | PartnerKind
 type Section = 'partners' | 'bib'
-const param = (k: string) => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get(k) : null)
 
 /** Chợ Runner: (1) HLV / cửa hàng / dịch vụ đã xác minh, (2) Chợ BIB. RaceHub không thu tiền hộ. */
 export function MarketScreen() {
   // ?tab=bib (từ thông báo) · ?kind=COACH|SHOP|SERVICE (từ bài Knowledge)
-  const [section, setSection] = useState<Section>(() => (param('tab') === 'bib' ? 'bib' : 'partners'))
+  const params = useSearchParams()
+  const bibOn = useFeature('bibMarket')
+  const [picked, setSection] = useState<Section>(() => (params.get('tab') === 'bib' ? 'bib' : 'partners'))
+  const section: Section = bibOn ? picked : 'partners'
   return (
     <div className="space-y-4 animate-fade-in">
       <BackLink fallback={routes.me} className="-mb-2" />
@@ -34,8 +38,8 @@ export function MarketScreen() {
           <UserRound className="size-4" aria-hidden />Tôi
         </Link>
       </header>
-      <div role="tablist" className="grid grid-cols-2 gap-2">
-        {([['partners', 'Đối tác', Store], ['bib', 'Chợ BIB', Handshake]] as const).map(([v, label, Icon]) => (
+      <div role="tablist" className={cn('grid gap-2', bibOn ? 'grid-cols-2' : 'grid-cols-1')}>
+        {([['partners', 'Đối tác', Store], ['bib', 'Chợ BIB', Handshake]] as const).filter(([v]) => bibOn || v !== 'bib').map(([v, label, Icon]) => (
           <button key={v} role="tab" aria-selected={section === v} onClick={() => setSection(v)}
             className={cn('flex h-12 items-center justify-center gap-2 rounded-xl border text-[15px] font-bold',
               section === v ? 'border-brand bg-brand text-brand-fg' : 'border-border bg-surface text-fg-muted')}>
@@ -50,8 +54,9 @@ export function MarketScreen() {
 }
 
 function Partners() {
+  const params = useSearchParams()
   const [kind, setKind] = useState<KindTab>(() => {
-    const k = param('kind')
+    const k = params.get('kind')
     return k === 'COACH' || k === 'SHOP' || k === 'SERVICE' ? k : 'ALL'
   })
   const [area, setArea] = useState('')

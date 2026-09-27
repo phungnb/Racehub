@@ -1,8 +1,9 @@
 'use client'
 
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState, useSyncExternalStore } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { ArrowLeft, LogOut, Mail, PersonStanding, Ruler, Trash2, Weight } from 'lucide-react'
 import { toast } from 'sonner'
@@ -189,13 +190,12 @@ const DELETE_ERRORS: Record<string, string> = {
   TRANSFER_CLUB_FIRST: 'Bạn đang là chủ nhiệm CLB còn thành viên — hãy chuyển quyền chủ nhiệm cho người khác trước.',
 }
 
-const noSubscribe = () => () => undefined
 
 /** Xoá tài khoản (bắt buộc theo App Store / Google Play và Luật Bảo vệ dữ liệu cá nhân) */
 function DeleteAccount() {
   const router = useRouter()
   // Mở thẳng từ menu ☰ → "Xoá tài khoản" (/me/settings?xoa=1); người dùng bấm đóng / mở thì theo lựa chọn đó
-  const fromMenu = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).get('xoa') === '1', () => false)
+  const fromMenu = useSearchParams().get('xoa') === '1'
   const [picked, setOpen] = useState<boolean | null>(null)
   const open = picked ?? fromMenu
   const [text, setText] = useState('')

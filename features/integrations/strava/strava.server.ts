@@ -1,7 +1,8 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { serverEnv } from '@/shared/config/env.server'
-import { analyzeRun, stravaStreams, type FraudResult } from '@/features/activity/server'
+import { analyzeRun, speedRulesFrom, stravaStreams, type FraudResult, type SpeedRules } from '@/features/activity/server'
+import { toOps } from '@/shared/lib/ops'
 import { mapStravaActivity, mapStravaDetail, summarize, syncWindowStart, tokenNeedsRefresh, type StravaSummaryActivity, type SyncSummary } from './mapping'
 
 export const STRAVA_SCOPES = 'read,activity:read_all'
@@ -118,12 +119,23 @@ const STREAM_KEYS = 'time,distance,latlng,heartrate,cadence'
  * Chấm điểm gian lận một bài chạy trước khi nhập (migration 002300): tải streams + pace các bài gần đây của người chạy.
  * Lỗi mạng / hết hạn mức → trả null, máy chủ CSDL vẫn áp luật cơ bản (không chặn việc nhập bài).
  */
+let rulesCache: { at: number; rules: SpeedRules } | null = null
+/** Ngưỡng tốc độ admin đặt (ops_policy.antiCheat) — nhớ 5 phút; lỗi → mặc định */
+async function speedRules(admin: SupabaseClient): Promise<SpeedRules> {
+  if (rulesCache && Date.now() - rulesCache.at < 5 * 60_000) return rulesCache.rules
+  const { data, error } = await admin.rpc('ops_policy')
+  const rules = speedRulesFrom(error ? null : toOps(data).antiCheat)
+  rulesCache = { at: Date.now(), rules }
+  return rules
+}
+
 async function assessRisk(admin: SupabaseClient, userId: string, token: string, a: StravaSummaryActivity): Promise<FraudResult | null> {
   const n = mapStravaActivity(a)
   if (!RUN_SPORTS.has(n.sport_type) || n.distance_m < 200) return null
+  const rules = await speedRules(admin)
   const summary = { sportType: n.sport_type, manual: n.manual, trainer: a.trainer === true, deviceName: n.device_name,
     distanceM: n.distance_m, movingS: n.moving_s, maxSpeedMps: n.max_speed_mps }
-  if (n.manual || Date.now() - Date.parse(n.started_at) > FRAUD_RECENT_MS) return analyzeRun(summary, null)
+  if (n.manual || Date.now() - Date.parse(n.started_at) > FRAUD_RECENT_MS) return analyzeRun(summary, null, [], rules)
   try {
     // Bài đã nhập (đồng bộ lại / webhook đổi tên) → không tải streams lần nữa
     const { data: existing } = await admin.from('activities').select('id').eq('source', 'STRAVA').eq('source_activity_id', String(a.id)).limit(1)
@@ -135,10 +147,10 @@ async function assessRisk(admin: SupabaseClient, userId: string, token: string, 
     ])
     const history = ((hist.data ?? []) as { moving_time_s: number; distance_m: number }[])
       .map((h) => h.moving_time_s / (h.distance_m / 1000))
-    return analyzeRun(summary, stravaStreams(raw), history)
+    return analyzeRun(summary, stravaStreams(raw), history, rules)
   } catch (e) {
     console.warn('[strava] fraud streams', (e as Error).message)
-    return analyzeRun(summary, null)
+    return analyzeRun(summary, null, [], rules)
   }
 }
 
