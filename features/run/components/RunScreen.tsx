@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { AlertTriangle, BatteryWarning, CheckCircle2, Clock3, CloudUpload, Footprints, Gift, History, Gauge, Hourglass, Loader2, Lock, MapPin, Pause, PauseCircle, Play, Satellite, Smartphone, Square, Timer, Unlock, Volume2, VolumeX, Watch, XCircle } from 'lucide-react'
+import { AlertTriangle, BatteryWarning, CheckCircle2, Clock3, CloudUpload, Coffee, FlaskConical, Footprints, Gift, History, Gauge, Hourglass, Loader2, Lock, MapPin, Pause, PauseCircle, Play, Satellite, Smartphone, Square, Timer, Unlock, Volume2, VolumeX, Watch, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, CoinAmount, ConfirmSheet, HoldButton, XpAmount } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -13,6 +13,8 @@ import { usePendingRunCount } from '../hooks/usePendingRuns'
 import { openLocationSettings } from '../model/location'
 import { BRAND_STEPS, androidBrand } from '../model/battery'
 import { nativePlatform } from '@/shared/lib/native'
+import { useMyProfile } from '@/features/auth'
+import { GpsQaPanel } from './GpsQuality'
 
 const DISCLOSED_KEY = 'rh-location-disclosed'
 
@@ -58,6 +60,9 @@ function Metric({ label, value, unit, icon: Icon }: { label: string; value: stri
 
 export function RunScreen({ onSaved }: { onSaved?: () => void }) {
   const t = useRunTracker()
+  const { profile } = useMyProfile()
+  // Nút bật chế độ kiểm thử GPS: admin hệ thống (người test khác mở /run?qa=1)
+  const canQa = t.qaOn || profile?.role === 'SYSTEM_ADMIN' || profile?.is_admin === true
   const pending = usePendingRunCount()
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [locked, setLocked] = useState(false)
@@ -79,6 +84,12 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Chạy</h1>
           <div className="flex flex-wrap justify-end gap-1.5">
+            {canQa && (
+              <button type="button" onClick={() => t.setQaOn(!t.qaOn)} aria-pressed={t.qaOn}
+                className={cn('inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold', t.qaOn ? 'bg-sky-500/15 text-sky-400' : 'bg-surface-2 text-fg-muted')}>
+                <FlaskConical className="size-4" aria-hidden /> Kiểm thử GPS {t.qaOn ? 'bật' : 'tắt'}
+              </button>
+            )}
             <AutoPauseToggle on={t.autoPauseOn} onChange={t.setAutoPauseOn} />
             <button onClick={() => t.setVoiceOn(!t.voiceOn)} className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1.5 text-xs font-semibold text-fg-muted"
               aria-pressed={t.voiceOn}>
@@ -120,8 +131,8 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
             <p className="flex gap-2 text-sm">
               <History className="mt-0.5 size-4 shrink-0 text-coin" aria-hidden />
               <span>
-                <b>Có bài chạy chưa lưu</b> — {formatKm(t.recovery.distanceM)} km · {formatDuration(t.recovery.movingS)},
-                bắt đầu {new Date(t.recovery.startedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}.
+                <b>Có bài chạy chưa lưu</b> — {formatKm(t.recovery.state.distanceM)} km · {formatDuration(t.recovery.state.movingS)},
+                bắt đầu {new Date(t.recovery.state.startedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}.
                 App đã bị đóng giữa chừng; dữ liệu đến lúc đó vẫn còn.
               </span>
             </p>
@@ -185,7 +196,24 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
             <span>GPS đã sẵn sàng — <b>bắt đầu chạy đi!</b> Thời gian chạy tự tính khi bạn di chuyển; tổng thời gian đang được tính từ lúc bấm.</span>
           </p>
         )}
-        {t.phase === 'RUNNING' && t.moved && t.autoPaused && t.autoPauseOn && (
+        {t.phase === 'RUNNING' && t.longStop && (
+          <div role="alert" className="mb-3 space-y-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-3 text-sm">
+            <p className="flex gap-2"><Coffee className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+              <span>Bạn đã đứng yên hơn <b>10 phút</b>. Đã chạy xong thì bấm <b>Kết thúc</b> — phần đứng yên cuối bài sẽ không tính vào tổng thời gian.
+                Đứng quá 30 phút app tự tạm dừng.</span></p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button size="sm" variant="secondary" onClick={t.dismissLongStop}>Vẫn đang nghỉ</Button>
+              <Button size="sm" variant="danger" onClick={t.finish}>Kết thúc bài chạy</Button>
+            </div>
+          </div>
+        )}
+        {t.phase === 'PAUSED' && t.autoStopped && (
+          <p role="status" className="mb-3 flex gap-2 rounded-xl bg-warning/10 px-3 py-2 text-xs text-fg">
+            <Coffee className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+            <span>Đã <b>tự tạm dừng</b> vì bạn đứng yên 30 phút. Chạy tiếp thì bấm Tiếp tục; đã xong thì bấm Kết thúc — phần đứng yên không tính vào tổng thời gian.</span>
+          </p>
+        )}
+        {t.phase === 'RUNNING' && t.moved && t.autoPaused && t.autoPauseOn && !t.longStop && (
           <p role="status" className="mb-3 flex gap-2 rounded-xl bg-warning/10 px-3 py-2 text-xs text-fg">
             <PauseCircle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
             <span>Bạn đang đứng yên nên <b>đồng hồ chạy tự dừng</b> — di chuyển là tính tiếp. Nghỉ không làm chậm pace; tổng thời gian vẫn chạy.</span>
@@ -281,7 +309,13 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
             <Metric label="Tổng" icon={Hourglass} value={formatDuration(t.elapsedS)} />
           </div>
           <p className="mt-3 text-[11px] text-fg-subtle">Pace tính theo thời gian chạy (bỏ lúc đứng nghỉ), như Strava / Garmin. Tổng = từ lúc bắt đầu đến kết thúc, trừ lúc bấm tạm dừng.</p>
+          {t.trimmedS > 0 && (
+            <p className="mt-2 rounded-lg bg-surface-2 px-3 py-2 text-xs text-fg-muted">
+              Đã bỏ <b className="text-fg">{formatDuration(t.trimmedS)}</b> đứng yên ở cuối bài (quên bấm Kết thúc) — giờ kết thúc tính từ lúc bạn dừng chạy.
+            </p>
+          )}
         </Card>
+        {t.qaOn && <GpsQaPanel qa={t.qa} onChange={t.setQa} distanceM={t.distanceM} summary={t.summary} />}
         {t.splits.length > 0 && (
           <Card>
             <p className="mb-2 text-sm font-semibold">Pace từng km</p>

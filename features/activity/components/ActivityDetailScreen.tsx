@@ -17,6 +17,7 @@ import { useActivityDetail } from '../hooks/useActivityDetail'
 import { compareNotes, decodePolyline, fastestSplit, splitPace, splitsFromPoints, type LatLng, type Split } from '../model/route'
 import { RouteMap } from './RouteMap'
 import { ShareActivitySheet } from './ShareActivity'
+import { ActivityGpsQuality } from './ActivityGpsQuality'
 
 const SOURCE_LABEL: Record<string, string> = { STRAVA: 'Strava', DIRECT_GPS: 'GPS RaceHub', GARMIN: 'Garmin', COROS: 'COROS' }
 
@@ -167,6 +168,8 @@ export function ActivityDetailScreen({ id }: { id: string }) {
           <Heart className="size-4 text-live" aria-hidden />{a.cheers.count} lượt cổ vũ · {formatCoin(a.cheers.total)} Xu
         </p>
       )}
+
+      {a.is_mine && a.source === 'DIRECT_GPS' && <ActivityGpsQuality id={a.id} distanceM={Number(a.distance_m)} />}
 
       {sharing && <ShareActivitySheet activity={a} route={a.map_allowed ? route : []} onClose={() => setSharing(false)} />}
     </div>

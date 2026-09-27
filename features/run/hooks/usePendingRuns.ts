@@ -43,6 +43,8 @@ export function usePendingRunSync() {
         const done = !error || error.message.includes('ACTIVITY_DUPLICATE')
         if (done) {
           updateQueue((q) => q.filter((x) => x.id !== item.id))
+          // Tóm tắt chất lượng GPS lúc chạy (008800) — tìm bài theo giờ bắt đầu nên gắn được cả khi máy chủ báo trùng
+          if (item.quality) void supabase.rpc('activity_attach_gps_quality', { p_started_at: item.payload.p_started_at, p_quality: item.quality })
           const id = (data as { activity_id?: string } | null)?.activity_id
           if (!error) {
             toast.success(`Đã gửi bài chạy ${formatKm(item.payload.p_distance_m)} km lên RaceHub`, {
