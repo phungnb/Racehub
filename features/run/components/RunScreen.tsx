@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { AlertTriangle, BatteryWarning, CheckCircle2, Clock3, CloudUpload, Gift, History, Gauge, Loader2, Lock, MapPin, Pause, Play, Satellite, Smartphone, Square, Timer, Unlock, Volume2, VolumeX, Watch, XCircle } from 'lucide-react'
+import { AlertTriangle, BatteryWarning, CheckCircle2, Clock3, CloudUpload, Footprints, Gift, History, Gauge, Hourglass, Loader2, Lock, MapPin, Pause, PauseCircle, Play, Satellite, Smartphone, Square, Timer, Unlock, Volume2, VolumeX, Watch, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, CoinAmount, ConfirmSheet, HoldButton, XpAmount } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -32,6 +32,16 @@ function GpsBadge({ gps }: { gps: GpsState }) {
     <span className={cn('inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-xs font-semibold', g.tone)}>
       <Satellite className={cn('size-3.5', gps === 'SEARCHING' && 'animate-pulse')} aria-hidden /> {g.text}
     </span>
+  )
+}
+
+/** Công tắc Tự tạm dừng (nhớ trên máy) */
+function AutoPauseToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <button type="button" onClick={() => onChange(!on)} aria-pressed={on}
+      className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1.5 text-xs font-semibold text-fg-muted">
+      <PauseCircle className={cn('size-4', on && 'text-brand')} aria-hidden /> Tự tạm dừng {on ? 'bật' : 'tắt'}
+    </button>
   )
 }
 
@@ -68,10 +78,13 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
       <div className="flex min-h-[70dvh] flex-col animate-fade-in">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Chạy</h1>
-          <button onClick={() => t.setVoiceOn(!t.voiceOn)} className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1.5 text-xs font-semibold text-fg-muted"
-            aria-pressed={t.voiceOn}>
-            {t.voiceOn ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />} Giọng HLV {t.voiceOn ? 'bật' : 'tắt'}
-          </button>
+          <div className="flex flex-wrap justify-end gap-1.5">
+            <AutoPauseToggle on={t.autoPauseOn} onChange={t.setAutoPauseOn} />
+            <button onClick={() => t.setVoiceOn(!t.voiceOn)} className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1.5 text-xs font-semibold text-fg-muted"
+              aria-pressed={t.voiceOn}>
+              {t.voiceOn ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />} Giọng HLV {t.voiceOn ? 'bật' : 'tắt'}
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-1 flex-col items-center justify-center gap-6 py-10">
@@ -125,7 +138,7 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
           </p>
         )}
         <Card className="space-y-2 text-sm text-fg-muted">
-          <p className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-brand" /> Chạy ngoài trời. Đứng yên thì app tự dừng tính km.</p>
+          <p className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-brand" /><span>Chạy ngoài trời. Dừng nghỉ (đèn đỏ, uống nước): app <b className="text-fg">tự tạm dừng đồng hồ chạy</b> và không cộng km — pace không bị chậm vì lúc nghỉ, như Strava / Garmin. Đi bộ hay chạy biến tốc nhiều thì có thể tắt Tự tạm dừng.</span></p>
           {t.background ? (
             <p className="flex gap-2"><Smartphone className="mt-0.5 size-4 shrink-0 text-brand" /><span>Bấm Bắt đầu rồi <b className="text-fg">cứ tắt màn hình, bỏ túi</b> — app vẫn ghi GPS. Lần đầu, hãy cho phép RaceHub dùng vị trí (iPhone: chọn <b className="text-fg">Luôn luôn</b> nếu được hỏi).</span></p>
           ) : (
@@ -142,15 +155,20 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
 
   // ---------------- Đang chạy / tạm dừng ----------------
   if (live) {
-    const status = t.phase === 'LOCATING' ? 'ĐANG TÌM GPS' : t.phase === 'PAUSED' ? 'TẠM DỪNG' : t.autoPaused ? 'TỰ TẠM DỪNG' : 'ĐANG CHẠY'
+    const status = t.phase === 'LOCATING' ? 'ĐANG TÌM GPS' : t.phase === 'PAUSED' ? 'TẠM DỪNG' : !t.moved ? 'SẴN SÀNG'
+      : t.autoPaused && t.autoPauseOn ? 'TỰ TẠM DỪNG' : 'ĐANG CHẠY'
+    // Đồng hồ chính: bật tự tạm dừng = thời gian chạy (đứng lại khi nghỉ); tắt = tổng thời gian (luôn nhảy)
+    const clock = t.autoPauseOn
+      ? { label: 'Thời gian chạy', value: t.movingS, other: 'Tổng thời gian', otherValue: t.elapsedS }
+      : { label: 'Tổng thời gian', value: t.elapsedS, other: 'Thời gian chạy', otherValue: t.movingS }
     if (locked && t.phase !== 'LOCATING') {
-      return <PocketMode distanceM={t.distanceM} movingS={t.movingS} pace={avgPace} status={status} onUnlock={() => setLocked(false)} />
+      return <PocketMode distanceM={t.distanceM} clockLabel={clock.label} clockS={clock.value} pace={avgPace} status={status} onUnlock={() => setLocked(false)} />
     }
     return (
       <div className="flex min-h-[75dvh] flex-col">
         <div className="flex items-center justify-between">
           <span className={cn('inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black tracking-wider',
-            status === 'ĐANG CHẠY' ? 'bg-brand text-brand-fg' : 'bg-warning/15 text-warning')}>
+            status === 'ĐANG CHẠY' ? 'bg-brand text-brand-fg' : status === 'SẴN SÀNG' ? 'bg-brand/15 text-brand' : 'bg-warning/15 text-warning')}>
             <span className={cn('size-2 rounded-full bg-current', status === 'ĐANG CHẠY' && 'animate-pulse')} />{status}
           </span>
           <GpsBadge gps={t.gps} />
@@ -161,10 +179,29 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
           <p className="mt-2 text-sm font-semibold uppercase tracking-widest text-fg-subtle">Kilômét</p>
         </div>
 
+        {t.phase === 'RUNNING' && !t.moved && (
+          <p role="status" className="mb-3 flex gap-2 rounded-xl bg-brand/10 px-3 py-2 text-xs text-fg">
+            <Footprints className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
+            <span>GPS đã sẵn sàng — <b>bắt đầu chạy đi!</b> Thời gian chạy tự tính khi bạn di chuyển; tổng thời gian đang được tính từ lúc bấm.</span>
+          </p>
+        )}
+        {t.phase === 'RUNNING' && t.moved && t.autoPaused && t.autoPauseOn && (
+          <p role="status" className="mb-3 flex gap-2 rounded-xl bg-warning/10 px-3 py-2 text-xs text-fg">
+            <PauseCircle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+            <span>Bạn đang đứng yên nên <b>đồng hồ chạy tự dừng</b> — di chuyển là tính tiếp. Nghỉ không làm chậm pace; tổng thời gian vẫn chạy.</span>
+          </p>
+        )}
+
         <div className="grid grid-cols-3 gap-2 rounded-[var(--radius-card)] border border-border bg-surface py-4">
-          <Metric label="Thời gian" icon={Timer} value={formatDuration(t.movingS)} />
+          <Metric label={clock.label} icon={Timer} value={formatDuration(clock.value)} />
           <Metric label="Pace TB" icon={Gauge} value={formatPace(avgPace)} unit="/km" />
           <Metric label="Hiện tại" icon={Clock3} value={formatPace(t.currentPace)} unit="/km" />
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-2 px-1">
+          <span className="flex items-center gap-1.5 text-xs text-fg-muted">
+            <Hourglass className="size-3.5" aria-hidden />{clock.other} <b className="font-mono tabular text-fg">{formatDuration(clock.otherValue)}</b>
+          </span>
+          {t.phase !== 'LOCATING' && <AutoPauseToggle on={t.autoPauseOn} onChange={t.setAutoPauseOn} />}
         </div>
 
         {t.splits.length > 0 && (
@@ -238,10 +275,12 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
         <h1 className="text-2xl font-bold">Tổng kết</h1>
         <Card className="text-center">
           <p className="font-mono tabular text-6xl font-black">{formatKm(t.distanceM)}<span className="ml-1 text-lg text-fg-muted">km</span></p>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <Metric label="Thời gian" icon={Timer} value={formatDuration(t.movingS)} />
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <Metric label="Thời gian chạy" icon={Timer} value={formatDuration(t.movingS)} />
             <Metric label="Pace TB" icon={Gauge} value={formatPace(avgPace)} unit="/km" />
+            <Metric label="Tổng" icon={Hourglass} value={formatDuration(t.elapsedS)} />
           </div>
+          <p className="mt-3 text-[11px] text-fg-subtle">Pace tính theo thời gian chạy (bỏ lúc đứng nghỉ), như Strava / Garmin. Tổng = từ lúc bắt đầu đến kết thúc, trừ lúc bấm tạm dừng.</p>
         </Card>
         {t.splits.length > 0 && (
           <Card>
@@ -289,7 +328,7 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
         </div>
         <Card className="grid grid-cols-2 gap-3 text-center">
           <div><p className="text-xs text-fg-subtle">Quãng đường</p><p className="font-mono tabular text-2xl font-bold">{formatKm(t.distanceM)} km</p></div>
-          <div><p className="text-xs text-fg-subtle">Thời gian</p><p className="font-mono tabular text-2xl font-bold">{formatDuration(t.movingS)}</p></div>
+          <div><p className="text-xs text-fg-subtle">Thời gian chạy</p><p className="font-mono tabular text-2xl font-bold">{formatDuration(t.movingS)}</p></div>
         </Card>
         <div className="flex gap-2">
           <Button block variant="secondary" className="flex-1" onClick={t.discard}>Chạy tiếp</Button>
@@ -315,7 +354,7 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
       </div>
       <Card className="grid grid-cols-2 gap-3 text-center">
         <div><p className="text-xs text-fg-subtle">Quãng đường</p><p className="font-mono tabular text-2xl font-bold">{formatKm(r?.distance_m ?? t.distanceM)} km</p></div>
-        <div><p className="text-xs text-fg-subtle">Thời gian</p><p className="font-mono tabular text-2xl font-bold">{formatDuration(t.movingS)}</p></div>
+        <div><p className="text-xs text-fg-subtle">Thời gian chạy</p><p className="font-mono tabular text-2xl font-bold">{formatDuration(t.movingS)}</p></div>
         <div><p className="text-xs text-fg-subtle">Phần thưởng</p><CoinAmount value={r?.earned_xu ?? 0} className="text-xl" /></div>
         <div><p className="text-xs text-fg-subtle">Kinh nghiệm</p><XpAmount value={r?.earned_xp ?? 0} className="text-xl" /></div>
       </Card>
@@ -371,7 +410,7 @@ function RoundAction({ label, onClick, children }: { label: string; onClick: () 
  * Chế độ bỏ túi: màn hình đen (tiết kiệm pin màn OLED), chữ lớn, chạm nhầm không có tác dụng.
  * Mở khóa bằng cách giữ nút 1,5 giây — chỉ ở đây mới cần giữ, để tránh bấm nhầm trong túi.
  */
-function PocketMode({ distanceM, movingS, pace, status, onUnlock }: { distanceM: number; movingS: number; pace: number; status: string; onUnlock: () => void }) {
+function PocketMode({ distanceM, clockLabel, clockS, pace, status, onUnlock }: { distanceM: number; clockLabel: string; clockS: number; pace: number; status: string; onUnlock: () => void }) {
   return (
     <div className="fixed inset-0 z-[80] flex flex-col items-center justify-between bg-black px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] text-white">
       <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-black tracking-wider text-white/70">{status}</span>
@@ -379,7 +418,7 @@ function PocketMode({ distanceM, movingS, pace, status, onUnlock }: { distanceM:
         <p className="font-mono tabular text-[6.5rem] font-black leading-none text-brand">{formatKm(distanceM)}</p>
         <p className="mt-1 text-sm font-semibold uppercase tracking-widest text-white/50">Kilômét</p>
         <div className="mt-10 grid grid-cols-2 gap-10">
-          <div><p className="text-xs uppercase tracking-wider text-white/50">Thời gian</p><p className="font-mono tabular text-4xl font-bold">{formatDuration(movingS)}</p></div>
+          <div><p className="text-xs uppercase tracking-wider text-white/50">{clockLabel}</p><p className="font-mono tabular text-4xl font-bold">{formatDuration(clockS)}</p></div>
           <div><p className="text-xs uppercase tracking-wider text-white/50">Pace TB</p><p className="font-mono tabular text-4xl font-bold">{formatPace(pace)}</p></div>
         </div>
       </div>
