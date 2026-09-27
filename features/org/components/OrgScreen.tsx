@@ -15,8 +15,9 @@ import { UnitsTab } from './tabs/UnitsTab'
 import { ReportTab } from './tabs/ReportTab'
 import { SettingsTab } from './tabs/SettingsTab'
 import { FeedTab } from './tabs/FeedTab'
+import { OverviewTab } from './tabs/OverviewTab'
 
-type Tab = 'feed' | 'campaigns' | 'members' | 'units' | 'report' | 'settings'
+type Tab = 'overview' | 'feed' | 'campaigns' | 'members' | 'units' | 'report' | 'settings'
 export const orgKey = (id: string) => ['org', id] as const
 
 /** Không gian tổ chức: chiến dịch, thành viên, đơn vị & CLB, báo cáo, cài đặt */
@@ -30,6 +31,7 @@ export function OrgScreen({ orgId }: { orgId: string }) {
   if (q.isError) return <ErrorState message={orgErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   const o = q.data
   const tabs: { id: Tab; label: string; badge?: number | null }[] = [
+    { id: 'overview', label: 'Tổng quan' },
     { id: 'feed', label: 'Bảng tin' },
     { id: 'campaigns', label: 'Chiến dịch' },
     { id: 'members', label: 'Thành viên', badge: o.pending_members },
@@ -38,7 +40,7 @@ export function OrgScreen({ orgId }: { orgId: string }) {
     ...(o.is_admin ? [{ id: 'settings' as Tab, label: 'Cài đặt' }] : []),
   ]
   const raw = params.get('tab') as Tab | null
-  const tab: Tab = raw && tabs.some((t) => t.id === raw) ? raw : 'feed'
+  const tab: Tab = raw && tabs.some((t) => t.id === raw) ? raw : 'overview'
   const setTab = (t: Tab) => router.replace(`${path}?tab=${t}`, { scroll: false })
   const left = o.active_until ? daysLeft(o.active_until, now) : null
 
@@ -69,6 +71,7 @@ export function OrgScreen({ orgId }: { orgId: string }) {
           </button>
         ))}
       </div>
+      {tab === 'overview' && <OverviewTab org={o} />}
       {tab === 'feed' && <FeedTab org={o} />}
       {tab === 'campaigns' && <CampaignsTab org={o} />}
       {tab === 'members' && <MembersTab org={o} />}

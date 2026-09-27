@@ -91,3 +91,17 @@ Với một doanh nghiệp 300 người, mức 10.000 ₫ / người / tháng t�
 - **Chế độ riêng tư**: thành viên chỉ thấy BXH đơn vị + thứ hạng của mình.
 - **Quay thưởng dùng chung toàn app**: chiến dịch tổ chức, thử thách, CLB, giải chạy ảo, toàn hệ thống (admin). Chọn đối tượng (hoàn thành / có chạy / tất cả),
   nhiều giải, loại người đã trúng. Quay **một lần**; thứ tự trúng = md5(seed + mã người dùng), công bố seed + mã băm danh sách để ai cũng kiểm tra lại. Quà do ban tổ chức tự trao.
+
+## 7. Cấu trúc màn tổ chức (008700)
+
+| Tab | Ai thấy | Nội dung |
+|---|---|---|
+| **Tổng quan** (mở đầu tiên) | Mọi thành viên | Tỷ lệ tham gia, tổng km, km bình quân, hạng của mình, biểu đồ km theo ngày; **BXH phòng ban** cộng dồn nhiều cấp, xếp theo tổng / bình quân / tỷ lệ tham gia; **BXH CLB**; top 10 cá nhân (ẩn khi bật riêng tư). Chọn Tuần / Tháng / 30 ngày / Năm. Admin xuất Excel. |
+| Bảng tin | Mọi thành viên | Thông báo ghim, bài viết, kết quả quay thưởng |
+| Chiến dịch | Mọi thành viên | Chiến dịch, BXH chiến dịch, chốt kết quả, chứng nhận, quay thưởng; xuất Excel (sheet cá nhân + đơn vị + CLB) |
+| Thành viên | Admin / trưởng đơn vị | Duyệt, gán đơn vị, **nhập Excel (.xlsx hoặc .csv, có tệp mẫu + hướng dẫn)**, **xuất Excel**, lời mời chờ |
+| Đơn vị | Mọi thành viên | Cây đơn vị tối đa 4 cấp, trưởng đơn vị; liên đoàn: CLB thành viên |
+| Báo cáo | Admin / trưởng đơn vị | Số liệu từng người theo khoảng ngày, mã NV, xuất Excel |
+| Cài đặt | Admin | Thương hiệu, email công ty, riêng tư, mã mời, CLB |
+
+Excel dùng định dạng `.xlsx` thật (dòng tiêu đề in đậm, cố định khi cuộn, số là số — cộng / lọc được ngay trong Excel).

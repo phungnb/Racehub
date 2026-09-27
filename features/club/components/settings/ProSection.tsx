@@ -13,6 +13,8 @@ import Link from 'next/link'
 import { ClubProPurchase, getPlanCompare } from '@/features/billing'
 import { routes } from '@/shared/config/routes'
 import { BrandingEditor } from './BrandingEditor'
+import { ProLockedButton } from './ProLock'
+import { downloadXlsx } from '@/shared/lib/excel'
 
 const BENEFITS = [
   { icon: Users, text: 'Không giới hạn Quản trị viên (gói miễn phí: 2)' },
@@ -27,6 +29,7 @@ const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('vi-VN')
 export function ProSection({ club }: { club: Club }) {
   const q = useQuery({ queryKey: ['club', club.id, 'plan'], queryFn: () => getClubPlan(club.id) })
   const [report, setReport] = useState(false)
+  const toPurchase = () => document.getElementById(`club-pro-buy-${club.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   if (q.isPending) return <Skeleton className="h-40" />
   if (q.isError) return <ErrorState message={clubErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   const p = q.data
@@ -60,10 +63,16 @@ export function ProSection({ club }: { club: Club }) {
             {p.slug && <a href={`/c/${p.slug}`} target="_blank" rel="noopener noreferrer" className="inline-block text-sm font-semibold text-brand">Xem trang công khai của CLB →</a>}
             <Button block variant="secondary" onClick={() => setReport(true)}><BarChart3 className="size-4" aria-hidden />Báo cáo chuyên cần</Button>
           </>
-        ) : null}
+        ) : (
+          <div className="grid gap-2">
+            <ProLockedButton icon={<Link2 className="size-4" />} label="Link mời riêng + trang công khai /c/tên-clb" feature="link mời riêng và trang công khai" onUpgrade={toPurchase} />
+            <ProLockedButton icon={<BarChart3 className="size-4" />} label="Báo cáo chuyên cần xuất Excel" feature="báo cáo chuyên cần" onUpgrade={toPurchase} />
+            <ProLockedButton icon={<Sparkles className="size-4" />} label="Tường nhà: ảnh bìa, khẩu hiệu, chủ đề màu" feature="trang trí tường nhà CLB" onUpgrade={toPurchase} />
+          </div>
+        )}
         <QuotaCard club={club} />
-        <BrandingEditor club={club} active={p.active} />
-        <ClubProPurchase clubId={club.id} active={p.active} />
+        {p.active && <BrandingEditor club={club} active />}
+        <div id={`club-pro-buy-${club.id}`}><ClubProPurchase clubId={club.id} active={p.active} /></div>
       </Card>
       {report && <ReportSheet club={club} onClose={() => setReport(false)} />}
     </section>
@@ -133,7 +142,6 @@ function SlugEditor({ clubId, current }: { clubId: string; current: string | nul
   )
 }
 
-const csvCell = (x: unknown) => { const s = String(x ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
 
 function monthRange(offset: number) {
   const d = new Date()
@@ -149,18 +157,13 @@ function ReportSheet({ club, onClose }: { club: Club; onClose: () => void }) {
   const exportCsv = () => {
     if (!q.data) return
     const head = ['Thành viên', 'Vai trò', 'Buổi chạy', 'Km', 'Sự kiện đăng ký đi', 'Điểm danh', 'Khoản quỹ đã đóng']
-    const rows = q.data.members.map((m: AttendanceRow) => [m.display_name, m.role, m.runs, String(m.km).replace('.', ','), m.events_going, m.events_checked_in, m.dues_paid])
-    const csv = '﻿' + [head, ...rows].map((x) => x.map(csvCell).join(',')).join('\n')
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-    a.download = `chuyen-can-${r.from.getFullYear()}-${String(r.from.getMonth() + 1).padStart(2, '0')}.csv`
-    a.click()
-    URL.revokeObjectURL(a.href)
+    const rows = q.data.members.map((m: AttendanceRow) => [m.display_name, m.role, m.runs, Number(m.km) || 0, m.events_going, m.events_checked_in, m.dues_paid])
+    void downloadXlsx(`chuyen-can-${r.from.getFullYear()}-${String(r.from.getMonth() + 1).padStart(2, '0')}`, [{ name: 'Chuyên cần', head, rows }])
   }
   const active = q.data?.members.filter((m) => m.runs > 0).length ?? 0
   return (
     <Sheet open onClose={onClose} title="Báo cáo chuyên cần" description={`${club.name} · ${r.label}`}
-      footer={<Button block onClick={exportCsv} disabled={!q.data}><Download className="size-4" aria-hidden />Xuất CSV</Button>}>
+      footer={<Button block onClick={exportCsv} disabled={!q.data}><Download className="size-4" aria-hidden />Xuất Excel</Button>}>
       <div className="space-y-3">
         <div className="grid grid-cols-3 gap-2">
           {[-2, -1, 0].map((o) => (

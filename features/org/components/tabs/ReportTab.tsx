@@ -6,7 +6,8 @@ import { Download } from 'lucide-react'
 import { Button, ErrorState, Field, Input, Skeleton } from '@/shared/ui'
 import { formatNumber } from '@/shared/lib/format'
 import { getOrgReport, orgErrorMessage, type OrgDetail } from '../../api/orgApi'
-import { downloadCsv, toDayInput, vnDayStart } from '../../model/org'
+import { toDayInput, vnDayStart } from '../../model/org'
+import { downloadXlsx } from '@/shared/lib/excel'
 
 /** Báo cáo cho bộ phận nhân sự / ban tổ chức: km, số buổi, số ngày chạy từng người trong khoảng ngày */
 export function ReportTab({ org }: { org: OrgDetail }) {
@@ -17,9 +18,10 @@ export function ReportTab({ org }: { org: OrgDetail }) {
   const rows = q.data ?? []
   const active = rows.filter((r) => r.runs > 0).length
   const km = rows.reduce((a, r) => a + Number(r.km), 0)
-  const exportCsv = () => downloadCsv(`bao-cao-${from}-${to}.csv`,
-    ['Họ tên', org.unit_label, 'Mã nhân viên', 'CLB', 'Thành viên trực tiếp', 'Km', 'Số buổi', 'Số ngày chạy'],
-    rows.map((r) => [r.name, r.unit_name ?? '', r.employee_code ?? '', r.clubs ?? '', r.direct ? 'Có' : 'Qua CLB', String(r.km).replace('.', ','), r.runs, r.active_days]))
+  const exportCsv = () => void downloadXlsx(`bao-cao-${from}-${to}`, [{
+    name: 'Báo cáo', head: ['Họ tên', org.unit_label, 'Mã nhân viên', 'CLB', 'Thành viên trực tiếp', 'Km', 'Số buổi', 'Số ngày chạy'],
+    rows: rows.map((r) => [r.name, r.unit_name ?? '', r.employee_code ?? '', r.clubs ?? '', r.direct ? 'Có' : 'Qua CLB', Number(r.km) || 0, r.runs, r.active_days]),
+  }])
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
@@ -33,7 +35,7 @@ export function ReportTab({ org }: { org: OrgDetail }) {
               <div key={l} className="rounded-xl bg-surface-2 p-2"><p className="font-mono font-bold">{v}</p><p className="text-[11px] text-fg-subtle">{l}</p></div>
             ))}
           </div>
-          <Button block variant="secondary" onClick={exportCsv} disabled={!rows.length}><Download className="size-4" aria-hidden />Xuất Excel (CSV)</Button>
+          <Button block variant="secondary" onClick={exportCsv} disabled={!rows.length}><Download className="size-4" aria-hidden />Xuất Excel</Button>
           <ul className="divide-y divide-border rounded-2xl border border-border bg-surface text-sm">
             <li className="grid grid-cols-[1fr_3.5rem_3rem_3rem] gap-1 px-3 py-2 text-[11px] font-semibold text-fg-subtle">
               <span>Thành viên</span><span className="text-right">Km</span><span className="text-right">Buổi</span><span className="text-right">Ngày</span>

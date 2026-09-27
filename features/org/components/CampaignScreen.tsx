@@ -14,7 +14,8 @@ import {
   cancelCampaign, getCampaignBoard, lockCampaign, orgErrorMessage, reviewCampaignResult,
   type BoardGroup, type BoardPerson, type CampaignBoard, type CampaignMetric,
 } from '../api/orgApi'
-import { campaignPhase, downloadCsv, fmtDay, fmtValue, METRIC, PHASE_LABEL, unitOptions } from '../model/org'
+import { downloadXlsx } from '@/shared/lib/excel'
+import { campaignPhase, fmtDay, fmtValue, METRIC, PHASE_LABEL, unitOptions } from '../model/org'
 import { CampaignFormSheet } from './tabs/CampaignsTab'
 import { CampaignCertDesigner, CampaignCertificateSheet } from './CampaignCert'
 
@@ -257,7 +258,14 @@ function GroupList({ rows, metric }: { rows: BoardGroup[]; metric: CampaignMetri
 
 function exportBoard(b: CampaignBoard) {
   const m = b.campaign.metric
-  downloadCsv(`chien-dich-${b.campaign.title.slice(0, 30)}.csv`, ['Hạng', 'Họ tên', 'Đơn vị', METRIC[m].label, 'Km', 'Số buổi', 'Số ngày', 'Hoàn thành', 'Duyệt'],
-    b.people.map((p) => [p.rank, p.name, p.unit_name ?? '', String(p.value).replace('.', ','), String(p.km).replace('.', ','), p.runs, p.active_days,
-      p.completed ? 'Có' : '', p.review_status === 'PENDING' ? 'Chờ duyệt' : p.review_status === 'OK' && b.locked ? 'Hợp lệ' : '']))
+  const num = (x: unknown) => Number(x) || 0
+  void downloadXlsx(`chien-dich-${b.campaign.title.slice(0, 30)}`, [
+    { name: 'Cá nhân', head: ['Hạng', 'Họ tên', 'Đơn vị', METRIC[m].label, 'Km', 'Số buổi', 'Số ngày', 'Hoàn thành', 'Duyệt'],
+      rows: b.people.map((p) => [p.rank, p.name, p.unit_name ?? '', num(p.value), num(p.km), p.runs, p.active_days,
+        p.completed ? 'Có' : '', p.review_status === 'PENDING' ? 'Chờ duyệt' : p.review_status === 'OK' && b.locked ? 'Hợp lệ' : '']) },
+    ...([['Đơn vị', b.units], ['CLB', b.clubs]] as const).filter(([, gs]) => gs?.length).map(([name, gs]) => ({
+      name, head: ['Hạng', name, 'Thành viên', 'Đã chạy', 'Tỷ lệ tham gia (%)', `Tổng ${METRIC[m].label}`, 'Bình quân / người'],
+      rows: gs.map((g, i) => [i + 1, g.name, g.members, g.active, g.members ? Math.round((g.active / g.members) * 100) : 0, num(g.total), num(g.avg)]),
+    })),
+  ])
 }

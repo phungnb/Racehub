@@ -116,3 +116,20 @@ export async function getPlanCompare(): Promise<PlanCompareData> {
   if (!data) throw new Error('NOT_DEPLOYED')
   return data as PlanCompareData
 }
+
+/** CLB mình là chủ nhiệm / quản trị viên — để chọn CLB khi nâng CLB Pro từ trang Gói */
+export interface ManagedClub { id: string; name: string; pro: boolean }
+export async function getManagedClubs(): Promise<ManagedClub[]> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+  const { data, error } = await supabase.from('club_members')
+    .select('role, club:clubs(id, name, plan, pro_until)')
+    .eq('user_id', user.id).eq('status', 'APPROVED').in('role', ['OWNER', 'CAPTAIN'])
+  if (error) throw error
+  const now = Date.now()
+  type Row = { club: { id: string; name: string; plan: string | null; pro_until: string | null } | null }
+  return ((data ?? []) as unknown as Row[]).filter((r) => r.club).map((r) => ({
+    id: r.club!.id, name: r.club!.name,
+    pro: r.club!.plan === 'PRO' && (!r.club!.pro_until || Date.parse(r.club!.pro_until) > now),
+  }))
+}
