@@ -1,18 +1,18 @@
 'use client'
 
 import Link from 'next/link'
-import { Gift, Medal, Radar, Store, Swords, type LucideIcon } from 'lucide-react'
+import { BookOpen, Gift, Medal, Radar, Store, type LucideIcon } from 'lucide-react'
 import { routes } from '@/shared/config/routes'
 
 const ITEMS: { href: string; label: string; icon: LucideIcon; tone: string }[] = [
   { href: routes.nearby, label: 'Quanh đây', icon: Radar, tone: 'bg-live/15 text-live' },
   { href: routes.races, label: 'Giải chạy ảo', icon: Medal, tone: 'bg-brand/15 text-brand' },
-  { href: '/cups', label: 'Thách đấu CLB', icon: Swords, tone: 'bg-warning/15 text-warning' },
+  { href: routes.learn, label: 'Kiến thức Runner', icon: BookOpen, tone: 'bg-warning/15 text-warning' },
   { href: routes.market, label: 'Chợ Runner', icon: Store, tone: 'bg-sky-500/15 text-sky-400' },
   { href: routes.invite, label: 'Mời bạn bè', icon: Gift, tone: 'bg-coin/15 text-coin' },
 ]
 
-/** Lối tắt trang chủ tới các khu ít nằm trên thanh điều hướng: runner quanh đây, giải chạy ảo, thách đấu CLB, Chợ Runner, mời bạn */
+/** Lối tắt trang chủ: runner quanh đây, giải chạy ảo, Kiến thức Runner, Chợ Runner, mời bạn (Thách đấu CLB nằm trong tab Thử thách) */
 export function ExploreShortcuts() {
   return (
     <nav aria-label="Khám phá" className="grid grid-cols-5 gap-2">

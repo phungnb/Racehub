@@ -1,11 +1,10 @@
 'use client'
 
-import Link from 'next/link'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, ChevronLeft, Copy, ExternalLink, Ticket } from 'lucide-react'
+import { Check, Copy, ExternalLink, Ticket } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Card, EmptyState, ErrorState, Skeleton } from '@/shared/ui'
+import { Button, Card, EmptyState, ErrorState, Skeleton, BackLink } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import { markVoucherUsed, myVouchers, voucherErrorMessage, type MyVoucher } from '../api/voucherApi'
@@ -30,7 +29,7 @@ export function VoucherWallet() {
   })
   return (
     <div className="space-y-4 animate-fade-in">
-      <Link href={routes.me} className="inline-flex items-center gap-1 text-sm text-fg-muted"><ChevronLeft className="size-4" aria-hidden />Tôi</Link>
+      <BackLink fallback={routes.me} />
       <header>
         <h1 className="text-2xl font-bold">Voucher của tôi</h1>
         <p className="text-sm text-fg-muted">Quà từ nhà tài trợ khi bạn hoàn thành thử thách / nhiệm vụ. Dùng trực tiếp tại cửa hàng / dịch vụ của nhà tài trợ.</p>

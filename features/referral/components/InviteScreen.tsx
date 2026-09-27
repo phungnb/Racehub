@@ -1,12 +1,11 @@
 'use client'
 
-import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, ChevronLeft, Copy, Download, Gift, Share2, Users } from 'lucide-react'
+import { Check, Copy, Download, Gift, Share2, Users } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, ErrorState, Input, Skeleton, useImageSaver } from '@/shared/ui'
+import { Avatar, Button, Card, ErrorState, Input, Skeleton, useImageSaver, BackLink } from '@/shared/ui'
 import { routes } from '@/shared/config/routes'
 import { applyReferral, myReferral, referralErrorMessage, referralLink, type MyReferral } from '../api/referralApi'
 
@@ -15,7 +14,7 @@ export function InviteScreen() {
   const q = useQuery({ queryKey: ['referral', 'mine'], queryFn: myReferral })
   return (
     <div className="space-y-4 animate-fade-in">
-      <Link href={routes.me} className="inline-flex items-center gap-1 text-sm text-fg-muted"><ChevronLeft className="size-4" aria-hidden />Tôi</Link>
+      <BackLink fallback={routes.me} />
       <header>
         <h1 className="text-2xl font-bold">Mời bạn bè</h1>
         <p className="text-sm text-fg-muted">Rủ bạn chạy cùng — cả hai cùng nhận Xu khi bạn mới hoàn thành những km đầu tiên.</p>
