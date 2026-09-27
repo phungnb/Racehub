@@ -1,9 +1,14 @@
 import type { Metadata } from 'next'
+import { HelpArticle, HelpShell, type HelpPage } from '@/features/help'
+import { loadHelpPage } from '@/shared/lib/help-page-server'
 import { Contact, LegalPage } from '@/shared/ui/legal/LegalPage'
 
 export const metadata: Metadata = { title: 'Chính sách quyền riêng tư' }
 
-export default function PrivacyPage() {
+// Bản admin soạn trong Quản trị → Hướng dẫn & chính sách (008500) nếu có; chưa có thì dùng bản viết sẵn dưới đây
+export default async function PrivacyPage() {
+  const page = await loadHelpPage<HelpPage>('privacy')
+  if (page?.body?.trim()) return <HelpShell back={null}><HelpArticle page={page} /></HelpShell>
   return (
     <LegalPage title="Chính sách quyền riêng tư">
       <p>

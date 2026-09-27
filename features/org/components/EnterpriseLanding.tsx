@@ -1,10 +1,11 @@
 import Link from 'next/link'
+import type { ReactNode } from 'react'
 import { BarChart3, Building2, Crown, FileSpreadsheet, Flag, Network, Palette, ShieldCheck, Trophy, Users } from 'lucide-react'
 import { QuoteForm } from './QuoteForm'
 
 const PLANS = [
-  { name: 'Free', price: '0 ₫', who: 'CLB nhỏ, mới thành lập', items: ['Không giới hạn thành viên', '2 thử thách nội bộ cùng lúc, ≤ 50 người', 'Lịch, điểm danh QR, quỹ VietQR', 'BXH, bảng tin, đội nhóm'] },
-  { name: 'CLB Pro', price: 'từ 129.000 ₫/tháng', who: 'CLB đang hoạt động đều', items: ['20 thử thách cùng lúc, tới 1.000 người', 'Tường nhà: ảnh bìa, chủ đề, huy hiệu PRO', 'Trang công khai + link riêng', 'Báo cáo chuyên cần, cửa hàng, giao lưu CLB'], highlight: true },
+  { name: 'Free', price: '0 ₫', who: 'CLB nhỏ, mới thành lập', items: ['Tối đa 50 thành viên', '2 thử thách nội bộ cùng lúc, ≤ 50 người', 'Lịch, điểm danh QR, quỹ VietQR', 'BXH, bảng tin, đội nhóm'] },
+  { name: 'CLB Pro', price: 'từ 129.000 ₫/tháng', who: 'CLB đang hoạt động đều', items: ['Không giới hạn thành viên', '20 thử thách cùng lúc, tới 1.000 người', 'Tường nhà: ảnh bìa, chủ đề, huy hiệu PRO', 'Trang công khai + link riêng', 'Báo cáo chuyên cần, cửa hàng, giao lưu CLB'], highlight: true },
   { name: 'Doanh nghiệp', price: 'Báo giá riêng', who: 'Doanh nghiệp, liên đoàn, trường học', items: ['Chiến dịch cho toàn tổ chức', 'BXH cá nhân · phòng ban · CLB', 'Quản lý nhiều CLB, tài trợ CLB Pro', 'Báo cáo cho nhân sự, hỗ trợ riêng'] },
 ]
 
@@ -20,7 +21,7 @@ const FEATURES = [
 ]
 
 /** Trang giới thiệu gói Doanh nghiệp + form báo giá (xem được khi chưa đăng nhập) */
-export function EnterpriseLanding() {
+export function EnterpriseLanding({ more }: { more?: ReactNode }) {
   return (
     <main className="mx-auto max-w-3xl px-4 pb-16">
       <header className="relative -mx-4 overflow-hidden px-5 pb-10 pt-12 text-center"
@@ -45,9 +46,16 @@ export function EnterpriseLanding() {
         ))}
       </section>
 
+      {more && (
+        <section className="mt-10 rounded-2xl border border-border bg-surface p-4 sm:p-6">
+          <h2 className="mb-3 text-xl font-bold">Tìm hiểu thêm</h2>
+          {more}
+        </section>
+      )}
+
       <section className="mt-10">
         <h2 className="text-center text-xl font-bold">Chọn gói phù hợp</h2>
-        <p className="mt-1 text-center text-sm text-fg-muted">Bắt đầu miễn phí, nâng cấp khi phong trào lớn lên.</p>
+        <p className="mt-1 text-center text-sm text-fg-muted">Bắt đầu miễn phí, nâng cấp khi phong trào lớn lên. <Link href="/goi" className="font-semibold text-brand">So sánh chi tiết →</Link></p>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {PLANS.map((p) => (
             <div key={p.name} className={`flex flex-col rounded-2xl border p-4 ${p.highlight ? 'border-coin/60 bg-gradient-to-b from-coin/10 to-surface' : 'border-border bg-surface'}`}>

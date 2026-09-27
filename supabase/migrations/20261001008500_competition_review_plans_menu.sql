@@ -1,11 +1,3 @@
--- RaceHub — PHẦN 13/14 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 008500
--- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
--- Xong thì chạy phần tiếp theo.
-begin;
--- ===================================================================
--- 20261001008500_competition_review_plans_menu.sql
--- ===================================================================
 -- 008500: Chống gian lận chỉ trong thi đấu + CLB Free tối đa 50 thành viên + bảng so sánh gói + admin sửa mọi trang menu.
 -- • Chống gian lận CHỈ áp cho người đang thi đấu: bài có dấu hiệu bất thường chỉ CHỜ DUYỆT khi lúc chạy người đó đang tham gia
 --   thử thách, giải chạy ảo hoặc chiến dịch doanh nghiệp. Ngoài thi đấu, bài GPS / Strava được TỰ DUYỆT (vẫn tính Xu, XP, BXH CLB),
@@ -730,5 +722,3 @@ revoke all on function public.plan_compare() from public;
 grant execute on function public.plan_compare() to anon, authenticated;
 
 notify pgrst, 'reload schema';
-
-commit;

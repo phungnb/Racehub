@@ -33,13 +33,13 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
 > ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
-> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 008400** + chạy lại 003500),
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 008500** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
 >
 > 📦 **File gộp quá dài, copy không hết?** Dùng bản **chia nhỏ** [`supabase/deploy/phan/`](../supabase/deploy/phan/README.md): 10 phần, mỗi phần ≤ ~90 KB.
-> Chạy **lần lượt** `phan_01.sql` → `phan_11.sql` (mỗi phần: SQL Editor → New query → dán → Run). Đã chạy một số rồi thì bắt đầu từ phần chứa
-> migration đầu tiên bị ✗ trong **Kiểm tra hệ thống**, và **luôn chạy phần cuối** (`phan_11.sql`, chạy lại kiểm tra hệ thống). Mẹo copy trên GitHub: mở file → nút **Raw** → Ctrl+A → Ctrl+C.
+> Chạy **lần lượt** `phan_01.sql` → `phan_14.sql` (mỗi phần: SQL Editor → New query → dán → Run). Đã chạy một số rồi thì bắt đầu từ phần chứa
+> migration đầu tiên bị ✗ trong **Kiểm tra hệ thống**, và **luôn chạy phần cuối** (`phan_14.sql`, chạy lại kiểm tra hệ thống). Mẹo copy trên GitHub: mở file → nút **Raw** → Ctrl+A → Ctrl+C.
 > File gộp tạo bằng `npm run db:bundle` (hoặc `node scripts/db-bundle.mjs <mốc>` để gộp từ mốc khác); test tự động bảo đảm file luôn khớp migration.
 
 Chạy các file trong `supabase/migrations/`, đúng thứ tự:
@@ -130,6 +130,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001008200_club_challenge_quota.sql` | **Hạn mức thử thách CLB theo gói** (tham khảo Tucana): thử thách nội bộ CLB **miễn phí** trong hạn mức — CLB miễn phí: 2 thử thách cùng lúc, ≤ 50 người, cần ≥ 5 thành viên có bài chạy hợp lệ trong 30 ngày (chặn "CLB một người"); CLB Pro: 20 thử thách cùng lúc, ≤ 1.000 người. Ngoài hạn mức vẫn tạo được, tính phí quy mô trừ quỹ CLB. Admin chỉnh con số ở **Quản trị → Chính sách** | Cần 0700, 2800, 3700, 3800, 7500; chạy lại 3500 |
 | `20261001008300_organizations.sql` | **RaceHub Doanh nghiệp / Liên CLB** (gói Enterprise, báo giá riêng): tổ chức có thương hiệu, đơn vị (phòng ban / chi nhánh / lớp), mã mời, số chỗ theo hợp đồng; CLB thành viên (có thể tài trợ CLB Pro); chiến dịch tổng km / số buổi / số ngày với BXH cá nhân · đơn vị · CLB; báo cáo CSV cho nhân sự; form báo giá công khai `/doanh-nghiep`; admin tạo / gia hạn ở **Quản trị → Kinh doanh → Doanh nghiệp**. Bucket ảnh `org-media`. Cron hằng ngày trả gói cũ cho CLB khi hợp đồng hết hạn. Xem `docs/DOANH_NGHIEP.md` | Cần 0500, 2800, 6900, 7000, 7100; chạy lại 3500 |
 | `20261001008400_org_management_draws.sql` | **Quản lý doanh nghiệp** (học từ FoxSteps): tự duyệt / chỉ nhận **email công ty**; **nhập danh sách Excel/CSV** (người chưa có tài khoản → lời mời chờ, tự áp khi vào; tuỳ chọn gỡ người nghỉ việc); **đơn vị nhiều cấp** (4 cấp) + **trưởng đơn vị**; chiến dịch có **trần km/ngày, ngày hội ×2/×3, chốt kết quả + duyệt top N**, **chứng nhận hoàn thành** (thiết kế như giải chạy ảo); **bảng tin tổ chức**; **chế độ riêng tư**. **Quay thưởng dùng chung** ở chiến dịch, thử thách, CLB (Đại sảnh), giải chạy ảo, Quản trị → Kinh doanh → Quay thưởng — quay một lần, công bố seed + mã băm để kiểm chứng | Cần 8300; chạy lại 3500 |
+| `20261001008500_competition_review_plans_menu.sql` | **Chống gian lận chỉ khi thi đấu**: bài nghi vấn chỉ chờ duyệt khi người chạy đang tham gia thử thách / giải chạy ảo / chiến dịch; ngoài thi đấu bài GPS / Strava **tự duyệt** (vẫn lưu mức nghi vấn, không tính vào thử thách / giải về sau), bài nhập tay vẫn chờ duyệt; bài đang chờ của người không thi đấu được tự duyệt. **CLB miễn phí tối đa 50 thành viên** (Quản trị → Chính sách, 0 = không giới hạn; không đuổi ai). **Bảng so sánh gói** `/goi`. **Điều khoản, Quyền riêng tư, Doanh nghiệp** thành trang menu admin sửa được | Cần 8400; chạy lại 3500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

@@ -208,7 +208,10 @@ export function PolicyTab({ policy, raw }: { policy: EconomyPolicy; raw: Record<
             onChange={(v) => set({ clubChallenge: { ...p.clubChallenge, freeMaxOpen: v } })} />
           <Num id="pol-cc-fslots" label="Quy mô mỗi thử thách" unit="người" value={p.clubChallenge.freeMaxSlots}
             onChange={(v) => set({ clubChallenge: { ...p.clubChallenge, freeMaxSlots: v } })} />
+          <Num id="pol-cc-fmembers" label="Thành viên tối đa (0 = không giới hạn)" unit="người" value={p.clubChallenge.freeMaxMembers}
+            onChange={(v) => set({ clubChallenge: { ...p.clubChallenge, freeMaxMembers: v } })} />
         </div>
+        <p className="text-xs text-fg-subtle">CLB đã vượt số này vẫn giữ đủ thành viên, chỉ không duyệt thêm người mới cho tới khi nâng Pro.</p>
         <p className="text-xs font-medium text-fg-muted">CLB Pro</p>
         <div className="grid grid-cols-2 gap-3">
           <Num id="pol-cc-popen" label="Thử thách cùng lúc" unit="cái" value={p.clubChallenge.proMaxOpen}
@@ -241,7 +244,7 @@ export function PolicyTab({ policy, raw }: { policy: EconomyPolicy; raw: Record<
           <li>Chạy: {runPolicyText(p.run)}</li>
           <li>Điểm danh +{formatNumber(p.checkinXu)} Xu (chạy ≥ {formatNumber(p.checkinMinKm)} km)</li>
           <li>Phí quy mô: {feePolicyText(p.capacityTiers)}</li>
-          <li>CLB miễn phí: {p.clubChallenge.freeMaxOpen} thử thách cùng lúc, ≤ {formatNumber(p.clubChallenge.freeMaxSlots)} người, cần {p.clubChallenge.freeMinActiveMembers} người chạy / {p.clubChallenge.activeWindowDays} ngày · Pro: {p.clubChallenge.proMaxOpen} cùng lúc, ≤ {formatNumber(p.clubChallenge.proMaxSlots)} người</li>
+          <li>CLB miễn phí: tối đa {p.clubChallenge.freeMaxMembers ? `${formatNumber(p.clubChallenge.freeMaxMembers)} thành viên` : 'không giới hạn thành viên'}, {p.clubChallenge.freeMaxOpen} thử thách cùng lúc, ≤ {formatNumber(p.clubChallenge.freeMaxSlots)} người, cần {p.clubChallenge.freeMinActiveMembers} người chạy / {p.clubChallenge.activeWindowDays} ngày · Pro: {p.clubChallenge.proMaxOpen} cùng lúc, ≤ {formatNumber(p.clubChallenge.proMaxSlots)} người</li>
         </ul>
       </ConfirmSheet>
     </div>

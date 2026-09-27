@@ -2,5 +2,6 @@
 export { MenuDrawer } from './components/MenuDrawer'
 export { HelpShell } from './components/HelpShell'
 export { HelpArticle } from './components/HelpArticle'
+export { HelpBody } from './components/HelpBody'
 export { HelpAdminTab } from './components/HelpAdminTab'
-export { groupMenu, staticHref, SECTION_LABEL, type HelpMenu, type HelpPage } from './model/help'
+export { groupMenu, staticHref, featuredMenu, SECTION_LABEL, type HelpMenu, type HelpPage } from './model/help'
