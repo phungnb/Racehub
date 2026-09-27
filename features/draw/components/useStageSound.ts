@@ -1,0 +1,35 @@
+'use client'
+
+import { useMemo, useRef } from 'react'
+
+/** Âm thanh sân khấu tạo bằng Web Audio (không tải file): tiếng "tách" khi tên đổi, hồi chuông khi có người trúng */
+export function useStageSound(on: boolean) {
+  const ctxRef = useRef<AudioContext | null>(null)
+  return useMemo(() => {
+    const ctx = () => {
+      if (!on || typeof window === 'undefined') return null
+      try {
+        const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+        if (!AC) return null
+        ctxRef.current ??= new AC()
+        if (ctxRef.current.state === 'suspended') void ctxRef.current.resume()
+        return ctxRef.current
+      } catch { return null }
+    }
+    const beep = (freq: number, at: number, dur: number, vol: number, type: OscillatorType = 'square') => {
+      const c = ctx()
+      if (!c) return
+      const o = c.createOscillator(), g = c.createGain()
+      o.type = type; o.frequency.value = freq
+      g.gain.setValueAtTime(vol, c.currentTime + at)
+      g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + at + dur)
+      o.connect(g).connect(c.destination)
+      o.start(c.currentTime + at); o.stop(c.currentTime + at + dur + 0.02)
+    }
+    return {
+      /** progress 0..1: tiếng tách cao dần khi vòng quay chậm lại */
+      tick: (progress: number) => beep(500 + progress * 500, 0, 0.03, 0.05),
+      win: () => [523, 659, 784, 1047].forEach((f, i) => beep(f, i * 0.12, 0.35, 0.12, 'triangle')),
+    }
+  }, [on])
+}
