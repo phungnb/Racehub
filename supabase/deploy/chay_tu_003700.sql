@@ -1,7 +1,7 @@
--- RaceHub: gộp 54 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 55 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -15547,6 +15547,33 @@ revoke execute on function public.handle_new_user(), public.sync_club_member_cou
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001009000_client_error_resolve.sql
+-- ===================================================================
+-- 009000: "Lỗi người dùng gặp" — admin đánh dấu ĐÃ XỬ LÝ (sau khi đã sửa nguyên nhân, vd. chạy migration còn thiếu):
+-- xoá khỏi nhật ký lỗi → số đỏ ở Quản trị → Hệ thống và mục Kiểm tra hệ thống sạch ngay, không phải đợi 24 giờ.
+-- Nếu lỗi còn xảy ra, lần tiếp theo người dùng gặp sẽ được ghi lại như mới. Mỗi lần xoá ghi nhật ký quản trị (số lần đã gặp).
+-- Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT, không RETURNING INTO. Chạy lại an toàn.
+
+create or replace function public.admin_resolve_client_error(p_code text default null) returns integer
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin uuid := private.require_admin();
+  v_code text := nullif(trim(coalesce(p_code, '')), '');
+  v_hits integer := (select coalesce(sum(e.hits), 0)::integer from private.client_errors e where v_code is null or e.code = v_code);
+begin
+  delete from private.client_error_users where v_code is null or code = v_code;
+  delete from private.client_errors where v_code is null or code = v_code;
+  insert into public.admin_audit_log (actor_id, action, target, old_value)
+  values (v_admin, 'CLIENT_ERROR_RESOLVE', 'error:' || coalesce(v_code, 'ALL'), jsonb_build_object('hits', v_hits));
+  return v_hits;
+end $$;
+
+revoke all on function public.admin_resolve_client_error(text) from public, anon;
+grant execute on function public.admin_resolve_client_error(text) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -15698,7 +15725,9 @@ begin
       'ok', to_regprocedure('public.admin_gps_qa_list(integer)') is not null and to_regclass('public.activity_gps_quality') is not null),
     jsonb_build_object('file', '20261001008900', 'label', 'VÁ BẢO MẬT: chặn người ngoài CLB / khách sửa CLB, đổi mã mời, chuyển quyền chủ',
       'ok', not has_function_privilege('anon', 'public.update_club(uuid, text, text, text, text)', 'execute')
-            and position('coalesce' in (select p.prosrc from pg_proc p where p.oid = 'public.transfer_ownership(uuid, uuid)'::regprocedure)) > 0));
+            and position('coalesce' in (select p.prosrc from pg_proc p where p.oid = 'public.transfer_ownership(uuid, uuid)'::regprocedure)) > 0),
+    jsonb_build_object('file', '20261001009000', 'label', 'Lỗi người dùng gặp: admin đánh dấu đã xử lý',
+      'ok', to_regprocedure('public.admin_resolve_client_error(text)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

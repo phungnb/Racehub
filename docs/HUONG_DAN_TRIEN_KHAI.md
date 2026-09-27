@@ -33,7 +33,7 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
 > ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
-> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 008900** + chạy lại 003500),
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 009000** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
 >
@@ -135,6 +135,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001008700_org_overview.sql` | **Tổng quan tổ chức** (tab mở đầu tiên): tỷ lệ tham gia, tổng km, km bình quân, hạng của mình, biểu đồ km theo ngày, **BXH phòng ban** (cộng dồn nhiều cấp, xếp theo tổng / bình quân / tỷ lệ tham gia), **BXH CLB**, top 10 cá nhân (ẩn khi bật riêng tư), xuất Excel | Cần 8500; chạy lại 3500 |
 | `20261001008800_gps_quality.sql` | **Chất lượng GPS** của mỗi bài ghi bằng app (điểm nhận / bị loại theo lý do, sai số, mất tín hiệu, ẩn app, đứng nghỉ lâu, phần đứng yên cuối bài bị cắt) — bảng riêng, chỉ chủ bài + admin xem; **Kiểm thử GPS** thực địa (11 kịch bản, quãng đường chuẩn, sai lệch %) ở Quản trị → Hệ thống | Chạy lại 3500 |
 | `20261001008900_club_rpc_auth_fix.sql` | **VÁ BẢO MẬT (chạy ngay):** các hàm quản lý CLB đời đầu bỏ qua kiểm tra quyền khi người gọi không thuộc CLB — bất kỳ ai (kể cả chưa đăng nhập) đổi được tên / thông báo / chính sách CLB, đổi mã mời, chuyển quyền chủ. Vá + thu hồi quyền gọi của khách với hàm ghi. **Nguyên tắc CLB:** chỉ chủ nhiệm + Ban quản trị (người được chủ nhiệm phân quyền) được tạo / sửa / xoá nội dung và cài đặt CLB — bình chọn chuyển sang chỉ Ban quản trị tạo; ảnh đại diện CLB chỉ Ban quản trị tải / thay / xoá | Chạy lại 3500 |
+| `20261001009000_client_error_resolve.sql` | **Lỗi người dùng gặp:** nút **Đã xử lý** / **Đánh dấu tất cả đã xử lý** ở Quản trị → Hệ thống — xoá lỗi đã sửa xong khỏi nhật ký, số đỏ sạch ngay (không phải đợi 24 giờ); lỗi còn xảy ra sẽ được ghi lại | Chạy lại 3500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

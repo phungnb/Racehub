@@ -32,6 +32,13 @@ export async function getClientErrors(days: number): Promise<ClientErrorRow[]> {
   return ((data ?? []) as ClientErrorRow[]).map((r) => ({ ...r, hits: Number(r.hits), users: Number(r.users), days: Number(r.days) }))
 }
 
+/** Đánh dấu lỗi đã xử lý (xoá khỏi nhật ký); không truyền mã = tất cả. Trả về số lần lỗi đã được xoá */
+export async function resolveClientError(code: string | null): Promise<number> {
+  const { data, error } = await supabase.rpc('admin_resolve_client_error', { p_code: code })
+  if (error) throw error
+  return Number(data ?? 0)
+}
+
 const MESSAGES: Record<string, string> = {
   INVALID_LEVEL: 'Mức thông báo không hợp lệ.',
   INVALID_TITLE: 'Tiêu đề cần 2–80 ký tự.',
