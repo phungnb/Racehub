@@ -1,65 +1,44 @@
 import { describe, it, expect } from 'vitest'
-import { evaluatePoint, haversineM, isStationary, nextSplit, rollingPace, segmentMovingS, smoothPoint, splitAnnouncement, type TrackPoint } from './tracker'
+import { TrackEngine, haversineM, isStationary, movingClock, nextSplit, rollingPace, segmentMovingS, splitAnnouncement, type TrackPoint } from './tracker'
 
 const pt = (lat: number, t: number, accuracy = 5, speed: number | null = null): TrackPoint =>
   ({ latitude: lat, longitude: 105.85, accuracy, altitude: 0, speed, recorded_at: new Date(t * 1000).toISOString() })
 const dLat = (m: number) => m / 111320
 
-describe('bộ lọc điểm GPS', () => {
-  it('nhận điểm chạy bình thường (3 m/s)', () => {
-    const r = evaluatePoint(pt(21, 0), pt(21 + dLat(30), 10))
-    expect(r.accept).toBe(true)
-    if (r.accept) { expect(r.distance).toBeCloseTo(30, 0); expect(r.speed).toBeCloseTo(3, 1) }
-  })
-  it('loại điểm sai số lớn, rung khi đứng yên, nhảy điểm, trùng thời gian', () => {
-    expect(evaluatePoint(pt(21, 0), pt(21 + dLat(30), 10, 80))).toEqual({ accept: false, reason: 'INACCURATE' })
-    expect(evaluatePoint(pt(21, 0), pt(21 + dLat(1), 10))).toEqual({ accept: false, reason: 'JITTER' })
-    expect(evaluatePoint(pt(21, 0), pt(21 + dLat(500), 10))).toEqual({ accept: false, reason: 'TELEPORT' })
-    expect(evaluatePoint(pt(21, 10), pt(21 + dLat(30), 10))).toEqual({ accept: false, reason: 'NO_TIME' })
-  })
-  it('ngồi yên với GPS sai số 15 m: rung 8–10 m không được cộng', () => {
-    expect(evaluatePoint(pt(21, 0, 15), pt(21 + dLat(12), 3, 15))).toEqual({ accept: false, reason: 'JITTER' })
-    // máy báo vận tốc 0 → điểm lệch 20 m vẫn coi là đứng yên
-    expect(evaluatePoint(pt(21, 0, 15), pt(21 + dLat(25), 3, 15, 0))).toEqual({ accept: false, reason: 'STILL' })
-    // máy báo đang chạy 3 m/s → nhận
-    expect(evaluatePoint(pt(21, 0, 15), pt(21 + dLat(25), 8, 15, 3)).accept).toBe(true)
-  })
-  it('mô phỏng ngồi yên 5 phút: tổng quãng đường ≈ 0', () => {
-    // GPS ngồi trong nhà: vị trí trôi chậm (±15 m) cộng rung ±4 m mỗi giây, sai số báo 12 m
-    let seed = 7
-    const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1
-    let anchor: TrackPoint | null = null
-    let total = 0
-    let dx = 0, dy = 0
-    const raw: TrackPoint[] = []
-    for (let t = 0; t < 300; t++) {
-      dx = Math.max(-15, Math.min(15, dx + rand() * 1.5))
-      dy = Math.max(-15, Math.min(15, dy + rand() * 1.5))
-      raw.push({ ...pt(21 + dLat(dy + rand() * 4), t, 12), longitude: 105.85 + dLat(dx + rand() * 4) })
-      if (isStationary(raw)) continue
-      const p = smoothPoint(raw)!
-      const v = evaluatePoint(anchor, p)
-      if (v.accept) { anchor = p; total += v.distance }
-    }
-    expect(total).toBeLessThan(30)
-  })
+describe('đứng yên', () => {
   it('đi bộ chậm 1,2 m/s vẫn được tính (không bị coi là đứng yên)', () => {
     const raw = Array.from({ length: 20 }, (_, t) => pt(21 + dLat(t * 1.2), t, 8))
     expect(isStationary(raw)).toBe(false)
     expect(isStationary(Array.from({ length: 20 }, (_, t) => pt(21 + dLat((t % 3) * 2), t, 8)))).toBe(true)
   })
-  it('chạy thật 3 m/s với GPS sai số 10 m: quãng đường sai lệch < 5%', () => {
-    let anchor: TrackPoint | null = null
-    let total = 0
-    const raw: TrackPoint[] = []
-    for (let t = 0; t <= 600; t++) {
-      raw.push(pt(21 + dLat(t * 3 + (t % 2 ? 4 : -4)), t, 10))
-      if (isStationary(raw)) continue
-      const p = smoothPoint(raw)!
-      const v = evaluatePoint(anchor, p)
-      if (v.accept) { anchor = p; total += v.distance }
+  it('ngồi yên 5 phút trong nhà (GPS trôi ±15 m): gần như không cộng km, không tính giờ chạy', () => {
+    let seed = 7
+    const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1
+    const eng = new TrackEngine()
+    let dist = 0, moving = 0, dx = 0, dy = 0
+    for (let t = 0; t < 300; t++) {
+      dx = Math.max(-15, Math.min(15, dx + rand() * 1.5))
+      dy = Math.max(-15, Math.min(15, dy + rand() * 1.5))
+      const r = eng.push({ ...pt(21 + dLat(dy + rand() * 4), t, 12, t % 2 ? 0.3 : 0), longitude: 105.85 + dLat(dx + rand() * 4) })
+      dist += r.distance; moving += r.moving
     }
-    expect(Math.abs(total - 1800) / 1800).toBeLessThan(0.05)
+    expect(dist).toBeLessThan(30)
+    expect(moving).toBeLessThan(20)
+  })
+})
+
+describe('đồng hồ thời gian chạy', () => {
+  it('chạy đều giữa hai điểm GPS, tối đa 5 giây', () => {
+    expect(movingClock(0, 100, 2, false)).toBe(102)
+    expect(movingClock(0, 100, 30, false)).toBe(105)
+  })
+  it('vừa dừng / tự tạm dừng: đứng lại, không tụt số', () => {
+    expect(movingClock(105, 100, 12, true)).toBe(105)
+    expect(movingClock(105, 103, 1, false)).toBe(105)
+    expect(movingClock(105, 104, 3, false)).toBe(107)
+  })
+  it('vừa tiếp tục sau tạm dừng tay (chưa có điểm mới): không chạy trước', () => {
+    expect(movingClock(100, 100, -1, false)).toBe(100)
   })
 })
 
@@ -76,29 +55,6 @@ describe('pace & split', () => {
     expect(segmentMovingS(60, 30, 3)).toBe(10)            // đứng 50 s rồi chạy 30 m
     expect(segmentMovingS(20, 0, 3)).toBe(0)
   })
-  it('pace trung bình khớp thực tế: chạy 5:00/km, dừng đèn đỏ 60 giây giữa chừng', () => {
-    let anchor: TrackPoint | null = null
-    let dist = 0, moving = 0, speed = 3.33
-    const raw: TrackPoint[] = []
-    for (let t = 0; t <= 420; t++) {
-      const m = t < 180 ? t * 3.333 : t < 240 ? 600 : 600 + (t - 240) * 3.333   // 180 s chạy, 60 s đứng, 180 s chạy
-      raw.push(pt(21 + dLat(m), t, 6))
-      if (isStationary(raw)) continue
-      const p = smoothPoint(raw)!
-      const v = evaluatePoint(anchor, p)
-      if (!v.accept) continue
-      if (anchor) {
-        const dt = (Date.parse(p.recorded_at) - Date.parse(anchor.recorded_at)) / 1000
-        moving += segmentMovingS(dt, v.distance, speed)
-        if (dt <= 15) speed = 0.7 * speed + 0.3 * v.speed
-      }
-      anchor = p
-      dist += v.distance
-    }
-    const pace = moving / (dist / 1000)
-    expect(pace).toBeGreaterThan(290)
-    expect(pace).toBeLessThan(310)
-  })
   it('split mỗi km, không lặp lại', () => {
     const s1 = nextSplit(990, 1005, 330, [])
     expect(s1).toEqual({ km: 1, seconds: 330 })
@@ -106,7 +62,7 @@ describe('pace & split', () => {
     expect(nextSplit(1990, 2002, 650, [s1!])).toEqual({ km: 2, seconds: 320 })
   })
   it('câu đọc giọng nói', () => {
-    expect(splitAnnouncement({ km: 3, seconds: 325 }, 1000)).toBe('Hoàn thành 3 ki lô mét. Pace 5 phút 25 giây. Tổng thời gian 16 phút.')
+    expect(splitAnnouncement({ km: 3, seconds: 325 }, 1000)).toBe('Hoàn thành 3 ki lô mét. Pace 5 phút 25 giây. Thời gian chạy 16 phút.')
   })
   it('haversine ~111 m cho 0,001 độ vĩ', () => {
     expect(haversineM(21, 105, 21.001, 105)).toBeCloseTo(111.2, 0)
@@ -116,7 +72,6 @@ describe('pace & split', () => {
 // ---------------------------------------------------------------------------------------------
 // Bộ máy GPS v2: mô phỏng chạy thật (vòng sân 400 m, đường phố có góc cua), nhiễu GPS, đứng chờ, mất tín hiệu
 // ---------------------------------------------------------------------------------------------
-import { TrackEngine } from './tracker'
 
 function noise(seed: number) {
   let s = seed
@@ -190,6 +145,12 @@ describe('bộ máy GPS v2 (Kalman + mất tín hiệu)', () => {
     const r = simulate(street(), 3, 10, 12, { noSpeed: true })
     expect(Math.abs(r.dist - r.total) / r.total).toBeLessThan(0.05)
   })
+  it('chạy 5:00/km, đứng nghỉ 60 giây giữa chừng: pace vẫn ≈ 5:00/km (tính theo thời gian di chuyển)', () => {
+    const r = simulate(street(), 3.333, 6, 8, { stopAt: 1500, stopS: 60 })
+    const pace = r.moving / (r.dist / 1000)
+    expect(pace).toBeGreaterThan(290)
+    expect(pace).toBeLessThan(310)
+  })
   it('đứng chờ đèn đỏ 90 giây: không cộng thêm quãng đường, không tính giờ di chuyển', () => {
     const base = simulate(street(), 3, 6, 8)
     const r = simulate(street(), 3, 6, 8, { stopAt: 1000, stopS: 90 })
@@ -222,9 +183,13 @@ describe('GPS sẵn sàng + làm gọn điểm', () => {
     expect(gpsReady([{ accuracy: 8, time: now - 500 }], now)).toBe(true)
     expect(gpsReady([{ accuracy: 8, time: now - 60_000 }], now)).toBe(false)
   })
-  it('làm tròn toạ độ 1 cm, giữ quãng đường tích luỹ', () => {
+  it('làm tròn toạ độ ~11 cm, giữ quãng đường tích luỹ', () => {
     const p = compactPoint({ latitude: 21.012345678912, longitude: 105.851234567891, accuracy: 7.345, altitude: 12.3456, speed: 3.14159, recorded_at: 'x', distance_m: 1234.5678 })
-    expect(p).toEqual({ latitude: 21.0123457, longitude: 105.8512346, accuracy: 7.3, altitude: 12.3, speed: 3.14, recorded_at: 'x', distance_m: 1234.6 })
-    expect(JSON.stringify(p).length).toBeLessThan(140)
+    expect(p).toEqual({ latitude: 21.012346, longitude: 105.851235, accuracy: 7.3, altitude: 12.3, speed: 3.14, recorded_at: 'x', distance_m: 1234.6 })
+    expect(JSON.stringify(p).length).toBeLessThan(130)
+  })
+  it('máy không báo độ cao / vận tốc: bỏ hẳn trường đó (không gửi số 0 giả)', () => {
+    const p = compactPoint({ latitude: 21, longitude: 105.85, accuracy: 5, altitude: null, speed: null, recorded_at: 'x' })
+    expect(p).toEqual({ latitude: 21, longitude: 105.85, accuracy: 5, recorded_at: 'x' })
   })
 })

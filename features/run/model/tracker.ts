@@ -4,9 +4,10 @@ export interface TrackPoint {
   latitude: number
   longitude: number
   accuracy: number
-  altitude: number
-  /** Vận tốc máy báo (m/s); null = máy không báo */
-  speed: number | null
+  /** Độ cao (m); không có = máy không báo (không gửi số 0 giả làm sai độ cao leo dốc) */
+  altitude?: number | null
+  /** Vận tốc máy báo (m/s); không có / null = máy không báo */
+  speed?: number | null
   recorded_at: string
   /** Quãng đường tích luỹ (m) app đo tới điểm này — máy chủ dùng (kẹp theo tuyến) thay vì cộng khoảng cách điểm-điểm có nhiễu */
   distance_m?: number
@@ -18,16 +19,12 @@ export interface Split {
 }
 
 export const GPS = {
-  MAX_ACCURACY_M: 25,      // bỏ điểm sai số lớn hơn (trong nhà, dưới mái che thường 30–100 m)
-  MIN_STEP_M: 6,           // quãng dịch chuyển tối thiểu so với điểm neo
-  ACCURACY_FACTOR: 1,      // …và tối thiểu bằng sai số trung bình của 2 điểm: rung GPS khi ngồi yên không cộng km
   STILL_WINDOW_S: 10,      // trong 10 giây gần nhất…
   STILL_MIN_M: 10,         // …vị trí (đã làm mượt) dời chưa tới 10 m (< 1 m/s) → đang đứng yên
-  STILL_DEVICE_MPS: 0.5,   // máy báo vận tốc < 0,5 m/s mà điểm vẫn "nhảy" → coi là đứng yên
-  MAX_SPEED_MPS: 12,       // > 43 km/h: nhảy điểm
   SEGMENT_MAX_S: 15,       // đoạn giữa 2 điểm dài hơn thế = có lúc đứng chờ → chỉ tính phần thời gian di chuyển
   AUTO_PAUSE_MPS: 0.6,     // < 2,2 km/h trong AUTO_PAUSE_AFTER_S → tự tạm dừng
   AUTO_PAUSE_AFTER_S: 10,
+  LIVE_MAX_S: 5,           // đồng hồ chạy "chạy trước" tối đa 5 giây giữa hai điểm GPS (≈ khoảng cách 2 điểm khi chạy / đi bộ)
 } as const
 
 export function haversineM(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -37,32 +34,6 @@ export function haversineM(lat1: number, lon1: number, lat2: number, lon2: numbe
   const dλ = toRad(lon2 - lon1)
   const a = Math.sin(dφ / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dλ / 2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
-
-export type PointVerdict =
-  | { accept: true; distance: number; speed: number }
-  | { accept: false; reason: 'INACCURATE' | 'JITTER' | 'STILL' | 'TELEPORT' | 'NO_TIME' }
-
-/**
- * Có nhận điểm GPS mới không, và cộng thêm bao nhiêu mét.
- * `prev` là điểm NEO (điểm được nhận gần nhất): điểm rung quanh chỗ đứng không dời neo,
- * nên khi thật sự di chuyển, quãng đường vẫn được cộng đủ từ neo tới vị trí mới.
- */
-export function evaluatePoint(prev: TrackPoint | null, next: TrackPoint): PointVerdict {
-  if (next.accuracy > GPS.MAX_ACCURACY_M) return { accept: false, reason: 'INACCURATE' }
-  if (!prev) return { accept: true, distance: 0, speed: 0 }
-  const dt = (Date.parse(next.recorded_at) - Date.parse(prev.recorded_at)) / 1000
-  if (dt <= 0) return { accept: false, reason: 'NO_TIME' }
-  const d = haversineM(prev.latitude, prev.longitude, next.latitude, next.longitude)
-  const minStep = Math.max(GPS.MIN_STEP_M, GPS.ACCURACY_FACTOR * ((prev.accuracy + next.accuracy) / 2))
-  if (d < minStep) return { accept: false, reason: 'JITTER' }
-  const speed = d / dt
-  // Máy báo gần như đứng yên nhưng điểm lệch vừa phải → rung GPS (điểm lệch rất xa thì vẫn xét tiếp)
-  if (next.speed !== null && next.speed >= 0 && next.speed < GPS.STILL_DEVICE_MPS && d < 3 * minStep) {
-    return { accept: false, reason: 'STILL' }
-  }
-  if (speed > GPS.MAX_SPEED_MPS) return { accept: false, reason: 'TELEPORT' }
-  return { accept: true, distance: d, speed }
 }
 
 const SMOOTH_N = 5
@@ -139,7 +110,7 @@ export function splitAnnouncement(split: Split, totalMovingS: number) {
   const m = Math.floor(split.seconds / 60)
   const s = split.seconds % 60
   const tm = Math.floor(totalMovingS / 60)
-  return `Hoàn thành ${split.km} ki lô mét. Pace ${m} phút ${s} giây. Tổng thời gian ${tm} phút.`
+  return `Hoàn thành ${split.km} ki lô mét. Pace ${m} phút ${s} giây. Thời gian chạy ${tm} phút.`
 }
 
 // ============================================================================================
@@ -147,14 +118,29 @@ export function splitAnnouncement(split: Split, totalMovingS: number) {
 // Dùng chung cho app cài (plugin nền) và trình duyệt. Hàm thuần — test bằng mô phỏng trong tracker.test.ts.
 // ============================================================================================
 
-/** Làm tròn điểm trước khi lưu / gửi: 7 chữ số thập phân ≈ 1 cm — mỗi điểm gọn ~20 % khi lưu tạm trên máy */
+/**
+ * Làm gọn điểm trước khi lưu tạm / gửi: toạ độ 6 chữ số thập phân ≈ 11 cm (GPS điện thoại sai số vài mét),
+ * bỏ hẳn độ cao / vận tốc khi máy không báo (máy chủ coi thiếu = không có) — mỗi điểm gọn ~30 %.
+ */
 export function compactPoint(p: TrackPoint): TrackPoint {
   const r = (x: number, k: number) => Math.round(x * k) / k
   return {
-    latitude: r(p.latitude, 1e7), longitude: r(p.longitude, 1e7), accuracy: r(p.accuracy, 10), altitude: r(p.altitude, 10),
-    speed: p.speed === null ? null : r(p.speed, 100), recorded_at: p.recorded_at,
+    latitude: r(p.latitude, 1e6), longitude: r(p.longitude, 1e6), accuracy: r(p.accuracy, 10),
+    ...(p.altitude == null ? {} : { altitude: r(p.altitude, 10) }),
+    ...(p.speed == null ? {} : { speed: r(p.speed, 100) }),
+    recorded_at: p.recorded_at,
     ...(p.distance_m === undefined ? {} : { distance_m: r(p.distance_m, 10) }),
   }
+}
+
+/**
+ * Số hiện trên đồng hồ "Thời gian chạy": thời gian di chuyển đã chốt + phần đang chạy từ điểm GPS cuối
+ * (tối đa LIVE_MAX_S, để đồng hồ nhảy đều từng giây). Không bao giờ lùi: khi vừa dừng, đồng hồ đứng lại
+ * thay vì tụt vài giây; khi chạy tiếp, số chốt đuổi kịp rồi đồng hồ nhảy tiếp.
+ */
+export function movingClock(shown: number, movingS: number, sinceAcceptS: number, idle: boolean): number {
+  const live = idle || sinceAcceptS < 0 ? 0 : Math.min(sinceAcceptS, GPS.LIVE_MAX_S)
+  return Math.max(shown, movingS + live)
 }
 
 /**
