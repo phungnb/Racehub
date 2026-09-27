@@ -1,6 +1,7 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
+import { useFeature } from '@/features/system'
 import Link from 'next/link'
 import { useDeferredValue, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -21,7 +22,9 @@ type Section = 'partners' | 'bib'
 export function MarketScreen() {
   // ?tab=bib (từ thông báo) · ?kind=COACH|SHOP|SERVICE (từ bài Knowledge)
   const params = useSearchParams()
-  const [section, setSection] = useState<Section>(() => (params.get('tab') === 'bib' ? 'bib' : 'partners'))
+  const bibOn = useFeature('bibMarket')
+  const [picked, setSection] = useState<Section>(() => (params.get('tab') === 'bib' ? 'bib' : 'partners'))
+  const section: Section = bibOn ? picked : 'partners'
   return (
     <div className="space-y-4 animate-fade-in">
       <BackLink fallback={routes.me} className="-mb-2" />
@@ -35,8 +38,8 @@ export function MarketScreen() {
           <UserRound className="size-4" aria-hidden />Tôi
         </Link>
       </header>
-      <div role="tablist" className="grid grid-cols-2 gap-2">
-        {([['partners', 'Đối tác', Store], ['bib', 'Chợ BIB', Handshake]] as const).map(([v, label, Icon]) => (
+      <div role="tablist" className={cn('grid gap-2', bibOn ? 'grid-cols-2' : 'grid-cols-1')}>
+        {([['partners', 'Đối tác', Store], ['bib', 'Chợ BIB', Handshake]] as const).filter(([v]) => bibOn || v !== 'bib').map(([v, label, Icon]) => (
           <button key={v} role="tab" aria-selected={section === v} onClick={() => setSection(v)}
             className={cn('flex h-12 items-center justify-center gap-2 rounded-xl border text-[15px] font-bold',
               section === v ? 'border-brand bg-brand text-brand-fg' : 'border-border bg-surface text-fg-muted')}>

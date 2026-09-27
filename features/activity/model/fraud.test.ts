@@ -96,3 +96,16 @@ describe('phát hiện gian lận bài chạy', () => {
     expect(stravaStreams({ time: { data: [0] } })).toBeNull()
   })
 })
+
+import { speedRulesFrom } from './fraud'
+
+describe('ngưỡng do admin đặt (Chính sách vận hành)', () => {
+  it('mặc định = luật cũ; siết ngưỡng giữ tốc độ thì bài 14,4 km/h bị cờ', () => {
+    const t = Array.from({ length: 1201 }, (_, i) => i)
+    const s = { time: t, distance: t.map((x) => x * 4) }
+    const summary = { distanceM: 4800, movingS: 1200 }
+    expect(analyzeRun(summary, s).verdict).toBe('OK')
+    const strict = speedRulesFrom({ highKmh: 13, highS: 120, severeKmh: 20, severeS: 120, vehicleKmh: 25, vehicleS: 30, spikeKmh: 43, spikeMax: 3 })
+    expect(analyzeRun(summary, s, [], strict).flags.map((f) => f.code)).toContain('SUSTAINED_SPEED')
+  })
+})

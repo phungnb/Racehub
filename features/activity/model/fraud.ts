@@ -57,6 +57,24 @@ export const FRAUD_CONFIG = {
   levels: { medium: 35, high: 65, critical: 85 },
 }
 
+/** Ngưỡng tốc độ dùng chung với máy chủ (ops_policy.antiCheat, 009100) — admin đổi được, không cần sửa code */
+export interface SpeedRules {
+  sustained: { normal: { kmh: number; s: number }; severe: { kmh: number; s: number } }
+  vehicle: { kmh: number; s: number }
+  teleport: { mps: number; minCount: number }
+}
+const DEFAULT_SPEED: SpeedRules = { sustained: FRAUD_CONFIG.sustained, vehicle: FRAUD_CONFIG.vehicle, teleport: FRAUD_CONFIG.teleport }
+
+/** Ngưỡng chống gian lận của Chính sách vận hành → luật tốc độ phân tích bài Strava */
+export function speedRulesFrom(ac: { highKmh: number; highS: number; severeKmh: number; severeS: number; vehicleKmh: number; vehicleS: number; spikeKmh: number; spikeMax: number } | null | undefined): SpeedRules {
+  if (!ac) return DEFAULT_SPEED
+  return {
+    sustained: { normal: { kmh: ac.highKmh, s: ac.highS }, severe: { kmh: ac.severeKmh, s: ac.severeS } },
+    vehicle: { kmh: ac.vehicleKmh, s: ac.vehicleS },
+    teleport: { mps: ac.spikeKmh / 3.6, minCount: ac.spikeMax },
+  }
+}
+
 const kmhToPace = (kmh: number) => {
   const s = Math.round(3600 / kmh)
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
@@ -107,8 +125,7 @@ function ruleSummary(s: FraudSummary): FraudFlag[] {
   return out
 }
 
-function ruleSpeed(t: number[], v: number[]): FraudFlag[] {
-  const c = FRAUD_CONFIG
+function ruleSpeed(t: number[], v: number[], c: SpeedRules): FraudFlag[] {
   const out: FraudFlag[] = []
   const [sev, sevAt] = longestRun(t, v, c.sustained.severe.kmh / 3.6)
   const [nor, norAt] = longestRun(t, v, c.sustained.normal.kmh / 3.6)
@@ -127,17 +144,17 @@ function ruleSpeed(t: number[], v: number[]): FraudFlag[] {
   return out
 }
 
-function ruleTeleport(t: number[], ll: [number, number][] | null | undefined): FraudFlag[] {
+function ruleTeleport(t: number[], ll: [number, number][] | null | undefined, c: SpeedRules): FraudFlag[] {
   if (!ll || ll.length < 2) return []
   let n = 0, first = -1
   for (let i = 1; i < Math.min(t.length, ll.length); i++) {
     const dt = t[i] - t[i - 1]
     if (dt <= 0 || !ll[i] || !ll[i - 1]) continue
     const d = haversine(ll[i - 1], ll[i])
-    if (d > 50 && d / dt > FRAUD_CONFIG.teleport.mps) { n++; if (first < 0) first = t[i] }
+    if (d > 50 && d / dt > c.teleport.mps) { n++; if (first < 0) first = t[i] }
   }
-  return n >= FRAUD_CONFIG.teleport.minCount
-    ? [{ code: 'GPS_TELEPORT', severity: 'HIGH', score: Math.min(100, 50 + n * 10), atS: first, message: `${n} lần vị trí nhảy xa bất thường (> 43 km/h)` }]
+  return n >= c.teleport.minCount
+    ? [{ code: 'GPS_TELEPORT', severity: 'HIGH', score: Math.min(100, 50 + n * 10), atS: first, message: `${n} lần vị trí nhảy xa bất thường (> ${Math.round(c.teleport.mps * 3.6)} km/h)` }]
     : []
 }
 
@@ -219,14 +236,14 @@ function ruleHistory(s: FraudSummary, history: number[]): FraudFlag[] {
     message: `Nhanh hơn thường ngày ${z.toFixed(1)} lần độ lệch chuẩn` }]
 }
 
-export function analyzeRun(summary: FraudSummary, streams: FraudStreams | null, history: number[] = []): FraudResult {
+export function analyzeRun(summary: FraudSummary, streams: FraudStreams | null, history: number[] = [], rules: SpeedRules = DEFAULT_SPEED): FraudResult {
   const flags: FraudFlag[] = [...ruleSummary(summary)]
   if (streams && streams.time.length >= 2 && streams.distance.length === streams.time.length) {
     const { time: t, distance: d } = streams
     const v = windowSpeeds(t, d)
-    flags.push(...ruleSpeed(t, v), ...ruleTeleport(t, streams.latlng), ...ruleStride(t, d, streams.cadence), ...ruleHr(t, d, streams.heartrate))
-  } else if ((summary.maxSpeedMps ?? 0) > 12) {
-    flags.push({ code: 'VEHICLE_BURST', severity: 'HIGH', score: 80, message: 'Vận tốc tối đa > 43 km/h' })
+    flags.push(...ruleSpeed(t, v, rules), ...ruleTeleport(t, streams.latlng, rules), ...ruleStride(t, d, streams.cadence), ...ruleHr(t, d, streams.heartrate))
+  } else if ((summary.maxSpeedMps ?? 0) > rules.teleport.mps) {
+    flags.push({ code: 'VEHICLE_BURST', severity: 'HIGH', score: 80, message: `Vận tốc tối đa > ${Math.round(rules.teleport.mps * 3.6)} km/h` })
   }
   flags.push(...ruleHistory(summary, history))
 

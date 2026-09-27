@@ -6,6 +6,7 @@
 // Giao diện (useRunTracker) chỉ gửi lệnh + hiển thị + đọc giọng nói theo sự kiện trả về.
 // Viết app native thuần sau này: giữ nguyên lớp này (hoặc port 1-1), chỉ thay nguồn vị trí.
 import { buildPayload, type RunPayload } from './recovery'
+import { DEFAULT_TRACKING, type TrackingRules } from '@/shared/lib/ops'
 import { ENGINE, GPS, TrackEngine, compactPoint, gpsReady, movingClock, nextSplit, rollingPace, type GpsGap, type Split, type TrackPoint } from './tracker'
 
 export type SessionPhase = 'LOCATING' | 'RUNNING' | 'PAUSED' | 'FINISHED'
@@ -29,6 +30,7 @@ export interface FixInput {
  *   Tránh bài "chạy 5 km trong 3 tiếng" vì quên bấm Kết thúc — tổng thời gian sai, chồng giờ với bài sau (máy chủ báo trùng).
  */
 export const STOP = { ASK_S: 600, AUTO_STOP_S: 1800, TRIM_S: 120 } as const
+// Giá trị trên là mặc định; admin đổi được ở Quản trị → Hệ thống → Chính sách vận hành (ops_policy.tracking, 009100)
 /** Quá 15 giây không có điểm GPS nào → "Mất GPS" */
 export const LOST_AFTER_MS = 15_000
 
@@ -113,6 +115,13 @@ export class RunSession {
   private lastAcceptAt = 0
   private elapsedAtMove = 0
   private hiddenAt: number | null = null
+  /** Quy tắc ghi bài chạy (giây) — từ chính sách vận hành, thiếu thì mặc định */
+  readonly rules: { autoPauseAfterS: number; askS: number; autoStopS: number; trimS: number }
+
+  constructor(rules: Partial<TrackingRules> = {}) {
+    const r = { ...DEFAULT_TRACKING, ...rules }
+    this.rules = { autoPauseAfterS: r.autoPauseAfterS, askS: r.longStopAskMin * 60, autoStopS: r.longStopAutoStopMin * 60, trimS: r.trimTailMin * 60 }
+  }
 
   get gaps(): GpsGap[] { return this.engine.gaps }
   get gapS() { return this.engine.gaps.reduce((s, g) => s + g.seconds, 0) }
@@ -195,7 +204,7 @@ export class RunSession {
     this.advance(now)
     const still = this.idleS(now)
     // Chưa di chuyển lần nào → "chờ bạn chạy", chưa phải tự tạm dừng
-    const idle = !this.moved || still > GPS.AUTO_PAUSE_AFTER_S
+    const idle = !this.moved || still > this.rules.autoPauseAfterS
     if (this.moved && idle && !this.autoPaused) {
       this.autoPaused = true; this.q.autoPauses++
       ev.push({ type: 'AUTO_PAUSE' }); this.log(now, 'auto_pause')
@@ -203,11 +212,11 @@ export class RunSession {
     this.gpsLost = this.lastFixAt > 0 && now - this.lastFixAt > LOST_AFTER_MS
     this.shownS = movingClock(this.shownS, this.movingS, this.lastAcceptAt ? (now - this.lastAcceptAt) / 1000 : -1, idle)
     this.currentPace = idle ? 0 : rollingPace(this.points, 30, now)
-    if (still >= STOP.ASK_S && !this.longStop && !this.autoStopped) {
+    if (still >= this.rules.askS && !this.longStop && !this.autoStopped) {
       this.longStop = true; this.q.longStops++
       ev.push({ type: 'LONG_STOP', minutes: Math.floor(still / 60) }); this.log(now, 'long_stop')
     }
-    if (still >= STOP.AUTO_STOP_S) {
+    if (still >= this.rules.autoStopS) {
       this.pause(now)
       this.autoStopped = true; this.q.autoStopped++; this.q.pauses--
       ev.push({ type: 'AUTO_STOPPED', minutes: Math.floor(still / 60) }); this.log(now, 'auto_stop')
@@ -245,7 +254,7 @@ export class RunSession {
     this.lastTick = null
     const tail = this.elapsedS - this.elapsedAtMove
     this.endedAt = now
-    if (this.moved && tail >= STOP.TRIM_S) {
+    if (this.moved && tail >= this.rules.trimS) {
       this.q.trimmedS += Math.round(tail)
       this.elapsedS = this.elapsedAtMove
       const lastPoint = this.points.length ? Date.parse(this.points[this.points.length - 1].recorded_at) : 0
@@ -274,8 +283,8 @@ export class RunSession {
   }
 
   /** Khôi phục bài dở dang: đang chạy → về Tạm dừng (bấm Tiếp tục để chạy tiếp) */
-  static restore(s: SessionState, points: TrackPoint[], now: number): RunSession {
-    const x = new RunSession()
+  static restore(s: SessionState, points: TrackPoint[], now: number, rules: Partial<TrackingRules> = {}): RunSession {
+    const x = new RunSession(rules)
     x.phase = s.phase === 'FINISHED' ? 'FINISHED' : 'PAUSED'
     x.startedAt = s.startedAt; x.endedAt = s.endedAt
     x.elapsedS = s.elapsedS; x.movingS = s.movingS; x.shownS = s.movingS; x.distanceM = s.distanceM

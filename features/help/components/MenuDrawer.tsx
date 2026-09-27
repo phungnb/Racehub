@@ -13,6 +13,7 @@ import { routes } from '@/shared/config/routes'
 import { ICONS } from '@/shared/config/brand'
 import type { Profile } from '@/shared/types/profile'
 import { helpMenu } from '../api/helpApi'
+import { useOpsPolicy } from '@/features/system'
 import { companyLine, featuredMenu, groupMenu, SECTION_LABEL, STATIC_POLICIES, staticHref } from '../model/help'
 
 /**
@@ -47,6 +48,7 @@ function Drawer({ profile, onSignOut, onClose }: { profile: Profile | null; onSi
   const groups = menu.data ? groupMenu(menu.data.pages) : [{ section: 'POLICY' as const, items: STATIC_POLICIES }]
   const company = companyLine(menu.data?.site ?? {})
   const featured = featuredMenu(menu.data?.pages ?? [])
+  const ops = useOpsPolicy()
 
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null
@@ -150,7 +152,7 @@ function Drawer({ profile, onSignOut, onClose }: { profile: Profile | null; onSi
           ))}
           {menu.isPending && <p className="px-3 text-xs text-fg-subtle">Đang tải hướng dẫn…</p>}
 
-          {profile && (
+          {profile && ops.features.orgs && (
             <section className="mb-3">
               <h2 className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-fg-subtle">Tổ chức</h2>
               <ul>

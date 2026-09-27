@@ -10,6 +10,7 @@ import { clearSnapshot, enqueue, loadSnapshot, saveSnapshot, type RunPayload, ty
 import { RunSession, type GpsQuality, type SessionEvent } from '../model/session'
 import { ENGINE, splitAnnouncement, type GpsGap, type Split } from '../model/tracker'
 import { deviceLabel, errorPct, QA_KEY, type QaInput } from '../model/qa'
+import { useOpsPolicy } from '@/features/system'
 import { keepAwake, reacquireAwake, releaseAwake } from '@/shared/lib/keepAwake'
 
 export type RunPhase = 'IDLE' | 'LOCATING' | 'RUNNING' | 'PAUSED' | 'FINISHED' | 'SAVING' | 'SAVED' | 'QUEUED'
@@ -74,6 +75,10 @@ export function useRunTracker() {
   /** Bài dở dang lưu trên máy từ lần trước (app bị đóng giữa chừng) — hỏi người chạy có khôi phục không */
   const [recovery, setRecovery] = useState<RunSnapshot | null>(() => (typeof window === 'undefined' ? null : loadSnapshot()))
 
+  // Quy tắc tự tạm dừng / đứng nghỉ lâu do admin đặt (Chính sách vận hành) — áp cho bài bắt đầu từ lúc này
+  const tracking = useOpsPolicy().tracking
+  const trackingRef = useRef(tracking)
+  useEffect(() => { trackingRef.current = tracking }, [tracking])
   const session = useRef(new RunSession())
   const phaseRef = useRef<RunPhase>('IDLE')
   const voiceRef = useRef(true)
@@ -167,7 +172,7 @@ export function useRunTracker() {
     if (!canTrackLocation()) { setGps('UNSUPPORTED'); return }
     setError(null)
     setResult(null)
-    session.current = new RunSession()
+    session.current = new RunSession(trackingRef.current)
     saved.current = 0
     lastPersist.current = 0
     clearSnapshot()
@@ -215,7 +220,7 @@ export function useRunTracker() {
   const restore = useCallback(() => {
     const r = recovery
     if (!r) return
-    session.current = RunSession.restore(r.state, r.points, Date.now())
+    session.current = RunSession.restore(r.state, r.points, Date.now(), trackingRef.current)
     saved.current = r.points.length
     setRecovery(null)
     setView(viewOf(session.current))

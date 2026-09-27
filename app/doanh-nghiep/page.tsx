@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { EnterpriseLanding } from '@/features/org'
 import { AdminEditLink, HelpBody, MenuDrawer, type HelpPage } from '@/features/help'
 import { loadHelpPage } from '@/shared/lib/help-page-server'
+import { loadOps, loadPlanFacts } from '@/shared/lib/ops-server'
 import { BackLink } from '@/shared/ui/BackLink'
 
 export const metadata: Metadata = {
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
 // Trang giới thiệu gói Doanh nghiệp (công khai) + form báo giá — migration 008300
 export default async function EnterprisePage() {
   // Phần "Tìm hiểu thêm": trang menu "doanh-nghiep" admin tự soạn (008500)
-  const more = await loadHelpPage<HelpPage>('doanh-nghiep')
+  const [more, ops, facts] = await Promise.all([loadHelpPage<HelpPage>('doanh-nghiep'), loadOps(), loadPlanFacts()])
   return (
     <>
       <nav className="mx-auto flex max-w-3xl items-center gap-1 px-4 pt-[max(env(safe-area-inset-top),0.5rem)]">
@@ -21,7 +22,7 @@ export default async function EnterprisePage() {
         <Link href="/" className="text-lg font-extrabold tracking-wide">RACE<span className="text-brand">HUB</span></Link>
       </nav>
       <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-4"><BackLink /><AdminEditLink slug="doanh-nghiep" /></div>
-      <EnterpriseLanding more={more?.body?.trim() ? <HelpBody page={more} /> : null} />
+      <EnterpriseLanding more={more?.body?.trim() ? <HelpBody page={more} /> : null} content={ops.content.enterprise} facts={facts} />
     </>
   )
 }

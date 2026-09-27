@@ -179,3 +179,27 @@ describe('kiểm thử GPS: chỉ số', () => {
     expect(deviceLabel('Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/128.0 Mobile Safari/537.36')).toBe('Pixel 7 · Android 13')
   })
 })
+
+describe('quy tắc ghi bài chạy do admin đặt (Chính sách vận hành)', () => {
+  it('hỏi Kết thúc sau 5 phút, tự tạm dừng sau 15 phút, tự tạm dừng khi đứng 20 giây', () => {
+    const s = new RunSession({ autoPauseAfterS: 20, longStopAskMin: 5, longStopAutoStopMin: 15 })
+    let t = 1_000_000, pos = 0
+    const ev: string[] = []
+    const step = (v: number, n: number) => {
+      for (let i = 0; i < n; i++) {
+        t += 1000; pos += v
+        for (const e of s.fix({ latitude: 21 + pos / 111320, longitude: 105.85, accuracy: 5, altitude: null, speed: v, time: t }, t)) ev.push(e.type)
+        for (const e of s.tick(t)) ev.push(e.type)
+      }
+    }
+    step(3, 300)
+    step(0, 15)
+    expect(s.autoPaused).toBe(false)          // chưa tới 20 giây
+    step(0, 10)
+    expect(s.autoPaused).toBe(true)
+    step(0, 5 * 60)
+    expect(ev).toContain('LONG_STOP')
+    step(0, 10 * 60)
+    expect(s.phase).toBe('PAUSED')
+  })
+})

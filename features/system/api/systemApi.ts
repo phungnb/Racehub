@@ -1,5 +1,6 @@
 // Thông báo hệ thống + nhật ký lỗi phía người dùng (migration 004400)
 import { supabase } from '@/shared/lib/supabase'
+import { toOps, type OpsPolicy } from '@/shared/lib/ops'
 import { systemErrorMessage } from '@/shared/lib/errors'
 import type { ErrorKind } from '@/shared/lib/errors'
 
@@ -45,10 +46,41 @@ const MESSAGES: Record<string, string> = {
   INVALID_MESSAGE: 'Nội dung tối đa 500 ký tự.',
   INVALID_TIME_RANGE: 'Thời điểm tự tắt phải ở tương lai.',
   FORBIDDEN: 'Chỉ quản trị hệ thống mới làm được việc này.',
+  INVALID_CONFIG: 'Giá trị ngoài giới hạn cho phép — kiểm tra lại các ô vừa sửa.',
+  VERSION_NOT_FOUND: 'Không tìm thấy phiên bản này.',
 }
 
 export function systemApiErrorMessage(e: unknown): string {
   const raw = (e as { message?: string } | null)?.message ?? ''
   const key = Object.keys(MESSAGES).find((k) => raw.includes(k))
   return key ? MESSAGES[key] : systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')
+}
+
+// ---------------- Chính sách vận hành (009100) ----------------
+
+export async function getOpsPolicy(): Promise<OpsPolicy> {
+  const { data, error } = await supabase.rpc('ops_policy')
+  if (error) throw error
+  return toOps(data)
+}
+
+export async function publishOpsPolicy(p: Partial<Pick<OpsPolicy, 'features' | 'tracking' | 'antiCheat' | 'content'>>, note: string): Promise<number> {
+  const { data, error } = await supabase.rpc('admin_publish_ops_policy', { p, p_note: note || null })
+  if (error) throw error
+  return Number(data)
+}
+
+export type ConfigKey = 'economy_global_config' | 'ops_policy'
+export interface ConfigVersion { version: number; status: string; created_at: string; by: string; value: Record<string, unknown> }
+
+export async function getConfigHistory(key: ConfigKey): Promise<ConfigVersion[]> {
+  const { data, error } = await supabase.rpc('admin_config_history', { p_key: key })
+  if (error) throw error
+  return (data ?? []) as ConfigVersion[]
+}
+
+export async function rollbackConfig(key: ConfigKey, version: number): Promise<number> {
+  const { data, error } = await supabase.rpc('admin_rollback_config', { p_key: key, p_version: version })
+  if (error) throw error
+  return Number(data)
 }

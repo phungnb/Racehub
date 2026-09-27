@@ -1,11 +1,3 @@
--- RaceHub — PHẦN 14/15 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 009100
--- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
--- Xong thì chạy phần tiếp theo.
-begin;
--- ===================================================================
--- 20261001009100_ops_policy.sql
--- ===================================================================
 -- 009100: CHÍNH SÁCH VẬN HÀNH — admin tự đặt lại quy tắc khi hệ thống đã chạy, không phải sửa code / chờ dựng lại app.
 -- Cùng cơ chế với chính sách kinh tế (system_config_versions): mỗi lần lưu là một PHIÊN BẢN mới, có kiểm tra giới hạn hợp lệ,
 -- ghi nhật ký quản trị (ai đổi, lúc nào, trước / sau), xem lịch sử và KHÔI PHỤC phiên bản cũ bằng một nút.
@@ -392,5 +384,3 @@ grant execute on function public.admin_publish_ops_policy(jsonb, text), public.a
   to authenticated;
 
 notify pgrst, 'reload schema';
-
-commit;

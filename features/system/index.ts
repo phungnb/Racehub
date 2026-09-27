@@ -2,3 +2,5 @@
 export { SystemNoticeBanner } from './components/SystemNoticeBanner'
 export { SystemNoticeEditor } from './components/SystemNoticeEditor'
 export { ClientErrorsPanel } from './components/ClientErrorsPanel'
+export { FeatureGate } from './components/FeatureGate'
+export { useOpsPolicy, useFeature, usePublishOps, useConfigHistory, useRollbackConfig } from './hooks/useSystem'

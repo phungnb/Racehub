@@ -56,3 +56,12 @@ Mức đánh giá sai lệch: **≤ 2 %** là tốt (ngang đồng hồ GPS), **
 
 - Trên app cài, dữ liệu lưu tạm nằm trong bộ nhớ của WebView, ghi 5 giây một lần và ngay khi app bị ẩn. Nếu hệ điều hành đóng app, có thể mất vài giây cuối.
 - iOS có thể dừng app khi máy quá nóng hoặc pin yếu. Không app nào tránh được hoàn toàn, kể cả Strava.
+
+## Admin đổi quy tắc không cần sửa code (009100)
+
+Vào **Quản trị → Hệ thống → Chính sách vận hành**. Mỗi lần lưu là một phiên bản mới, có kiểm tra giới hạn, ghi nhật ký quản trị, xem được lịch sử và khôi phục bằng một nút.
+
+- **Ghi bài chạy:** tự tạm dừng sau bao nhiêu giây đứng yên; hỏi Kết thúc sau bao nhiêu phút; tự chuyển Tạm dừng sau bao nhiêu phút; đứng yên cuối bài bao lâu thì bỏ. App đọc lại mỗi 10 phút và áp cho bài bắt đầu sau đó (`RunSession` nhận quy tắc qua hàm khởi tạo).
+- **Ngưỡng chống gian lận:** số bài tối đa mỗi ngày, pace nhanh nhất hợp lệ, tốc độ đi xe, giữ tốc độ cao hoặc nghiêm trọng, nhảy điểm GPS.
+  - `submit_and_process_activity` (bài ghi bằng app) và `analyzeRun` (bài từ Strava) đọc chung một bộ ngưỡng.
+  - Chỉ admin và máy chủ đọc được các số này.
