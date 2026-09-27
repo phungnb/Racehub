@@ -210,6 +210,8 @@ export function PolicyTab({ policy, raw }: { policy: EconomyPolicy; raw: Record<
             onChange={(v) => set({ clubChallenge: { ...p.clubChallenge, freeMaxSlots: v } })} />
           <Num id="pol-cc-fmembers" label="Thành viên tối đa (0 = không giới hạn)" unit="người" value={p.clubChallenge.freeMaxMembers}
             onChange={(v) => set({ clubChallenge: { ...p.clubChallenge, freeMaxMembers: v } })} />
+          <Num id="pol-cc-fcaptains" label="Quản trị viên tối đa (không tính chủ nhiệm)" unit="người" value={p.clubChallenge.freeMaxCaptains}
+            onChange={(v) => set({ clubChallenge: { ...p.clubChallenge, freeMaxCaptains: v } })} />
         </div>
         <p className="text-xs text-fg-subtle">CLB đã vượt số này vẫn giữ đủ thành viên, chỉ không duyệt thêm người mới cho tới khi nâng Pro.</p>
         <p className="text-xs font-medium text-fg-muted">CLB Pro</p>

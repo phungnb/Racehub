@@ -151,7 +151,9 @@ begin
     jsonb_build_object('file', '20261001009000', 'label', 'Lỗi người dùng gặp: admin đánh dấu đã xử lý',
       'ok', to_regprocedure('public.admin_resolve_client_error(text)') is not null),
     jsonb_build_object('file', '20261001009100', 'label', 'Chính sách vận hành: bật / tắt tính năng, ghi bài chạy, ngưỡng chống gian lận, trang Doanh nghiệp + lịch sử / khôi phục',
-      'ok', to_regprocedure('public.admin_publish_ops_policy(jsonb, text)') is not null and to_regprocedure('public.admin_rollback_config(text, integer)') is not null));
+      'ok', to_regprocedure('public.admin_publish_ops_policy(jsonb, text)') is not null and to_regprocedure('public.admin_rollback_config(text, integer)') is not null),
+    jsonb_build_object('file', '20261001009200', 'label', 'Thẻ gói Miễn phí / CLB Miễn phí / Doanh nghiệp do admin soạn + số quản trị viên CLB miễn phí do admin đặt',
+      'ok', to_regprocedure('private.valid_plan_content(jsonb)') is not null and to_regprocedure('private.club_free_captains()') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

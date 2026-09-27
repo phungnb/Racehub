@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { CloseButton } from '@/shared/ui/legal/CloseButton'
 import { BackLink } from '@/shared/ui/BackLink'
+import { StatusBarScrim } from '@/shared/ui/StatusBarScrim'
 import { MenuDrawer } from './MenuDrawer'
 import { AdminEditLink } from './AdminEditLink'
 
@@ -14,6 +15,7 @@ export function HelpShell({ children, back = '/help', backLabel = 'Hướng dẫ
 }) {
   return (
     <main className="mx-auto min-h-dvh max-w-2xl px-4 pb-12 pt-[max(env(safe-area-inset-top),0.5rem)]">
+      <StatusBarScrim />
       <nav className="mb-4 flex items-center gap-1">
         <MenuDrawer className="-ml-2" />
         <Link href="/" className="text-lg font-extrabold tracking-wide">RACE<span className="text-brand">HUB</span></Link>

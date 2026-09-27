@@ -10,6 +10,7 @@ import { cn } from '@/shared/lib/cn'
 import { formatVnd } from '@/shared/lib/economy'
 import { formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
+import { renderPerks, toPlanContent, type PlanVars } from '@/shared/lib/ops'
 import { billingErrorMessage, getFreeChallengeSlots, getManagedClubs, getPlanCompare, MONTH_LABEL, type ComparePlan, type Order, type PlanCompareData } from '../api/billingApi'
 import { useActiveSales, useCreateOrder, useMyPlan } from '../hooks/useBilling'
 import { bestSale, salePrice } from '../model/sale'
@@ -26,8 +27,8 @@ function Perks({ items }: { items: string[] }) {
   )
 }
 
-function PlanCard({ title, badge, description, perks, tone, current, action }: {
-  title: string; badge?: string; description?: string | null; perks: string[]; tone: 'free' | 'vip' | 'pro' | 'org'; current?: boolean; action?: React.ReactNode
+function PlanCard({ title, badge, description, perks, tone, current, action, note }: {
+  title: string; badge?: string; description?: string | null; perks: string[]; tone: 'free' | 'vip' | 'pro' | 'org'; current?: boolean; action?: React.ReactNode; note?: string
 }) {
   const TONE = { free: 'border-border bg-surface', vip: 'border-coin/40 bg-gradient-to-br from-coin/10 to-surface', pro: 'border-brand/40 bg-gradient-to-br from-brand/10 to-surface', org: 'border-sky-500/40 bg-gradient-to-br from-sky-500/10 to-surface' }
   return (
@@ -42,6 +43,7 @@ function PlanCard({ title, badge, description, perks, tone, current, action }: {
       </div>
       <Perks items={perks} />
       {action}
+      {note && <p className="text-xs text-fg-muted">{note}</p>}
     </div>
   )
 }
@@ -133,49 +135,43 @@ export function PlanCompare({ signedIn = true }: { signedIn?: boolean }) {
     ? <Button block variant={club ? 'primary' : 'coin'} onClick={() => setUpgrade({ plan, club })}>{label}</Button>
     : <Link href={login} className="flex h-11 items-center justify-center rounded-xl bg-coin text-sm font-bold text-brand-fg">Đăng nhập để nâng cấp</Link>
   const c = d.club
+  // Nội dung thẻ Miễn phí / CLB Miễn phí / Doanh nghiệp: admin soạn ở Quản trị → Gói & giá (009200); số liệu thay theo chính sách đang áp dụng
+  const t = toPlanContent(d.content)
+  const vars: PlanVars = {
+    freeSlots: freeN, clubMaxMembers: c.freeMaxMembers, clubMaxOpen: c.freeMaxOpen, clubMaxSlots: c.freeMaxSlots,
+    clubMinActive: c.freeMinActiveMembers, activeDays: c.activeWindowDays, clubCaptains: d.free_captains, proMaxOpen: c.proMaxOpen, proMaxSlots: c.proMaxSlots,
+  }
+  const perks = (lines: string[]) => renderPerks(lines, vars)
 
   return (
     <div className="space-y-6">
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-lg font-bold"><Crown className="size-5 text-coin" aria-hidden />Cá nhân</h2>
-        <PlanCard tone="free" title="Miễn phí" current={signedIn && !myCode} perks={[
-          'Ghi bài bằng GPS trong app hoặc tự động từ Strava', 'Xu, XP, cấp độ, huy hiệu, nhiệm vụ, nhân vật',
-          'Tham gia thử thách, CLB, giải chạy ảo, tổ chức không giới hạn',
-          ...(freeN > 0 ? [`Tạo miễn phí thử thách cá nhân và thử thách nhóm tới ${formatNumber(freeN)} người`] : []),
-          `Thử thách đông hơn${freeN > 0 ? ` ${formatNumber(freeN)} người` : ''}: trả Xu theo quy mô`,
-        ]} />
+        <PlanCard tone="free" title={t.free.title} description={t.free.subtitle} current={signedIn && !myCode} perks={perks(t.free.perks)} />
         {vip.map((p) => (
           <PlanCard key={p.code} tone="vip" title={p.name} badge={`VIP${p.tier}`} description={p.description} current={myCode === p.code}
-            perks={[...(creditLine(p) ? [creditLine(p)!] : []), ...p.perks.filter((x) => !/lượt tạo/i.test(x) || !p.credits.length)]}
+            perks={perks([...(creditLine(p) ? [creditLine(p)!] : []), ...p.perks.filter((x) => !/lượt tạo/i.test(x) || !p.credits.length)])}
             action={upgradeBtn(p, false, myCode === p.code ? 'Gia hạn' : 'Nâng cấp')} />
         ))}
-        <p className="text-xs text-fg-muted">VIP không tăng km, XP hay thứ hạng — mọi runner thi đấu công bằng.</p>
+        {t.free.note && <p className="text-xs text-fg-muted">{t.free.note}</p>}
       </section>
 
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-lg font-bold"><Shield className="size-5 text-brand" aria-hidden />Câu lạc bộ</h2>
-        <PlanCard tone="free" title="CLB Miễn phí" perks={[
-          c.freeMaxMembers ? `Tối đa ${formatNumber(c.freeMaxMembers)} thành viên` : 'Không giới hạn thành viên',
-          `${c.freeMaxOpen} thử thách nội bộ miễn phí cùng lúc, mỗi thử thách ≤ ${formatNumber(c.freeMaxSlots)} người (cần ≥ ${c.freeMinActiveMembers} thành viên có bài chạy trong ${c.activeWindowDays} ngày)`,
-          `Tối đa ${d.free_captains} quản trị viên`, 'Bảng tin, chat, lịch, điểm danh QR, quỹ VietQR, bảng xếp hạng',
-          'Ngày hội ×2/×3, đại sảnh danh vọng, cửa hàng CLB, giao lưu CLB',
-        ]} />
+        <PlanCard tone="free" title={t.clubFree.title} description={t.clubFree.subtitle} perks={perks(t.clubFree.perks)} />
         {pro && (
-          <PlanCard tone="pro" title={pro.name} description={pro.description} perks={[
+          <PlanCard tone="pro" title={pro.name} description={pro.description} perks={perks([
             ...pro.perks,
-            ...(pro.perks.some((x) => /cùng lúc/.test(x)) ? [] : [`${c.proMaxOpen} thử thách nội bộ cùng lúc, mỗi thử thách ≤ ${formatNumber(c.proMaxSlots)} người`]),
-          ]} action={upgradeBtn(pro, true, 'Nâng cấp CLB Pro')} />
+            ...(pro.perks.some((x) => /cùng lúc/.test(x)) ? [] : ['{proMaxOpen} thử thách nội bộ cùng lúc, mỗi thử thách ≤ {proMaxSlots} người']),
+          ])} action={upgradeBtn(pro, true, 'Nâng cấp CLB Pro')} />
         )}
-        <p className="flex items-start gap-1.5 text-xs text-fg-muted"><Users className="mt-0.5 size-3.5 shrink-0" aria-hidden />CLB miễn phí vượt số thành viên vẫn giữ đủ người, chỉ chưa duyệt thêm người mới cho tới khi nâng Pro.</p>
+        {t.clubFree.note && <p className="flex items-start gap-1.5 text-xs text-fg-muted"><Users className="mt-0.5 size-3.5 shrink-0" aria-hidden />{t.clubFree.note}</p>}
       </section>
 
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-lg font-bold"><Building2 className="size-5 text-sky-400" aria-hidden />Doanh nghiệp · Liên đoàn · Trường học</h2>
-        <PlanCard tone="org" title="RaceHub Doanh nghiệp" description="Báo giá riêng theo số người và thời hạn" perks={[
-          'Chiến dịch sức khoẻ cho cả tổ chức (km, số buổi, số ngày chạy)', 'Bảng xếp hạng phòng ban / chi nhánh / CLB — tổng và bình quân đầu người',
-          'Nhập danh sách nhân viên từ Excel, tự duyệt email công ty, đơn vị nhiều cấp', 'Báo cáo theo mã nhân viên, xuất Excel',
-          'Chốt kết quả, chứng nhận hoàn thành, quay thưởng minh bạch', 'Quản lý nhiều CLB, tài trợ CLB Pro cho cả hệ thống',
-        ]} action={<Link href={routes.enterprise} className="flex h-11 items-center justify-center rounded-xl bg-sky-500 text-sm font-bold text-white">Xem chi tiết & nhận báo giá</Link>} />
+        <PlanCard tone="org" title={t.org.title} description={t.org.subtitle} perks={perks(t.org.perks)} note={t.org.note}
+          action={<Link href={routes.enterprise} className="flex h-11 items-center justify-center rounded-xl bg-sky-500 text-sm font-bold text-white">Xem chi tiết & nhận báo giá</Link>} />
       </section>
 
       {upgrade && <UpgradeSheet plan={upgrade.plan} clubMode={upgrade.club} onClose={() => setUpgrade(null)} />}

@@ -14,8 +14,8 @@ import { consoleErrorMessage } from '../../api/consoleApi'
 
 /** Bản đồ mọi chính sách admin tự đổi được — không phải sửa code */
 const MAP: { tab: string; title: string; text: string }[] = [
-  { tab: 'policy', title: 'Kinh tế Xu & thưởng', text: 'Xu mỗi km, trần / ngày, thưởng lên cấp, giới thiệu bạn, chào mừng trở lại, phí tạo thử thách, hạn mức CLB miễn phí' },
-  { tab: 'plans', title: 'Gói & giá', text: 'Giá VIP / CLB Pro theo kỳ hạn, quyền lợi từng gói, lượt tạo thử thách kèm gói' },
+  { tab: 'policy', title: 'Kinh tế Xu & thưởng', text: 'Xu mỗi km, trần / ngày, thưởng lên cấp, giới thiệu bạn, chào mừng trở lại, phí tạo thử thách, hạn mức CLB miễn phí (thành viên, quản trị viên, thử thách)' },
+  { tab: 'plans', title: 'Gói & giá', text: 'Thẻ gói Miễn phí / CLB Miễn phí / Doanh nghiệp, giá VIP / CLB Pro theo kỳ hạn, quyền lợi, lượt tạo thử thách kèm gói' },
   { tab: 'promos', title: 'Khuyến mãi', text: 'Giảm giá gói, mã khuyến mãi, tặng Xu theo nhóm' },
   { tab: 'quests', title: 'Nhiệm vụ', text: 'Nhiệm vụ ngày / tuần / tháng / sự kiện và phần thưởng' },
   { tab: 'gifts', title: 'Quà tặng', text: 'Danh mục quà, giá Xu' },
