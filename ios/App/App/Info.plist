@@ -60,6 +60,10 @@
 	<string>RaceHub dùng vị trí để ghi quãng đường, pace và bản đồ bài chạy của bạn.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Cho phép "Luôn luôn" để RaceHub tiếp tục ghi bài chạy khi bạn khóa màn hình hoặc bỏ điện thoại vào túi. RaceHub chỉ dùng vị trí trong lúc bạn đang ghi bài chạy.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>RaceHub lưu ảnh bài chạy, BIB và chứng nhận vào thư viện ảnh khi bạn chọn "Lưu hình ảnh".</string>
 	<key>NSCameraUsageDescription</key>
 	<string>RaceHub dùng camera để quét mã QR điểm danh sự kiện CLB.</string>
 	<key>UIBackgroundModes</key>

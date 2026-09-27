@@ -70,6 +70,37 @@ Trong Xcode:
 2. **Product → Archive** → **Distribute App** → **App Store Connect**.
 3. Vào App Store Connect → **TestFlight** để cài thử trên iPhone, rồi mới gửi duyệt.
 
+## Checklist trước khi đóng gói
+
+**Máy chủ & dữ liệu**
+- [ ] Chạy đủ migration tới **008900** (bản vá bảo mật CLB). Quản trị → Hệ thống → Kiểm tra hệ thống phải xanh hết.
+- [ ] Biến môi trường production trên Vercel đầy đủ. Mục "Kiểm tra hệ thống" hiện đúng Strava, VAPID và webhook.
+- [ ] Nhập **thông tin pháp nhân** (Quản trị → Hướng dẫn & chính sách): tên công ty, MST, địa chỉ, email hỗ trợ. Hai cửa hàng đều kiểm tra thông tin này.
+- [ ] Trang **Quyền riêng tư** và **Điều khoản** mở được khi chưa đăng nhập: `/privacy`, `/terms`.
+- [ ] Nên dùng **tên miền riêng** thay `racehub-iota.vercel.app` trước khi nộp. Đổi sau khi đã nộp thì phải dựng lại app.
+
+**App**
+- [ ] Logo nguồn **1024×1024** (hiện là bản 512 phóng to): `python3 scripts/make-app-icons.py logo-1024.png`.
+- [ ] Phiên bản: Android `versionCode` / `versionName` trong `android/app/build.gradle`; iOS `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION`. Mỗi lần nộp phải **tăng** số build.
+- [ ] Khoá ký Android (`.jks`) và mật khẩu: cất ở 2 nơi an toàn, **không** đưa vào git.
+- [ ] Tài khoản thử cho người duyệt (email + mật khẩu), có sẵn vài bài chạy, CLB và thử thách.
+- [ ] Thử trên máy thật theo 11 kịch bản **Kiểm thử GPS** (`/run?qa=1`), ít nhất 1 iPhone và 1 Android. Xem kết quả ở Quản trị → Hệ thống → Kiểm thử GPS.
+
+**Khai báo quyền riêng tư** (App Store: *App Privacy*; Google Play: *Data safety*). Khai đúng những gì RaceHub thu thập:
+
+| Dữ liệu | Mục đích | Gắn với tài khoản | Theo dõi quảng cáo |
+|---|---|---|---|
+| Vị trí chính xác (chỉ trong lúc ghi bài chạy) | Chức năng app | Có | Không |
+| Email, tên hiển thị, ảnh đại diện | Tài khoản | Có | Không |
+| Dữ liệu thể thao (bài chạy, quãng đường, nhịp tim từ Strava) | Chức năng app | Có | Không |
+| Ảnh người dùng tải lên (CLB, bài viết) | Chức năng app | Có | Không |
+| Thông tin thiết bị + chất lượng GPS của bài chạy | Chẩn đoán / chống gian lận | Có | Không |
+
+- Không bán dữ liệu, không quảng cáo theo dõi (App Store: *Data Not Used to Track You*).
+- Người dùng tự **xoá tài khoản** trong app: Cài đặt → Xoá tài khoản. Cả hai cửa hàng đều bắt buộc có chức năng này.
+- iOS đã khai `ITSAppUsesNonExemptEncryption = false` (chỉ dùng HTTPS), nên không phải trả lời câu hỏi mã hoá mỗi lần nộp.
+- Android đã tắt sao lưu dữ liệu app (`allowBackup=false`): phiên đăng nhập và bài chạy dở không bị sao chép sang máy khác.
+
 ## Khi đổi logo / tên miền
 
 - **Logo:** `python3 scripts/make-app-icons.py đường-dẫn/logo-1024.png`, rồi dựng lại app. App Store yêu cầu ảnh nguồn **1024×1024**; hiện đang tạm dùng bản 512 phóng to.
