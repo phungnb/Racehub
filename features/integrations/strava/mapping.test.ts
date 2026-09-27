@@ -38,8 +38,8 @@ describe('tiện ích đồng bộ', () => {
     expect(summarize([
       { result: 'IMPORTED', validation_status: 'APPROVED', earned_xu: 5 },
       { result: 'IMPORTED', validation_status: 'PENDING', earned_xu: 0 },
-      { result: 'SKIPPED' }, { result: 'DUPLICATE' }, { result: 'UPDATED' },
-    ])).toEqual({ imported: 2, pending: 1, skipped: 1, duplicates: 2, earned_xu: 5 })
+      { result: 'SKIPPED', reason: 'NOT_RUN' }, { result: 'DUPLICATE' }, { result: 'UPDATED' },
+    ])).toEqual({ imported: 2, pending: 1, skipped: 1, duplicates: 2, earned_xu: 5, skip_reasons: { NOT_RUN: 1 } })
   })
 })
 

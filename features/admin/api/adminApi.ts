@@ -399,3 +399,11 @@ export async function getServerCheck(): Promise<{ items: ServerCheckItem[]; orig
   const j = (await res.json().catch(() => null)) as { items?: ServerCheckItem[]; origin?: string } | null
   return { items: Array.isArray(j?.items) ? j.items : [], origin: j?.origin ?? '' }
 }
+
+/** Đăng ký webhook Strava từ máy chủ (thay lệnh curl); trả mã subscription */
+export async function registerStravaWebhook(): Promise<{ id: number; callback: string; already: boolean }> {
+  const res = await fetch('/api/admin/strava-webhook', { method: 'POST' })
+  const j = (await res.json().catch(() => null)) as { id?: number; callback?: string; already?: boolean; error?: string } | null
+  if (!res.ok || !j?.id) throw new Error(j?.error ?? `Lỗi ${res.status}`)
+  return { id: j.id, callback: j.callback ?? '', already: !!j.already }
+}

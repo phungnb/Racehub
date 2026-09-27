@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { AlertTriangle, BellOff, Bug, CheckCircle2, ChevronDown, Database, HardDrive, Megaphone, RefreshCw, Server, XCircle, type LucideIcon } from 'lucide-react'
 import { Button, Card, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatRelative } from '@/shared/lib/format'
 import { ClientErrorsPanel, SystemNoticeEditor } from '@/features/system'
-import { getNotifyErrors, getServerCheck, getSystemCheck, type ServerCheckItem } from '../api/adminApi'
+import { getNotifyErrors, getServerCheck, getSystemCheck, registerStravaWebhook, type ServerCheckItem } from '../api/adminApi'
 
 type Status = 'ok' | 'warn' | 'fail'
 const ICON: Record<Status, LucideIcon> = { ok: CheckCircle2, warn: AlertTriangle, fail: XCircle }
@@ -104,7 +105,13 @@ export function SystemTab() {
       <Section icon={Server} title="Máy chủ (Vercel) & Strava">
         {server.isPending ? <Skeleton className="h-32" /> : server.isError ? (
           <Row status="warn" label="Không kiểm tra được máy chủ" detail={`Bản app đang chạy có thể chưa có trang này — gộp nhánh và triển khai lại. (${(server.error as Error).message})`} />
-        ) : (server.data?.items ?? []).map((i) => <Row key={i.key} status={i.status} label={i.label} detail={i.detail} />)}
+        ) : (
+          <>
+            {(server.data?.items ?? []).map((i) => <Row key={i.key} status={i.status} label={i.label} detail={i.detail} />)}
+            {(server.data?.items ?? []).some((i) => i.key === 'strava_webhook' && i.status !== 'ok') && <StravaWebhookButton onDone={() => void server.refetch()} />}
+            {(server.data?.items ?? []).some((i) => i.key === 'vapid' && i.status !== 'ok') && <VapidGenerator />}
+          </>
+        )}
       </Section>
 
       {d && (
@@ -177,5 +184,57 @@ function NotifyErrorsPanel() {
         </li>
       ))}
     </ul>
+  )
+}
+
+/** Đăng ký webhook Strava bằng một nút: bài chạy mới tự về app sau vài phút, không cần bấm Đồng bộ */
+function StravaWebhookButton({ onDone }: { onDone: () => void }) {
+  const reg = useMutation({
+    mutationFn: registerStravaWebhook,
+    onSuccess: (r) => { toast.success(r.already ? `Webhook đã có sẵn (mã ${r.id}).` : `Đã đăng ký webhook Strava (mã ${r.id}).`); onDone() },
+    onError: (e) => toast.error((e as Error).message, { duration: 12000 }),
+  })
+  return (
+    <div className="space-y-1.5 rounded-xl border border-brand/30 bg-brand/5 p-3">
+      <p className="text-sm">Đăng ký webhook để bài chạy trên Strava <b>tự về app</b> vài phút sau khi lưu. Cần biến <code className="font-mono text-xs">STRAVA_WEBHOOK_VERIFY_TOKEN</code> trên Vercel (chuỗi ngẫu nhiên bất kỳ).</p>
+      <Button size="sm" loading={reg.isPending} onClick={() => reg.mutate()}>Đăng ký webhook Strava</Button>
+      {reg.error && <p className="text-xs text-danger">{(reg.error as Error).message}</p>}
+    </div>
+  )
+}
+
+const b64url = (buf: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+
+/**
+ * Tạo cặp khóa VAPID ngay trên trình duyệt (Web Crypto, P-256) — thay lệnh `npx web-push generate-vapid-keys` khi chỉ có điện thoại.
+ * Khóa chỉ hiện trên màn hình này, KHÔNG gửi lên máy chủ; admin tự dán vào Vercel rồi Redeploy.
+ */
+function VapidGenerator() {
+  const [keys, setKeys] = useState<{ pub: string; priv: string } | null>(null)
+  const gen = async () => {
+    const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify'])
+    const pub = b64url(await crypto.subtle.exportKey('raw', pair.publicKey))
+    const jwk = await crypto.subtle.exportKey('jwk', pair.privateKey)
+    setKeys({ pub, priv: jwk.d ?? '' })
+  }
+  const copy = (v: string) => { void navigator.clipboard?.writeText(v).then(() => toast.success('Đã chép')) }
+  return (
+    <div className="space-y-2 rounded-xl border border-warning/40 bg-warning/5 p-3 text-sm">
+      <p>Tạo cặp khóa mới ngay trên máy này (không gửi đi đâu), rồi dán vào <b>Vercel → Settings → Environment Variables</b> và <b>Redeploy</b>.</p>
+      {!keys ? <Button size="sm" variant="secondary" onClick={() => void gen()}>Tạo cặp khóa VAPID</Button> : (
+        <div className="space-y-2">
+          {[['NEXT_PUBLIC_VAPID_PUBLIC_KEY', keys.pub], ['VAPID_PRIVATE_KEY', keys.priv]].map(([k, v]) => (
+            <div key={k} className="space-y-1">
+              <p className="font-mono text-xs font-semibold">{k}</p>
+              <div className="flex gap-2">
+                <code className="min-w-0 flex-1 break-all rounded-lg bg-surface-2 p-2 font-mono text-[11px]">{v}</code>
+                <Button size="sm" variant="secondary" className="shrink-0" onClick={() => copy(v)}>Chép</Button>
+              </div>
+            </div>
+          ))}
+          <p className="text-xs text-fg-muted">Sau khi đổi khóa, mỗi người cần bật lại thông báo một lần (Cài đặt → Thông báo). Không chụp màn hình khóa bí mật.</p>
+        </div>
+      )}
+    </div>
   )
 }

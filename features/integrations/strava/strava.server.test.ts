@@ -49,7 +49,7 @@ describe('syncStravaActivities', () => {
     expect(details.map(([, a]) => a.p_detail)).toEqual([expect.objectContaining({ polyline: 'x', detailed: false }), expect.objectContaining({ polyline: 'x' })])
     expect(calls.updates[0]).toMatchObject({ access_token: 'new', refresh_token: 'r2' })
     expect(calls.updates.at(-1)).toHaveProperty('last_synced_at')
-    expect(s).toEqual({ imported: 2, pending: 0, skipped: 0, duplicates: 0, earned_xu: 10 })
+    expect(s).toEqual({ imported: 2, pending: 0, skipped: 0, duplicates: 0, earned_xu: 10, skip_reasons: {} })
   })
 
   it('chưa kết nối / token bị thu hồi → lỗi rõ ràng', async () => {
