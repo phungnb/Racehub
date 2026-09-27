@@ -17,18 +17,30 @@ const EMPTY: HelpInput = { slug: '', section: 'GUIDE', title: '', icon: '', summ
 /** Quản trị → Cộng đồng → Hướng dẫn & chính sách: soạn trang menu ☰ + thông tin pháp nhân */
 export function HelpAdminTab() {
   const q = useQuery({ queryKey: KEY, queryFn: adminHelpList })
-  const [editing, setEditing] = useState<HelpAdminPage | 'new' | null>(null)
+  const [editing, setEditing] = useState<HelpAdminPage | { preset: Partial<HelpInput> } | null>(null)
+  // Mở từ nút "Sửa trang này" (?edit=slug): vào thẳng trình soạn trang đó; trang chưa có thì tạo mới với slug sẵn
+  const [wanted, setWanted] = useState(() => (typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('edit')))
+  if (wanted && q.data) {
+    setWanted(null)
+    window.history.replaceState(null, '', '?tab=help')
+    setEditing(q.data.pages.find((p) => p.slug === wanted) ?? { preset: { slug: wanted, section: wanted === 'terms' || wanted === 'privacy' ? 'POLICY' : 'GUIDE' } })
+  }
   if (q.isPending) return <div className="space-y-2"><Skeleton className="h-24" /><Skeleton className="h-64" /></div>
   if (q.isError) return <ErrorState message={helpErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
-  if (editing) return <Editor initial={editing === 'new' ? null : editing} site={q.data.site} onClose={() => setEditing(null)} />
+  if (editing) {
+    const isNew = 'preset' in editing
+    return <Editor initial={isNew ? null : editing} preset={isNew ? editing.preset : undefined} site={q.data.site} onClose={() => setEditing(null)} />
+  }
   const sections: HelpSection[] = ['GUIDE', 'POLICY', 'SUPPORT']
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <p className="min-w-0 flex-1 text-sm text-fg-muted">
-          Nội dung menu ☰ (xem được cả khi chưa đăng nhập). Điều khoản & Quyền riêng tư nằm ở trang cố định <Link href="/terms" className="text-brand underline">/terms</Link>, <Link href="/privacy" className="text-brand underline">/privacy</Link>.
+          Mọi trang trong menu ☰ (xem được cả khi chưa đăng nhập), gồm cả <Link href="/terms" className="text-brand underline">Điều khoản</Link>,{' '}
+          <Link href="/privacy" className="text-brand underline">Quyền riêng tư</Link>, phần thông tin thêm của <Link href="/goi" className="text-brand underline">Gói & quyền lợi</Link> và{' '}
+          <Link href="/doanh-nghiep" className="text-brand underline">Doanh nghiệp</Link>. Mẹo: mở trang đó khi đăng nhập admin, bấm <b>Sửa trang này</b>.
         </p>
-        <Button size="sm" onClick={() => setEditing('new')}><Plus className="size-4" aria-hidden />Trang mới</Button>
+        <Button size="sm" onClick={() => setEditing({ preset: {} })}><Plus className="size-4" aria-hidden />Trang mới</Button>
       </div>
       <SiteInfoCard site={q.data.site} />
       {q.data.pages.length === 0 && <EmptyState icon={FileText} title="Chưa có trang" description="Chạy migration 007300 để có nội dung mẫu, hoặc tạo trang mới." />}
@@ -96,12 +108,12 @@ function SiteInfoCard({ site }: { site: SiteInfo }) {
   )
 }
 
-function Editor({ initial, site, onClose }: { initial: HelpAdminPage | null; site: SiteInfo; onClose: () => void }) {
+function Editor({ initial, preset, site, onClose }: { initial: HelpAdminPage | null; preset?: Partial<HelpInput>; site: SiteInfo; onClose: () => void }) {
   const qc = useQueryClient()
   const [f, setF] = useState<HelpInput>(() => (initial ? {
     slug: initial.slug, section: initial.section, title: initial.title, icon: initial.icon ?? '', summary: initial.summary ?? '', body: initial.body,
     version: initial.version, effective_at: initial.effective_at, sort: initial.sort, is_published: initial.is_published, needs_review: initial.needs_review,
-  } : EMPTY))
+  } : { ...EMPTY, ...preset }))
   const [mode, setMode] = useState<'edit' | 'preview'>('edit')
   const [confirmDel, setConfirmDel] = useState(false)
   const set = <K extends keyof HelpInput>(k: K, v: HelpInput[K]) => setF((x) => ({ ...x, [k]: v }))

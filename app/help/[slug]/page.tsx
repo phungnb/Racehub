@@ -18,5 +18,5 @@ export async function generateMetadata({ params }: PageProps<'/help/[slug]'>): P
 export default async function HelpPageRoute({ params }: PageProps<'/help/[slug]'>) {
   const page = await load((await params).slug)
   if (!page) notFound()
-  return <HelpShell><HelpArticle page={page} /></HelpShell>
+  return <HelpShell editSlug={page.slug}><HelpArticle page={page} /></HelpShell>
 }

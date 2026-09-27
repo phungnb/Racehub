@@ -16,7 +16,7 @@ export default async function PlansPage() {
     createSupabaseServerClient().then((s) => s.auth.getUser()).then((r) => !!r.data.user).catch(() => false),
   ])
   return (
-    <HelpShell back={null}>
+    <HelpShell back={null} editSlug="vip-pro">
       <h1 className="flex items-center gap-2 text-2xl font-bold"><span aria-hidden>👑</span>{notes?.title ?? 'Gói & quyền lợi'}</h1>
       <p className="mb-4 mt-1 text-sm text-fg-muted">
         Bắt đầu miễn phí, nâng cấp khi cần. Giá và hạn mức dưới đây luôn là số mới nhất.

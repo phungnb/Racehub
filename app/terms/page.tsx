@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: 'Điều khoản sử dụng' }
 // Bản admin soạn trong Quản trị → Hướng dẫn & chính sách (008500) nếu có; chưa có thì dùng bản viết sẵn dưới đây
 export default async function TermsPage() {
   const page = await loadHelpPage<HelpPage>('terms')
-  if (page?.body?.trim()) return <HelpShell back={null}><HelpArticle page={page} /></HelpShell>
+  if (page?.body?.trim()) return <HelpShell back={null} editSlug="terms"><HelpArticle page={page} /></HelpShell>
   return (
     <LegalPage title="Điều khoản sử dụng">
       <p>Khi tạo tài khoản hoặc sử dụng RaceHub, bạn đồng ý với các điều khoản dưới đây và <Link href="/privacy" className="text-brand underline">Chính sách quyền riêng tư</Link>.</p>

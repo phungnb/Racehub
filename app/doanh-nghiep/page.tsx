@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { EnterpriseLanding } from '@/features/org'
-import { HelpBody, MenuDrawer, type HelpPage } from '@/features/help'
+import { AdminEditLink, HelpBody, MenuDrawer, type HelpPage } from '@/features/help'
 import { loadHelpPage } from '@/shared/lib/help-page-server'
 import { BackLink } from '@/shared/ui/BackLink'
 
@@ -20,7 +20,7 @@ export default async function EnterprisePage() {
         <MenuDrawer className="-ml-2" />
         <Link href="/" className="text-lg font-extrabold tracking-wide">RACE<span className="text-brand">HUB</span></Link>
       </nav>
-      <div className="mx-auto max-w-3xl px-4"><BackLink /></div>
+      <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-4"><BackLink /><AdminEditLink slug="doanh-nghiep" /></div>
       <EnterpriseLanding more={more?.body?.trim() ? <HelpBody page={more} /> : null} />
     </>
   )
