@@ -1,11 +1,3 @@
--- RaceHub — PHẦN 16/17 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 010000
--- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
--- Xong thì chạy phần tiếp theo.
-begin;
--- ===================================================================
--- 20261001010000_gps_policy_v1.sql
--- ===================================================================
 -- 010000: CHÍNH SÁCH CHỐNG GIAN LẬN GPS V1 — ưu tiên công nhận bài chạy, chỉ giữ bài có dấu hiệu bất thường RÕ RÀNG.
 --   • Mất GPS một đoạn KHÔNG phải gian lận: tính đủ quãng đường, không trừ km. Chỉ giữ bài khi đoạn nối thẳng nhanh như đi xe
 --     (> antiCheat.severeKmh) hoặc chiếm hơn antiCheat.gapReviewPct % bài chạy (mặc định 50; 100 = không bao giờ giữ vì mất GPS).
@@ -343,5 +335,3 @@ end $$;
 revoke all on function private.ops_defaults(), private.valid_ops(jsonb) from public, anon, authenticated;
 
 notify pgrst, 'reload schema';
-
-commit;

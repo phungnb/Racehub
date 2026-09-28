@@ -33,13 +33,13 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
 > ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
-> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 009900** + chạy lại 003500),
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 010000** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
 >
 > 📦 **File gộp quá dài, copy không hết?** Dùng bản **chia nhỏ** [`supabase/deploy/phan/`](../supabase/deploy/phan/README.md): 10 phần, mỗi phần ≤ ~90 KB.
-> Chạy **lần lượt** `phan_01.sql` → `phan_16.sql` (mỗi phần: SQL Editor → New query → dán → Run). Đã chạy một số rồi thì bắt đầu từ phần chứa
-> migration đầu tiên bị ✗ trong **Kiểm tra hệ thống**, và **luôn chạy phần cuối** (`phan_16.sql`, chạy lại kiểm tra hệ thống). Mẹo copy trên GitHub: mở file → nút **Raw** → Ctrl+A → Ctrl+C.
+> Chạy **lần lượt** `phan_01.sql` → `phan_17.sql` (mỗi phần: SQL Editor → New query → dán → Run). Đã chạy một số rồi thì bắt đầu từ phần chứa
+> migration đầu tiên bị ✗ trong **Kiểm tra hệ thống**, và **luôn chạy phần cuối** (`phan_17.sql`, chạy lại kiểm tra hệ thống). Mẹo copy trên GitHub: mở file → nút **Raw** → Ctrl+A → Ctrl+C.
 > File gộp tạo bằng `npm run db:bundle` (hoặc `node scripts/db-bundle.mjs <mốc>` để gộp từ mốc khác); test tự động bảo đảm file luôn khớp migration.
 
 Chạy các file trong `supabase/migrations/`, đúng thứ tự:
@@ -145,6 +145,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001009700_review_scope_fix.sql` | **VÁ CHỐNG GIAN LẬN**: ngoài thử thách chỉ tự duyệt bài nghi vấn **mức Thấp** (admin chỉnh ngưỡng ở Chính sách vận hành); bài mất GPS gần hết quãng / tốc độ giống đi xe → chờ xác minh, chưa cộng Xu / XP; người chạy chọn **"Chỉ tính phần có GPS"**; lời báo cho người chạy viết lại, không lộ ngưỡng | Chạy lại 3500 |
 | `20261001009800_anticheat_all_runs.sql` | **Chống gian lận cho mọi bài chạy**: bỏ hẳn ngoại lệ "không thi đấu thì tự duyệt" — bài nghi vấn của ai cũng chờ xác minh, chưa cộng Xu / XP (ngưỡng tự duyệt mặc định 0, admin chỉnh ở Chính sách vận hành, áp như nhau cho mọi người); lời báo cho người chạy rút còn một câu ngắn | Chạy lại 3500 |
 | `20261001009900_overlap_runs.sql` | **Bài chạy trùng giờ** (một tài khoản ghi trên nhiều thiết bị): mỗi thời điểm chỉ tính một bài — bài dài hơn hẳn (> 10%) được tính, bài trùng giờ còn lại chuyển "Không ghi nhận" và bị thu hồi Xu / XP / nhiệm vụ / thử thách; bài dài nhưng nghi vấn không thay được bài đã tính; khóa theo tài khoản để 2 máy gửi cùng lúc không lọt cả hai; áp cho cả GPS trong app và Strava / Garmin / COROS | Chạy lại 3500 |
+| `20261001010000_gps_policy_v1.sql` | **Chống gian lận GPS V1** — ưu tiên công nhận: mất GPS một đoạn vẫn tính đủ km (chỉ giữ bài khi đoạn nối thẳng nhanh như đi xe hoặc chiếm > 50% bài — admin chỉnh "Mất GPS" ở Chính sách vận hành); điểm GPS nhảy không cộng km; số km app gửi lệch chỉ ghi nhận; tốc độ đi xe, pace phi thực tế, bài không GPS, bài nhập tay vẫn chờ xác minh | Chạy lại 3500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

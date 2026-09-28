@@ -10,6 +10,8 @@ export interface AntiCheatRules {
   highKmh: number; highS: number; spikeKmh: number; spikeMax: number
   /** 009800: tự duyệt bài nghi vấn có điểm rủi ro ≤ số này, áp như nhau cho mọi bài (0 = không tự duyệt bài nghi vấn nào) */
   autoApproveMaxScore: number
+  /** 010000: mất GPS chỉ giữ bài khi phần nối thẳng chiếm hơn bấy nhiêu % quãng đường (100 = không bao giờ giữ vì mất GPS) */
+  gapReviewPct: number
 }
 export interface EnterpriseContent { title: string; subtitle: string; features: { title: string; text: string }[] }
 /** Một thẻ gói trên trang /goi (009200): dòng quyền lợi dùng được biến {freeSlots}, {clubMaxMembers}… (xem PLAN_VARS) */
@@ -36,7 +38,7 @@ export const FEATURES: { key: FeatureKey; label: string; hint: string }[] = [
 
 export const DEFAULT_TRACKING: TrackingRules = { autoPauseAfterS: 10, longStopAskMin: 10, longStopAutoStopMin: 30, trimTailMin: 2 }
 export const DEFAULT_ANTI_CHEAT: AntiCheatRules = {
-  dailyRunLimit: 20, minPaceMin: 3, vehicleKmh: 25, vehicleS: 30, severeKmh: 20, severeS: 120, highKmh: 17, highS: 180, spikeKmh: 43, spikeMax: 3, autoApproveMaxScore: 0,
+  dailyRunLimit: 20, minPaceMin: 3, vehicleKmh: 25, vehicleS: 30, severeKmh: 20, severeS: 120, highKmh: 17, highS: 180, spikeKmh: 43, spikeMax: 3, autoApproveMaxScore: 0, gapReviewPct: 50,
 }
 export const DEFAULT_ENTERPRISE: EnterpriseContent = {
   title: 'Phong trào chạy bộ cho cả tổ chức',
@@ -189,7 +191,7 @@ export const TRACKING_LIMITS: Record<keyof TrackingRules, [number, number]> = {
 }
 export const ANTI_CHEAT_LIMITS: Record<keyof AntiCheatRules, [number, number]> = {
   dailyRunLimit: [3, 100], minPaceMin: [2, 5], vehicleKmh: [20, 60], vehicleS: [10, 600], severeKmh: [15, 40], severeS: [30, 1800],
-  highKmh: [12, 35], highS: [30, 3600], spikeKmh: [30, 150], spikeMax: [1, 100], autoApproveMaxScore: [0, 100],
+  highKmh: [12, 35], highS: [30, 3600], spikeKmh: [30, 150], spikeMax: [1, 100], autoApproveMaxScore: [0, 100], gapReviewPct: [10, 100],
 }
 
 export function validateOps(o: Pick<OpsPolicy, 'tracking'> & { content: Pick<OpsPolicy['content'], 'enterprise'>; antiCheat?: AntiCheatRules }): string | null {

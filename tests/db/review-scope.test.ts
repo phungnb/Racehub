@@ -58,14 +58,14 @@ describe('tự duyệt chỉ mức thấp + chỉ tính phần có GPS (009700)'
     expect(a).toMatchObject({ status: 'REJECTED', earned_xp: 0 })
   })
 
-  it('mất GPS một đoạn giữa bài: chỉ tính phần có GPS → duyệt ngay, cộng Xu / XP theo km đã kiểm chứng', async () => {
-    const r = await submit([[600, 3], [600, 3, true], [300, 3]])       // 1,8 km + 1,8 km mất tín hiệu + 0,9 km
+  it('mất GPS phần lớn bài: chỉ tính phần có GPS → duyệt ngay, cộng Xu / XP theo km đã kiểm chứng', async () => {
+    const r = await submit([[300, 3], [900, 3, true], [300, 3]])       // 0,9 km + 2,7 km mất tín hiệu (60%, 010000) + 0,9 km
     expect(r.validation_status).toBe('PENDING')
     expect(await fails(rpc(db, OTHER, `select public.accept_verified_distance($1) as r`, [r.activity_id]))).toContain('FORBIDDEN')
     const a = await rpc(db, RUNNER, `select public.accept_verified_distance($1) as r`, [r.activity_id])
     expect(a.status).toBe('APPROVED')
-    expect(Number(a.distance_m)).toBeGreaterThan(2500)
-    expect(Number(a.distance_m)).toBeLessThan(2900)
+    expect(Number(a.distance_m)).toBeGreaterThan(1600)
+    expect(Number(a.distance_m)).toBeLessThan(2000)
     expect(Number(a.earned_xp)).toBeGreaterThan(0)
     expect(a.reason).toBe('Chỉ tính phần có GPS.')
     expect(await fails(rpc(db, RUNNER, `select public.accept_verified_distance($1) as r`, [r.activity_id]))).toContain('NOT_ELIGIBLE')
