@@ -96,7 +96,9 @@ begin
     jsonb_build_object('file', '20261001005900', 'label', 'Bộ đồng phục: áo + quần + tất + giày, họa tiết, mặc cả bộ',
       'ok', to_regprocedure('private.clean_design(jsonb, text)') is not null),
     jsonb_build_object('file', '20261001006000', 'label', 'Bộ sưu tập nhân vật (dáng) + thiết kế in kéo thả, độ đậm màu, ảnh vải',
-      'ok', to_regprocedure('private.character_bodies()') is not null),
+      'ok', to_regprocedure('private.character_bodies()') is not null))
+  -- PostgreSQL giới hạn 100 tham số mỗi hàm → danh sách chia thành nhiều mảng rồi nối lại
+  || jsonb_build_array(
     jsonb_build_object('file', '20261001006100', 'label', 'Quanh đây: runner gần bạn (ô ~1 km), kết nối, rủ chạy, buổi chạy công khai, chặn / báo cáo',
       'ok', to_regprocedure('public.nearby_runners(jsonb)') is not null),
     jsonb_build_object('file', '20261001006200', 'label', 'RaceHub Knowledge: kiến thức & tin tức, CMS có duyệt chuyên môn, tiến độ đọc, chuỗi bài → huy hiệu',
@@ -178,7 +180,9 @@ begin
       'ok', to_regprocedure('private.activity_overlap_guard()') is not null
             and exists (select 1 from pg_trigger t where t.tgname = 'trg_ac_activity_overlap' and t.tgrelid = 'public.activities'::regclass)),
     jsonb_build_object('file', '20261001010000', 'label', 'Chống gian lận GPS V1: mất GPS một đoạn vẫn tính đủ km, điểm nhảy không cộng km, chỉ giữ bài có dấu hiệu rõ',
-      'ok', (private.ops_defaults()->'antiCheat') ? 'gapReviewPct'));
+      'ok', (private.ops_defaults()->'antiCheat') ? 'gapReviewPct'),
+    jsonb_build_object('file', '20261001010100', 'label', 'Vá sau nghiệm thu: thu hồi quyền ghi thừa trên 9 bảng, chống spam yêu cầu báo giá',
+      'ok', not has_table_privilege('anon', 'public.partners', 'insert') and to_regclass('public.org_leads_user_idx') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

@@ -1,7 +1,7 @@
--- RaceHub: gộp 65 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 66 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -18331,6 +18331,59 @@ revoke all on function private.ops_defaults(), private.valid_ops(jsonb) from pub
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001010100_qa_hardening.sql
+-- ===================================================================
+-- 010100: VÁ SAU NGHIỆM THU
+-- 1. Chín bảng tạo sau này còn quyền ghi mặc định (INSERT / UPDATE / DELETE) cho anon và authenticated. RLS không có luật ghi
+--    nên thực tế đã bị chặn, nhưng thu hồi để hai lớp bảo vệ: mọi thao tác ghi chỉ đi qua RPC đã kiểm tra quyền.
+-- 2. Yêu cầu báo giá Doanh nghiệp (gửi được khi chưa đăng nhập): trước chỉ giới hạn theo số điện thoại → đổi số là gửi được
+--    hàng loạt, spam thông báo tới admin. Thêm giới hạn 5 / ngày mỗi tài khoản và 20 / giờ cho toàn bộ khách chưa đăng nhập.
+-- Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT, không RETURNING INTO. Chạy lại an toàn.
+
+revoke insert, update, delete, truncate on public.challenge_honor_prefs, public.challenge_honorees, public.challenge_honors,
+  public.item_promo_redemptions, public.item_promotions, public.partners, public.voucher_campaigns, public.voucher_codes,
+  public.voucher_grants from anon, authenticated;
+
+create index if not exists org_leads_user_idx on public.org_leads (user_id, created_at desc);
+
+create or replace function public.request_enterprise_quote(p jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_phone text := regexp_replace(trim(coalesce(p->>'phone', '')), '\s+', ' ', 'g');
+  v_id uuid;
+  a record;
+begin
+  if char_length(trim(coalesce(p->>'contact_name', ''))) < 2 then raise exception 'NAME_REQUIRED'; end if;
+  if char_length(trim(coalesce(p->>'org_name', ''))) < 2 then raise exception 'ORG_NAME_REQUIRED'; end if;
+  if v_phone !~ '^[0-9+ .()-]{8,20}$' then raise exception 'INVALID_PHONE'; end if;
+  if (select count(*) from public.org_leads l where l.phone = v_phone and l.created_at > now() - interval '1 day') >= 3 then
+    raise exception 'RATE_LIMITED';
+  end if;
+  -- 010100: đổi số điện thoại để gửi hàng loạt → giới hạn thêm theo tài khoản và tổng số yêu cầu chưa đăng nhập
+  if auth.uid() is not null
+     and (select count(*) from public.org_leads l where l.user_id = auth.uid() and l.created_at > now() - interval '1 day') >= 5 then
+    raise exception 'RATE_LIMITED';
+  end if;
+  if auth.uid() is null
+     and (select count(*) from public.org_leads l where l.user_id is null and l.created_at > now() - interval '1 hour') >= 20 then
+    raise exception 'RATE_LIMITED';
+  end if;
+  v_id := gen_random_uuid();
+  insert into public.org_leads (id, user_id, contact_name, org_name, kind, size, phone, email, note)
+  values (v_id, auth.uid(), left(trim(p->>'contact_name'), 80), left(trim(p->>'org_name'), 120),
+          case when p->>'kind' in ('COMPANY', 'FEDERATION', 'SCHOOL', 'OTHER') then p->>'kind' else 'OTHER' end,
+          case when coalesce(p->>'size', '') ~ '^[0-9]{1,7}$' then greatest((p->>'size')::int, 1) end, v_phone,
+          nullif(left(trim(coalesce(p->>'email', '')), 120), ''), nullif(left(trim(coalesce(p->>'note', '')), 1000), ''));
+  for a in select pr.id from public.profiles pr where pr.role = 'SYSTEM_ADMIN' loop
+    perform private.notify(a.id, null, 'ENTERPRISE_LEAD', 'Yêu cầu báo giá Doanh nghiệp: ' || left(trim(p->>'org_name'), 80),
+      left(trim(p->>'contact_name'), 80) || ' · ' || v_phone, '/admin?tab=enterprise', auth.uid(), true);
+  end loop;
+  return jsonb_build_object('id', v_id);
+end $$;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -18423,7 +18476,9 @@ begin
     jsonb_build_object('file', '20261001005900', 'label', 'Bộ đồng phục: áo + quần + tất + giày, họa tiết, mặc cả bộ',
       'ok', to_regprocedure('private.clean_design(jsonb, text)') is not null),
     jsonb_build_object('file', '20261001006000', 'label', 'Bộ sưu tập nhân vật (dáng) + thiết kế in kéo thả, độ đậm màu, ảnh vải',
-      'ok', to_regprocedure('private.character_bodies()') is not null),
+      'ok', to_regprocedure('private.character_bodies()') is not null))
+  -- PostgreSQL giới hạn 100 tham số mỗi hàm → danh sách chia thành nhiều mảng rồi nối lại
+  || jsonb_build_array(
     jsonb_build_object('file', '20261001006100', 'label', 'Quanh đây: runner gần bạn (ô ~1 km), kết nối, rủ chạy, buổi chạy công khai, chặn / báo cáo',
       'ok', to_regprocedure('public.nearby_runners(jsonb)') is not null),
     jsonb_build_object('file', '20261001006200', 'label', 'RaceHub Knowledge: kiến thức & tin tức, CMS có duyệt chuyên môn, tiến độ đọc, chuỗi bài → huy hiệu',
@@ -18505,7 +18560,9 @@ begin
       'ok', to_regprocedure('private.activity_overlap_guard()') is not null
             and exists (select 1 from pg_trigger t where t.tgname = 'trg_ac_activity_overlap' and t.tgrelid = 'public.activities'::regclass)),
     jsonb_build_object('file', '20261001010000', 'label', 'Chống gian lận GPS V1: mất GPS một đoạn vẫn tính đủ km, điểm nhảy không cộng km, chỉ giữ bài có dấu hiệu rõ',
-      'ok', (private.ops_defaults()->'antiCheat') ? 'gapReviewPct'));
+      'ok', (private.ops_defaults()->'antiCheat') ? 'gapReviewPct'),
+    jsonb_build_object('file', '20261001010100', 'label', 'Vá sau nghiệm thu: thu hồi quyền ghi thừa trên 9 bảng, chống spam yêu cầu báo giá',
+      'ok', not has_table_privilege('anon', 'public.partners', 'insert') and to_regclass('public.org_leads_user_idx') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
