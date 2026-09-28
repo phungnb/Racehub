@@ -33,7 +33,7 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
 > ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
-> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 009700** + chạy lại 003500),
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 009800** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
 >
@@ -143,6 +143,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001009500_draw_sources.sql` | **Quay thưởng**: quay cho người **đã điểm danh tại một buổi**, hoặc **dán danh sách tên** (khách mời, người chưa có tài khoản); **nhà tài trợ** (tên + logo) trên màn hình quay và nội dung công bố | Chạy lại 3500 |
 | `20261001009600_club_dashboard_recap.sql` | **Bảng điều khiển ban quản trị** (tab Quản trị của CLB): đơn chờ duyệt, người 30 ngày chưa chạy, tuần này so với tuần trước, quỹ, lịch, thử thách, quay thưởng, top điểm; **tổng kết tuần + tháng** tự động (bật / tắt, "Đăng ngay"). Cron `/api/cron/club-recap` chạy **hằng ngày** | Chạy lại 3500 |
 | `20261001009700_review_scope_fix.sql` | **VÁ CHỐNG GIAN LẬN**: ngoài thử thách chỉ tự duyệt bài nghi vấn **mức Thấp** (admin chỉnh ngưỡng ở Chính sách vận hành); bài mất GPS gần hết quãng / tốc độ giống đi xe → chờ xác minh, chưa cộng Xu / XP; người chạy chọn **"Chỉ tính phần có GPS"**; lời báo cho người chạy viết lại, không lộ ngưỡng | Chạy lại 3500 |
+| `20261001009800_anticheat_all_runs.sql` | **Chống gian lận cho mọi bài chạy**: bỏ hẳn ngoại lệ "không thi đấu thì tự duyệt" — bài nghi vấn của ai cũng chờ xác minh, chưa cộng Xu / XP (ngưỡng tự duyệt mặc định 0, admin chỉnh ở Chính sách vận hành, áp như nhau cho mọi người); lời báo cho người chạy rút còn một câu ngắn | Chạy lại 3500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

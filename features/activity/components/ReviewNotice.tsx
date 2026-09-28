@@ -23,7 +23,7 @@ export function ReviewNotice({ activityId, status, reason, onResolved, compact }
   const accept = useMutation({
     mutationFn: () => acceptVerifiedDistance(activityId!),
     onSuccess: (r) => {
-      toast[r.status === 'APPROVED' ? 'success' : 'info'](r.status === 'APPROVED' ? `Đã ghi nhận ${formatKm(r.distance_m)} km có tín hiệu GPS` : 'Phần có tín hiệu GPS quá ngắn nên bài không được ghi nhận')
+      toast[r.status === 'APPROVED' ? 'success' : 'info'](r.status === 'APPROVED' ? `Đã ghi nhận ${formatKm(r.distance_m)} km` : 'Không ghi nhận: quãng đường quá ngắn')
       void qc.invalidateQueries({ queryKey: ['activity'] })
       void qc.invalidateQueries({ queryKey: ['activities'] })
       onResolved?.(r)
@@ -32,10 +32,10 @@ export function ReviewNotice({ activityId, status, reason, onResolved, compact }
   })
 
   const v = status === 'APPROVED'
-    ? { icon: CheckCircle2, title: 'Đã ghi nhận bài chạy', tone: 'text-success bg-success/10 border-success/30' }
+    ? { icon: CheckCircle2, title: 'Đã ghi nhận', tone: 'text-success bg-success/10 border-success/30' }
     : status === 'PENDING'
       ? { icon: Clock3, title: 'Đang chờ xác minh', tone: 'text-warning bg-warning/10 border-warning/30' }
-      : { icon: XCircle, title: 'Bài chạy không được ghi nhận', tone: 'text-danger bg-danger/10 border-danger/30' }
+      : { icon: XCircle, title: 'Không ghi nhận', tone: 'text-danger bg-danger/10 border-danger/30' }
   // Bài hợp lệ bình thường không cần giải thích; chỉ hiện ghi chú khi có điều chỉnh (vd. chỉ tính phần có GPS)
   const note = status === 'APPROVED' ? (reason?.startsWith('Chỉ tính phần') ? reason : null) : reason
   const i = info.data
@@ -45,13 +45,11 @@ export function ReviewNotice({ activityId, status, reason, onResolved, compact }
         <v.icon className={compact ? 'size-4' : 'size-12'} aria-hidden />{v.title}
       </p>
       {note && <p className="text-sm text-fg">{note}</p>}
-      {status === 'PENDING' && <p className="text-xs text-fg-muted">Xu, XP và thành tích được cộng khi bài được xác nhận. Bạn sẽ nhận thông báo.</p>}
       {status === 'PENDING' && i?.can_accept_verified && (
         <div className={cn('w-full space-y-1.5 pt-1', compact ? '' : 'max-w-sm')}>
           <Button block variant="secondary" loading={accept.isPending} onClick={() => accept.mutate()}>
-            Chỉ tính phần có GPS ({formatKm(i.verified_distance_m)} km)
+            Chỉ tính phần có GPS · {formatKm(i.verified_distance_m)} km
           </Button>
-          <p className="text-[11px] text-fg-muted">Bỏ {formatKm(i.gap_distance_m)} km mất tín hiệu, ghi nhận ngay phần còn lại.</p>
         </div>
       )}
     </div>

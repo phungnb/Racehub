@@ -160,13 +160,13 @@ begin
   if v_dist < 200 then
     update public.activities set validation_status = 'REJECTED', status = 'REJECTED', updated_at = now(),
            review_detail = coalesce(review_detail, validation_reason),
-           validation_reason = 'Phần có tín hiệu GPS dưới 200 m nên bài không được ghi nhận.'
+           validation_reason = 'Quãng đường có GPS dưới 200 m.'
      where id = a.id;
   else
     update public.activities set distance_m = v_dist, moving_distance_m = v_dist, moving_time_s = v_moving,
            avg_pace_s = case when v_moving > 0 then round(v_moving / (v_dist / 1000.0)) else avg_pace_s end,
            review_detail = coalesce(review_detail, validation_reason),
-           validation_reason = 'Chỉ tính phần có tín hiệu GPS (bỏ ' || replace(round(v_gap / 1000.0, 2)::text, '.', ',') || ' km mất tín hiệu).',
+           validation_reason = 'Chỉ tính phần có GPS.',
            validation_status = 'APPROVED', status = 'READY', updated_at = now()
      where id = a.id;                                   -- APPROVED → trigger thưởng Xu / XP như khi duyệt
   end if;

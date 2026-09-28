@@ -38,7 +38,7 @@ const AC_LABEL: Record<keyof AntiCheatRules, [string, string]> = {
   severeKmh: ['Giữ tốc độ nghiêm trọng', 'km/h'], severeS: ['…liên tục', 'giây'],
   highKmh: ['Giữ tốc độ cao', 'km/h'], highS: ['…liên tục', 'giây'],
   spikeKmh: ['Nhảy điểm GPS nhanh hơn', 'km/h'], spikeMax: ['…quá số lần', 'lần'],
-  autoApproveMaxScore: ['Ngoài thi đấu: tự duyệt bài nghi vấn tới mức (34 = chỉ mức Thấp, 64 = cả Trung bình)', 'điểm'],
+  autoApproveMaxScore: ['Tự duyệt bài nghi vấn có điểm rủi ro tới (0 = kiểm tra mọi bài, khuyên dùng)', 'điểm'],
 }
 
 function NumField({ id, label, unit, hint, value, onChange, limits }: {
@@ -130,7 +130,7 @@ function Editor({ current, onGo }: { current: OpsPolicy; onGo: (tab: string) => 
         </div>
       </Section>
 
-      <Section title="Ngưỡng chống gian lận" hint="Bài vượt ngưỡng chờ duyệt. Ngoài thử thách / giải / chiến dịch chỉ tự duyệt bài nghi vấn mức thấp (ô cuối). Dùng chung cho bài ghi bằng app và bài từ Strava. Người dùng không xem được các số này.">
+      <Section title="Ngưỡng chống gian lận" hint="Áp cho mọi bài chạy (ghi bằng app và từ Strava). Bài vượt ngưỡng chờ duyệt, chưa cộng Xu / XP. Người dùng không xem được các số này.">
         <div className="grid gap-3 sm:grid-cols-2">
           {(Object.keys(AC_LABEL) as (keyof AntiCheatRules)[]).map((k) => (
             <NumField key={k} id={`ac-${k}`} label={AC_LABEL[k][0]} unit={AC_LABEL[k][1]} value={anti[k]} limits={ANTI_CHEAT_LIMITS[k]}

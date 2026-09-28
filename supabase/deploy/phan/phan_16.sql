@@ -171,7 +171,9 @@ begin
     jsonb_build_object('file', '20261001009600', 'label', 'Bảng điều khiển ban quản trị CLB + tổng kết tuần / tháng tự động',
       'ok', to_regprocedure('public.club_admin_dashboard(uuid)') is not null and to_regprocedure('public.post_monthly_club_recaps()') is not null),
     jsonb_build_object('file', '20261001009700', 'label', 'VÁ CHỐNG GIAN LẬN: không tự duyệt bài nghi vấn từ mức Trung bình, "chỉ tính phần có GPS", lời báo thân thiện',
-      'ok', to_regprocedure('public.accept_verified_distance(uuid)') is not null and private.sc_col('activities', 'review_detail')));
+      'ok', to_regprocedure('public.accept_verified_distance(uuid)') is not null and private.sc_col('activities', 'review_detail')),
+    jsonb_build_object('file', '20261001009800', 'label', 'Chống gian lận cho MỌI bài chạy (không còn tự duyệt khi không thi đấu), lời báo ngắn',
+      'ok', coalesce((private.ops_defaults()->'antiCheat'->>'autoApproveMaxScore')::int, -1) = 0));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

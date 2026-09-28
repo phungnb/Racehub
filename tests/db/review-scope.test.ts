@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import { createDb, asUser } from './load-schema'
 
-// Migration 009700: ngoài thử thách chỉ tự duyệt bài nghi vấn mức thấp; "chỉ tính phần có GPS"; lời báo thân thiện
+// Migration 009700 + 009800: mọi bài nghi vấn chờ xác minh (không còn ngoại lệ ngoài thử thách); "chỉ tính phần có GPS"; lời báo ngắn
 const [RUNNER, OTHER, ADM] = ['00000000-0000-0000-0000-0000000097a1', '00000000-0000-0000-0000-0000000097a2', '00000000-0000-0000-0000-0000000097a3']
 type R = { validation_status: string; validation_reason: string | null; activity_id: string; earned_xp: number; earned_xu: number; distance_m: number }
 type Row = Record<string, any>
@@ -47,7 +47,7 @@ describe('tự duyệt chỉ mức thấp + chỉ tính phần có GPS (009700)'
     const r = await submit([[10, 2], [870, 3.44, true]])
     expect(r.validation_status).toBe('PENDING')
     expect(Number(r.earned_xp)).toBe(0)
-    expect(r.validation_reason).toContain('mất tín hiệu GPS')
+    expect(r.validation_reason).toBe('Mất tín hiệu GPS một đoạn.')
     expect(r.validation_reason).not.toMatch(/Mức nghi vấn|Tự duyệt|trình duyệt/)
     const info = await rpc(db, RUNNER, `select public.activity_review_info($1) as r`, [r.activity_id])
     expect(info).toMatchObject({ status: 'PENDING', can_accept_verified: true })
@@ -67,14 +67,14 @@ describe('tự duyệt chỉ mức thấp + chỉ tính phần có GPS (009700)'
     expect(Number(a.distance_m)).toBeGreaterThan(2500)
     expect(Number(a.distance_m)).toBeLessThan(2900)
     expect(Number(a.earned_xp)).toBeGreaterThan(0)
-    expect(a.reason).toContain('Chỉ tính phần có tín hiệu GPS')
+    expect(a.reason).toBe('Chỉ tính phần có GPS.')
     expect(await fails(rpc(db, RUNNER, `select public.accept_verified_distance($1) as r`, [r.activity_id]))).toContain('NOT_ELIGIBLE')
   })
 
   it('bài có tốc độ giống đi xe: không cho "chỉ tính phần có GPS", phải chờ xác minh', async () => {
     const r = await submit([[600, 3], [120, 12], [600, 3]])
     expect(r.validation_status).toBe('PENDING')
-    expect(r.validation_reason).toContain('tốc độ khác với chạy bộ')
+    expect(r.validation_reason).toBe('Tốc độ có đoạn bất thường.')
     expect(r.validation_reason).not.toContain('km/h')
     expect((await rpc(db, RUNNER, `select public.activity_review_info($1) as r`, [r.activity_id])).can_accept_verified).toBe(false)
   })
@@ -87,5 +87,12 @@ describe('tự duyệt chỉ mức thấp + chỉ tính phần có GPS (009700)'
     await rpc(db, ADM, `select public.admin_publish_ops_policy($1::jsonb) as r`, [JSON.stringify({ antiCheat: { autoApproveMaxScore: 45 } })])
     const g = await submit([[600, 3], [600, 3, true], [300, 3]])
     expect(g.validation_status).toBe('APPROVED')
+  })
+
+  it('Điều khoản sử dụng nói đúng chính sách mới: mọi bài chạy đều được kiểm tra', async () => {
+    const t = (await db.query<{ body: string }>(`select body from public.help_pages where slug = 'terms'`)).rows[0].body
+    expect(t).toContain('Mọi bài chạy đều được hệ thống kiểm tra')
+    expect(t).not.toContain('ghi nhận tự động')
+    expect(t).not.toContain('không thi đấu')
   })
 })

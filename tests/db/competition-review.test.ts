@@ -37,7 +37,7 @@ function track(start: Date, segments: [number, number][]) {
 type R = { validation_status: string; validation_reason: string; activity_id: string; earned_xp: number }
 const fails = async (p: Promise<unknown>) => { try { await p } catch (e) { return (e as Error).message } return 'OK' }
 
-describe('chống gian lận chỉ khi thi đấu + CLB Free 50 thành viên (008500)', () => {
+describe('chống gian lận cho mọi bài (008500 → 009800) + CLB Free 50 thành viên', () => {
   let db: PGlite
   let hoursBack = 60
   // Bài giữ 20 km/h liên tục 3 phút → bộ kiểm tra gắn cờ nghi vấn
@@ -78,12 +78,12 @@ describe('chống gian lận chỉ khi thi đấu + CLB Free 50 thành viên (00
     expect(await row(r.activity_id)).toMatchObject({ review_skipped: false })
   })
 
-  it('bài Strava ngoài thi đấu: nghi vấn mức thấp → tự duyệt, mức cao → chờ; bài nhập tay vẫn chờ duyệt', async () => {
+  it('bài Strava (009800): mọi bài nghi vấn đều chờ, có thi đấu hay không; bài nhập tay vẫn chờ duyệt', async () => {
     const base = { sport_type: 'Run', elapsed_s: 1800, moving_s: 1800, distance_m: 5000, max_speed_mps: 4 }
     const a = await ingest(FREE_RUNNER, 's-1', { ...base, started_at: new Date(Date.now() - 80 * 3600_000).toISOString(),
       risk: { verdict: 'REVIEW', level: 'LOW', score: 30, reason: 'Khác thường ngày' } })
-    expect(a.validation_status).toBe('APPROVED')
-    expect((await row(a.activity_id as string)).review_skipped).toBe(true)
+    expect(a.validation_status).toBe('PENDING')
+    expect((await row(a.activity_id as string)).review_skipped).toBe(false)
     const hi = await ingest(FREE_RUNNER, 's-1b', { ...base, started_at: new Date(Date.now() - 85 * 3600_000).toISOString(),
       risk: { verdict: 'REVIEW', level: 'HIGH', score: 70, reason: 'Nhịp tim không khớp pace' } })
     expect(hi.validation_status).toBe('PENDING')
@@ -110,7 +110,7 @@ describe('chống gian lận chỉ khi thi đấu + CLB Free 50 thành viên (00
     expect(await n(ok.activity_id)).toBe(1)
   })
 
-  it('chạy lại file: bài đang chờ duyệt của người không thi đấu được tự duyệt; người đang thi đấu giữ nguyên', async () => {
+  it('chạy lại file (009800): không còn tự duyệt bài đang chờ của ai', async () => {
     const pending = await db.query<{ id: string }>(`
       insert into public.activities (user_id, title, source, started_at, ended_at, distance_m, moving_distance_m, moving_time_s, elapsed_time_s,
         avg_pace_s, validation_status, validation_reason, status, is_manual)
@@ -122,8 +122,7 @@ describe('chống gian lận chỉ khi thi đấu + CLB Free 50 thành viên (00
     await db.query(`update public.activities set validation_status = 'PENDING', status = 'PROCESSING',
                     validation_reason = 'Mức nghi vấn: Cao. GPS nhảy. Bài được tính sau khi ban quản trị CLB hoặc admin xác minh.' where id in ($1, $2)`, [a, b])
     await db.exec(readFileSync('supabase/migrations/20261001008500_competition_review_plans_menu.sql', 'utf8'))
-    expect(await row(a)).toMatchObject({ validation_status: 'APPROVED', review_skipped: true })
-    expect((await row(a)).earned_xp).toBeGreaterThan(0)
+    expect((await row(a)).validation_status).toBe('PENDING')
     expect((await row(b)).validation_status).toBe('PENDING')
   })
 

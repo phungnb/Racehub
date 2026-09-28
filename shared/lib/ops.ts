@@ -8,7 +8,7 @@ export interface TrackingRules { autoPauseAfterS: number; longStopAskMin: number
 export interface AntiCheatRules {
   dailyRunLimit: number; minPaceMin: number; vehicleKmh: number; vehicleS: number; severeKmh: number; severeS: number
   highKmh: number; highS: number; spikeKmh: number; spikeMax: number
-  /** 009700: ngoài thi đấu chỉ tự duyệt bài nghi vấn có điểm rủi ro ≤ số này (34 = chỉ mức Thấp) */
+  /** 009800: tự duyệt bài nghi vấn có điểm rủi ro ≤ số này, áp như nhau cho mọi bài (0 = không tự duyệt bài nghi vấn nào) */
   autoApproveMaxScore: number
 }
 export interface EnterpriseContent { title: string; subtitle: string; features: { title: string; text: string }[] }
@@ -36,7 +36,7 @@ export const FEATURES: { key: FeatureKey; label: string; hint: string }[] = [
 
 export const DEFAULT_TRACKING: TrackingRules = { autoPauseAfterS: 10, longStopAskMin: 10, longStopAutoStopMin: 30, trimTailMin: 2 }
 export const DEFAULT_ANTI_CHEAT: AntiCheatRules = {
-  dailyRunLimit: 20, minPaceMin: 3, vehicleKmh: 25, vehicleS: 30, severeKmh: 20, severeS: 120, highKmh: 17, highS: 180, spikeKmh: 43, spikeMax: 3, autoApproveMaxScore: 34,
+  dailyRunLimit: 20, minPaceMin: 3, vehicleKmh: 25, vehicleS: 30, severeKmh: 20, severeS: 120, highKmh: 17, highS: 180, spikeKmh: 43, spikeMax: 3, autoApproveMaxScore: 0,
 }
 export const DEFAULT_ENTERPRISE: EnterpriseContent = {
   title: 'Phong trào chạy bộ cho cả tổ chức',

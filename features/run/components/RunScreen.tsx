@@ -390,7 +390,7 @@ function RunResult({ t }: { t: ReturnType<typeof useRunTracker> }) {
         <div><p className="text-xs text-fg-subtle">Quãng đường</p><p className="font-mono tabular text-2xl font-bold">{formatKm(fixed?.distance_m ?? r?.distance_m ?? t.distanceM)} km</p></div>
         <div><p className="text-xs text-fg-subtle">Thời gian chạy</p><p className="font-mono tabular text-2xl font-bold">{formatDuration(t.movingS)}</p></div>
         {pending ? (
-          <p className="col-span-2 text-sm text-fg-muted">Phần thưởng sẽ được cộng khi bài được xác nhận.</p>
+          <p className="col-span-2 text-sm text-fg-muted">Phần thưởng: chờ xác minh</p>
         ) : (
           <>
             <div><p className="text-xs text-fg-subtle">Phần thưởng</p><CoinAmount value={fixed?.earned_xu ?? r?.earned_xu ?? 0} className="text-xl" /></div>

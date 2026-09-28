@@ -66,8 +66,9 @@ Vào **Quản trị → Hệ thống → Chính sách vận hành**. Mỗi lần
   - `submit_and_process_activity` (bài ghi bằng app) và `analyzeRun` (bài từ Strava) đọc chung một bộ ngưỡng.
   - Chỉ admin và máy chủ đọc được các số này.
 
-## Bài nghi vấn ngoài thử thách (009700)
+## Bài nghi vấn (009700, 009800)
 
-- Chỉ tự duyệt bài nghi vấn **mức Thấp** (điểm rủi ro ≤ `antiCheat.autoApproveMaxScore`, mặc định 34). Từ mức Trung bình trở lên: chờ xác minh, chưa cộng Xu / XP / BXH / điểm CLB — dù có thi đấu hay không.
+- **Mọi bài chạy** (ghi bằng app hoặc từ Strava) qua cùng một bộ kiểm tra, có tham gia thử thách hay không — vì bài nào cũng được cộng Xu / XP.
+- Bài có dấu hiệu nghi vấn → chờ xác minh, chưa cộng Xu / XP / BXH / điểm CLB. Ngưỡng tự duyệt `antiCheat.autoApproveMaxScore` mặc định 0 (không tự duyệt bài nghi vấn nào); admin có thể nâng, áp như nhau cho mọi người.
 - Bài chờ vì **mất tín hiệu GPS** (không có dấu hiệu tốc độ bất thường): người chạy bấm **"Chỉ tính phần có GPS"** → bỏ quãng nối thẳng, bài được duyệt ngay với phần đã kiểm chứng (dưới 200 m thì không ghi nhận).
-- Lời báo cho người chạy (`validation_reason`) viết gọn, không lộ ngưỡng phát hiện. Chi tiết kỹ thuật lưu ở `review_detail`, người duyệt (ban quản trị CLB, admin) xem được.
+- Lời báo cho người chạy chỉ một câu ngắn (vd. "Mất tín hiệu GPS một đoạn."), không lộ ngưỡng. Chi tiết kỹ thuật ở `review_detail` cho người duyệt.

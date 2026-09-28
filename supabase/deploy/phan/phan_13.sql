@@ -68,16 +68,8 @@ drop trigger if exists trg_ab_activity_review_scope on public.activities;
 create trigger trg_ab_activity_review_scope before insert on public.activities
   for each row execute function private.activity_review_scope();
 
--- Bài đang chờ duyệt của người không thi đấu → tự duyệt ngay (trigger thưởng Xu / XP chạy như khi duyệt tay).
--- 009700: chỉ bài nghi vấn mức thấp (điểm rủi ro < 35) — chạy lại file này không được duyệt bài giống đi xe / mất GPS gần hết quãng.
-update public.activities a
-   set validation_status = 'APPROVED',
-       status = case when a.status = 'PROCESSING' then 'READY' else a.status end,
-       review_skipped = true,
-       validation_reason = private.review_skipped_reason(a.validation_reason)
- where a.validation_status = 'PENDING' and not coalesce(a.is_manual, false) and a.user_id is not null
-   and coalesce(a.status, '') <> 'DELETED' and a.started_at is not null and coalesce(a.risk_score, 0) < 35
-   and not private.in_competition(a.user_id, a.started_at);
+-- (Bản đầu có bước tự duyệt bài đang chờ của người không thi đấu. Đã bỏ ở 009800: mọi bài chạy đều qua kiểm tra chống gian lận,
+--  nên chạy lại file này không duyệt bài nào.)
 
 -- Bài GPS trong app: trả về trạng thái sau khi trigger xử lý (bản 006600 + đọc lại trạng thái)
 create or replace function public.submit_and_process_activity(
