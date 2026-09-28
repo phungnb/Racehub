@@ -29,7 +29,7 @@ export function UsersTab() {
   )
 }
 
-function UserDetail({ id }: { id: string }) {
+export function UserDetail({ id }: { id: string }) {
   const q = useQuery({ queryKey: ['admin', 'user', id], queryFn: () => adminUserDetail(id) })
   if (q.isPending) return <Skeleton className="h-96" />
   if (q.isError || !q.data) return <ErrorState message={consoleErrorMessage(q.error, 'Không tải được hồ sơ.')} error={q.error} onRetry={() => void q.refetch()} />

@@ -2,7 +2,7 @@
 
 import { useSearchParams } from 'next/navigation'
 import { useState } from 'react'
-import { Activity, BookOpen, Link2, LifeBuoy, ShieldAlert, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, Building2, FlaskConical, SlidersHorizontal, type LucideIcon } from 'lucide-react'
+import { Activity, Fingerprint, BookOpen, Link2, LifeBuoy, ShieldAlert, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, Building2, FlaskConical, SlidersHorizontal, type LucideIcon } from 'lucide-react'
 import { ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { adminErrorMessage } from '../api/adminApi'
@@ -26,6 +26,7 @@ import { CupReviewList } from '@/features/cup'
 import type { AdminInbox } from '../api/consoleApi'
 import { InboxPanel, useAdminInbox } from './console/InboxPanel'
 import { UsersTab } from './console/UsersTab'
+import { RiskTab } from './console/RiskTab'
 import { ChallengesTab } from './console/ChallengesTab'
 import { AuditTab } from './console/AuditTab'
 import { ReportsTab } from './console/ReportsTab'
@@ -38,14 +39,14 @@ import { HelpAdminTab } from '@/features/help'
 import { EnterpriseAdminTab } from '@/features/org'
 import { DrawPanel } from '@/features/draw'
 
-type Tab = 'overview' | 'metrics' | 'users' | 'review' | 'reports' | 'challenges' | 'clubs' | 'cups' | 'partners' | 'organizers' | 'content' | 'help' | 'bib'
+type Tab = 'overview' | 'metrics' | 'users' | 'risk' | 'review' | 'reports' | 'challenges' | 'clubs' | 'cups' | 'partners' | 'organizers' | 'content' | 'help' | 'bib'
   | 'enterprise' | 'draws' | 'orders' | 'plans' | 'promos' | 'quests' | 'gifts' | 'items' | 'grant' | 'passes' | 'policy' | 'system' | 'audit' | 'strava' | 'gps' | 'ops'
 type Badge = keyof AdminInbox
 const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; label: string; icon: LucideIcon; badge?: Badge }[] }[] = [
   { id: 'home', label: 'Tổng quan', icon: LayoutDashboard, tabs: [
     { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard }, { id: 'metrics', label: 'Chỉ số', icon: BarChart3 }] },
   { id: 'people', label: 'Người dùng', icon: Users, tabs: [
-    { id: 'users', label: 'Người dùng', icon: Users }, { id: 'review', label: 'Duyệt bài chạy', icon: CheckCircle2, badge: 'reviews' },
+    { id: 'users', label: 'Người dùng', icon: Users }, { id: 'risk', label: 'Tài khoản bất thường', icon: Fingerprint }, { id: 'review', label: 'Duyệt bài chạy', icon: CheckCircle2, badge: 'reviews' },
     { id: 'reports', label: 'Báo cáo', icon: ShieldAlert, badge: 'reports' }] },
   { id: 'community', label: 'Cộng đồng', icon: Trophy, tabs: [
     { id: 'challenges', label: 'Thử thách', icon: Trophy }, { id: 'clubs', label: 'CLB Pro', icon: Crown }, { id: 'cups', label: 'Thách đấu CLB', icon: Swords, badge: 'cups' },
@@ -119,6 +120,7 @@ export function AdminConsole() {
       {tab === 'overview' && <InboxPanel onGo={setTab} />}
       {tab === 'system' ? <SystemTab />
         : tab === 'users' ? <UsersTab />
+        : tab === 'risk' ? <RiskTab />
         : tab === 'challenges' ? <ChallengesTab />
         : tab === 'audit' ? <AuditTab />
         : tab === 'strava' ? <StravaTab />

@@ -35,7 +35,7 @@ export function RaceDetailScreen({ id }: { id: string }) {
   const phase = racePhase(r, now)
   return (
     <div className="space-y-5 pb-6 animate-fade-in">
-      <Link href="/races" className="inline-flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg"><ArrowLeft className="size-4" aria-hidden />Giải chạy ảo</Link>
+      <Link href="/races" className="inline-flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg"><ArrowLeft className="size-4" aria-hidden />Giải chạy</Link>
       <div className="rounded-[var(--radius-card)] border border-border bg-gradient-to-br from-brand/20 via-surface-2 to-surface p-4">
         <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', PHASE[phase].tone)}>{PHASE[phase].label}</span>
         <h1 className="mt-2 text-2xl font-bold leading-tight">{r.title}</h1>

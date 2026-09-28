@@ -72,3 +72,18 @@ export const AUDIT_LABEL: Record<string, string> = {
   SYSTEM_NOTICE: 'Bật thông báo hệ thống', SYSTEM_NOTICE_OFF: 'Tắt thông báo hệ thống', RACE_ORGANIZER: 'Quyền tổ chức giải', PUSH_TEST: 'Thử thông báo đẩy',
 }
 export const auditLabel = (a: string) => AUDIT_LABEL[a] ?? a.replace(/_/g, ' ').toLowerCase()
+
+/** Tài khoản bất thường (migration 010300): dấu hiệu dùng chung tài khoản / nuôi nhiều tài khoản / ăn gian Xu */
+export type RiskFlagCode = 'TWO_PLACES' | 'SHARED_DEVICE' | 'OVERLAP' | 'REFERRAL_FARM' | 'SUSPICIOUS'
+export interface AccountRisk {
+  user_id: string; name: string; avatar_url: string | null; email: string | null; banned: boolean; score: number
+  flags: { code: RiskFlagCode; count: number }[]
+}
+export const adminAccountRisks = (days: number) => call<AccountRisk[]>('admin_account_risks', { p_days: days })
+export const RISK_FLAG: Record<RiskFlagCode, { label: string; hint: string }> = {
+  TWO_PLACES: { label: 'Hai nơi cùng lúc', hint: 'Hai bài chạy cùng giờ, điểm xuất phát cách nhau hơn 2 km — nhiều khả năng hai người dùng chung tài khoản.' },
+  SHARED_DEVICE: { label: 'Chung thiết bị', hint: 'Cùng một điện thoại / trình duyệt đã đăng nhập các tài khoản khác (theo đăng ký thông báo).' },
+  OVERLAP: { label: 'Bài trùng giờ', hint: 'Bài bị loại vì trùng giờ với bài khác của chính tài khoản này.' },
+  REFERRAL_FARM: { label: 'Nghi nuôi lời mời', hint: 'Người được mời đã mang thưởng giới thiệu về nhưng mỗi người chỉ chạy tối đa 1 bài.' },
+  SUSPICIOUS: { label: 'Bài nghi vấn', hint: 'Bài có điểm rủi ro cao (tốc độ đi xe, GPS bất thường…) bị giữ hoặc bị từ chối.' },
+}

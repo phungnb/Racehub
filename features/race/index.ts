@@ -1,4 +1,4 @@
-// Cổng công khai của module race (giải chạy ảo). Code ngoài module chỉ import từ '@/features/race'.
+// Cổng công khai của module race (giải chạy). Code ngoài module chỉ import từ '@/features/race'.
 export { RacesScreen } from './components/RacesScreen'
 export { RaceDetailScreen } from './components/RaceDetailScreen'
 export { CreateRaceScreen } from './components/CreateRaceScreen'

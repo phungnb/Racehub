@@ -221,7 +221,7 @@ export const WALLET_LABEL: Record<string, string> = {
   CLUB_FUND_TOPUP: 'Nạp quỹ CLB', IAP_TOPUP_VND: 'Nạp Xu',
   REFERRAL_INVITER: 'Thưởng giới thiệu', REFERRAL_REFEREE: 'Thưởng được mời', OPENING_BALANCE: 'Số dư đầu kỳ',
   GIFT: 'Tặng quà', XU_PURCHASE: 'Nạp Xu', XU_PURCHASE_BONUS: 'Tặng thêm khi nạp', RATE_CONVERSION: 'Đổi quy ước 1 Xu = 100đ',
-  GAME_COMEBACK: 'Chào mừng trở lại', PROMO: 'Khuyến mãi', RACE_FEE: 'Phí tạo giải chạy ảo', LEVEL_UP_XU: 'Thưởng lên cấp', CHECKIN: 'Điểm danh',
+  GAME_COMEBACK: 'Chào mừng trở lại', PROMO: 'Khuyến mãi', RACE_FEE: 'Phí tạo giải chạy', LEVEL_UP_XU: 'Thưởng lên cấp', CHECKIN: 'Điểm danh',
 }
 export const walletLabel = (type: string) => WALLET_LABEL[type] ?? 'Giao dịch'
 

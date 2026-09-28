@@ -51,7 +51,7 @@ export default function ReferralPage({ params }: PageProps<'/join/[code]'>) {
           <ul className="space-y-2 text-left text-sm">
             <li className="flex gap-3"><Footprints className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />Ghi bài chạy bằng app hoặc tự đồng bộ từ Strava, Garmin, COROS…</li>
             <li className="flex gap-3"><Users className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />Vào CLB, chat, thử thách đội cùng bạn bè</li>
-            <li className="flex gap-3"><Trophy className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />Lên cấp, nhận Xu, huy hiệu, giải chạy ảo có BIB & chứng nhận</li>
+            <li className="flex gap-3"><Trophy className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />Lên cấp, nhận Xu, huy hiệu, giải chạy có BIB & chứng nhận</li>
             {p.referee_xu > 0 && <li className="flex gap-3"><Gift className="mt-0.5 size-4 shrink-0 text-coin" aria-hidden />
               <span>Quà chào mừng <b className="text-coin">{p.referee_xu} Xu</b> khi bạn chạy đủ {p.min_km} km đầu tiên</span></li>}
           </ul>

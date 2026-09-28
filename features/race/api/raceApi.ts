@@ -1,4 +1,4 @@
-// Giải chạy ảo (migration 002700)
+// Giải chạy (migration 002700)
 import { prepareImage } from '@/shared/lib/image'
 import { supabase } from '@/shared/lib/supabase'
 import type { BibDesign, StoredDesign } from '../model/bib'
@@ -145,7 +145,7 @@ export async function uploadRaceImage(raceId: string, file: File): Promise<strin
 const MESSAGES: Record<string, string> = {
   FORBIDDEN: 'Bạn không có quyền làm việc này.',
   APP_OUTDATED: 'Ứng dụng vừa được cập nhật — tải lại trang rồi lưu lại thiết kế.',
-  RACE_ORGANIZER_REQUIRED: 'Chỉ CLB hoặc cá nhân được RaceHub cấp quyền mới tạo được giải chạy ảo. Liên hệ admin để đăng ký.',
+  RACE_ORGANIZER_REQUIRED: 'Chỉ CLB hoặc cá nhân được RaceHub cấp quyền mới tạo được giải chạy. Liên hệ admin để đăng ký.',
   CAPACITY_REQUIRED: 'Chọn quy mô (số VĐV tối đa) — phí tạo giải tính theo quy mô.',
   INSUFFICIENT_BALANCE: 'Ví của bạn không đủ Xu trả phí tạo giải.',
   INSUFFICIENT_TREASURY: 'Quỹ CLB không đủ Xu trả phí tạo giải.',

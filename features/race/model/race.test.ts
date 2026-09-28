@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { canRegister, dashboardCsv, distanceLabel, racePace, racePhase, raceTime } from './race'
 
-describe('giải chạy ảo', () => {
+describe('giải chạy', () => {
   const r = { status: 'PUBLISHED' as const, start_at: '2026-10-10T00:00:00Z', end_at: '2026-10-20T00:00:00Z', reg_close_at: '2026-10-15T00:00:00Z' }
   it('trạng thái giải và hạn đăng ký', () => {
     expect(racePhase(r, Date.parse('2026-10-01T00:00:00Z'))).toBe('UPCOMING')
