@@ -5,6 +5,7 @@ import { AdminEditLink, HelpBody, MenuDrawer, type HelpPage } from '@/features/h
 import { loadHelpPage } from '@/shared/lib/help-page-server'
 import { loadOps, loadPlanFacts } from '@/shared/lib/ops-server'
 import { BackLink } from '@/shared/ui/BackLink'
+import { StatusBarScrim } from '@/shared/ui/StatusBarScrim'
 
 export const metadata: Metadata = {
   title: 'RaceHub Doanh nghiệp',
@@ -17,6 +18,7 @@ export default async function EnterprisePage() {
   const [more, ops, facts] = await Promise.all([loadHelpPage<HelpPage>('doanh-nghiep'), loadOps(), loadPlanFacts()])
   return (
     <>
+      <StatusBarScrim />
       <nav className="mx-auto flex max-w-3xl items-center gap-1 px-4 pt-[max(env(safe-area-inset-top),0.5rem)]">
         <MenuDrawer className="-ml-2" />
         <Link href="/" className="text-lg font-extrabold tracking-wide">RACE<span className="text-brand">HUB</span></Link>

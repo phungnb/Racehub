@@ -11,7 +11,7 @@ import { BottomTabBar } from './_components/BottomTabBar'
 import { FullScreenMessage } from './_components/FullScreenMessage'
 import { OfflineBanner } from '@/features/pwa'
 import { usePushSync } from '@/features/notification'
-import { PendingRunSync } from '@/features/run'
+import { PendingRunSync, useRunActive } from '@/features/run'
 
 // Khung chung cho mọi màn hình cần đăng nhập
 export default function AppLayout({ children }: LayoutProps<'/'>) {
@@ -19,6 +19,8 @@ export default function AppLayout({ children }: LayoutProps<'/'>) {
   const pathname = usePathname()
   const { session, loading } = useSession()
   const { profile, isError, error, refetch } = useMyProfile()
+  // Đang chạy: ẩn thanh trên / dưới — chạm nhầm lúc chạy không rời màn Chạy
+  const running = useRunActive()
   usePushSync(session?.user.id ?? null)
 
   useEffect(() => {
@@ -41,11 +43,11 @@ export default function AppLayout({ children }: LayoutProps<'/'>) {
     <div className="mx-auto flex min-h-dvh max-w-md flex-col border-x border-border/60">
       <OfflineBanner />
       <PendingRunSync />
-      <TopBar profile={profile} />
+      {!running && <TopBar profile={profile} />}
       <main className="flex-1 px-4 pb-32 pt-4">
         {isError ? <ErrorState message="Không tải được hồ sơ của bạn." error={error} onRetry={() => refetch()} /> : children}
       </main>
-      <BottomTabBar />
+      {!running && <BottomTabBar />}
     </div>
   )
 }

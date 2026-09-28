@@ -10,7 +10,7 @@ export const routes = {
   run: '/run',
   clubs: '/clubs',
   club: (id: string) => `/clubs/${encodeURIComponent(id)}`,
-  clubTab: (id: string, tab: 'chat' | 'challenges' | 'leaderboard' | 'members' | 'treasury' | 'settings' | 'photos' | 'hall' | 'shop' | 'exchange' | 'settings') => `/clubs/${encodeURIComponent(id)}/${tab}`,
+  clubTab: (id: string, tab: 'chat' | 'challenges' | 'leaderboard' | 'members' | 'treasury' | 'settings' | 'photos' | 'hall' | 'shop' | 'exchange' | 'settings' | 'admin') => `/clubs/${encodeURIComponent(id)}/${tab}`,
   notifications: '/notifications',
   orgs: '/orgs',
   org: (id: string) => `/orgs/${encodeURIComponent(id)}`,

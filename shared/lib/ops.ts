@@ -8,15 +8,22 @@ export interface TrackingRules { autoPauseAfterS: number; longStopAskMin: number
 export interface AntiCheatRules {
   dailyRunLimit: number; minPaceMin: number; vehicleKmh: number; vehicleS: number; severeKmh: number; severeS: number
   highKmh: number; highS: number; spikeKmh: number; spikeMax: number
+  /** 009800: tự duyệt bài nghi vấn có điểm rủi ro ≤ số này, áp như nhau cho mọi bài (0 = không tự duyệt bài nghi vấn nào) */
+  autoApproveMaxScore: number
+  /** 010000: mất GPS chỉ giữ bài khi phần nối thẳng chiếm hơn bấy nhiêu % quãng đường (100 = không bao giờ giữ vì mất GPS) */
+  gapReviewPct: number
 }
 export interface EnterpriseContent { title: string; subtitle: string; features: { title: string; text: string }[] }
+/** Một thẻ gói trên trang /goi (009200): dòng quyền lợi dùng được biến {freeSlots}, {clubMaxMembers}… (xem PLAN_VARS) */
+export interface PlanCardContent { title: string; subtitle: string; perks: string[]; note: string }
+export interface PlanContent { free: PlanCardContent; clubFree: PlanCardContent; org: PlanCardContent }
 export interface OpsPolicy {
   version: number
   features: Record<FeatureKey, boolean>
   tracking: TrackingRules
   /** chỉ admin / máy chủ nhận được */
   antiCheat?: AntiCheatRules
-  content: { enterprise: EnterpriseContent }
+  content: { enterprise: EnterpriseContent; plans: PlanContent }
 }
 
 export const FEATURES: { key: FeatureKey; label: string; hint: string }[] = [
@@ -31,7 +38,7 @@ export const FEATURES: { key: FeatureKey; label: string; hint: string }[] = [
 
 export const DEFAULT_TRACKING: TrackingRules = { autoPauseAfterS: 10, longStopAskMin: 10, longStopAutoStopMin: 30, trimTailMin: 2 }
 export const DEFAULT_ANTI_CHEAT: AntiCheatRules = {
-  dailyRunLimit: 20, minPaceMin: 3, vehicleKmh: 25, vehicleS: 30, severeKmh: 20, severeS: 120, highKmh: 17, highS: 180, spikeKmh: 43, spikeMax: 3,
+  dailyRunLimit: 20, minPaceMin: 3, vehicleKmh: 25, vehicleS: 30, severeKmh: 20, severeS: 120, highKmh: 17, highS: 180, spikeKmh: 43, spikeMax: 3, autoApproveMaxScore: 0, gapReviewPct: 50,
 }
 export const DEFAULT_ENTERPRISE: EnterpriseContent = {
   title: 'Phong trào chạy bộ cho cả tổ chức',
@@ -47,11 +54,105 @@ export const DEFAULT_ENTERPRISE: EnterpriseContent = {
     { title: 'Chống gian lận, tôn trọng riêng tư', text: 'Chỉ tính bài chạy hợp lệ (GPS, pace, duyệt); người chạy tắt chia sẻ bài nào thì bài đó không vào bảng.' },
   ],
 }
+export const DEFAULT_PLAN_CONTENT: PlanContent = {
+  free: {
+    title: 'Miễn phí', subtitle: '',
+    perks: [
+      'Ghi bài bằng GPS trong app hoặc tự động từ Strava',
+      'Xu, XP, cấp độ, huy hiệu, nhiệm vụ, nhân vật',
+      'Tham gia thử thách, CLB, giải chạy ảo, tổ chức không giới hạn',
+      'Tạo miễn phí thử thách cá nhân và thử thách nhóm tới {freeSlots} người',
+      'Thử thách đông hơn {freeSlots} người: trả Xu theo quy mô',
+    ],
+    note: 'VIP không tăng km, XP hay thứ hạng — mọi runner thi đấu công bằng.',
+  },
+  clubFree: {
+    title: 'CLB Miễn phí', subtitle: '',
+    perks: [
+      'Tối đa {clubMaxMembers} thành viên',
+      '{clubMaxOpen} thử thách nội bộ miễn phí cùng lúc, mỗi thử thách ≤ {clubMaxSlots} người (cần ≥ {clubMinActive} thành viên có bài chạy trong {activeDays} ngày)',
+      'Tối đa {clubCaptains} quản trị viên',
+      'Bảng tin, chat, lịch, điểm danh QR, quỹ VietQR, bảng xếp hạng',
+      'Ngày hội ×2/×3, đại sảnh danh vọng, cửa hàng CLB, giao lưu CLB',
+    ],
+    note: 'CLB miễn phí vượt số thành viên vẫn giữ đủ người, chỉ chưa duyệt thêm người mới cho tới khi nâng Pro.',
+  },
+  org: {
+    title: 'RaceHub Doanh nghiệp', subtitle: 'Báo giá riêng theo số người và thời hạn',
+    perks: [
+      'Chiến dịch sức khoẻ cho cả tổ chức (km, số buổi, số ngày chạy)',
+      'Bảng xếp hạng phòng ban / chi nhánh / CLB — tổng và bình quân đầu người',
+      'Nhập danh sách nhân viên từ Excel, tự duyệt email công ty, đơn vị nhiều cấp',
+      'Báo cáo theo mã nhân viên, xuất Excel',
+      'Chốt kết quả, chứng nhận hoàn thành, quay thưởng minh bạch',
+      'Quản lý nhiều CLB, tài trợ CLB Pro cho cả hệ thống',
+    ],
+    note: '',
+  },
+}
+
+/** Biến dùng trong dòng quyền lợi: app thay bằng số đang áp dụng (Kinh tế / Gói & giá). Biến hideZero = 0 (không có / không giới hạn) thì ẩn cả dòng. */
+export const PLAN_VARS = [
+  { key: 'freeSlots', label: 'Quy mô thử thách tạo miễn phí', hideZero: true },
+  { key: 'clubMaxMembers', label: 'Thành viên tối đa CLB miễn phí', hideZero: true },
+  { key: 'clubMaxOpen', label: 'Thử thách CLB miễn phí cùng lúc', hideZero: true },
+  { key: 'clubMaxSlots', label: 'Quy mô thử thách CLB miễn phí', hideZero: true },
+  { key: 'clubMinActive', label: 'Thành viên đang chạy tối thiểu', hideZero: false },
+  { key: 'activeDays', label: 'Số ngày tính "đang chạy"', hideZero: false },
+  { key: 'clubCaptains', label: 'Quản trị viên CLB miễn phí', hideZero: true },
+  { key: 'proMaxOpen', label: 'Thử thách CLB Pro cùng lúc', hideZero: true },
+  { key: 'proMaxSlots', label: 'Quy mô thử thách CLB Pro', hideZero: true },
+] as const
+export type PlanVars = Record<(typeof PLAN_VARS)[number]['key'], number>
+
+const fmt = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+const HIDE_ZERO = new Set<string>(PLAN_VARS.filter((v) => v.hideZero).map((v) => v.key))
+/** Thay biến trong các dòng quyền lợi; dòng có biến hideZero bằng 0 (vd. không giới hạn thành viên) bị ẩn */
+export function renderPerks(lines: string[], vars: Partial<PlanVars>): string[] {
+  return lines.flatMap((line) => {
+    let hide = false
+    const out = line.replace(/\{(\w+)\}/g, (m, k: string) => {
+      const v = (vars as Record<string, number | undefined>)[k]
+      if (v === undefined) return m
+      if (!v && HIDE_ZERO.has(k)) hide = true
+      return fmt(v)
+    })
+    return hide ? [] : [out]
+  })
+}
+
+const str = (v: unknown, d: string) => (typeof v === 'string' ? v : d)
+function toCard(raw: unknown, d: PlanCardContent): PlanCardContent {
+  const r = (raw ?? {}) as Record<string, unknown>
+  const perks = Array.isArray(r.perks) ? r.perks.filter((x): x is string => typeof x === 'string') : []
+  return { title: str(r.title, '') || d.title, subtitle: str(r.subtitle, d.subtitle), perks: perks.length ? perks : d.perks, note: str(r.note, d.note) }
+}
+export function toPlanContent(raw: unknown): PlanContent {
+  const r = (raw ?? {}) as Record<string, unknown>
+  const d = DEFAULT_PLAN_CONTENT
+  return { free: toCard(r.free, d.free), clubFree: toCard(r.clubFree, d.clubFree), org: toCard(r.org, d.org) }
+}
+
+export const PLAN_CARD_LABEL: Record<keyof PlanContent, string> = { free: 'Cá nhân · Miễn phí', clubFree: 'CLB Miễn phí', org: 'Doanh nghiệp' }
+
+/** Khớp private.valid_plan_card (009200) */
+export function validatePlanContent(p: PlanContent): string | null {
+  for (const k of Object.keys(PLAN_CARD_LABEL) as (keyof PlanContent)[]) {
+    const c = p[k], name = PLAN_CARD_LABEL[k]
+    if (c.title.trim().length < 2 || c.title.length > 60) return `${name}: tên gói cần 2–60 ký tự.`
+    if (c.subtitle.length > 200) return `${name}: mô tả tối đa 200 ký tự.`
+    if (c.note.length > 300) return `${name}: ghi chú tối đa 300 ký tự.`
+    if (!c.perks.length || c.perks.length > 15) return `${name}: cần 1–15 dòng quyền lợi.`
+    if (c.perks.some((x) => x.trim().length < 2 || x.length > 200)) return `${name}: mỗi dòng quyền lợi 2–200 ký tự.`
+  }
+  return null
+}
+
 export const DEFAULT_OPS: OpsPolicy = {
   version: 0,
   features: { nearby: true, market: true, bibMarket: true, knowledge: true, races: true, cups: true, orgs: true },
   tracking: DEFAULT_TRACKING,
-  content: { enterprise: DEFAULT_ENTERPRISE },
+  content: { enterprise: DEFAULT_ENTERPRISE, plans: DEFAULT_PLAN_CONTENT },
 }
 
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d)
@@ -79,6 +180,7 @@ export function toOps(raw: unknown): OpsPolicy {
         subtitle: typeof ent.subtitle === 'string' ? ent.subtitle : DEFAULT_ENTERPRISE.subtitle,
         features: feats.length ? feats : DEFAULT_ENTERPRISE.features,
       },
+      plans: toPlanContent((r.content as Record<string, unknown> | undefined)?.plans),
     },
   }
 }
@@ -89,10 +191,10 @@ export const TRACKING_LIMITS: Record<keyof TrackingRules, [number, number]> = {
 }
 export const ANTI_CHEAT_LIMITS: Record<keyof AntiCheatRules, [number, number]> = {
   dailyRunLimit: [3, 100], minPaceMin: [2, 5], vehicleKmh: [20, 60], vehicleS: [10, 600], severeKmh: [15, 40], severeS: [30, 1800],
-  highKmh: [12, 35], highS: [30, 3600], spikeKmh: [30, 150], spikeMax: [1, 100],
+  highKmh: [12, 35], highS: [30, 3600], spikeKmh: [30, 150], spikeMax: [1, 100], autoApproveMaxScore: [0, 100], gapReviewPct: [10, 100],
 }
 
-export function validateOps(o: Pick<OpsPolicy, 'tracking' | 'content'> & { antiCheat?: AntiCheatRules }): string | null {
+export function validateOps(o: Pick<OpsPolicy, 'tracking'> & { content: Pick<OpsPolicy['content'], 'enterprise'>; antiCheat?: AntiCheatRules }): string | null {
   for (const [k, [lo, hi]] of Object.entries(TRACKING_LIMITS)) {
     const v = o.tracking[k as keyof TrackingRules]
     if (!(v >= lo && v <= hi)) return `Ghi bài chạy: giá trị "${k}" phải từ ${lo} đến ${hi}.`

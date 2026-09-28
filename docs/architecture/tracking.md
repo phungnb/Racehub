@@ -65,3 +65,32 @@ Vào **Quản trị → Hệ thống → Chính sách vận hành**. Mỗi lần
 - **Ngưỡng chống gian lận:** số bài tối đa mỗi ngày, pace nhanh nhất hợp lệ, tốc độ đi xe, giữ tốc độ cao hoặc nghiêm trọng, nhảy điểm GPS.
   - `submit_and_process_activity` (bài ghi bằng app) và `analyzeRun` (bài từ Strava) đọc chung một bộ ngưỡng.
   - Chỉ admin và máy chủ đọc được các số này.
+
+## Bài nghi vấn (009700, 009800)
+
+- **Mọi bài chạy** (ghi bằng app hoặc từ Strava) qua cùng một bộ kiểm tra, có tham gia thử thách hay không — vì bài nào cũng được cộng Xu / XP.
+- Bài có dấu hiệu nghi vấn → chờ xác minh, chưa cộng Xu / XP / BXH / điểm CLB. Ngưỡng tự duyệt `antiCheat.autoApproveMaxScore` mặc định 0 (không tự duyệt bài nghi vấn nào); admin có thể nâng, áp như nhau cho mọi người.
+- Bài chờ vì **mất tín hiệu GPS** (không có dấu hiệu tốc độ bất thường): người chạy bấm **"Chỉ tính phần có GPS"** → bỏ quãng nối thẳng, bài được duyệt ngay với phần đã kiểm chứng (dưới 200 m thì không ghi nhận).
+- Lời báo cho người chạy chỉ một câu ngắn (vd. "Mất tín hiệu GPS một đoạn."), không lộ ngưỡng. Chi tiết kỹ thuật ở `review_detail` cho người duyệt.
+
+## Bài chạy trùng giờ (009900)
+
+- Một tài khoản ghi nhiều bài chồng thời gian (nhiều thiết bị, dùng chung tài khoản, hoặc app + đồng hồ/Strava): **mỗi thời điểm chỉ tính một bài**. Hai bài coi là trùng khi chồng nhau > 60 giây.
+- Bài mới dài hơn tổng các bài trùng giờ đang được tính trên 10% và không nghi vấn → bài mới được tính; các bài cũ chuyển "Không ghi nhận", thu hồi Xu / XP (`private.revoke_run_reward`), nhiệm vụ / huy hiệu / thử thách tự tính lại qua trigger sẵn có.
+- Ngược lại bài mới vẫn được lưu vào lịch sử với lời báo "Trùng giờ với bài chạy khác." (không còn bị bỏ lặng lẽ). Strava / Garmin / COROS trùng giờ mà không dài hơn thì bỏ qua như trước.
+- Trigger `trg_ac_activity_overlap` (BEFORE INSERT, mọi đường ghi bài) khóa theo tài khoản (`pg_advisory_xact_lock`), nên hai máy gửi cùng lúc không lọt cả hai bài. Gửi lại đúng bài cũ vẫn báo `ACTIVITY_DUPLICATE`.
+
+## Chính sách GPS V1 (010000)
+
+Ưu tiên công nhận bài chạy, chỉ giữ bài có dấu hiệu bất thường rõ ràng; admin không duyệt tay từng bài.
+
+| Dấu hiệu | Xử lý |
+|---|---|
+| Mất GPS một đoạn, tốc độ nối thẳng hợp lý | Duyệt, **tính đủ km** (cờ `GPS_GAP` INFO) |
+| Mất GPS mà đoạn nối thẳng > `severeKmh` | Chờ xác minh |
+| Đoạn mất GPS > `gapReviewPct` % bài (mặc định 50, 100 = không giữ) | Chờ xác minh; người chạy có thể chọn "Chỉ tính phần có GPS" |
+| Điểm GPS nhảy ra rồi quay về | Bỏ điểm đó khỏi km; chỉ giữ bài khi > 10% số điểm bị nhảy |
+| Di chuyển nhanh liên tục (đi xe) | Chờ xác minh (không bị nhầm là điểm nhảy) |
+| Số km app gửi lệch tuyến GPS | Chỉ ghi nhận (`DISTANCE_MISMATCH`), km luôn do máy chủ tính |
+| Pace phi thực tế, bài không có GPS, bài nhập tay (Strava) | Chờ xác minh |
+| Trùng giờ / trùng nguồn | Chỉ tính một bài (009900) |

@@ -11,6 +11,9 @@ export interface RunMeta { distance_m: number; moving_s: number; avg_pace_s: num
 export interface RecapMeta {
   week: string; distance_m: number; run_count: number; active_members: number; new_members: number
   top: { user_id: string; name: string; distance_m: number }[]
+  /** 009600: tổng kết tháng, top điểm CLB, buổi chạy nhóm, lượt điểm danh, cột mốc */
+  period?: 'WEEK' | 'MONTH'; points_top?: { user_id: string; name: string; points: number }[]
+  events?: number; checkins?: number; milestones?: number
 }
 
 export interface ChallengeMeta {

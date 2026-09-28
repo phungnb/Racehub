@@ -240,7 +240,7 @@ function RecapCard({ post }: { post: ClubPost }) {
     <Card id={`post-${post.id}`} className="space-y-4 border-xp/30 bg-gradient-to-br from-xp/10 to-transparent">
       <header className="flex items-center gap-2">
         <Trophy className="size-5 text-xp" aria-hidden />
-        <h3 className="font-bold">{post.title ?? 'Tổng kết tuần'}</h3>
+        <h3 className="font-bold">{post.title ?? (m.period === 'MONTH' ? 'Tổng kết tháng' : 'Tổng kết tuần')}</h3>
         <span className="ml-auto text-xs text-fg-subtle">{formatRelative(post.created_at)}</span>
       </header>
       <div className="grid grid-cols-3 gap-2 text-center">
@@ -259,7 +259,18 @@ function RecapCard({ post }: { post: ClubPost }) {
           ))}
         </ol>
       )}
-      {!!m.new_members && <p className="text-sm text-fg-muted">Chào mừng {m.new_members} thành viên mới trong tuần.</p>}
+      {!!m.points_top?.length && (
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-coin">Top điểm CLB</p>
+          <p className="text-sm">{m.points_top.map((t, i) => `${i + 1}. ${t.name} · ${formatNumber(Math.round(Number(t.points)))} điểm`).join('   ')}</p>
+        </div>
+      )}
+      {(!!m.events || !!m.milestones) && (
+        <p className="text-sm text-fg-muted">
+          {m.events ? `${m.events} buổi chạy nhóm · ${formatNumber(m.checkins ?? 0)} lượt điểm danh` : ''}{m.events && m.milestones ? ' · ' : ''}{m.milestones ? `${m.milestones} cột mốc mới` : ''}
+        </p>
+      )}
+      {!!m.new_members && <p className="text-sm text-fg-muted">Chào mừng {m.new_members} thành viên mới trong {m.period === 'MONTH' ? 'tháng' : 'tuần'}.</p>}
     </Card>
   )
 }

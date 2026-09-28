@@ -13,6 +13,7 @@ import { MONTH_LABEL, usePricing, type PaymentAccount, type Plan, type XuPackage
 import { adminErrorMessage, type AccountHit } from '../../api/adminApi'
 import { grantPlan, savePlan, saveXuPackage, setPaymentAccount } from '../../api/commerceApi'
 import { AccountPicker } from '../economy/AccountPicker'
+import { FreePlansEditor } from './FreePlansEditor'
 
 const MONTHS = [1, 3, 6, 12]
 const digits = (v: string) => Number(v.replace(/\D/g, '') || 0)
@@ -22,7 +23,7 @@ function useRefresh() {
   return () => { void qc.invalidateQueries({ queryKey: ['billing'] }); void qc.invalidateQueries({ queryKey: ['admin'] }) }
 }
 
-/** Gói & giá: tài khoản nhận tiền, bảng giá VIP / CLB Pro, lượt tạo mỗi tháng, gói nạp Xu, cấp gói thủ công */
+/** Gói & giá: tài khoản nhận tiền, thẻ gói Miễn phí / Doanh nghiệp, bảng giá VIP / CLB Pro, lượt tạo mỗi tháng, gói nạp Xu, cấp gói thủ công */
 export function PlansTab() {
   const q = usePricing()
   if (q.isPending) return <Skeleton className="h-96" />
@@ -30,6 +31,7 @@ export function PlansTab() {
   return (
     <div className="space-y-6">
       <PaymentForm current={q.data.payment} />
+      <FreePlansEditor />
       <section className="space-y-3">
         <SectionTitle>Bảng giá gói</SectionTitle>
         {q.data.plans.map((p) => <PlanEditor key={p.code + JSON.stringify(p)} plan={p} />)}

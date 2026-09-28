@@ -30,7 +30,7 @@ const today = () => `least(now(), private.vn_start(private.vn_day(now())) + inte
 const run = async (db: PGlite, uid: string, km: number, at = today()) =>
   (await db.query<{ id: string }>(`
     insert into public.activities (user_id, title, source, started_at, ended_at, distance_m, moving_distance_m, moving_time_s, avg_pace_s, validation_status, status)
-    values ($1, 'Chạy', 'DIRECT_GPS', ${at}, ${at} + interval '30 minutes', $2::numeric, $2::numeric, $3::int, 360, 'APPROVED', 'READY') returning id`,
+    values ($1, 'Chạy', 'DIRECT_GPS', ${at}, ${at} + interval '1 minute', $2::numeric, $2::numeric, $3::int, 360, 'APPROVED', 'READY') returning id`,
     [uid, km * 1000, Math.round(km * 360)])).rows[0].id
 const earned = async (db: PGlite, actId: string) => Number((await db.query<{ e: string }>(`select earned_xu as e from public.activities where id = $1`, [actId])).rows[0].e)
 const give = (db: PGlite, acc: string, amount: number, key: string) =>

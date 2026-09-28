@@ -16,6 +16,7 @@ import { activityErrorMessage, type ActivityDetail } from '../api/activities'
 import { useActivityDetail } from '../hooks/useActivityDetail'
 import { compareNotes, decodePolyline, fastestSplit, splitPace, splitsFromPoints, type LatLng, type Split } from '../model/route'
 import { RouteMap } from './RouteMap'
+import { ReviewNotice } from './ReviewNotice'
 import { ShareActivitySheet } from './ShareActivity'
 import { ActivityGpsQuality } from './ActivityGpsQuality'
 
@@ -82,18 +83,8 @@ export function ActivityDetailScreen({ id }: { id: string }) {
         </div>
       )}
 
-      {a.is_mine && a.validation_status === 'PENDING' && (
-        <div className="rounded-2xl border border-warning/40 bg-warning/10 p-3 text-sm">
-          <p className="font-semibold text-warning">Bài đang chờ xác minh</p>
-          {a.validation_reason && <p className="mt-1 text-fg">{a.validation_reason}</p>}
-          <p className="mt-1 text-xs text-fg-muted">Chưa cộng Xu và chưa tính vào thử thách. Bạn sẽ nhận thông báo khi ban quản trị CLB hoặc admin xác minh xong.</p>
-        </div>
-      )}
-      {a.is_mine && a.validation_status === 'REJECTED' && (
-        <div className="rounded-2xl border border-danger/40 bg-danger/10 p-3 text-sm">
-          <p className="font-semibold text-danger">Bài không được ghi nhận</p>
-          {a.validation_reason && <p className="mt-1 text-fg">{a.validation_reason}</p>}
-        </div>
+      {a.is_mine && (a.validation_status === 'PENDING' || a.validation_status === 'REJECTED' || a.validation_reason?.startsWith('Chỉ tính phần')) && (
+        <ReviewNotice compact activityId={a.id} status={a.validation_status} reason={a.validation_reason} />
       )}
 
       {/* Bản đồ */}

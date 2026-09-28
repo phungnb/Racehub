@@ -108,7 +108,8 @@ export interface ComparePlan {
   code: string; name: string; owner_type: 'USER' | 'CLUB'; tier: number; description: string | null
   perks: string[]; prices: { months: number; price_vnd: number }[]; credits: PlanCredit[]
 }
-export interface PlanCompareData { plans: ComparePlan[]; club: ClubChallengePolicy; free_captains: number }
+/** content: nội dung thẻ Miễn phí / CLB Miễn phí / Doanh nghiệp admin soạn (009200); chưa chạy migration thì không có */
+export interface PlanCompareData { plans: ComparePlan[]; club: ClubChallengePolicy; free_captains: number; content?: unknown }
 
 export async function getPlanCompare(): Promise<PlanCompareData> {
   const { data, error } = await supabase.rpc('plan_compare')

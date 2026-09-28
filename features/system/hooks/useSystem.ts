@@ -45,7 +45,10 @@ export function usePublishOps() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ p, note }: { p: Parameters<typeof publishOpsPolicy>[0]; note: string }) => publishOpsPolicy(p, note),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: opsKey }); void qc.invalidateQueries({ queryKey: ['system', 'config-history'] }) },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: opsKey }); void qc.invalidateQueries({ queryKey: ['system', 'config-history'] })
+      void qc.invalidateQueries({ queryKey: ['billing'] })   // thẻ gói trên trang /goi
+    },
   })
 }
 
@@ -61,6 +64,7 @@ export function useRollbackConfig() {
       void qc.invalidateQueries({ queryKey: ['system', 'config-history'] })
       void qc.invalidateQueries({ queryKey: ['admin'] })
       void qc.invalidateQueries({ queryKey: ['economy'] })
+      void qc.invalidateQueries({ queryKey: ['billing'] })
     },
   })
 }

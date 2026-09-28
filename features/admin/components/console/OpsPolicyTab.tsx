@@ -14,8 +14,8 @@ import { consoleErrorMessage } from '../../api/consoleApi'
 
 /** Bản đồ mọi chính sách admin tự đổi được — không phải sửa code */
 const MAP: { tab: string; title: string; text: string }[] = [
-  { tab: 'policy', title: 'Kinh tế Xu & thưởng', text: 'Xu mỗi km, trần / ngày, thưởng lên cấp, giới thiệu bạn, chào mừng trở lại, phí tạo thử thách, hạn mức CLB miễn phí' },
-  { tab: 'plans', title: 'Gói & giá', text: 'Giá VIP / CLB Pro theo kỳ hạn, quyền lợi từng gói, lượt tạo thử thách kèm gói' },
+  { tab: 'policy', title: 'Kinh tế Xu & thưởng', text: 'Xu mỗi km, trần / ngày, thưởng lên cấp, giới thiệu bạn, chào mừng trở lại, phí tạo thử thách, hạn mức CLB miễn phí (thành viên, quản trị viên, thử thách)' },
+  { tab: 'plans', title: 'Gói & giá', text: 'Thẻ gói Miễn phí / CLB Miễn phí / Doanh nghiệp, giá VIP / CLB Pro theo kỳ hạn, quyền lợi, lượt tạo thử thách kèm gói' },
   { tab: 'promos', title: 'Khuyến mãi', text: 'Giảm giá gói, mã khuyến mãi, tặng Xu theo nhóm' },
   { tab: 'quests', title: 'Nhiệm vụ', text: 'Nhiệm vụ ngày / tuần / tháng / sự kiện và phần thưởng' },
   { tab: 'gifts', title: 'Quà tặng', text: 'Danh mục quà, giá Xu' },
@@ -38,7 +38,20 @@ const AC_LABEL: Record<keyof AntiCheatRules, [string, string]> = {
   severeKmh: ['Giữ tốc độ nghiêm trọng', 'km/h'], severeS: ['…liên tục', 'giây'],
   highKmh: ['Giữ tốc độ cao', 'km/h'], highS: ['…liên tục', 'giây'],
   spikeKmh: ['Nhảy điểm GPS nhanh hơn', 'km/h'], spikeMax: ['…quá số lần', 'lần'],
+  autoApproveMaxScore: ['Tự duyệt bài nghi vấn có điểm rủi ro tới (0 = kiểm tra mọi bài, khuyên dùng)', 'điểm'],
+  gapReviewPct: ['Mất GPS: chỉ giữ bài khi đoạn mất chiếm hơn (100 = không giữ)', '%'],
 }
+
+// Nguyên tắc cố định (V1): hiển thị để admin biết hệ thống đang xử lý thế nào, không chỉnh được
+const AC_FIXED: [string, string][] = [
+  ['Tự duyệt bài hợp lý', 'Có'],
+  ['Cho phép mất GPS một đoạn', 'Có — tính đủ quãng đường'],
+  ['Trừ km chỉ vì mất GPS', 'Không'],
+  ['Điểm GPS nhảy xa', 'Không tính vào quãng đường'],
+  ['Bài trùng giờ / trùng nguồn', 'Chỉ tính một bài'],
+  ['Bài nhập tay, bài không có GPS', 'Giữ thưởng, chờ xác minh'],
+  ['Admin duyệt thủ công mọi bài', 'Không — chỉ bài có dấu hiệu rõ'],
+]
 
 function NumField({ id, label, unit, hint, value, onChange, limits }: {
   id: string; label: string; unit: string; hint?: string; value: number; onChange: (v: number) => void; limits: [number, number]
@@ -129,7 +142,12 @@ function Editor({ current, onGo }: { current: OpsPolicy; onGo: (tab: string) => 
         </div>
       </Section>
 
-      <Section title="Ngưỡng chống gian lận" hint="Chỉ áp khi người chạy đang tham gia thử thách / giải / chiến dịch; bài vượt ngưỡng chờ duyệt. Dùng chung cho bài ghi bằng app và bài từ Strava. Người dùng không xem được các số này.">
+      <Section title="Ngưỡng chống gian lận" hint="Áp cho mọi bài chạy (ghi bằng app và từ Strava). Bài vượt ngưỡng chờ duyệt, chưa cộng Xu / XP. Người dùng không xem được các số này.">
+        <dl className="mb-3 divide-y divide-border rounded-xl border border-border text-sm">
+          {AC_FIXED.map(([k, v]) => (
+            <div key={k} className="flex justify-between gap-3 px-3 py-2"><dt className="text-fg-muted">{k}</dt><dd className="text-right font-medium">{v}</dd></div>
+          ))}
+        </dl>
         <div className="grid gap-3 sm:grid-cols-2">
           {(Object.keys(AC_LABEL) as (keyof AntiCheatRules)[]).map((k) => (
             <NumField key={k} id={`ac-${k}`} label={AC_LABEL[k][0]} unit={AC_LABEL[k][1]} value={anti[k]} limits={ANTI_CHEAT_LIMITS[k]}

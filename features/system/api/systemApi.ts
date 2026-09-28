@@ -64,7 +64,8 @@ export async function getOpsPolicy(): Promise<OpsPolicy> {
   return toOps(data)
 }
 
-export async function publishOpsPolicy(p: Partial<Pick<OpsPolicy, 'features' | 'tracking' | 'antiCheat' | 'content'>>, note: string): Promise<number> {
+/** Gửi một phần là đủ: nhóm / thẻ không gửi giữ nguyên bản đang dùng */
+export async function publishOpsPolicy(p: Partial<Pick<OpsPolicy, 'features' | 'tracking' | 'antiCheat'>> & { content?: Partial<OpsPolicy['content']> }, note: string): Promise<number> {
   const { data, error } = await supabase.rpc('admin_publish_ops_policy', { p, p_note: note || null })
   if (error) throw error
   return Number(data)

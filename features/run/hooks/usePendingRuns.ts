@@ -7,7 +7,8 @@ import { toast } from 'sonner'
 import { supabase } from '@/shared/lib/supabase'
 import { describeError } from '@/shared/lib/errors'
 import { formatKm } from '@/shared/lib/format'
-import { loadQueue, updateQueue, QUEUE_KEY } from '../model/recovery'
+import { useSession } from '@/features/auth'
+import { loadQueue, ownedBy, updateQueue, QUEUE_KEY } from '../model/recovery'
 
 const QUEUED = 'rh-run-queued'          // bài mới vào hàng chờ → thử gửi ngay
 const CHANGED = 'rh-run-queue-changed'  // hàng chờ đổi → chỉ cập nhật con số
@@ -21,24 +22,28 @@ const subscribe = (cb: () => void) => {
   window.addEventListener('storage', onStorage)
   return () => { window.removeEventListener(CHANGED, cb); window.removeEventListener(QUEUED, cb); window.removeEventListener('storage', onStorage) }
 }
-const countSnapshot = () => loadQueue().length
-
-/** Số bài chạy đang chờ gửi lên máy chủ (lưu trên máy vì lúc bấm Lưu bị mất mạng) */
-export const usePendingRunCount = () => useSyncExternalStore(subscribe, countSnapshot, () => 0)
+/** Số bài chạy của tài khoản này đang chờ gửi lên máy chủ (lưu trên máy vì lúc bấm Lưu bị mất mạng) */
+export function usePendingRunCount() {
+  const uid = useSession().session?.user.id
+  return useSyncExternalStore(subscribe, () => ownedBy(loadQueue(), uid).length, () => 0)
+}
 
 /**
  * Gắn một lần trong khung app: có mạng lại / mở app / mỗi phút → gửi các bài chạy đang chờ.
+ * Chỉ gửi bài của tài khoản đang đăng nhập (người khác dùng chung máy không nhận nhầm bài).
  * Máy chủ nhận bài trùng thì báo ACTIVITY_DUPLICATE → coi như đã gửi xong.
  */
 export function usePendingRunSync() {
   const qc = useQueryClient()
   const router = useRouter()
+  const uid = useSession().session?.user.id
 
   const flush = useCallback(async () => {
-    if (syncing || !navigator.onLine || !loadQueue().length) return
+    const mine = ownedBy(loadQueue(), uid)
+    if (syncing || !navigator.onLine || !mine.length) return
     syncing = true
     try {
-      for (const item of loadQueue()) {
+      for (const item of mine) {
         const { data, error } = await supabase.rpc('submit_and_process_activity', item.payload)
         const done = !error || error.message.includes('ACTIVITY_DUPLICATE')
         if (done) {
@@ -75,7 +80,7 @@ export function usePendingRunSync() {
       void qc.invalidateQueries({ queryKey: ['game'] })
       void qc.invalidateQueries({ queryKey: ['profile'] })
     }
-  }, [qc, router])
+  }, [qc, router, uid])
 
   useEffect(() => {
     const kick = () => { void flush() }

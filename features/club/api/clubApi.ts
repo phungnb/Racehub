@@ -387,7 +387,7 @@ const MESSAGES: Record<string, string> = {
   POST_NOT_FOUND: 'Bài đăng không còn tồn tại.',
   INVALID_IMAGE_PATH: 'Ảnh không hợp lệ, hãy tải lại.',
   RATE_LIMITED: 'Bạn gửi hơi nhanh, đợi một chút rồi thử lại nhé.',
-  CAPTAIN_LIMIT: 'CLB chưa đủ điều kiện thêm quản trị viên: gói Miễn phí tối đa 2 người. Nâng cấp CLB Pro để thêm.',
+  CAPTAIN_LIMIT: 'CLB đã đủ số quản trị viên của gói Miễn phí. Nâng cấp CLB Pro để thêm.',
   PRO_REQUIRED: 'CLB chưa đủ điều kiện dùng tính năng này: cần nâng cấp CLB Pro.',
   INVALID_SLUG: 'Link riêng dài 3–30 ký tự, chỉ gồm chữ thường không dấu, số và dấu gạch ngang.',
   SLUG_TAKEN: 'Link này đã có CLB khác dùng.',

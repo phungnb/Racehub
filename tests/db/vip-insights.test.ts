@@ -19,7 +19,7 @@ const fails = async (p: Promise<unknown>) => { try { await p } catch (e) { retur
 const run = async (db: PGlite, uid: string, daysAgo: number, km: number, status = 'APPROVED') =>
   (await db.query<{ id: string }>(`
     insert into public.activities (user_id, title, source, started_at, ended_at, distance_m, moving_distance_m, moving_time_s, elapsed_time_s, avg_pace_s, validation_status, status)
-    values ($1, 'Chạy', 'STRAVA', now() - make_interval(days => $2), now() - make_interval(days => $2) + interval '1 hour', $3::numeric, $3::numeric, $4::int, $4::int, 300, $5, 'READY')
+    values ($1, 'Chạy', 'STRAVA', now() - make_interval(days => $2), now() - make_interval(days => $2) + interval '1 minute', $3::numeric, $3::numeric, $4::int, $4::int, 300, $5, 'READY')
     returning id`, [uid, daysAgo, km * 1000, Math.round(km * 300), status])).rows[0].id
 
 describe('Phân tích VIP + chỉ số kinh tế (004000)', () => {

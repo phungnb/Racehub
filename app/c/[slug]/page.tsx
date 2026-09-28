@@ -5,6 +5,7 @@ import { cache } from 'react'
 import { CalendarDays, Flag, Lock, Trophy, Users } from 'lucide-react'
 import { createSupabaseServerClient } from '@/shared/lib/supabase-server'
 import { MenuDrawer } from '@/features/help'
+import { StatusBarScrim } from '@/shared/ui/StatusBarScrim'
 import { CLUB_THEMES, type ClubTheme } from '@/features/club'
 
 interface PublicClub {
@@ -44,6 +45,7 @@ export default async function ClubPublicPage({ params }: PageProps<'/c/[slug]'>)
   ]
   return (
     <main className="mx-auto min-h-dvh max-w-2xl pb-16">
+      <StatusBarScrim />
       <nav className="flex items-center gap-1 px-4 pt-[max(env(safe-area-inset-top),0.5rem)]">
         <MenuDrawer className="-ml-2" />
         <Link href="/" className="text-lg font-extrabold tracking-wide">RACE<span className="text-brand">HUB</span></Link>

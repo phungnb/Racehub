@@ -4,6 +4,8 @@
 //    Điểm GPS lưu THEO KHỐI 100 điểm: mỗi lần chỉ ghi lại khối cuối (đang đầy dần) + phần tóm tắt nhỏ —
 //    bài 3 tiếng vẫn chỉ ghi vài KB mỗi lần, nên lưu dày được (5 giây, mỗi km, mỗi lần tạm dừng / ẩn app).
 // 2. Bấm Lưu mà mất mạng / máy chủ lỗi: bài vào hàng chờ trên máy, tự gửi lại khi có mạng (gửi trùng thì máy chủ bỏ qua).
+// 3. Mỗi bài lưu trên máy ghi kèm tài khoản chạy (uid): đăng xuất rồi người khác đăng nhập cùng máy thì không thấy,
+//    không khôi phục, không gửi nhầm bài đó vào tài khoản của họ.
 import type { SessionState } from './session'
 import type { Split, TrackPoint } from './tracker'
 
@@ -19,7 +21,7 @@ interface LegacySnapshot {
   points: TrackPoint[]
   splits: Split[]
 }
-interface RunMeta { v: 2; savedAt: number; count: number; state: SessionState }
+interface RunMeta { v: 2; savedAt: number; count: number; state: SessionState; uid?: string }
 
 /** Bài dở dang đọc từ máy */
 export interface RunSnapshot { savedAt: number; state: SessionState; points: TrackPoint[] }
@@ -41,6 +43,8 @@ export interface PendingRun {
   id: string; payload: RunPayload; createdAt: number; attempts: number; lastError?: string
   /** tóm tắt chất lượng GPS gắn vào bài sau khi gửi được (activity_attach_gps_quality) */
   quality?: Record<string, unknown>
+  /** tài khoản đã chạy bài này (bài lưu từ bản cũ không có) */
+  uid?: string
 }
 
 export const SNAPSHOT_KEY = 'rh-run-active'
@@ -64,13 +68,13 @@ const write = (s: Store | null, key: string, v: unknown) => { try { s?.setItem(k
  * Lưu tạm bài đang chạy. `saved` = số điểm đã lưu chắc chắn ở lần trước: chỉ ghi lại từ khối chứa điểm đó trở đi.
  * Trả về số điểm đã lưu (dùng làm `saved` lần sau), hoặc `saved` cũ nếu bộ nhớ đầy / lỗi.
  */
-export function saveSnapshot(state: SessionState, points: TrackPoint[], saved = 0, now = Date.now(), s: Store | null = store()): number {
+export function saveSnapshot(state: SessionState, points: TrackPoint[], saved = 0, now = Date.now(), s: Store | null = store(), uid?: string): number {
   const count = points.length
   for (let i = Math.floor(Math.min(saved, count) / CHUNK); i * CHUNK < count; i++) {
     if (!write(s, chunkKey(i), points.slice(i * CHUNK, (i + 1) * CHUNK))) return saved
   }
   // Tóm tắt ghi SAU các khối: đọc lại luôn thấy đủ điểm mà tóm tắt nói tới
-  return write(s, SNAPSHOT_KEY, { v: 2, savedAt: now, count, state } satisfies RunMeta) ? count : saved
+  return write(s, SNAPSHOT_KEY, { v: 2, savedAt: now, count, state, ...(uid ? { uid } : {}) } satisfies RunMeta) ? count : saved
 }
 
 export function clearSnapshot(s: Store | null = store()) {
@@ -82,9 +86,10 @@ export function clearSnapshot(s: Store | null = store()) {
   } catch { /* bỏ qua */ }
 }
 
-/** Bài dở dang còn khôi phục được (có ít nhất 100 m hoặc 1 phút) */
-export function loadSnapshot(now = Date.now(), s: Store | null = store()): RunSnapshot | null {
+/** Bài dở dang còn khôi phục được (có ít nhất 100 m hoặc 1 phút); bài của tài khoản khác thì để nguyên, không trả về */
+export function loadSnapshot(now = Date.now(), s: Store | null = store(), uid?: string): RunSnapshot | null {
   const meta = read<RunMeta | LegacySnapshot>(s, SNAPSHOT_KEY)
+  if (meta?.v === 2 && meta.uid && uid && meta.uid !== uid) return null
   let snap: RunSnapshot | null = null
   if (meta?.v === 2 && meta.state) {
     const points: TrackPoint[] = []
@@ -131,14 +136,17 @@ export function loadQueue(now = Date.now(), s: Store | null = store()): PendingR
 }
 
 /** Thêm vào hàng chờ; cùng giờ bắt đầu = cùng bài (không thêm trùng) */
-export function enqueue(payload: RunPayload, now = Date.now(), s: Store | null = store(), quality?: Record<string, unknown>): PendingRun {
+export function enqueue(payload: RunPayload, now = Date.now(), s: Store | null = store(), quality?: Record<string, unknown>, uid?: string): PendingRun {
   const q = loadQueue(now, s)
   const existing = q.find((x) => x.payload.p_started_at === payload.p_started_at)
   if (existing) return existing
-  const item: PendingRun = { id: `${payload.p_started_at}`, payload, createdAt: now, attempts: 0, ...(quality ? { quality } : {}) }
+  const item: PendingRun = { id: `${payload.p_started_at}`, payload, createdAt: now, attempts: 0, ...(quality ? { quality } : {}), ...(uid ? { uid } : {}) }
   write(s, QUEUE_KEY, [...q, item])
   return item
 }
+
+/** Bài trong hàng chờ của tài khoản đang đăng nhập (bài bản cũ chưa ghi uid: coi như của người đang dùng máy) */
+export const ownedBy = (q: PendingRun[], uid: string | null | undefined) => (uid ? q.filter((x) => !x.uid || x.uid === uid) : [])
 
 export function updateQueue(fn: (q: PendingRun[]) => PendingRun[], now = Date.now(), s: Store | null = store()) {
   const next = fn(loadQueue(now, s))
