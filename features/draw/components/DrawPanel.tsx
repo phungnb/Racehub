@@ -2,24 +2,30 @@
 
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, Copy, Gift, ListChecks, Minus, MonitorPlay, Plus, ShieldCheck, Trash2, UserMinus, Zap } from 'lucide-react'
+import { ArrowDown, ArrowUp, Copy, Gift, ImagePlus, ListChecks, Minus, MonitorPlay, Plus, ShieldCheck, Trash2, UserMinus, Zap } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, ConfirmSheet, Field, Input, SectionTitle, Sheet, Skeleton, SwitchRow } from '@/shared/ui'
+import { Avatar, Button, Card, ConfirmSheet, Field, Input, SectionTitle, Sheet, Skeleton, SwitchRow, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { filterSearch } from '@/shared/lib/search'
 import {
-  cancelDraw, createDraw, drawErrorMessage, listCandidates, listDraws, runDraw,
+  cancelDraw, createDraw, drawErrorMessage, listCandidates, listDrawEvents, listDraws, runDraw, uploadSponsorLogo,
   type DrawCandidate, type DrawRule, type DrawScope, type LuckyDraw,
 } from '../api/drawApi'
 import { prizeProgress, resultText } from '../model/stage'
 import { DrawStage } from './DrawStage'
 
+const PASTE = 'Dán danh sách tên'
 const RULES: Record<DrawScope, Partial<Record<DrawRule, string>>> = {
-  ORG_CAMPAIGN: { COMPLETED: 'Người đạt mục tiêu', ACTIVE: 'Người có chạy trong chiến dịch', ALL: 'Mọi người tham gia', PICKED: 'BTC tự chọn danh sách' },
-  CHALLENGE: { COMPLETED: 'Người hoàn thành thử thách', ACTIVE: 'Người đã có thành tích', ALL: 'Mọi người tham gia', PICKED: 'BTC tự chọn danh sách' },
-  RACE: { COMPLETED: 'VĐV đã về đích', ALL: 'Mọi VĐV đăng ký', PICKED: 'BTC tự chọn danh sách' },
-  CLUB: { ACTIVE: 'Thành viên có chạy 30 ngày qua', ALL: 'Mọi thành viên', PICKED: 'BTC tự chọn danh sách' },
-  SYSTEM: { ACTIVE: 'Runner có chạy 30 ngày qua', ALL: 'Mọi tài khoản' },
+  ORG_CAMPAIGN: { COMPLETED: 'Người đạt mục tiêu', ACTIVE: 'Người có chạy trong chiến dịch', ALL: 'Mọi người tham gia', PICKED: 'BTC tự chọn danh sách', MANUAL: PASTE },
+  CHALLENGE: { COMPLETED: 'Người hoàn thành thử thách', ACTIVE: 'Người đã có thành tích', ALL: 'Mọi người tham gia', PICKED: 'BTC tự chọn danh sách', MANUAL: PASTE },
+  RACE: { COMPLETED: 'VĐV đã về đích', ALL: 'Mọi VĐV đăng ký', PICKED: 'BTC tự chọn danh sách', MANUAL: PASTE },
+  CLUB: { EVENT: 'Người có mặt tại một buổi (đã điểm danh)', ACTIVE: 'Thành viên có chạy 30 ngày qua', ALL: 'Mọi thành viên', PICKED: 'BTC tự chọn danh sách', MANUAL: PASTE },
+  SYSTEM: { ACTIVE: 'Runner có chạy 30 ngày qua', ALL: 'Mọi tài khoản', MANUAL: PASTE },
+}
+const RULE_HINT: Partial<Record<DrawRule, string>> = {
+  PICKED: 'Tích từng người: người được đề cử, người có mặt tại buổi lễ…',
+  EVENT: 'Chỉ ai đã quét QR hoặc được ban quản trị điểm danh — không gọi tên người vắng',
+  MANUAL: 'Khách mời, người chưa có tài khoản, danh sách từ Google Form… Mỗi dòng một người',
 }
 const STATUS: Record<LuckyDraw['status'], [string, string]> = {
   READY: ['Chờ quay', 'bg-surface-2'], LIVE: ['Đang quay', 'bg-danger/20 text-danger'], DONE: ['Đã công bố', 'bg-coin/20 text-coin'], CANCELLED: ['Đã huỷ', 'bg-surface-2'],
@@ -72,7 +78,9 @@ function DrawCard({ d, scope, refId, onStage }: { d: LuckyDraw; scope: DrawScope
   const progress = prizeProgress(d)
   const total = progress.reduce((a, p) => a + p.qty, 0)
   const won = progress.reduce((a, p) => a + p.won, 0)
-  const who = d.rule === 'PICKED' ? `BTC chọn ${d.picked_count ?? 0} người` : rules[d.rule] ?? d.rule
+  const who = d.rule === 'PICKED' ? `BTC chọn ${d.picked_count ?? 0} người`
+    : d.rule === 'MANUAL' ? `Danh sách dán ${d.manual_count ?? 0} người`
+    : d.rule === 'EVENT' ? `Có mặt tại: ${d.event?.title ?? 'buổi đã chọn'}` : rules[d.rule] ?? d.rule
   const copy = () => void navigator.clipboard?.writeText(resultText(d)).then(() => toast.success('Đã sao chép kết quả — dán vào Zalo / Facebook'), () => toast.error('Không sao chép được'))
   const [label, tone] = STATUS[d.status]
   return (
@@ -82,6 +90,7 @@ function DrawCard({ d, scope, refId, onStage }: { d: LuckyDraw; scope: DrawScope
         <div className="min-w-0 flex-1">
           <p className="font-semibold">{d.title}</p>
           <p className="text-xs text-fg-muted">{who}{d.excluded_count ? ` · loại trừ ${d.excluded_count}` : ''} · {d.prizes.map((p) => `${p.qty} × ${p.name}`).join(', ')}</p>
+          {d.sponsor?.name && <p className="text-xs font-semibold text-coin">Nhà tài trợ: {d.sponsor.name}</p>}
         </div>
         <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold', tone)}>
           {d.status === 'LIVE' && <span className="mr-1 inline-block size-1.5 animate-pulse rounded-full bg-danger align-middle" />}{label}
@@ -122,7 +131,7 @@ function DrawCard({ d, scope, refId, onStage }: { d: LuckyDraw; scope: DrawScope
                   <p className="mb-1 text-xs font-bold uppercase tracking-wide text-coin">{p.name}</p>
                   <ol className="space-y-1">
                     {ws.map((w) => (
-                      <li key={w.user_id} className={cn('flex items-center gap-3 rounded-xl px-2 py-1.5', w.me ? 'bg-brand/15' : 'bg-surface-2/60', w.status === 'ABSENT' && 'opacity-50')}>
+                      <li key={w.key} className={cn('flex items-center gap-3 rounded-xl px-2 py-1.5', w.me ? 'bg-brand/15' : 'bg-surface-2/60', w.status === 'ABSENT' && 'opacity-50')}>
                         <Avatar src={w.avatar_url} name={w.name} size="sm" />
                         <span className={cn('min-w-0 flex-1 truncate text-sm font-semibold', w.status === 'ABSENT' && 'line-through')}>{w.name}{w.me ? ' (bạn)' : ''}</span>
                         {w.status === 'ABSENT' && <span className="shrink-0 text-[11px] text-fg-subtle">vắng mặt</span>}
@@ -165,6 +174,18 @@ function CreateDrawSheet({ scope, refId, onClose, onCreated }: { scope: DrawScop
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [excluded, setExcluded] = useState<Set<string>>(new Set())
   const [picker, setPicker] = useState<'picked' | 'excluded' | null>(null)
+  const [namesText, setNamesText] = useState('')
+  const [eventId, setEventId] = useState<string | null>(null)
+  const [sponsorName, setSponsorName] = useState('')
+  const [sponsorLogo, setSponsorLogo] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const names = namesText.split(/\r?\n/).map((x) => x.trim()).filter(Boolean)
+  const events = useQuery({ queryKey: ['draw-events', refId], queryFn: () => listDrawEvents(refId!), enabled: scope === 'CLUB' && rule === 'EVENT' && !!refId })
+  const pickLogo = async (f: File | undefined) => {
+    if (!f || !refId) return
+    setUploading(true)
+    try { setSponsorLogo(await uploadSponsorLogo(refId, f)) } catch (e) { toast.error(drawErrorMessage(e)) } finally { setUploading(false) }
+  }
   const needPeople = rule === 'PICKED' || picker !== null || excluded.size > 0
   const cands = useQuery({ queryKey: ['draw-candidates', scope, refId], queryFn: () => listCandidates(scope, refId), enabled: needPeople && scope !== 'SYSTEM' })
   const create = useMutation({
@@ -172,12 +193,15 @@ function CreateDrawSheet({ scope, refId, onClose, onCreated }: { scope: DrawScop
       title: title.trim(), rule, exclude_winners: exclude,
       prizes: prizes.filter((p) => p.name.trim()).map((p) => ({ name: p.name.trim(), qty: p.qty })),
       picked: rule === 'PICKED' ? [...picked] : [], excluded: [...excluded],
+      names: rule === 'MANUAL' ? names : [], event_id: rule === 'EVENT' ? eventId : null,
+      sponsor: sponsorName.trim() ? { name: sponsorName.trim(), logo_url: sponsorLogo } : null,
     }),
     onSuccess: (d) => { toast.success('Đã tạo lượt quay'); void qc.invalidateQueries({ queryKey: ['draws', scope, refId] }); onClose(); if (d.eligible_now) onCreated(d.id) },
     onError: (e) => toast.error(drawErrorMessage(e)),
   })
   const move = (i: number, dir: -1 | 1) => setPrizes((ps) => { const a = [...ps]; const j = i + dir; if (j < 0 || j >= a.length) return ps; [a[i], a[j]] = [a[j], a[i]]; return a })
   const valid = title.trim().length >= 3 && prizes.some((p) => p.name.trim()) && (rule !== 'PICKED' || picked.size > 0)
+    && (rule !== 'MANUAL' || (names.length > 0 && names.length <= 2000)) && (rule !== 'EVENT' || !!eventId)
 
   if (picker) {
     const set = picker === 'picked' ? picked : excluded
@@ -200,14 +224,35 @@ function CreateDrawSheet({ scope, refId, onClose, onCreated }: { scope: DrawScop
               <button key={r} type="button" role="radio" aria-checked={rule === r} onClick={() => setRule(r)}
                 className={cn('rounded-xl border p-3 text-left text-sm font-semibold', rule === r ? 'border-brand/60 bg-brand/10' : 'border-border')}>
                 {RULES[scope][r]}
-                {r === 'PICKED' && <span className="block text-xs font-normal text-fg-muted">Tích từng người: người được đề cử, người có mặt tại buổi lễ…</span>}
+                {RULE_HINT[r] && <span className="block text-xs font-normal text-fg-muted">{RULE_HINT[r]}</span>}
               </button>
             ))}
           </div>
           {rule === 'PICKED' && (
             <Button block variant="secondary" onClick={() => setPicker('picked')}><ListChecks className="size-4" aria-hidden />{picked.size ? `Đã chọn ${picked.size} người · sửa` : 'Chọn người'}</Button>
           )}
-          {scope !== 'SYSTEM' && (
+          {rule === 'EVENT' && (
+            events.isPending ? <Skeleton className="h-24" /> : !events.data?.length ? (
+              <p className="rounded-xl border border-dashed border-border p-3 text-sm text-fg-muted">Chưa có buổi nào trong 60 ngày qua. Tạo buổi ở tab Lịch rồi điểm danh bằng QR.</p>
+            ) : (
+              <div role="radiogroup" aria-label="Chọn buổi" className="grid gap-1.5">
+                {events.data.map((e) => (
+                  <button key={e.id} type="button" role="radio" aria-checked={eventId === e.id} onClick={() => setEventId(e.id)}
+                    className={cn('flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-sm', eventId === e.id ? 'border-brand bg-brand/10' : 'border-border')}>
+                    <span className="min-w-0 truncate"><b>{e.title}</b> · {new Date(e.starts_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</span>
+                    <span className="shrink-0 text-xs text-fg-muted">{e.checked_in} đã điểm danh</span>
+                  </button>
+                ))}
+              </div>
+            )
+          )}
+          {rule === 'MANUAL' && (
+            <Field label={`Danh sách người được quay (${names.length} người)`} htmlFor="d-names"
+              hint="Dán từ Excel / Zalo / Google Form: mỗi dòng một người, dòng trống tự bỏ. Trùng tên vẫn tính là hai người.">
+              <Textarea id="d-names" rows={6} value={namesText} onChange={(e) => setNamesText(e.target.value)} placeholder={'Nguyễn Văn An\nTrần Thị Bình\nLê Minh Cường'} />
+            </Field>
+          )}
+          {scope !== 'SYSTEM' && rule !== 'MANUAL' && (
             <Button block variant="ghost" onClick={() => setPicker('excluded')}><UserMinus className="size-4" aria-hidden />{excluded.size ? `Loại trừ ${excluded.size} người · sửa` : 'Loại trừ người (BTC, nhà tài trợ…)'}</Button>
           )}
         </div>
@@ -232,7 +277,19 @@ function CreateDrawSheet({ scope, refId, onClose, onCreated }: { scope: DrawScop
           ))}
           {prizes.length < 10 && <Button size="sm" variant="secondary" onClick={() => setPrizes([...prizes, { name: '', qty: 1 }])}><Plus className="size-4" aria-hidden />Thêm giải</Button>}
         </div>
-        <SwitchRow checked={exclude} onChange={setExclude} label="Loại người đã trúng ở lượt trước" description="Mỗi người trúng tối đa một lần trong cùng chương trình" />
+        <div className="space-y-2">
+          <p className="text-sm font-semibold">Nhà tài trợ (không bắt buộc)</p>
+          <Input aria-label="Tên nhà tài trợ" maxLength={80} value={sponsorName} onChange={(e) => setSponsorName(e.target.value)} placeholder="VD: Cửa hàng giày ABC" />
+          {sponsorName.trim() && scope === 'CLUB' && (
+            <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-border p-2 text-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element -- xem trước logo vừa tải */}
+              {sponsorLogo ? <img src={sponsorLogo} alt="" className="h-10 max-w-24 object-contain" /> : <ImagePlus className="size-5 text-fg-muted" aria-hidden />}
+              <span className="text-fg-muted">{uploading ? 'Đang tải…' : sponsorLogo ? 'Đổi logo' : 'Tải logo (hiện trên màn hình quay)'}</span>
+              <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => void pickLogo(e.target.files?.[0])} />
+            </label>
+          )}
+        </div>
+        {rule !== 'MANUAL' && <SwitchRow checked={exclude} onChange={setExclude} label="Loại người đã trúng ở lượt trước" description="Mỗi người trúng tối đa một lần trong cùng chương trình" />}
       </div>
     </Sheet>
   )

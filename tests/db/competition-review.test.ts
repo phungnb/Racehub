@@ -61,13 +61,15 @@ describe('chống gian lận chỉ khi thi đấu + CLB Free 50 thành viên (00
 
   beforeAll(async () => { db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed }) }, 240_000)
 
-  it('không thi đấu: bài GPS nghi vấn tự duyệt (tính XP), vẫn lưu mức nghi vấn, đánh dấu review_skipped', async () => {
+  it('không thi đấu (009700): bài nghi vấn mức Cao KHÔNG tự duyệt — chờ xác minh, chưa cộng XP; lời báo không lộ ngưỡng', async () => {
     const r = await suspicious(FREE_RUNNER)
-    expect(r.validation_status).toBe('APPROVED')
-    expect(r.validation_reason).toContain('Tự duyệt')
-    expect(r.validation_reason).toContain('20 km/h')
-    expect(Number(r.earned_xp)).toBeGreaterThan(0)
-    expect(await row(r.activity_id)).toMatchObject({ validation_status: 'APPROVED', review_skipped: true, risk_level: 'HIGH' })
+    expect(r.validation_status).toBe('PENDING')
+    expect(r.validation_reason).not.toContain('km/h')
+    expect(r.validation_reason).not.toContain('Mức nghi vấn')
+    expect(Number(r.earned_xp)).toBe(0)
+    expect(await row(r.activity_id)).toMatchObject({ validation_status: 'PENDING', review_skipped: false, risk_level: 'HIGH' })
+    const d = await db.query<{ review_detail: string }>(`select review_detail from public.activities where id = $1`, [r.activity_id])
+    expect(d.rows[0].review_detail).toContain('20 km/h')                 // người duyệt vẫn thấy chi tiết kỹ thuật
   })
 
   it('đang tham gia thử thách: bài nghi vấn vẫn chờ duyệt như cũ', async () => {
@@ -76,12 +78,15 @@ describe('chống gian lận chỉ khi thi đấu + CLB Free 50 thành viên (00
     expect(await row(r.activity_id)).toMatchObject({ review_skipped: false })
   })
 
-  it('bài Strava: REVIEW ngoài thi đấu → tự duyệt; bài nhập tay vẫn chờ duyệt', async () => {
+  it('bài Strava ngoài thi đấu: nghi vấn mức thấp → tự duyệt, mức cao → chờ; bài nhập tay vẫn chờ duyệt', async () => {
     const base = { sport_type: 'Run', elapsed_s: 1800, moving_s: 1800, distance_m: 5000, max_speed_mps: 4 }
     const a = await ingest(FREE_RUNNER, 's-1', { ...base, started_at: new Date(Date.now() - 80 * 3600_000).toISOString(),
-      risk: { verdict: 'REVIEW', level: 'HIGH', score: 70, reason: 'Nhịp tim không khớp pace' } })
+      risk: { verdict: 'REVIEW', level: 'LOW', score: 30, reason: 'Khác thường ngày' } })
     expect(a.validation_status).toBe('APPROVED')
     expect((await row(a.activity_id as string)).review_skipped).toBe(true)
+    const hi = await ingest(FREE_RUNNER, 's-1b', { ...base, started_at: new Date(Date.now() - 85 * 3600_000).toISOString(),
+      risk: { verdict: 'REVIEW', level: 'HIGH', score: 70, reason: 'Nhịp tim không khớp pace' } })
+    expect(hi.validation_status).toBe('PENDING')
     const m = await ingest(FREE_RUNNER, 's-2', { ...base, manual: true, started_at: new Date(Date.now() - 90 * 3600_000).toISOString() })
     expect(m.validation_status).toBe('PENDING')
     const c = await ingest(RACER, 's-3', { ...base, started_at: new Date(Date.now() - 100 * 3600_000).toISOString(),
@@ -89,9 +94,9 @@ describe('chống gian lận chỉ khi thi đấu + CLB Free 50 thành viên (00
     expect(c.validation_status).toBe('PENDING')
   })
 
-  it('bài tự duyệt có dấu hiệu bất thường không tính vào thử thách tham gia sau đó; bài bình thường vẫn tính', async () => {
+  it('bài nghi vấn không tính vào thử thách tham gia sau đó; bài bình thường vẫn tính', async () => {
     const bad = await suspicious(LATE)
-    expect(bad.validation_status).toBe('APPROVED')
+    expect(bad.validation_status).toBe('PENDING')
     const start = new Date(Date.now() - (hoursBack -= 3) * 3600_000)
     const { pts, seconds } = track(start, [[1500, 3]])
     const ok = (await asUser<{ r: R }>(db, LATE, '/rpc/submit_and_process_activity',

@@ -62,7 +62,9 @@ describe('chính sách vận hành (009100)', () => {
     await rpc(db, ADM, `select public.admin_publish_ops_policy($1::jsonb, 'Siết ngưỡng') as r`, [JSON.stringify({ antiCheat: { highKmh: 13, highS: 120 } })])
     const r = await submit(4, 1200)
     expect(r.validation_status).toBe('PENDING')
-    expect(r.validation_reason).toContain('≥ 13 km/h')
+    // 009700: người chạy thấy lời báo thân thiện; ngưỡng kỹ thuật chỉ ở review_detail cho người duyệt
+    expect(r.validation_reason).not.toContain('km/h')
+    expect((await db.query<{ d: string }>(`select review_detail as d from public.activities where id = $1`, [(r as unknown as { activity_id: string }).activity_id])).rows[0].d).toContain('≥ 13 km/h')
   })
 
   it('lịch sử + khôi phục phiên bản cũ', async () => {

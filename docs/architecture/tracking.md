@@ -65,3 +65,9 @@ Vào **Quản trị → Hệ thống → Chính sách vận hành**. Mỗi lần
 - **Ngưỡng chống gian lận:** số bài tối đa mỗi ngày, pace nhanh nhất hợp lệ, tốc độ đi xe, giữ tốc độ cao hoặc nghiêm trọng, nhảy điểm GPS.
   - `submit_and_process_activity` (bài ghi bằng app) và `analyzeRun` (bài từ Strava) đọc chung một bộ ngưỡng.
   - Chỉ admin và máy chủ đọc được các số này.
+
+## Bài nghi vấn ngoài thử thách (009700)
+
+- Chỉ tự duyệt bài nghi vấn **mức Thấp** (điểm rủi ro ≤ `antiCheat.autoApproveMaxScore`, mặc định 34). Từ mức Trung bình trở lên: chờ xác minh, chưa cộng Xu / XP / BXH / điểm CLB — dù có thi đấu hay không.
+- Bài chờ vì **mất tín hiệu GPS** (không có dấu hiệu tốc độ bất thường): người chạy bấm **"Chỉ tính phần có GPS"** → bỏ quãng nối thẳng, bài được duyệt ngay với phần đã kiểm chứng (dưới 200 m thì không ghi nhận).
+- Lời báo cho người chạy (`validation_reason`) viết gọn, không lộ ngưỡng phát hiện. Chi tiết kỹ thuật lưu ở `review_detail`, người duyệt (ban quản trị CLB, admin) xem được.

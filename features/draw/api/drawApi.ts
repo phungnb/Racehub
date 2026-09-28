@@ -3,9 +3,11 @@ import { supabase } from '@/shared/lib/supabase'
 import { systemErrorMessage } from '@/shared/lib/errors'
 
 export type DrawScope = 'ORG_CAMPAIGN' | 'CHALLENGE' | 'CLUB' | 'RACE' | 'SYSTEM'
-export type DrawRule = 'COMPLETED' | 'ACTIVE' | 'ALL' | 'PICKED'
+export type DrawRule = 'COMPLETED' | 'ACTIVE' | 'ALL' | 'PICKED' | 'EVENT' | 'MANUAL'
 export interface DrawWinner {
-  user_id: string; name: string; avatar_url: string | null; prize: string; position: number; me: boolean
+  /** 009500: khoá người trúng — mã người dùng, hoặc "số dòng|tên" với danh sách dán (user_id rỗng) */
+  key: string
+  user_id: string | null; name: string; avatar_url: string | null; prize: string; position: number; me: boolean
   /** 009300: suất thuộc giải thứ mấy; ABSENT = vắng mặt, suất đã quay lại cho người khác */
   prize_idx: number | null; status: 'WON' | 'ABSENT'
 }
@@ -19,8 +21,15 @@ export interface LuckyDraw {
   seed_hash?: string | null; started_at?: string | null; picked_count?: number; excluded_count?: number
   /** Tên chạy trong vòng quay (khi đang quay) */
   reel?: { name: string; avatar_url: string | null }[] | null
+  /** 009500: buổi điểm danh (EVENT), số dòng dán (MANUAL), nhà tài trợ */
+  event?: { id: string; title: string; starts_at: string } | null; manual_count?: number
+  sponsor?: { name: string; logo_url: string | null } | null
 }
-export interface DrawInput { title: string; rule: DrawRule; prizes: { name: string; qty: number }[]; exclude_winners: boolean; picked?: string[]; excluded?: string[] }
+export interface DrawEvent { id: string; title: string; starts_at: string; checked_in: number }
+export interface DrawInput {
+  title: string; rule: DrawRule; prizes: { name: string; qty: number }[]; exclude_winners: boolean; picked?: string[]; excluded?: string[]
+  names?: string[]; event_id?: string | null; sponsor?: { name: string; logo_url: string | null } | null
+}
 
 const call = async <T>(fn: string, args: Record<string, unknown>): Promise<T> => {
   const { data, error } = await supabase.rpc(fn, args)
@@ -34,7 +43,19 @@ export const createDraw = (scope: DrawScope, refId: string | null, p: DrawInput)
 export const listCandidates = (scope: DrawScope, refId: string | null) => call<DrawCandidate[]>('lucky_draw_candidates', { p_scope: scope, p_ref: refId })
 export const startDraw = (id: string) => call<LuckyDraw>('start_lucky_draw', { p_id: id })
 export const drawNext = (id: string, prize: number) => call<LuckyDraw>('draw_next', { p_id: id, p_prize: prize })
-export const drawAbsent = (id: string, userId: string) => call<LuckyDraw>('draw_absent', { p_id: id, p_user: userId })
+export const drawAbsent = (id: string, key: string) => call<LuckyDraw>('draw_absent_key', { p_id: id, p_key: key })
+export const listDrawEvents = (clubId: string) => call<DrawEvent[]>('club_draw_events', { p_club: clubId })
+
+/** Logo nhà tài trợ (lượt quay của CLB): bucket club-media, thư mục <club_id>/<user_id>/ như ảnh bài đăng */
+export async function uploadSponsorLogo(clubId: string, file: File): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('NOT_AUTHENTICATED')
+  const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
+  const path = `${clubId}/${user.id}/sponsor-${Date.now()}.${ext}`
+  const { error } = await supabase.storage.from('club-media').upload(path, file, { contentType: file.type, upsert: false })
+  if (error) throw error
+  return supabase.storage.from('club-media').getPublicUrl(path).data.publicUrl
+}
 export const finishDraw = (id: string) => call<LuckyDraw>('finish_lucky_draw', { p_id: id })
 export const runDraw = (id: string) => call<LuckyDraw>('run_lucky_draw', { p_id: id })
 export const cancelDraw = (id: string) => call<void>('cancel_lucky_draw', { p_id: id })
@@ -53,6 +74,9 @@ const MESSAGES: Record<string, string> = {
   NOT_A_WINNER: 'Người này không còn trong danh sách trúng.',
   NO_WINNERS: 'Chưa có ai trúng — quay ít nhất một giải trước khi công bố.',
   DRAW_STARTED: 'Đã quay ra người trúng nên không huỷ được. Hãy quay tiếp hoặc công bố.',
+  NAMES_REQUIRED: 'Dán ít nhất một tên (mỗi dòng một người).',
+  EVENT_REQUIRED: 'Chọn một buổi của CLB.',
+  INVALID_SPONSOR: 'Tên nhà tài trợ tối đa 80 ký tự; logo phải là ảnh https.',
   FORBIDDEN: 'Bạn không có quyền làm việc này.',
 }
 export function drawErrorMessage(e: unknown): string {

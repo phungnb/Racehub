@@ -3,7 +3,7 @@ import type { DrawWinner } from '../api/drawApi'
 import { latestWinner, nextPrize, prizeProgress, reelNames, resultText, spinDelays } from './stage'
 
 const w = (user: string, prize_idx: number, position: number, status: DrawWinner['status'] = 'WON'): DrawWinner =>
-  ({ user_id: user, name: `Tên ${user}`, avatar_url: null, prize: `G${prize_idx}`, prize_idx, position, status, me: false })
+  ({ key: user, user_id: user, name: `Tên ${user}`, avatar_url: null, prize: `G${prize_idx}`, prize_idx, position, status, me: false })
 const prizes = [{ name: 'Giải nhất', qty: 1 }, { name: 'Giải nhì', qty: 2 }, { name: 'Khuyến khích', qty: 3 }]
 
 describe('màn hình quay thưởng', () => {
@@ -48,5 +48,6 @@ describe('màn hình quay thưởng', () => {
     expect(t).not.toContain('Giải nhì')
     expect(t).toContain('40 người')
     expect(t).toContain('abc (md5 = def)')
+    expect(resultText({ title: 'X', prizes, winners: [], entrant_count: 1, seed: null, seed_hash: null, sponsor: { name: 'Shop A', logo_url: null } })).toContain('Nhà tài trợ: Shop A')
   })
 })

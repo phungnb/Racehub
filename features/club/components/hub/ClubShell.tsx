@@ -34,6 +34,8 @@ export function ClubShell({ clubId, children }: { clubId: string; children: Reac
   const theme = club.theme ? CLUB_THEMES[club.theme] : null
   const base = routes.club(clubId)
   const tabs = [
+    // Bảng điều khiển ban quản trị (009600): chỉ chủ nhiệm / quản trị viên thấy
+    ...(isStaff ? [{ href: `${base}/admin`, label: 'Quản trị', badge: pending }] : []),
     { href: base, label: 'Bảng tin' },
     { href: `${base}/chat`, label: 'Chat', badge: unread },
     { href: `${base}/events`, label: 'Lịch' },

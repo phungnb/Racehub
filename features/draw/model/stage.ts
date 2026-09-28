@@ -46,8 +46,8 @@ export function reelNames(pool: string[], winner: string, steps: number, rand: (
 }
 
 /** Nội dung công bố để dán vào Zalo / Facebook */
-export function resultText(d: Pick<LuckyDraw, 'title' | 'prizes' | 'winners' | 'entrant_count' | 'seed' | 'seed_hash'>): string {
-  const lines = [`🎁 KẾT QUẢ ${d.title.toUpperCase()}`, '']
+export function resultText(d: Pick<LuckyDraw, 'title' | 'prizes' | 'winners' | 'entrant_count' | 'seed' | 'seed_hash'> & { sponsor?: LuckyDraw['sponsor'] }): string {
+  const lines = [`🎁 KẾT QUẢ ${d.title.toUpperCase()}`, ...(d.sponsor?.name ? [`Nhà tài trợ: ${d.sponsor.name}`] : []), '']
   d.prizes.forEach((p, idx) => {
     const ws = d.winners.filter((w) => w.status !== 'ABSENT' && (w.prize_idx === idx || (w.prize_idx == null && w.prize === p.name)))
     if (!ws.length) return

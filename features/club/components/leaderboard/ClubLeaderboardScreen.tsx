@@ -13,6 +13,7 @@ import { useClubLeaderboard } from '../../hooks/useLeaderboard'
 import { ClubBattles } from './ClubBattles'
 import { ClubRankings } from './ClubRankings'
 import { BoostDays } from './BoostDays'
+import { ClubPoints } from './ClubPoints'
 
 const PERIODS: { value: LeaderboardPeriod; label: string }[] = [
   { value: 'WEEK', label: 'Tuần này' },
@@ -20,17 +21,19 @@ const PERIODS: { value: LeaderboardPeriod; label: string }[] = [
   { value: 'ALL', label: 'Tất cả' },
 ]
 
-type View = 'members' | 'battles' | 'clubs'
+type View = 'members' | 'points' | 'battles' | 'clubs'
 const VIEWS: { value: View; label: string }[] = [
   { value: 'members', label: 'Thành viên' },
+  { value: 'points', label: 'Điểm CLB' },
   { value: 'battles', label: 'Đấu CLB' },
   { value: 'clubs', label: 'Xếp hạng CLB' },
 ]
 
-/** Tab BXH: thành viên trong CLB · CLB đấu CLB · xếp hạng CLB toàn hệ thống (?tab=battles|clubs từ thông báo) */
+/** Tab BXH: thành viên trong CLB · điểm CLB (009400) · CLB đấu CLB · xếp hạng CLB toàn hệ thống (?tab=points|battles|clubs) */
 export function ClubLeaderboardScreen({ clubId }: { clubId: string }) {
   const sp = useSearchParams()
-  const initial = sp.get('tab') === 'battles' ? 'battles' : sp.get('tab') === 'clubs' ? 'clubs' : 'members'
+  const tab = sp.get('tab')
+  const initial: View = tab === 'battles' || tab === 'clubs' || tab === 'points' ? tab : 'members'
   const [view, setView] = useState<View>(initial)
   const { isStaff } = useClub(clubId)
   return (
@@ -44,7 +47,8 @@ export function ClubLeaderboardScreen({ clubId }: { clubId: string }) {
           </button>
         ))}
       </div>
-      {view === 'battles' ? <ClubBattles clubId={clubId} isStaff={isStaff} />
+      {view === 'points' ? <ClubPoints clubId={clubId} />
+        : view === 'battles' ? <ClubBattles clubId={clubId} isStaff={isStaff} />
         : view === 'clubs' ? <ClubRankings clubId={clubId} />
         : <MemberLeaderboard clubId={clubId} />}
     </div>

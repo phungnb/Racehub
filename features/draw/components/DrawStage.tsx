@@ -41,7 +41,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
   const [soundOn, setSoundOn] = useState(true)
   const sound = useStageSound(soundOn)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const seen = useRef<string | null>(latestWinner(draw.winners)?.user_id ?? null)
+  const seen = useRef<string | null>(latestWinner(draw.winners)?.key ?? null)
 
   const put = (x: LuckyDraw) => { setLocal(x); qc.setQueryData<LuckyDraw[]>(key, (l) => l?.map((y) => (y.id === x.id ? x : y))) }
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
@@ -72,8 +72,8 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
   useEffect(() => {
     if (manage) return
     const w = latestWinner(d.winners)
-    if (!w || w.user_id === seen.current) return
-    seen.current = w.user_id
+    if (!w || w.key === seen.current) return
+    seen.current = w.key
     roll(w, poolNames(d))
   }, [d, manage, roll])
 
@@ -90,7 +90,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
       clearInterval(pre)
       put(x)
       const w = latestWinner(x.winners)
-      if (w) { seen.current = w.user_id; roll(w, poolNames(x)) }
+      if (w) { seen.current = w.key; roll(w, poolNames(x)) }
     } catch (e) {
       clearInterval(pre); setPhase('idle'); setReel(null)
       toast.error(drawErrorMessage(e))
@@ -100,7 +100,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
   const absent = async () => {
     if (!shown || busy) return
     setBusy(true)
-    try { put(await drawAbsent(d.id, shown.user_id)); toast(`${shown.name}: vắng mặt — quay lại ${shown.prize}`); setShown(null); setPhase('idle'); setReel(null); setPrize(shown.prize_idx) }
+    try { put(await drawAbsent(d.id, shown.key)); toast(`${shown.name}: vắng mặt — quay lại ${shown.prize}`); setShown(null); setPhase('idle'); setReel(null); setPrize(shown.prize_idx) }
     catch (e) { toast.error(drawErrorMessage(e)) } finally { setBusy(false) }
   }
 
@@ -153,6 +153,13 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
             {d.entrant_count ?? d.eligible_now ?? 0} người trong danh sách · {won}/{totalSlots} suất đã trao
           </p>
         </div>
+        {d.sponsor?.name && (
+          <span className="hidden items-center gap-2 rounded-xl bg-white/10 px-2.5 py-1 text-xs sm:flex">
+            <span className="text-white/60">Tài trợ</span>
+            {/* eslint-disable-next-line @next/next/no-img-element -- logo nhà tài trợ do BTC tải lên */}
+            {d.sponsor.logo_url ? <img src={d.sponsor.logo_url} alt={d.sponsor.name} className="h-7 max-w-28 object-contain" /> : <b>{d.sponsor.name}</b>}
+          </span>
+        )}
         <button type="button" onClick={() => setSoundOn(!soundOn)} aria-label={soundOn ? 'Tắt âm thanh' : 'Bật âm thanh'} className="grid size-10 place-items-center rounded-full hover:bg-white/10">
           {soundOn ? <Volume2 className="size-5" aria-hidden /> : <VolumeX className="size-5" aria-hidden />}
         </button>
@@ -191,7 +198,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
             <div className={cn('relative grid w-full max-w-3xl place-items-center overflow-hidden rounded-[2rem] border-2 px-4 py-6 sm:py-10',
               phase === 'landed' ? 'border-coin bg-coin/10 shadow-[0_0_80px_-10px_var(--color-coin)]' : 'border-white/15 bg-white/[0.04]')}>
               {phase === 'landed' && shown ? (
-                <div key={shown.user_id} className="flex flex-col items-center gap-3 animate-winner">
+                <div key={shown.key} className="flex flex-col items-center gap-3 animate-winner">
                   <Avatar src={shown.avatar_url} name={shown.name} size="xl" className="ring-4 ring-coin" />
                   <p className="text-4xl font-extrabold leading-tight sm:text-7xl">{shown.name}</p>
                   <p className="text-sm font-semibold text-coin sm:text-xl">Chúc mừng! 🎉</p>
@@ -230,7 +237,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
                 <p className="mb-1 text-xs font-bold uppercase tracking-wider text-coin">{p.name}</p>
                 <ul className="space-y-1">
                   {d.winners.filter((w) => w.prize_idx === p.idx).map((w) => (
-                    <li key={w.user_id} className={cn('flex items-center gap-2 text-sm', w.status === 'ABSENT' && 'text-white/40')}>
+                    <li key={w.key} className={cn('flex items-center gap-2 text-sm', w.status === 'ABSENT' && 'text-white/40')}>
                       <Avatar src={w.avatar_url} name={w.name} size="xs" />
                       <span className={cn('min-w-0 flex-1 truncate', w.status === 'ABSENT' && 'line-through')}>{w.name}</span>
                       {w.status === 'ABSENT' && <span className="shrink-0 text-[11px]">vắng mặt</span>}

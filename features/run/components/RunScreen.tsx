@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { AlertTriangle, BatteryWarning, CheckCircle2, Clock3, CloudUpload, Coffee, FlaskConical, Footprints, Gift, History, Gauge, Hourglass, Loader2, Lock, MapPin, Pause, PauseCircle, Play, Satellite, Smartphone, Square, Timer, Unlock, Volume2, VolumeX, Watch, XCircle } from 'lucide-react'
+import { AlertTriangle, BatteryWarning, Clock3, CloudUpload, Coffee, FlaskConical, Footprints, Gift, History, Gauge, Hourglass, Loader2, Lock, MapPin, Pause, PauseCircle, Play, Satellite, Smartphone, Square, Timer, Unlock, Volume2, VolumeX, Watch } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, CoinAmount, ConfirmSheet, HoldButton, XpAmount } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -15,6 +15,7 @@ import { BRAND_STEPS, androidBrand } from '../model/battery'
 import { nativePlatform } from '@/shared/lib/native'
 import { useMyProfile } from '@/features/auth'
 import { GpsQaPanel } from './GpsQuality'
+import { ReviewNotice, type AcceptResult } from '@/features/activity'
 
 const DISCLOSED_KEY = 'rh-location-disclosed'
 
@@ -373,26 +374,31 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
   }
 
   // ---------------- Đã lưu: kết quả xác thực + phần thưởng (MH 16–17) ----------------
+  return <RunResult t={t} />
+}
+
+/** Kết quả sau khi lưu: trạng thái viết cho người chạy (009700), số liệu, phần thưởng; bài mất GPS chọn "chỉ tính phần có GPS" ngay tại đây */
+function RunResult({ t }: { t: ReturnType<typeof useRunTracker> }) {
   const r = t.result
-  const verdict = r?.validation_status === 'APPROVED'
-    ? { icon: CheckCircle2, title: 'Bài chạy hợp lệ', tone: 'text-success bg-success/10' }
-    : r?.validation_status === 'PENDING'
-      ? { icon: AlertTriangle, title: 'Đang chờ xác minh', tone: 'text-warning bg-warning/10' }
-      : { icon: XCircle, title: 'Không được ghi nhận', tone: 'text-danger bg-danger/10' }
+  const [fixed, setFixed] = useState<AcceptResult | null>(null)
+  const status = fixed?.status ?? r?.validation_status
+  const pending = status === 'PENDING'
   return (
     <div className="space-y-4 animate-fade-in">
-      <div className={cn('flex flex-col items-center gap-2 rounded-[var(--radius-card)] px-4 py-6 text-center', verdict.tone)}>
-        <verdict.icon className="size-12" aria-hidden />
-        <p className="text-xl font-bold">{verdict.title}</p>
-        {r?.validation_reason && <p className="text-sm opacity-90">{r.validation_reason}</p>}
-      </div>
+      <ReviewNotice activityId={r?.activity_id} status={status} reason={fixed?.reason ?? r?.validation_reason} onResolved={setFixed} />
       <Card className="grid grid-cols-2 gap-3 text-center">
-        <div><p className="text-xs text-fg-subtle">Quãng đường</p><p className="font-mono tabular text-2xl font-bold">{formatKm(r?.distance_m ?? t.distanceM)} km</p></div>
+        <div><p className="text-xs text-fg-subtle">Quãng đường</p><p className="font-mono tabular text-2xl font-bold">{formatKm(fixed?.distance_m ?? r?.distance_m ?? t.distanceM)} km</p></div>
         <div><p className="text-xs text-fg-subtle">Thời gian chạy</p><p className="font-mono tabular text-2xl font-bold">{formatDuration(t.movingS)}</p></div>
-        <div><p className="text-xs text-fg-subtle">Phần thưởng</p><CoinAmount value={r?.earned_xu ?? 0} className="text-xl" /></div>
-        <div><p className="text-xs text-fg-subtle">Kinh nghiệm</p><XpAmount value={r?.earned_xp ?? 0} className="text-xl" /></div>
+        {pending ? (
+          <p className="col-span-2 text-sm text-fg-muted">Phần thưởng sẽ được cộng khi bài được xác nhận.</p>
+        ) : (
+          <>
+            <div><p className="text-xs text-fg-subtle">Phần thưởng</p><CoinAmount value={fixed?.earned_xu ?? r?.earned_xu ?? 0} className="text-xl" /></div>
+            <div><p className="text-xs text-fg-subtle">Kinh nghiệm</p><XpAmount value={fixed?.earned_xp ?? r?.earned_xp ?? 0} className="text-xl" /></div>
+          </>
+        )}
       </Card>
-      {r?.activity_id && r.validation_status === 'APPROVED' && <RunRewards activityId={r.activity_id} />}
+      {r?.activity_id && status === 'APPROVED' && <RunRewards activityId={r.activity_id} />}
       <div className="flex gap-2">
         <Button block variant="secondary" className="flex-1" onClick={t.discard}>Chạy tiếp</Button>
         <Link href="/feed" className="flex-1"><Button block>Về trang chủ</Button></Link>

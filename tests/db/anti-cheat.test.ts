@@ -30,6 +30,8 @@ function track(start: Date, segments: [number, number][]) {
 }
 
 type R = { validation_status: string; validation_reason: string; activity_id: string; earned_xu: number }
+// 009700: người chạy thấy lời báo thân thiện; chi tiết kỹ thuật cho người duyệt nằm ở review_detail
+const detailOf = async (db: PGlite, id: string) => (await db.query<{ d: string }>(`select coalesce(review_detail, validation_reason) as d from public.activities where id = $1`, [id])).rows[0].d
 
 describe('chống gian lận (002300)', () => {
   let db: PGlite
@@ -57,7 +59,7 @@ describe('chống gian lận (002300)', () => {
   it('giữ ≥ 20 km/h liên tục 3 phút → chờ duyệt, không thưởng', async () => {
     const r = await submit([[600, 3], [180, 6], [600, 3]])
     expect(r.validation_status).toBe('PENDING')
-    expect(r.validation_reason).toContain('20 km/h')
+    expect(await detailOf(db, r.activity_id)).toContain('20 km/h')
     expect(Number(r.earned_xu)).toBe(0)
     expect((await risk(r.activity_id)).risk_flags).toEqual([expect.objectContaining({ code: 'SUSTAINED_SPEED', severity: 'SEVERE' })])
   })
@@ -65,7 +67,7 @@ describe('chống gian lận (002300)', () => {
   it('đoạn đi xe máy 35 km/h trong 1 phút → chờ duyệt (đoạn đi xe)', async () => {
     const r = await submit([[900, 3], [60, 9.7], [900, 3]])
     expect(r.validation_status).toBe('PENDING')
-    expect(r.validation_reason).toContain('đi xe')
+    expect(await detailOf(db, r.activity_id)).toContain('đi xe')
   })
 
   it('mất tín hiệu GPS (tắt màn hình): tuyến 2 điểm nối thẳng 3 km → chờ xác minh, cờ GPS_GAP; mất ngắn → vẫn duyệt, cờ INFO', async () => {
@@ -77,7 +79,7 @@ describe('chống gian lận (002300)', () => {
          p_elapsed_s => 1174, p_moving_s => 1065, p_distance_m => 3050, p_avg_pace_s => 349, p_track_points => $3::jsonb) as r`,
       [start.toISOString(), new Date(start.getTime() + 1174_000).toISOString(), JSON.stringify(pts)])).rows[0].r
     expect(r.validation_status).toBe('PENDING')
-    expect(r.validation_reason).toContain('Mất tín hiệu GPS')
+    expect(await detailOf(db, r.activity_id)).toContain('Mất tín hiệu GPS')
     expect((await risk(r.activity_id)).risk_flags).toEqual([expect.objectContaining({ code: 'GPS_GAP', severity: 'HIGH' })])
 
     // Mất 80 giây (≈ 240 m, qua hầm) giữa bài ~5 km → vẫn hợp lệ, cờ INFO để tham khảo
@@ -101,7 +103,7 @@ describe('chống gian lận (002300)', () => {
         risk: { verdict: 'REVIEW', score: 70, level: 'HIGH', reason: 'Sải chân > 2.1 m liên tục 3 phút', flags: [{ code: 'STRIDE', severity: 'SEVERE' }] },
       })])).rows[0].r
       expect(bad).toMatchObject({ validation_status: 'PENDING' })
-      expect(bad.validation_reason ?? (bad as unknown as { reason: string }).reason).toContain('Sải chân')
+      expect(await detailOf(db, (bad as unknown as { activity_id: string }).activity_id)).toContain('Sải chân')
       const good = (await db.query<{ r: R }>(`select public.ingest_provider_activity($1, 'STRAVA', 'ac-2', $2::jsonb) as r`, [U, JSON.stringify({
         ...base, started_at: new Date(Date.now() - 60 * 3600_000).toISOString(), risk: { verdict: 'OK', score: 0, level: 'LOW' },
       })])).rows[0].r
