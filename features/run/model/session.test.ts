@@ -64,7 +64,9 @@ describe('phiên chạy: bắt đầu, tự tạm dừng, tạm dừng tay', () 
   it('tạm dừng tay 2 phút rồi tiếp tục: không nối đoạn, tổng thời gian không tính lúc tạm dừng', () => {
     const { s, step, now } = sim()
     step(3, 200)
+    expect(s.currentPace).toBeGreaterThan(0)
     s.pause(now())
+    expect(s.currentPace).toBe(0)                // tạm dừng: không hiện pace cũ
     const e = s.elapsedS, d = s.distanceM
     step(3, 120)                             // vẫn di chuyển nhưng đang tạm dừng
     expect(s.elapsedS).toBe(e)

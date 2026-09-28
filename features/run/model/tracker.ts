@@ -165,6 +165,8 @@ export const ENGINE = {
   GAP_MIN_MPS: 0.7,       // …và ≥ 0,7 m/s (chậm hơn = đã dừng, không tính giờ di chuyển)
   MAX_SPEED_MPS: 12,
   SPEED_W_MIN: 0.7,       // luôn tin vận tốc Doppler ≥ 70 % khi máy có báo (mô phỏng: sai lệch < 2 % mọi kịch bản)
+  GATE_SIGMA: 5,          // điểm lệch khỏi vị trí dự đoán > 5 lần độ bất định → điểm nhảy, không đưa vào bộ lọc
+  GATE_MAX_SKIP: 3,       // …trừ khi 3 điểm liên tiếp cùng lệch (người chạy thật sự đổi hướng / GPS vừa bắt lại) → nhận
 } as const
 
 export interface GpsGap { from: string; to: string; seconds: number; meters: number; counted: boolean }
@@ -173,6 +175,10 @@ export interface GpsGap { from: string; to: string; seconds: number; meters: num
 class Axis {
   p = 0; v = 0; P00 = 0; P01 = 0; P10 = 0; P11 = 0
   init(z: number, r: number) { this.p = z; this.v = 0; this.P00 = r; this.P01 = 0; this.P10 = 0; this.P11 = 9 }
+  /** Vị trí + phương sai dự đoán sau dt giây, không đổi trạng thái (để loại điểm nhảy trước khi cập nhật) */
+  peek(dt: number, q: number) {
+    return { p: this.p + this.v * dt, P00: this.P00 + dt * (this.P10 + this.P01) + dt * dt * this.P11 + (q * dt ** 4) / 4 }
+  }
   predict(dt: number, q: number) {
     this.p += this.v * dt
     const dt2 = dt * dt, dt3 = dt2 * dt, dt4 = dt3 * dt
@@ -222,12 +228,13 @@ export class TrackEngine {
   private spdAcc = 0
   private spdOk = true
   private lastSpeed: number | null = null
+  private outliers = 0
   raw: TrackPoint[] = []
   gaps: GpsGap[] = []
   recentSpeed = 2.8
 
   /** Tạm dừng / tiếp tục: không nối quãng giữa hai lần */
-  breakSegment() { this.started = false; this.anchor = null; this.raw = []; this.lastGood = null }
+  breakSegment() { this.started = false; this.anchor = null; this.raw = []; this.lastGood = null; this.outliers = 0 }
 
   private toXY(lat: number, lng: number) { return { x: (lng - this.lng0) * this.kx, y: (lat - this.lat0) * 111_320 } }
   private toLL(x: number, y: number) { return { latitude: this.lat0 + y / 111_320, longitude: this.lng0 + x / this.kx } }
@@ -246,7 +253,7 @@ export class TrackEngine {
       this.e.init(z.x, r); this.n.init(z.y, r)
       this.started = true; this.lastT = t
       this.anchor = { x: z.x, y: z.y, t }
-      this.raw = [p]; this.lastGood = p; this.spdAcc = 0; this.spdOk = true; this.lastSpeed = p.speed != null && p.speed >= 0 ? p.speed : null
+      this.raw = [p]; this.lastGood = p; this.outliers = 0; this.spdAcc = 0; this.spdOk = true; this.lastSpeed = p.speed != null && p.speed >= 0 ? p.speed : null
       return { point: { ...p }, distance: 0, moving: 0, gap: null, reason: 'FIRST' }
     }
 
@@ -262,16 +269,23 @@ export class TrackEngine {
       const gap: GpsGap = { from: this.lastGood?.recorded_at ?? p.recorded_at, to: p.recorded_at, seconds: Math.round(span), meters: Math.round(d), counted }
       this.gaps.push(gap)
       this.e.init(z.x, r); this.n.init(z.y, r)
-      this.lastT = t; this.anchor = { x: z.x, y: z.y, t }; this.raw = [p]; this.lastGood = p
+      this.lastT = t; this.anchor = { x: z.x, y: z.y, t }; this.raw = [p]; this.lastGood = p; this.outliers = 0
       this.spdAcc = 0; this.spdOk = true; this.lastSpeed = p.speed != null && p.speed >= 0 ? p.speed : null
       return { point: { ...p }, distance: counted ? d : 0, moving: counted ? span : 0, gap }
     }
+
+    // Điểm nhảy: lệch quá xa vị trí dự đoán so với sai số → bỏ TRƯỚC khi cập nhật, bộ lọc không bị kéo lệch theo.
+    // (Bỏ sau khi cập nhật thì vận tốc ước lượng đã hỏng, vài giây sau vẫn cộng một phần cú nhảy vào km.)
+    const q = ENGINE.ACCEL_SIGMA ** 2
+    const pe = this.e.peek(dt, q), pn = this.n.peek(dt, q)
+    const gate = ENGINE.GATE_SIGMA * Math.sqrt(Math.max(pe.P00, pn.P00) + r)
+    if (Math.hypot(z.x - pe.p, z.y - pn.p) > gate && this.outliers < ENGINE.GATE_MAX_SKIP) { this.outliers++; return none('TELEPORT') }
+    this.outliers = 0
 
     // Tích phân vận tốc máy báo giữa hai điểm (thiếu vận tốc ở bất kỳ điểm nào → không dùng cho bước này)
     if (p.speed != null && p.speed >= 0 && this.lastSpeed != null) this.spdAcc += ((p.speed + this.lastSpeed) / 2) * dt
     else this.spdOk = false
     this.lastSpeed = p.speed != null && p.speed >= 0 ? p.speed : null
-    const q = ENGINE.ACCEL_SIGMA ** 2
     this.e.predict(dt, q); this.n.predict(dt, q)
     this.e.update(z.x, r); this.n.update(z.y, r)
     this.lastT = t

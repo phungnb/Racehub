@@ -164,6 +164,30 @@ describe('bộ máy GPS v2 (Kalman + mất tín hiệu)', () => {
     expect(r.gaps[0].seconds).toBeGreaterThanOrEqual(120)
     expect(Math.abs(r.dist - 4000) / 4000).toBeLessThan(0.04)
   })
+  it('GPS nhảy xa từng điểm (80 m, máy vẫn báo sai số 10 m): bị loại trước bộ lọc, gần như không cộng km', () => {
+    const run = (jumps: boolean) => {
+      const e = new TrackEngine()
+      let dist = 0
+      for (let t = 0; t <= 600; t++) {
+        const jump = jumps && t % 45 === 20
+        const r = e.push({ ...pt(21 + dLat(t * 3), t, 10, 3), longitude: 105.85 + (jump ? dLat(80) : 0) })
+        dist += r.distance
+      }
+      return dist
+    }
+    const clean = run(false)
+    expect(Math.abs(run(true) - clean)).toBeLessThan(15)
+    expect(Math.abs(clean - 1800) / 1800).toBeLessThan(0.02)
+  })
+  it('đổi hướng thật (quay đầu 180°): sau vài điểm bộ lọc vẫn nhận lại, không kẹt', () => {
+    const e = new TrackEngine()
+    let dist = 0
+    for (let t = 0; t <= 200; t++) {
+      const y = t <= 100 ? t * 3 : 300 - (t - 100) * 3
+      dist += e.push(pt(21 + dLat(y), t, 6, 3)).distance
+    }
+    expect(Math.abs(dist - 600) / 600).toBeLessThan(0.05)
+  })
   it('điểm sai số > 35 m bị bỏ; điểm đầu tiên không cộng quãng đường', () => {
     const e = new TrackEngine()
     const first = e.push({ latitude: 21, longitude: 105.85, accuracy: 8, altitude: 0, speed: null, recorded_at: new Date(1000).toISOString() })

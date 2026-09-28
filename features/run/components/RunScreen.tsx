@@ -48,14 +48,27 @@ function AutoPauseToggle({ on, onChange }: { on: boolean; onChange: (on: boolean
   )
 }
 
-function Metric({ label, value, unit, icon: Icon }: { label: string; value: string; unit?: string; icon: typeof Clock3 }) {
+/** Một chỉ số; `big` cho màn đang chạy — đọc được khi cầm máy rung lắc, liếc nhanh */
+function Metric({ label, value, unit, icon: Icon, big = false }: { label: string; value: string; unit?: string; icon: typeof Clock3; big?: boolean }) {
   return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-fg-subtle">
-        <Icon className="size-3.5" aria-hidden />{label}
+    <div className="flex min-w-0 flex-col items-center gap-1">
+      <span className={cn('flex items-center gap-1 text-center text-[11px] font-semibold uppercase leading-tight tracking-wider text-fg-subtle', big && 'min-h-7 items-end')}>
+        <Icon className="size-3.5 shrink-0" aria-hidden />{label}
       </span>
-      <span className="font-mono tabular text-2xl font-bold">{value}{unit && <span className="ml-0.5 text-sm text-fg-muted">{unit}</span>}</span>
+      <span className={cn('font-mono tabular font-bold', big ? 'text-[1.75rem] leading-none sm:text-4xl' : 'text-2xl')}>
+        {value}{unit && <span className="ml-0.5 text-sm text-fg-muted">{unit}</span>}
+      </span>
     </div>
+  )
+}
+
+/** Băng thông báo ngắn trong lúc chạy: một dòng, chữ đủ to để liếc */
+function Notice({ tone, icon: Icon, children, alert = false }: { tone: 'brand' | 'warning' | 'danger'; icon: typeof Clock3; children: React.ReactNode; alert?: boolean }) {
+  const cls = { brand: 'bg-brand/10 text-fg [&>svg]:text-brand', warning: 'bg-warning/10 text-fg [&>svg]:text-warning', danger: 'bg-danger/10 text-danger' }[tone]
+  return (
+    <p role={alert ? 'alert' : 'status'} className={cn('mb-3 flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold', cls)}>
+      <Icon className="size-5 shrink-0" aria-hidden /><span className="min-w-0">{children}</span>
+    </p>
   )
 }
 
@@ -191,40 +204,28 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
           <p className="mt-2 text-sm font-semibold uppercase tracking-widest text-fg-subtle">Kilômét</p>
         </div>
 
-        {t.phase === 'RUNNING' && !t.moved && (
-          <p role="status" className="mb-3 flex gap-2 rounded-xl bg-brand/10 px-3 py-2 text-xs text-fg">
-            <Footprints className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
-            <span>GPS đã sẵn sàng — <b>bắt đầu chạy đi!</b> Thời gian chạy tự tính khi bạn di chuyển; tổng thời gian đang được tính từ lúc bấm.</span>
-          </p>
-        )}
+        {t.phase === 'RUNNING' && !t.moved && <Notice tone="brand" icon={Footprints}>GPS sẵn sàng — bắt đầu chạy!</Notice>}
         {t.phase === 'RUNNING' && t.longStop && (
-          <div role="alert" className="mb-3 space-y-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-3 text-sm">
-            <p className="flex gap-2"><Coffee className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
-              <span>Bạn đã đứng yên hơn <b>10 phút</b>. Đã chạy xong thì bấm <b>Kết thúc</b> — phần đứng yên cuối bài sẽ không tính vào tổng thời gian.
-                Đứng quá 30 phút app tự tạm dừng.</span></p>
+          <div role="alert" className="mb-3 space-y-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-3">
+            <p className="flex items-center gap-2 text-sm font-semibold"><Coffee className="size-5 shrink-0 text-warning" aria-hidden />
+              Đứng yên hơn {t.stopRules.askMin} phút. Đã chạy xong?</p>
             <div className="grid grid-cols-2 gap-2">
-              <Button size="sm" variant="secondary" onClick={t.dismissLongStop}>Vẫn đang nghỉ</Button>
-              <Button size="sm" variant="danger" onClick={t.finish}>Kết thúc bài chạy</Button>
+              <Button variant="secondary" onClick={t.dismissLongStop}>Vẫn đang nghỉ</Button>
+              <Button variant="danger" onClick={t.finish}>Kết thúc</Button>
             </div>
           </div>
         )}
         {t.phase === 'PAUSED' && t.autoStopped && (
-          <p role="status" className="mb-3 flex gap-2 rounded-xl bg-warning/10 px-3 py-2 text-xs text-fg">
-            <Coffee className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
-            <span>Đã <b>tự tạm dừng</b> vì bạn đứng yên 30 phút. Chạy tiếp thì bấm Tiếp tục; đã xong thì bấm Kết thúc — phần đứng yên không tính vào tổng thời gian.</span>
-          </p>
+          <Notice tone="warning" icon={Coffee}>Đã tự tạm dừng sau {t.stopRules.autoStopMin} phút đứng yên.</Notice>
         )}
         {t.phase === 'RUNNING' && t.moved && t.autoPaused && t.autoPauseOn && !t.longStop && (
-          <p role="status" className="mb-3 flex gap-2 rounded-xl bg-warning/10 px-3 py-2 text-xs text-fg">
-            <PauseCircle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
-            <span>Bạn đang đứng yên nên <b>đồng hồ chạy tự dừng</b> — di chuyển là tính tiếp. Nghỉ không làm chậm pace; tổng thời gian vẫn chạy.</span>
-          </p>
+          <Notice tone="warning" icon={PauseCircle}>Đứng yên — đồng hồ chạy tạm dừng.</Notice>
         )}
 
-        <div className="grid grid-cols-3 gap-2 rounded-[var(--radius-card)] border border-border bg-surface py-4">
-          <Metric label={clock.label} icon={Timer} value={formatDuration(clock.value)} />
-          <Metric label="Pace TB" icon={Gauge} value={formatPace(avgPace)} unit="/km" />
-          <Metric label="Hiện tại" icon={Clock3} value={formatPace(t.currentPace)} unit="/km" />
+        <div className="grid grid-cols-3 gap-2 rounded-[var(--radius-card)] border border-border bg-surface px-1 py-4">
+          <Metric big label={clock.label} icon={Timer} value={formatDuration(clock.value)} />
+          <Metric big label="Pace TB" icon={Gauge} value={formatPace(avgPace)} />
+          <Metric big label="Hiện tại" icon={Clock3} value={formatPace(t.currentPace)} />
         </div>
         <div className="mt-2 flex items-center justify-between gap-2 px-1">
           <span className="flex items-center gap-1.5 text-xs text-fg-muted">
@@ -243,23 +244,14 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
           </ol>
         )}
 
-        {t.gps === 'LOST' && t.phase === 'RUNNING' && (
-          <p role="alert" className="mt-3 flex gap-2 rounded-xl bg-danger/10 px-3 py-2 text-xs text-danger">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-            Đang mất tín hiệu GPS (trong nhà, hầm, dưới mái che dày hoặc màn hình vừa tắt). Ra chỗ thoáng — app tự nối lại khi có tín hiệu.
-          </p>
-        )}
-        {t.gaps.length > 0 && (
-          <p role="status" className="mt-3 flex gap-2 rounded-xl bg-warning/10 px-3 py-2 text-xs text-warning">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-            <span>
-              Mất GPS {t.gaps.length} lần, tổng {Math.max(1, Math.round(t.gapS / 60))} phút.
-              {t.gaps.some((g) => g.counted) ? ' Đoạn đó tính theo đường thẳng nên có thể thiếu so với thực tế.' : ''}
-              {t.gaps.some((g) => !g.counted) ? ' Đoạn có tốc độ bất thường không được tính.' : ''}
-              {!t.background && ' Giữ màn hình sáng (nút Khoá màn hình), đừng bấm nút nguồn.'}
-            </span>
-          </p>
-        )}
+        <div className="mt-3">
+          {t.gps === 'LOST' && t.phase === 'RUNNING' && <Notice alert tone="danger" icon={AlertTriangle}>Mất tín hiệu GPS — ra chỗ thoáng.</Notice>}
+          {t.gaps.length > 0 && (
+            <Notice tone="warning" icon={AlertTriangle}>
+              Mất GPS {t.gaps.length} lần ({Math.max(1, Math.round(t.gapS / 60))} phút).{!t.background && ' Giữ màn hình sáng, đừng bấm nút nguồn.'}
+            </Notice>
+          )}
+        </div>
 
         {t.phase === 'LOCATING' ? (
           <div className="mt-8 flex flex-col items-center gap-3">

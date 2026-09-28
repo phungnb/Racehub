@@ -232,6 +232,7 @@ export class RunSession {
     this.advance(now)
     this.phase = 'PAUSED'
     this.lastTick = null
+    this.currentPace = 0                // tạm dừng: không hiện pace cũ
     this.q.pauses++
     this.log(now, 'pause')
   }

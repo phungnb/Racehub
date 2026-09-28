@@ -2,32 +2,29 @@
 
 import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { supabase } from '@/shared/lib/supabase'
-import { describeError } from '@/shared/lib/errors'
 import { nativePlatform } from '@/shared/lib/native'
-import { canTrackLocation, tracksInBackground, watchLocation, type LocationError, type LocationFix } from '../model/location'
-import { clearSnapshot, enqueue, loadSnapshot, saveSnapshot, type RunPayload, type RunSnapshot } from '../model/recovery'
-import { RunSession, type GpsQuality, type SessionEvent } from '../model/session'
-import { ENGINE, splitAnnouncement, type GpsGap, type Split } from '../model/tracker'
-import { deviceLabel, errorPct, QA_KEY, type QaInput } from '../model/qa'
+import { useSession } from '@/features/auth'
 import { useOpsPolicy } from '@/features/system'
 import { keepAwake, reacquireAwake, releaseAwake } from '@/shared/lib/keepAwake'
+import { canTrackLocation, tracksInBackground, watchLocation, type LocationError, type LocationFix } from '../model/location'
+import { clearSnapshot, loadSnapshot, saveSnapshot, type RunSnapshot } from '../model/recovery'
+import { RunSession, type GpsQuality, type SessionEvent } from '../model/session'
+import { ENGINE, type GpsGap, type Split } from '../model/tracker'
+import { coachLine, persistsNow } from '../model/coach'
+import { deviceLabel, errorPct, QA_KEY, type QaInput } from '../model/qa'
+import { submitRun, type SaveResult } from '../api/submitRun'
+import { useStoredFlag } from './useStoredFlag'
+import { setRunActive } from './useRunActive'
 
+export type { SaveResult }
 export type RunPhase = 'IDLE' | 'LOCATING' | 'RUNNING' | 'PAUSED' | 'FINISHED' | 'SAVING' | 'SAVED' | 'QUEUED'
 export type GpsState = 'OFF' | 'SEARCHING' | 'GOOD' | 'WEAK' | 'LOST' | 'DENIED' | 'UNSUPPORTED'
-
-export interface SaveResult {
-  activity_id?: string
-  validation_status: 'APPROVED' | 'PENDING' | 'REJECTED'
-  validation_reason: string
-  earned_xu: number
-  earned_xp: number
-  distance_m: number
-}
 
 const AUTO_PAUSE_KEY = 'rh-run-auto-pause'
 /** Lưu tạm 5 giây một lần khi đang chạy (chỉ ghi khối điểm cuối — xem recovery.ts); đổi trạng thái / qua km / ẩn app thì lưu ngay */
 const PERSIST_EVERY_MS = 5_000
+/** Tạm dừng quá lâu: tắt GPS cho đỡ pin; bấm Tiếp tục thì bật lại (đoạn GPS mới vốn không nối qua quãng tạm dừng) */
+const GPS_OFF_AFTER_PAUSE_MS = 5 * 60_000
 
 /** Những gì màn hình cần vẽ — chép từ RunSession sau mỗi lệnh / điểm GPS / nhịp đồng hồ */
 interface View {
@@ -41,16 +38,21 @@ const viewOf = (s: RunSession): View => ({
   autoPaused: s.autoPaused, moved: s.moved, longStop: s.longStop, autoStopped: s.autoStopped, trimmedS: s.q.trimmedS,
   splits: s.splits, gaps: [...s.gaps], gapS: s.gapS,
 })
-const readFlag = (key: string, dflt: boolean) => {
-  try { const v = localStorage.getItem(key); return v === null ? dflt : v === '1' } catch { return dflt }
+
+function speak(text: string) {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+  const u = new SpeechSynthesisUtterance(text)
+  u.lang = 'vi-VN'
+  window.speechSynthesis.speak(u)
 }
-const writeFlag = (key: string, on: boolean) => { try { localStorage.setItem(key, on ? '1' : '0') } catch { /* bỏ qua */ } }
+const vibrate = (pattern: number[]) => { try { navigator.vibrate?.(pattern) } catch { /* máy không hỗ trợ */ } }
 
 /**
  * Màn Chạy ↔ Tracking Engine: giữ một RunSession, nối nguồn vị trí + đồng hồ + lưu tạm + gửi máy chủ,
  * đọc giọng nói theo sự kiện. Mọi phép tính / trạng thái nằm trong RunSession (model/session.ts).
  */
 export function useRunTracker() {
+  const uid = useSession().session?.user.id
   const [phase, setPhaseState] = useState<RunPhase>('IDLE')
   const [gps, setGps] = useState<GpsState>('OFF')
   const [view, setView] = useState<View>(EMPTY)
@@ -59,48 +61,33 @@ export function useRunTracker() {
    * Tự tạm dừng (như Strava / Garmin, mặc định bật): đồng hồ chính là "thời gian chạy", đứng lại khi bạn dừng.
    * Tắt: đồng hồ chính là tổng thời gian, luôn nhảy. Pace luôn tính theo thời gian di chuyển.
    */
-  const [autoPauseOn, setAutoPauseOnState] = useState(() => typeof window === 'undefined' || readFlag(AUTO_PAUSE_KEY, true))
+  const [autoPauseOn, setAutoPauseOn] = useStoredFlag(AUTO_PAUSE_KEY, true)
   /** Chế độ kiểm thử GPS (bật bằng ?qa=1 hoặc nút của admin): nhập kịch bản + quãng chuẩn, xem chỉ số chất lượng */
-  const qaParam = useSearchParams().get('qa') === '1'
-  const [qaOn, setQaOnState] = useState(() => {
-    if (typeof window === 'undefined') return false
-    if (qaParam) { writeFlag(QA_KEY, true); return true }
-    return readFlag(QA_KEY, false)
-  })
+  const [qaOn, setQaOn] = useStoredFlag(QA_KEY, false, useSearchParams().get('qa') === '1' ? true : undefined)
   const [qa, setQa] = useState<QaInput>({ scenario: null, ref_m: null, note: '' })
   const [result, setResult] = useState<SaveResult | null>(null)
   /** Chỉ số chất lượng GPS chốt lúc kết thúc — hiện ở màn tổng kết (chế độ kiểm thử) */
   const [summary, setSummary] = useState<GpsQuality | null>(null)
   const [error, setError] = useState<string | null>(null)
-  /** Bài dở dang lưu trên máy từ lần trước (app bị đóng giữa chừng) — hỏi người chạy có khôi phục không */
-  const [recovery, setRecovery] = useState<RunSnapshot | null>(() => (typeof window === 'undefined' ? null : loadSnapshot()))
+  /** Bài dở dang của chính tài khoản này, lưu trên máy từ lần trước (app bị đóng giữa chừng) — hỏi có khôi phục không */
+  const [recovery, setRecovery] = useState<RunSnapshot | null>(null)
+  const [recoveryFor, setRecoveryFor] = useState<string | undefined>()
+  if (uid && uid !== recoveryFor) { setRecoveryFor(uid); setRecovery(loadSnapshot(undefined, undefined, uid)) }
 
   // Quy tắc tự tạm dừng / đứng nghỉ lâu do admin đặt (Chính sách vận hành) — áp cho bài bắt đầu từ lúc này
   const tracking = useOpsPolicy().tracking
-  const trackingRef = useRef(tracking)
-  useEffect(() => { trackingRef.current = tracking }, [tracking])
+  const latest = useRef({ tracking, uid, voiceOn, autoPauseOn })
+  useEffect(() => { latest.current = { tracking, uid, voiceOn, autoPauseOn } }, [tracking, uid, voiceOn, autoPauseOn])
+
   const session = useRef(new RunSession())
   const phaseRef = useRef<RunPhase>('IDLE')
-  const voiceRef = useRef(true)
-  const autoPauseRef = useRef(autoPauseOn)
   const stopLocation = useRef<(() => void) | null>(null)
   const lastPersist = useRef(0)
   /** số điểm đã lưu chắc chắn trên máy (lưu theo khối: lần sau chỉ ghi từ khối chứa điểm này) */
   const saved = useRef(0)
 
-  useEffect(() => { voiceRef.current = voiceOn }, [voiceOn])
-  useEffect(() => { autoPauseRef.current = autoPauseOn }, [autoPauseOn])
-
   const setPhase = useCallback((p: RunPhase) => { phaseRef.current = p; setPhaseState(p) }, [])
-  const setAutoPauseOn = useCallback((on: boolean) => { setAutoPauseOnState(on); writeFlag(AUTO_PAUSE_KEY, on) }, [])
-  const setQaOn = useCallback((on: boolean) => { setQaOnState(on); writeFlag(QA_KEY, on) }, [])
-
-  const speak = useCallback((text: string) => {
-    if (!voiceRef.current || typeof window === 'undefined' || !('speechSynthesis' in window)) return
-    const u = new SpeechSynthesisUtterance(text)
-    u.lang = 'vi-VN'
-    window.speechSynthesis.speak(u)
-  }, [])
+  const say = useCallback((text: string) => { if (latest.current.voiceOn) speak(text) }, [])
 
   /** Lưu tạm bài đang chạy trên máy (tối đa 5 giây một lần, trừ khi `force`) */
   const persist = useCallback((force = false) => {
@@ -109,7 +96,7 @@ export function useRunTracker() {
     const st = session.current.snapshot()
     if (!st) return
     lastPersist.current = now
-    saved.current = saveSnapshot(st, session.current.points, saved.current, now)
+    saved.current = saveSnapshot(st, session.current.points, saved.current, now, undefined, latest.current.uid)
   }, [])
 
   /** Chép trạng thái RunSession ra màn hình */
@@ -121,36 +108,24 @@ export function useRunTracker() {
     if (s.gpsLost && s.phase === 'RUNNING') setGps('LOST')
   }, [setPhase])
 
-  /** Sự kiện từ RunSession → giọng HLV + lưu ngay những mốc quan trọng */
+  /** Sự kiện từ RunSession → giọng HLV + rung + lưu ngay những mốc quan trọng, rồi vẽ lại */
   const handle = useCallback((events: SessionEvent[]) => {
-    let force = false
     for (const e of events) {
-      switch (e.type) {
-        case 'START': speak('Bắt đầu chạy'); force = true; break
-        case 'SPLIT': speak(splitAnnouncement(e.split, e.movingS)); force = true; break
-        case 'AUTO_PAUSE': if (autoPauseRef.current) speak('Tự tạm dừng'); break
-        case 'AUTO_RESUME': if (autoPauseRef.current) speak('Tiếp tục chạy'); break
-        case 'LONG_STOP':
-          speak(`Bạn đã đứng yên ${e.minutes} phút. Nếu đã chạy xong, hãy bấm Kết thúc.`)
-          try { navigator.vibrate?.([300, 150, 300]) } catch { /* bỏ qua */ }
-          break
-        case 'AUTO_STOPPED': speak(`Đã tạm dừng bài chạy vì bạn đứng yên ${e.minutes} phút.`); force = true; break
-        case 'GAP': force = true; break
-      }
+      const line = coachLine(e, latest.current.autoPauseOn)
+      if (line) say(line)
+      if (e.type === 'LONG_STOP') vibrate([300, 150, 300])
     }
-    persist(force)
-  }, [speak, persist])
+    persist(events.some(persistsNow))
+    sync()
+  }, [say, persist, sync])
 
-  // App cài: GPS chạy nền, để màn hình tắt cho đỡ pin. Trình duyệt: giữ màn hình sáng (Wake Lock + video câm cho iPhone)
-  const acquireWakeLock = useCallback(() => { if (!tracksInBackground()) void keepAwake() }, [])
-  const releaseWakeLock = useCallback(() => releaseAwake(), [])
-  const stopWatch = useCallback(() => { stopLocation.current?.(); stopLocation.current = null }, [])
-
+  // ---------- Nguồn vị trí ----------
   const onPosition = useCallback((fix: LocationFix) => {
     setGps(fix.accuracy <= ENGINE.GOOD_ACCURACY_M ? 'GOOD' : 'WEAK')
     handle(session.current.fix(fix, Date.now()))
-    sync()
-  }, [handle, sync])
+  }, [handle])
+
+  const stopWatch = useCallback(() => { stopLocation.current?.(); stopLocation.current = null }, [])
 
   const onPositionError = useCallback((err: LocationError) => {
     setGps(err.denied ? 'DENIED' : 'WEAK')
@@ -161,18 +136,38 @@ export function useRunTracker() {
     }
   }, [stopWatch, setPhase])
 
-  // Đồng hồ: RunSession tính theo mốc thời gian thật, không đếm tích tắc (chính xác cả khi tab bị treo)
+  /** Bật (hoặc bật lại) theo dõi vị trí */
+  const startWatch = useCallback(() => {
+    stopLocation.current?.()
+    stopLocation.current = watchLocation(onPosition, onPositionError)
+  }, [onPosition, onPositionError])
+
+  // App cài: GPS chạy nền, để màn hình tắt cho đỡ pin. Trình duyệt: giữ màn hình sáng (Wake Lock + video câm cho iPhone)
+  const acquireWakeLock = useCallback(() => { if (!tracksInBackground()) void keepAwake() }, [])
+
+  /** Dừng hẳn: GPS + giữ màn hình */
+  const stopAll = useCallback(() => { stopWatch(); releaseAwake() }, [stopWatch])
+
+  // ---------- Đồng hồ: RunSession tính theo mốc thời gian thật, không đếm tích tắc (chính xác cả khi tab bị treo) ----------
   useEffect(() => {
     if (phase !== 'RUNNING') return
-    const id = setInterval(() => { handle(session.current.tick(Date.now())); sync() }, 1000)
+    const id = setInterval(() => handle(session.current.tick(Date.now())), 1000)
     return () => clearInterval(id)
-  }, [phase, handle, sync])
+  }, [phase, handle])
 
+  // Tạm dừng lâu (bấm tay hoặc tự dừng sau khi đứng yên): tắt GPS để đỡ pin
+  useEffect(() => {
+    if (phase !== 'PAUSED') return
+    const id = setTimeout(() => { stopWatch(); setGps('OFF') }, GPS_OFF_AFTER_PAUSE_MS)
+    return () => clearTimeout(id)
+  }, [phase, stopWatch])
+
+  // ---------- Lệnh của người chạy ----------
   const start = useCallback(() => {
     if (!canTrackLocation()) { setGps('UNSUPPORTED'); return }
     setError(null)
     setResult(null)
-    session.current = new RunSession(trackingRef.current)
+    session.current = new RunSession(latest.current.tracking)
     saved.current = 0
     lastPersist.current = 0
     clearSnapshot()
@@ -181,46 +176,46 @@ export function useRunTracker() {
     setGps('SEARCHING')
     setPhase('LOCATING')
     acquireWakeLock()          // gọi ngay trong thao tác bấm: iPhone mới cho phát video giữ màn hình
-    stopLocation.current?.()
-    stopLocation.current = watchLocation(onPosition, onPositionError)
-  }, [acquireWakeLock, onPosition, onPositionError, setPhase])
+    startWatch()
+  }, [acquireWakeLock, startWatch, setPhase])
 
   /** Bắt đầu dù tín hiệu GPS còn yếu */
-  const startAnyway = useCallback(() => { handle(session.current.begin(Date.now())); sync() }, [handle, sync])
+  const startAnyway = useCallback(() => handle(session.current.begin(Date.now())), [handle])
 
   const pause = useCallback(() => {
-    session.current.pause(Date.now()); speak('Tạm dừng'); persist(true); sync()
-  }, [speak, persist, sync])
+    session.current.pause(Date.now()); say('Tạm dừng'); persist(true); sync()
+  }, [say, persist, sync])
+
   const resume = useCallback(() => {
-    session.current.resume(Date.now()); speak('Tiếp tục'); persist(true); sync()
-  }, [speak, persist, sync])
+    session.current.resume(Date.now()); say('Tiếp tục'); persist(true); sync()
+    if (!stopLocation.current) { setGps('SEARCHING'); startWatch() }      // GPS đã tắt vì tạm dừng lâu
+  }, [say, persist, sync, startWatch])
+
   /** "Vẫn đang nghỉ" ở câu hỏi kết thúc khi đứng yên lâu */
   const dismissLongStop = useCallback(() => { session.current.dismissLongStop(); sync() }, [sync])
 
   const finish = useCallback(() => {
-    stopWatch()
-    releaseWakeLock()
+    stopAll()
     session.current.finish(Date.now())
     setSummary(session.current.quality())
     setPhase('FINISHED')
-    speak('Kết thúc bài chạy')
+    say('Kết thúc bài chạy')
     persist(true)
     sync()
-  }, [releaseWakeLock, speak, stopWatch, persist, sync, setPhase])
+  }, [stopAll, say, persist, sync, setPhase])
 
   const discard = useCallback(() => {
-    stopWatch()
-    releaseWakeLock()
+    stopAll()
     clearSnapshot()
     setPhase('IDLE')
     setGps('OFF')
-  }, [releaseWakeLock, stopWatch, setPhase])
+  }, [stopAll, setPhase])
 
   /** Khôi phục bài dở dang: đang chạy → về trạng thái tạm dừng (bấm Tiếp tục để chạy tiếp); đã kết thúc → màn lưu */
   const restore = useCallback(() => {
     const r = recovery
     if (!r) return
-    session.current = RunSession.restore(r.state, r.points, Date.now(), trackingRef.current)
+    session.current = RunSession.restore(r.state, r.points, Date.now(), latest.current.tracking)
     saved.current = r.points.length
     setRecovery(null)
     setView(viewOf(session.current))
@@ -228,11 +223,8 @@ export function useRunTracker() {
     setPhase('PAUSED')
     setGps('SEARCHING')
     acquireWakeLock()
-    if (canTrackLocation()) {
-      stopLocation.current?.()
-      stopLocation.current = watchLocation(onPosition, onPositionError)
-    }
-  }, [recovery, acquireWakeLock, onPosition, onPositionError, setPhase])
+    if (canTrackLocation()) startWatch()
+  }, [recovery, acquireWakeLock, startWatch, setPhase])
 
   const dismissRecovery = useCallback(() => { clearSnapshot(); setRecovery(null) }, [])
 
@@ -252,37 +244,16 @@ export function useRunTracker() {
   const save = useCallback(async () => {
     setPhase('SAVING')
     setError(null)
-    const payload: RunPayload = session.current.payload(Date.now())
-    const q = quality()
-    const { data, error: rpcError } = await supabase.rpc('submit_and_process_activity', payload)
-    if (rpcError) {
-      if (rpcError.message.includes('ACTIVITY_DUPLICATE')) {
-        clearSnapshot()
-        setError('Bài chạy này đã được lưu trước đó.')
-        setPhase('FINISHED')
-        return null
-      }
-      // Mất mạng / máy chủ lỗi: giữ bài trên máy, tự gửi khi có mạng — người chạy không mất bài
-      const kind = describeError(rpcError).kind
-      if (kind === 'OFFLINE' || kind === 'NETWORK' || kind === 'TIMEOUT' || kind === 'SERVER') {
-        enqueue(payload, Date.now(), undefined, q)
-        clearSnapshot()
-        setPhase('QUEUED')
-        window.dispatchEvent(new Event('rh-run-queued'))
-        return null
-      }
-      setError('Không lưu được bài chạy. Thử lại sau ít phút.')
-      setPhase('FINISHED')
-      return null
+    const out = await submitRun(session.current.payload(Date.now()), quality(), latest.current.uid)
+    switch (out.kind) {
+      case 'SAVED': setResult(out.result); setPhase('SAVED'); return out.result
+      case 'QUEUED': setPhase('QUEUED'); return null
+      case 'DUPLICATE': setError('Bài chạy này đã được lưu trước đó.'); setPhase('FINISHED'); return null
+      case 'FAILED': setError('Không lưu được bài chạy. Thử lại sau ít phút.'); setPhase('FINISHED'); return null
     }
-    // Không chặn người chạy: gắn tóm tắt chất lượng GPS phía sau (máy chủ chưa chạy 008800 thì bỏ qua)
-    void supabase.rpc('activity_attach_gps_quality', { p_started_at: payload.p_started_at, p_quality: q })
-    clearSnapshot()
-    setResult(data as SaveResult)
-    setPhase('SAVED')
-    return data as SaveResult
   }, [quality, setPhase])
 
+  // ---------- Vòng đời trang ----------
   // Tắt màn hình / chuyển app: trình duyệt dừng GPS và nhả chế độ giữ sáng màn hình.
   // Quay lại → xin lại cả hai; đoạn bị mất được bộ máy GPS ghi thành "mất tín hiệu" (gaps) — không nối âm thầm.
   // Trong app cài: GPS vẫn chạy nền; chỉ lưu tạm ngay (hệ điều hành có thể đóng app lúc chạy nền) + thống kê.
@@ -295,24 +266,25 @@ export function useRunTracker() {
       session.current.visible(now)
       if (tracksInBackground()) return
       reacquireAwake()
-      if (stopLocation.current) {
-        stopLocation.current()
-        stopLocation.current = watchLocation(onPosition, onPositionError)
-      }
+      if (stopLocation.current) startWatch()
     }
     // Đóng tab / tải lại trang: lưu nốt phần mới nhất
     const onHide = () => { if (phaseRef.current === 'RUNNING' || phaseRef.current === 'PAUSED') persist(true) }
     document.addEventListener('visibilitychange', onVis)
     window.addEventListener('pagehide', onHide)
     return () => { document.removeEventListener('visibilitychange', onVis); window.removeEventListener('pagehide', onHide) }
-  }, [onPosition, onPositionError, persist])
+  }, [startWatch, persist])
+
+  // Khung app ẩn thanh điều hướng khi đang có bài chạy
+  useEffect(() => { setRunActive(phase === 'LOCATING' || phase === 'RUNNING' || phase === 'PAUSED') }, [phase])
 
   // Rời màn hình khi đang chạy: dọn GPS + wake lock
-  useEffect(() => () => { stopWatch(); releaseWakeLock() }, [releaseWakeLock, stopWatch])
+  useEffect(() => () => { stopAll(); setRunActive(false) }, [stopAll])
 
   return {
     background: tracksInBackground(),
     phase, gps, ...view, autoPauseOn, voiceOn, result, error, recovery, qaOn, qa, summary,
+    stopRules: { askMin: tracking.longStopAskMin, autoStopMin: tracking.longStopAutoStopMin },
     setVoiceOn, setAutoPauseOn, setQaOn, setQa, start, startAnyway, pause, resume, finish, discard, save, restore, dismissRecovery, dismissLongStop,
   }
 }

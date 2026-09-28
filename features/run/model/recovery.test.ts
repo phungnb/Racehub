@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildPayload, clearSnapshot, enqueue, loadQueue, loadSnapshot, saveSnapshot, updateQueue, SNAPSHOT_KEY, SNAPSHOT_MAX_AGE_MS } from './recovery'
+import { buildPayload, clearSnapshot, enqueue, loadQueue, loadSnapshot, ownedBy, saveSnapshot, updateQueue, SNAPSHOT_KEY, SNAPSHOT_MAX_AGE_MS } from './recovery'
 import { RunSession, type SessionState } from './session'
 
 const mem = () => {
@@ -60,5 +60,19 @@ describe('lưu tạm + khôi phục bài chạy', () => {
     expect(loadQueue(now, s)).toHaveLength(1)
     updateQueue((q) => q.filter(() => false), now, s)
     expect(loadQueue(now, s)).toHaveLength(0)
+  })
+
+  it('bài của tài khoản khác trên cùng máy: không khôi phục, không đếm, không gửi', () => {
+    const s = mem()
+    saveSnapshot(state(), [pt], 0, 10_000, s, 'user-a')
+    expect(loadSnapshot(20_000, s, 'user-b')).toBeNull()
+    expect(loadSnapshot(20_000, s, 'user-a')).toMatchObject({ state: { distanceM: 2000 } })
+    const p = { ...buildPayload({ startedAt: 1_000, endedAt: 2_000, elapsedS: 600, movingS: 600, distanceM: 2000, points: [pt] }) }
+    enqueue(p, 5_000, s, undefined, 'user-a')
+    enqueue({ ...p, p_started_at: 'legacy' }, 5_000, s)
+    const q = loadQueue(6_000, s)
+    expect(ownedBy(q, 'user-b').map((x) => x.id)).toEqual(['legacy'])
+    expect(ownedBy(q, 'user-a')).toHaveLength(2)
+    expect(ownedBy(q, null)).toEqual([])
   })
 })
