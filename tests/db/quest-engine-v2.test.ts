@@ -29,7 +29,7 @@ const ago = (m: number) => {
 const runAt = async (db: PGlite, uid: string, km: number, at: Date) => {
   const id = (await db.query<{ id: string }>(`
     insert into public.activities (user_id, title, source, started_at, ended_at, distance_m, moving_distance_m, moving_time_s, avg_pace_s, validation_status, status)
-    values ($1, 'Chạy', 'STRAVA', $2::timestamptz, $2::timestamptz + interval '40 minutes', $3::numeric, $3::numeric, $4::int, 330, 'APPROVED', 'READY')
+    values ($1, 'Chạy', 'STRAVA', $2::timestamptz, $2::timestamptz + interval '1 minute', $3::numeric, $3::numeric, $4::int, 330, 'APPROVED', 'READY')
     returning id`, [uid, at.toISOString(), km * 1000, Math.round(km * 330)])).rows[0].id
   await db.query(`select private.reward_activity($1)`, [id])
   return id

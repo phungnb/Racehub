@@ -165,7 +165,10 @@ begin
     jsonb_build_object('file', '20261001009700', 'label', 'VÁ CHỐNG GIAN LẬN: không tự duyệt bài nghi vấn từ mức Trung bình, "chỉ tính phần có GPS", lời báo thân thiện',
       'ok', to_regprocedure('public.accept_verified_distance(uuid)') is not null and private.sc_col('activities', 'review_detail')),
     jsonb_build_object('file', '20261001009800', 'label', 'Chống gian lận cho MỌI bài chạy (không còn tự duyệt khi không thi đấu), lời báo ngắn',
-      'ok', coalesce((private.ops_defaults()->'antiCheat'->>'autoApproveMaxScore')::int, -1) = 0));
+      'ok', coalesce((private.ops_defaults()->'antiCheat'->>'autoApproveMaxScore')::int, -1) = 0),
+    jsonb_build_object('file', '20261001009900', 'label', 'Bài chạy trùng giờ (nhiều thiết bị): mỗi thời điểm chỉ tính một bài, bài dài nhất; thu hồi thưởng bài bị thay',
+      'ok', to_regprocedure('private.activity_overlap_guard()') is not null
+            and exists (select 1 from pg_trigger t where t.tgname = 'trg_ac_activity_overlap' and t.tgrelid = 'public.activities'::regclass)));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

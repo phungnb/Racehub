@@ -72,3 +72,10 @@ Vào **Quản trị → Hệ thống → Chính sách vận hành**. Mỗi lần
 - Bài có dấu hiệu nghi vấn → chờ xác minh, chưa cộng Xu / XP / BXH / điểm CLB. Ngưỡng tự duyệt `antiCheat.autoApproveMaxScore` mặc định 0 (không tự duyệt bài nghi vấn nào); admin có thể nâng, áp như nhau cho mọi người.
 - Bài chờ vì **mất tín hiệu GPS** (không có dấu hiệu tốc độ bất thường): người chạy bấm **"Chỉ tính phần có GPS"** → bỏ quãng nối thẳng, bài được duyệt ngay với phần đã kiểm chứng (dưới 200 m thì không ghi nhận).
 - Lời báo cho người chạy chỉ một câu ngắn (vd. "Mất tín hiệu GPS một đoạn."), không lộ ngưỡng. Chi tiết kỹ thuật ở `review_detail` cho người duyệt.
+
+## Bài chạy trùng giờ (009900)
+
+- Một tài khoản ghi nhiều bài chồng thời gian (nhiều thiết bị, dùng chung tài khoản, hoặc app + đồng hồ/Strava): **mỗi thời điểm chỉ tính một bài**. Hai bài coi là trùng khi chồng nhau > 60 giây.
+- Bài mới dài hơn tổng các bài trùng giờ đang được tính trên 10% và không nghi vấn → bài mới được tính; các bài cũ chuyển "Không ghi nhận", thu hồi Xu / XP (`private.revoke_run_reward`), nhiệm vụ / huy hiệu / thử thách tự tính lại qua trigger sẵn có.
+- Ngược lại bài mới vẫn được lưu vào lịch sử với lời báo "Trùng giờ với bài chạy khác." (không còn bị bỏ lặng lẽ). Strava / Garmin / COROS trùng giờ mà không dài hơn thì bỏ qua như trước.
+- Trigger `trg_ac_activity_overlap` (BEFORE INSERT, mọi đường ghi bài) khóa theo tài khoản (`pg_advisory_xact_lock`), nên hai máy gửi cùng lúc không lọt cả hai bài. Gửi lại đúng bài cũ vẫn báo `ACTIVITY_DUPLICATE`.
