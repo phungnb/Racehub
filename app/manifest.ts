@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     id: '/',
     name: 'RaceHub — Chạy bộ, thử thách & CLB',
     short_name: 'RaceHub',
-    description: 'Chạy bộ cùng CLB: thử thách, giải chạy ảo, nhân vật và phần thưởng Xu.',
+    description: 'Chạy bộ cùng CLB: thử thách, giải chạy, nhân vật và phần thưởng Xu.',
     lang: 'vi',
     start_url: '/feed?source=pwa',
     scope: '/',

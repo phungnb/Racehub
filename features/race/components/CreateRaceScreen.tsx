@@ -69,7 +69,7 @@ export function CreateRaceScreen() {
   }
 
   if (org.isLoading) return <Skeleton className="h-96" />
-  if (!org.canCreate) return <EmptyState icon={Flag} title="Cần được cấp quyền tổ chức giải" description="Giải chạy ảo dành cho CLB hoặc cá nhân được RaceHub cấp quyền. Liên hệ admin để đăng ký làm ban tổ chức." />
+  if (!org.canCreate) return <EmptyState icon={Flag} title="Cần được cấp quyền tổ chức giải" description="Giải chạy dành cho CLB hoặc cá nhân được RaceHub cấp quyền. Liên hệ admin để đăng ký làm ban tổ chức." />
   const q = quote.data
   const short = !!q && !q.pass && q.fee > q.payer_balance
   const valid = title.trim().length >= 3 && distances.length > 0 && start && end && Date.parse(fromLocal(end)) > Date.parse(fromLocal(start))
@@ -77,8 +77,8 @@ export function CreateRaceScreen() {
 
   return (
     <div className="space-y-5 pb-6">
-      <Link href="/races" className="inline-flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg"><ArrowLeft className="size-4" aria-hidden />Giải chạy ảo</Link>
-      <h1 className="text-2xl font-bold">Tạo giải chạy ảo</h1>
+      <Link href="/races" className="inline-flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg"><ArrowLeft className="size-4" aria-hidden />Giải chạy</Link>
+      <h1 className="text-2xl font-bold">Tạo giải chạy</h1>
 
       <Field label="Đơn vị tổ chức">
         <div className="grid gap-2">

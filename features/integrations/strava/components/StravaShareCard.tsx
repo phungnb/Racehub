@@ -49,7 +49,7 @@ export function StravaShareCard() {
         <div className="min-w-0 flex-1 space-y-1 text-sm">
           <p className="font-semibold">Hiện bài chạy từ Strava cho CLB & bảng xếp hạng</p>
           <p className="text-fg-muted">
-            {on ? 'Đang bật: thành viên CLB thấy quãng đường, thời gian bài Strava của bạn; bài được tính vào thử thách, giải chạy ảo, BXH. Bản đồ, nhịp tim chỉ bạn xem.'
+            {on ? 'Đang bật: thành viên CLB thấy quãng đường, thời gian bài Strava của bạn; bài được tính vào thử thách, giải chạy, BXH. Bản đồ, nhịp tim chỉ bạn xem.'
               : `Đang tắt: ${d.hidden_runs} bài Strava chỉ mình bạn thấy — vẫn tính Xu, XP, huy hiệu nhưng không lên BXH, thử thách của CLB.`}
           </p>
           <PoweredByStrava />

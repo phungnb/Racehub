@@ -94,7 +94,7 @@ export function GiftsTab() {
   )
 }
 
-/** Quyền tổ chức giải chạy ảo: chỉ CLB / cá nhân được admin cấp mới tạo được giải */
+/** Quyền tổ chức giải chạy: chỉ CLB / cá nhân được admin cấp mới tạo được giải */
 export function OrganizersTab() {
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['admin', 'organizers'], queryFn: listOrganizers })
@@ -120,7 +120,7 @@ export function OrganizersTab() {
       <section>
         <SectionTitle>Đang có quyền</SectionTitle>
         {q.isPending ? <Skeleton className="h-24" /> : q.isError ? <ErrorState message={adminErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
-          : !q.data.length ? <EmptyState icon={Flag} title="Chưa cấp cho ai" description="Hiện chỉ admin tạo được giải chạy ảo." />
+          : !q.data.length ? <EmptyState icon={Flag} title="Chưa cấp cho ai" description="Hiện chỉ admin tạo được giải chạy." />
           : (
             <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
               {q.data.map((g) => (

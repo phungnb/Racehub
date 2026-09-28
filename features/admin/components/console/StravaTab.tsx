@@ -55,7 +55,7 @@ export function StravaTab() {
           )
         })}
       </ul>
-      <p className="text-xs text-fg-subtle">Đổi chính sách áp dụng ngay cho mọi bài Strava: thêm / gỡ khỏi bảng tin CLB, thử thách đang diễn ra, giải chạy ảo. Được ghi nhật ký quản trị.</p>
+      <p className="text-xs text-fg-subtle">Đổi chính sách áp dụng ngay cho mọi bài Strava: thêm / gỡ khỏi bảng tin CLB, thử thách đang diễn ra, giải chạy. Được ghi nhật ký quản trị.</p>
       <ConfirmSheet open={pick !== null} onClose={() => setPick(null)} danger={pick === 'ALL'} loading={save.isPending}
         title="Đổi chính sách bài Strava?" confirmLabel="Áp dụng" onConfirm={() => { if (reason.trim().length >= 3) save.mutate(); else toast.error('Ghi lý do (ít nhất 3 ký tự)') }}>
         <div className="space-y-2 text-sm text-fg-muted">

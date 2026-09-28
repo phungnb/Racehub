@@ -161,7 +161,7 @@ export function PolicyTab({ policy, raw }: { policy: EconomyPolicy; raw: Record<
         </div>
       </Section>
 
-      <Section title="Phí tạo thử thách / giải chạy ảo theo quy mô"
+      <Section title="Phí tạo thử thách / giải chạy theo quy mô"
         hint="Thu một lần theo số người tối đa, không phụ thuộc thời gian. Thử thách CLB trừ quỹ CLB; thách đấu CLB luôn miễn phí.">
         <p className="text-xs font-medium text-fg-muted">Mức (tối đa số người — phí)</p>
         <Rows items={p.capacityTiers} addLabel="Thêm mức" onChange={(capacityTiers) => set({ capacityTiers })}

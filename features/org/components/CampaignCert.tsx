@@ -18,7 +18,7 @@ import { useHistory } from '@/shared/design/studio/useHistory'
 import { getCampaignCertificate, orgErrorMessage, setCampaignCertDesign, uploadOrgImage, type CampaignCertificate, type CampaignMetric } from '../api/orgApi'
 import { fmtValue } from '../model/org'
 
-/** Nhãn trường dữ liệu trên chứng nhận chiến dịch (cùng khoá với chứng nhận giải chạy ảo) */
+/** Nhãn trường dữ liệu trên chứng nhận chiến dịch (cùng khoá với chứng nhận giải chạy) */
 const CAMPAIGN_BINDS: typeof CERT_BINDS = {
   name: { label: 'Tên người chạy', sample: 'Nguyễn Văn An' },
   race: { label: 'Tên chiến dịch', sample: 'Tháng 10 chạy vì sức khoẻ' },
@@ -44,7 +44,7 @@ function certData(c: Pick<CampaignCertificate, 'campaign' | 'org_name' | 'name' 
   }
 }
 
-/** Quản trị thiết kế chứng nhận hoàn thành chiến dịch — cùng trình thiết kế với chứng nhận giải chạy ảo */
+/** Quản trị thiết kế chứng nhận hoàn thành chiến dịch — cùng trình thiết kế với chứng nhận giải chạy */
 export function CampaignCertDesigner({ orgId, campaign, onClose }: {
   orgId: string; onClose: () => void
   campaign: { id: string; title: string; org_name: string; metric: CampaignMetric; ends_at: string; cert_design?: StoredCert | null }

@@ -43,7 +43,7 @@ export const BIB_BINDS: Binds = {
   number: { label: 'Số BIB', sample: '0421' },
   name: { label: 'Tên VĐV', sample: 'NGUYỄN VĂN AN' },
   org: { label: 'Đơn vị tổ chức', sample: 'Hồ Tây Runners' },
-  race: { label: 'Tên giải', sample: 'Giải chạy ảo' },
+  race: { label: 'Tên giải', sample: 'Giải chạy' },
   distance: { label: 'Cự ly', sample: '21 km' },
   dates: { label: 'Ngày thi đấu', sample: '01/10 – 31/10' },
 }

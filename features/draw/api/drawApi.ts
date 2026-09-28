@@ -1,4 +1,4 @@
-// Quay thưởng dùng chung toàn app (migration 008400, sân khấu 009300): chiến dịch tổ chức, thử thách, CLB, giải chạy ảo, toàn hệ thống.
+// Quay thưởng dùng chung toàn app (migration 008400, sân khấu 009300): chiến dịch tổ chức, thử thách, CLB, giải chạy, toàn hệ thống.
 import { supabase } from '@/shared/lib/supabase'
 import { systemErrorMessage } from '@/shared/lib/errors'
 

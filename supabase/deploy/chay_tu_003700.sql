@@ -1,7 +1,7 @@
--- RaceHub: gộp 66 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 68 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -18384,6 +18384,264 @@ end $$;
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001010200_race_rename.sql
+-- ===================================================================
+-- 010200: ĐỔI TÊN "Giải chạy ảo" → "Giải chạy" (tên tính năng, không đổi chức năng).
+-- Đổi chữ trong: trang Hướng dẫn / Điều khoản / Quyền riêng tư, bài Kiến thức, thông báo cấp quyền tổ chức giải,
+-- lý do trừ Xu khi tạo giải, thẻ gói mặc định. Thông báo / giao dịch đã gửi trước đây giữ nguyên chữ cũ.
+-- Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT, không RETURNING INTO. Chạy lại an toàn.
+
+update public.help_pages
+   set title = replace(replace(replace(title, 'GIẢI CHẠY ẢO', 'GIẢI CHẠY'), 'Giải chạy ảo', 'Giải chạy'), 'giải chạy ảo', 'giải chạy'), summary = replace(replace(replace(summary, 'GIẢI CHẠY ẢO', 'GIẢI CHẠY'), 'Giải chạy ảo', 'Giải chạy'), 'giải chạy ảo', 'giải chạy'), body = replace(replace(replace(body, 'GIẢI CHẠY ẢO', 'GIẢI CHẠY'), 'Giải chạy ảo', 'Giải chạy'), 'giải chạy ảo', 'giải chạy')
+ where title ilike '%chạy ảo%' or summary ilike '%chạy ảo%' or body ilike '%giải chạy ảo%';
+
+update public.content_articles
+   set title = replace(replace(replace(title, 'GIẢI CHẠY ẢO', 'GIẢI CHẠY'), 'Giải chạy ảo', 'Giải chạy'), 'giải chạy ảo', 'giải chạy'), summary = replace(replace(replace(summary, 'GIẢI CHẠY ẢO', 'GIẢI CHẠY'), 'Giải chạy ảo', 'Giải chạy'), 'giải chạy ảo', 'giải chạy'), body = replace(replace(replace(body, 'GIẢI CHẠY ẢO', 'GIẢI CHẠY'), 'Giải chạy ảo', 'Giải chạy'), 'giải chạy ảo', 'giải chạy'), ctas = replace(replace(replace(ctas::text, 'GIẢI CHẠY ẢO', 'GIẢI CHẠY'), 'Giải chạy ảo', 'Giải chạy'), 'giải chạy ảo', 'giải chạy')::jsonb
+ where title ilike '%giải chạy ảo%' or summary ilike '%giải chạy ảo%' or body ilike '%giải chạy ảo%' or ctas::text ilike '%giải chạy ảo%';
+
+-- Thông báo khi admin cấp quyền tổ chức giải (bản 003800, chỉ đổi chữ)
+create or replace function public.admin_set_race_organizer(p_owner_type text, p_owner_id uuid, p_allow boolean, p_note text default null) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := private.require_admin();
+begin
+  if upper(p_owner_type) not in ('USER', 'CLUB') then raise exception 'INVALID_OWNER'; end if;
+  if p_allow then
+    insert into public.race_organizer_grants (owner_type, owner_id, note, granted_by) values (upper(p_owner_type), p_owner_id, p_note, v_uid)
+    on conflict (owner_type, owner_id) do update set note = excluded.note, granted_by = excluded.granted_by, created_at = now();
+    if upper(p_owner_type) = 'CLUB' then
+      perform private.notify_club(p_owner_id, true, 'CLUB_PRO', 'CLB được cấp quyền tổ chức giải chạy', null, '/races/new', v_uid);
+    else
+      perform private.notify(p_owner_id, null, 'VIP', 'Bạn được cấp quyền tổ chức giải chạy', null, '/races/new', v_uid, true);
+    end if;
+  else
+    delete from public.race_organizer_grants where owner_type = upper(p_owner_type) and owner_id = p_owner_id;
+  end if;
+  insert into public.admin_audit_log (actor_id, action, target, new_value)
+  values (v_uid, 'RACE_ORGANIZER', p_owner_id::text, jsonb_build_object('type', upper(p_owner_type), 'allow', p_allow, 'note', p_note));
+end $$;
+
+-- Tạo giải: lý do trừ phí trong lịch sử Xu (bản 003800, chỉ đổi chữ)
+create or replace function public.create_virtual_race(p jsonb) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_id uuid := gen_random_uuid();
+  v_club uuid := nullif(p->>'club_id', '')::uuid;
+  v_title text := trim(coalesce(p->>'title', ''));
+  v_start timestamptz := (p->>'start_at')::timestamptz;
+  v_end timestamptz := (p->>'end_at')::timestamptz;
+  v_close timestamptz := coalesce(nullif(p->>'reg_close_at', '')::timestamptz, (p->>'end_at')::timestamptz);
+  v_aud text := upper(coalesce(p->>'audience', 'PUBLIC'));
+  v_max integer := nullif(p->>'max_participants', '')::integer;
+  v_prefix text := upper(coalesce(nullif(trim(p->>'bib_prefix'), ''), 'RH'));
+  v_dist numeric[];
+  v_admin boolean := public.is_system_admin();
+  v_payer uuid;
+  v_fee integer := 0;
+  v_pass uuid;
+begin
+  if not v_admin then
+    if v_club is not null then
+      if not public.club_is_staff(v_club) then raise exception 'FORBIDDEN'; end if;
+      if not exists (select 1 from public.race_organizer_grants g where g.owner_type = 'CLUB' and g.owner_id = v_club) then raise exception 'RACE_ORGANIZER_REQUIRED'; end if;
+    elsif not exists (select 1 from public.race_organizer_grants g where g.owner_type = 'USER' and g.owner_id = v_uid) then
+      raise exception 'RACE_ORGANIZER_REQUIRED';
+    end if;
+    if v_max is null then raise exception 'CAPACITY_REQUIRED'; end if;
+  end if;
+  if length(v_title) < 3 or length(v_title) > 120 then raise exception 'INVALID_TITLE'; end if;
+  if v_start is null or v_end is null or v_end <= v_start then raise exception 'INVALID_TIME_RANGE'; end if;
+  if v_end < now() or v_end - v_start > interval '92 days' then raise exception 'INVALID_DURATION'; end if;
+  if v_close > v_end or v_close < now() then raise exception 'INVALID_REG_CLOSE'; end if;
+  if v_aud not in ('PUBLIC', 'CLUB_ONLY') or (v_aud = 'CLUB_ONLY' and v_club is null) then raise exception 'INVALID_AUDIENCE'; end if;
+  if v_max is not null and (v_max < 2 or v_max > 100000) then raise exception 'INVALID_MAX'; end if;
+  if v_prefix !~ '^[A-Z0-9]{1,6}$' then raise exception 'INVALID_BIB_PREFIX'; end if;
+  v_dist := (select array_agg(d order by d) from (
+               select distinct round((e)::numeric, 2) as d from jsonb_array_elements_text(coalesce(p->'distances', '[]'::jsonb)) as t(e)) s);
+  if v_dist is null or array_length(v_dist, 1) > 6 or v_dist[1] < 1 or v_dist[array_length(v_dist, 1)] > 250 then
+    raise exception 'INVALID_DISTANCES';
+  end if;
+
+  -- Phí theo quy mô (admin miễn phí). Lượt tạo (vé) dùng trước, rồi mới trừ Xu.
+  if not v_admin then
+    v_payer := coalesce(v_club, v_uid);
+    perform private.issue_credits(case when v_club is null then 'USER' else 'CLUB' end, v_payer);
+    v_fee := private.challenge_creation_fee(false, v_max, v_start, v_end);
+    if v_fee > 0 then
+      v_pass := (select t.id from (select x.id, row_number() over (order by x.expires_at nulls last, x.max_slots, x.created_at) as rn
+                                     from public.challenge_passes x
+                                    where x.owner_id = v_payer and x.remaining > 0 and x.max_slots >= v_max
+                                      and (x.expires_at is null or x.expires_at > now())) t where t.rn = 1);
+      if v_pass is not null then
+        update public.challenge_passes set remaining = remaining - 1, updated_at = now() where id = v_pass;
+        v_fee := 0;
+      elsif private.balance(v_payer) < v_fee then
+        raise exception '%', case when v_club is null then 'INSUFFICIENT_BALANCE' else 'INSUFFICIENT_TREASURY' end;
+      else
+        perform private.ledger_post('RACE_FEE', 'race_fee:' || v_id, 'Phí tạo giải chạy: ' || v_title, v_uid,
+          private.debit_entries(v_payer, v_fee, private.system_account()), v_id);
+        if v_club is not null then
+          insert into public.club_treasury_log (club_id, user_id, amount, kind, note)
+          values (v_club, v_uid, -v_fee, 'SPEND', left('Phí tạo giải: ' || v_title, 200));
+        end if;
+      end if;
+    end if;
+  end if;
+
+  insert into public.virtual_races (id, organizer_id, club_id, title, description, start_at, end_at, reg_close_at, distances,
+                                    audience, max_participants, bib_prefix, fee_charged, pass_id)
+  values (v_id, v_uid, v_club, v_title, nullif(left(trim(coalesce(p->>'description', '')), 3000), ''), v_start, v_end, v_close,
+          v_dist, v_aud, v_max, v_prefix, v_fee, v_pass);
+  return v_id;
+end $$;
+
+-- Thẻ gói mặc định (bản 009200, chỉ đổi chữ)
+create or replace function private.plan_content_defaults() returns jsonb
+language sql immutable as $$
+  select jsonb_build_object(
+    'free', jsonb_build_object('title', 'Miễn phí', 'subtitle', '',
+      'perks', jsonb_build_array(
+        'Ghi bài bằng GPS trong app hoặc tự động từ Strava',
+        'Xu, XP, cấp độ, huy hiệu, nhiệm vụ, nhân vật',
+        'Tham gia thử thách, CLB, giải chạy, tổ chức không giới hạn',
+        'Tạo miễn phí thử thách cá nhân và thử thách nhóm tới {freeSlots} người',
+        'Thử thách đông hơn {freeSlots} người: trả Xu theo quy mô'),
+      'note', 'VIP không tăng km, XP hay thứ hạng — mọi runner thi đấu công bằng.'),
+    'clubFree', jsonb_build_object('title', 'CLB Miễn phí', 'subtitle', '',
+      'perks', jsonb_build_array(
+        'Tối đa {clubMaxMembers} thành viên',
+        '{clubMaxOpen} thử thách nội bộ miễn phí cùng lúc, mỗi thử thách ≤ {clubMaxSlots} người (cần ≥ {clubMinActive} thành viên có bài chạy trong {activeDays} ngày)',
+        'Tối đa {clubCaptains} quản trị viên',
+        'Bảng tin, chat, lịch, điểm danh QR, quỹ VietQR, bảng xếp hạng',
+        'Ngày hội ×2/×3, đại sảnh danh vọng, cửa hàng CLB, giao lưu CLB'),
+      'note', 'CLB miễn phí vượt số thành viên vẫn giữ đủ người, chỉ chưa duyệt thêm người mới cho tới khi nâng Pro.'),
+    'org', jsonb_build_object('title', 'RaceHub Doanh nghiệp', 'subtitle', 'Báo giá riêng theo số người và thời hạn',
+      'perks', jsonb_build_array(
+        'Chiến dịch sức khoẻ cho cả tổ chức (km, số buổi, số ngày chạy)',
+        'Bảng xếp hạng phòng ban / chi nhánh / CLB — tổng và bình quân đầu người',
+        'Nhập danh sách nhân viên từ Excel, tự duyệt email công ty, đơn vị nhiều cấp',
+        'Báo cáo theo mã nhân viên, xuất Excel',
+        'Chốt kết quả, chứng nhận hoàn thành, quay thưởng minh bạch',
+        'Quản lý nhiều CLB, tài trợ CLB Pro cho cả hệ thống'),
+      'note', ''))
+$$;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001010300_account_risks.sql
+-- ===================================================================
+-- 010300: TÀI KHOẢN BẤT THƯỜNG (Quản trị → Người dùng → Tài khoản bất thường)
+-- Gom các dấu hiệu dùng chung tài khoản / nuôi nhiều tài khoản / ăn gian Xu thành một danh sách cho admin xem và khóa:
+--   • TWO_PLACES     hai bài chạy cùng lúc ở hai nơi cách nhau > 2 km (một tài khoản, hai người chạy)
+--   • SHARED_DEVICE  một thiết bị đăng nhập nhiều tài khoản (theo đăng ký thông báo đẩy; chỉ lưu mã băm, không lưu địa chỉ)
+--   • OVERLAP        nhiều bài bị loại vì trùng giờ với bài khác (009900)
+--   • REFERRAL_FARM  mời ≥ 3 người đã nhận thưởng giới thiệu nhưng mỗi người chỉ chạy ≤ 1 bài (nghi tự tạo tài khoản ảo)
+--   • SUSPICIOUS     nhiều bài nghi vấn nặng (điểm rủi ro ≥ 50) bị giữ hoặc bị từ chối
+-- Chỉ là gợi ý để admin xem xét — không tự khóa ai. Điểm 0–100, chỉ liệt kê từ 20 điểm.
+-- Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT, không RETURNING INTO. Chạy lại an toàn.
+
+create table if not exists private.device_links (
+  device text not null,                          -- md5(endpoint thông báo đẩy): nhận ra cùng máy, không lộ địa chỉ
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  first_seen timestamptz not null default now(),
+  last_seen timestamptz not null default now(),
+  primary key (device, user_id)
+);
+create index if not exists device_links_user_idx on private.device_links (user_id);
+revoke all on private.device_links from public, anon, authenticated;
+
+create or replace function private.track_device_link() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  insert into private.device_links (device, user_id) values (md5(new.endpoint), new.user_id)
+  on conflict (device, user_id) do update set last_seen = now();
+  return new;
+end $$;
+
+drop trigger if exists trg_push_device_link on public.push_subscriptions;
+create trigger trg_push_device_link after insert or update of user_id, last_seen_at on public.push_subscriptions
+  for each row execute function private.track_device_link();
+
+-- Thiết bị đang đăng ký hiện có
+insert into private.device_links (device, user_id, first_seen, last_seen)
+select md5(s.endpoint), s.user_id, s.created_at, s.last_seen_at from public.push_subscriptions s
+on conflict (device, user_id) do nothing;
+
+create or replace function public.admin_account_risks(p_days integer default 30) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_admin uuid := private.require_admin();
+  v_since timestamptz := now() - make_interval(days => greatest(1, least(coalesce(p_days, 30), 365)));
+begin
+  return (
+    with dup as (
+      select a.user_id, count(*) as n from public.activities a
+       where a.created_at >= v_since and a.validation_reason = 'Trùng giờ với bài chạy khác.' group by 1
+    ), two as (
+      select a.user_id, count(*) as n
+        from public.activities a
+        join public.activities b on b.user_id = a.user_id and b.id > a.id
+             and b.started_at < coalesce(a.ended_at, a.started_at) and coalesce(b.ended_at, b.started_at) > a.started_at
+        join public.activity_details da on da.activity_id = a.id
+        join public.activity_details db on db.activity_id = b.id
+       where a.started_at >= v_since and coalesce(a.status, '') <> 'DELETED' and coalesce(b.status, '') <> 'DELETED'
+         and da.start_lat is not null and db.start_lat is not null
+         and private.haversine_m(da.start_lat, da.start_lng, db.start_lat, db.start_lng) > 2000
+       group by 1
+    ), sus as (
+      select a.user_id, count(*) as n from public.activities a
+       where a.created_at >= v_since and a.validation_status in ('PENDING', 'REJECTED') and coalesce(a.risk_score, 0) >= 50
+       group by 1
+    ), dev as (
+      select l.user_id, count(distinct o.user_id) as n
+        from private.device_links l join private.device_links o on o.device = l.device and o.user_id <> l.user_id
+       where l.last_seen >= v_since and o.last_seen >= v_since
+       group by 1
+    ), ref as (
+      select p.referred_by as user_id, count(*) as n
+        from public.profiles p
+       where p.referred_by is not null and p.created_at >= v_since
+         and exists (select 1 from public.ledger_transactions t where t.idempotency_key = 'referral_inviter:' || p.id)
+         and (select count(*) from public.activities x
+               where x.user_id = p.id and x.validation_status = 'APPROVED' and coalesce(x.status, '') <> 'DELETED') <= 1
+       group by 1 having count(*) >= 3
+    ), ids as (
+      select user_id from dup union select user_id from two union select user_id from sus
+      union select user_id from dev union select user_id from ref
+    ), scored as (
+      select i.user_id, coalesce(two.n, 0) as two, coalesce(dev.n, 0) as dev, coalesce(dup.n, 0) as dup,
+             coalesce(ref.n, 0) as ref, coalesce(sus.n, 0) as sus,
+             least(coalesce(two.n, 0) * 40, 80) + least(coalesce(dev.n, 0) * 25, 50) + least(coalesce(dup.n, 0) * 10, 40)
+             + least(coalesce(ref.n, 0) * 10, 50) + least(coalesce(sus.n, 0) * 5, 30) as score
+        from ids i
+        left join two on two.user_id = i.user_id left join dev on dev.user_id = i.user_id left join dup on dup.user_id = i.user_id
+        left join ref on ref.user_id = i.user_id left join sus on sus.user_id = i.user_id
+    ), ranked as (
+      select s.*, row_number() over (order by s.score desc, s.user_id) as rn from scored s where s.score >= 20
+    )
+    select coalesce(jsonb_agg(jsonb_build_object(
+        'user_id', r.user_id, 'name', pr.display_name, 'avatar_url', pr.avatar_url, 'email', au.email,
+        'banned', pr.banned_at is not null, 'score', least(r.score, 100),
+        'flags', (select coalesce(jsonb_agg(jsonb_build_object('code', v.code, 'count', v.n) order by v.ord), '[]'::jsonb)
+                    from (values (1, 'TWO_PLACES', r.two), (2, 'SHARED_DEVICE', r.dev), (3, 'OVERLAP', r.dup),
+                                 (4, 'REFERRAL_FARM', r.ref), (5, 'SUSPICIOUS', r.sus)) v(ord, code, n)
+                   where v.n > 0))
+        order by r.score desc, r.user_id), '[]'::jsonb)
+      from ranked r
+      join public.profiles pr on pr.id = r.user_id
+      left join auth.users au on au.id = r.user_id
+     where r.rn <= 200
+  );
+end $$;
+
+revoke all on function private.track_device_link() from public, anon, authenticated;
+revoke all on function public.admin_account_risks(integer) from public, anon;
+grant execute on function public.admin_account_risks(integer) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -18562,7 +18820,11 @@ begin
     jsonb_build_object('file', '20261001010000', 'label', 'Chống gian lận GPS V1: mất GPS một đoạn vẫn tính đủ km, điểm nhảy không cộng km, chỉ giữ bài có dấu hiệu rõ',
       'ok', (private.ops_defaults()->'antiCheat') ? 'gapReviewPct'),
     jsonb_build_object('file', '20261001010100', 'label', 'Vá sau nghiệm thu: thu hồi quyền ghi thừa trên 9 bảng, chống spam yêu cầu báo giá',
-      'ok', not has_table_privilege('anon', 'public.partners', 'insert') and to_regclass('public.org_leads_user_idx') is not null));
+      'ok', not has_table_privilege('anon', 'public.partners', 'insert') and to_regclass('public.org_leads_user_idx') is not null),
+    jsonb_build_object('file', '20261001010200', 'label', 'Đổi tên "Giải chạy ảo" thành "Giải chạy" (trang hướng dẫn, bài Kiến thức, thông báo, thẻ gói)',
+      'ok', not exists (select 1 from public.help_pages h where h.body ilike '%giải chạy ảo%')),
+    jsonb_build_object('file', '20261001010300', 'label', 'Tài khoản bất thường cho admin: hai nơi cùng lúc, chung thiết bị, bài trùng giờ, nuôi lời mời',
+      'ok', to_regprocedure('public.admin_account_risks(integer)') is not null and to_regclass('private.device_links') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

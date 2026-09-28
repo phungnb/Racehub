@@ -1,4 +1,4 @@
-// Giải chạy ảo: định dạng, trạng thái, CSV cho ban tổ chức (hàm thuần)
+// Giải chạy: định dạng, trạng thái, CSV cho ban tổ chức (hàm thuần)
 import type { DashboardRow, Race } from '../api/raceApi'
 
 export type RacePhase = 'CANCELLED' | 'UPCOMING' | 'LIVE' | 'ENDED'

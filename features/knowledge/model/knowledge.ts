@@ -26,7 +26,7 @@ export const CTA_KINDS: Record<CtaKind, { label: string; target?: string }> = {
   GOAL: { label: 'Đặt mục tiêu tuần' },
   CHALLENGES: { label: 'Khám phá thử thách' },
   CHALLENGE: { label: 'Mở thử thách', target: 'Mã thử thách' },
-  RACES: { label: 'Giải chạy ảo' },
+  RACES: { label: 'Giải chạy' },
   RACE: { label: 'Mở giải chạy', target: 'Mã giải chạy' },
   MARKET: { label: 'Chợ Runner', target: 'COACH / SHOP / SERVICE (tuỳ chọn)' },
   PARTNER: { label: 'Xem hồ sơ HLV / cửa hàng', target: 'Mã hồ sơ đối tác' },

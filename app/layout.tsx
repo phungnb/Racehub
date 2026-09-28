@@ -13,7 +13,7 @@ const mono = JetBrains_Mono({ variable: '--font-jetbrains', subsets: ['latin'] }
 
 export const metadata: Metadata = {
   title: { default: 'RaceHub — Chạy bộ, thử thách & cộng đồng', template: '%s · RaceHub' },
-  description: 'Nền tảng chạy bộ xã hội: thử thách, giải chạy ảo, CLB và phần thưởng RaceCoin.',
+  description: 'Nền tảng chạy bộ xã hội: thử thách, giải chạy, CLB và phần thưởng RaceCoin.',
   applicationName: 'RaceHub',
   appleWebApp: { capable: true, title: 'RaceHub', statusBarStyle: 'black-translucent' },
   icons: { icon: [{ url: ICONS.any192, sizes: '192x192', type: 'image/png' }], apple: ICONS.apple },

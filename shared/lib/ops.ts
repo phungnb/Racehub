@@ -31,7 +31,7 @@ export const FEATURES: { key: FeatureKey; label: string; hint: string }[] = [
   { key: 'market', label: 'Chợ Runner', hint: 'HLV, cửa hàng, dịch vụ đã xác minh' },
   { key: 'bibMarket', label: 'Chợ BIB', hint: 'Nhượng lại / tìm mua BIB giải chạy' },
   { key: 'knowledge', label: 'Kiến thức Runner', hint: 'Bài viết, giáo án' },
-  { key: 'races', label: 'Giải chạy ảo', hint: 'Đăng ký, BIB, chứng nhận' },
+  { key: 'races', label: 'Giải chạy', hint: 'Đăng ký, BIB, chứng nhận' },
   { key: 'cups', label: 'Thách đấu CLB', hint: 'CLB đấu CLB, giải nhiều CLB' },
   { key: 'orgs', label: 'Tổ chức / Doanh nghiệp', hint: 'Chiến dịch, BXH phòng ban' },
 ]
@@ -60,7 +60,7 @@ export const DEFAULT_PLAN_CONTENT: PlanContent = {
     perks: [
       'Ghi bài bằng GPS trong app hoặc tự động từ Strava',
       'Xu, XP, cấp độ, huy hiệu, nhiệm vụ, nhân vật',
-      'Tham gia thử thách, CLB, giải chạy ảo, tổ chức không giới hạn',
+      'Tham gia thử thách, CLB, giải chạy, tổ chức không giới hạn',
       'Tạo miễn phí thử thách cá nhân và thử thách nhóm tới {freeSlots} người',
       'Thử thách đông hơn {freeSlots} người: trả Xu theo quy mô',
     ],

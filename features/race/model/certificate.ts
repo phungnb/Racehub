@@ -1,4 +1,4 @@
-// Giấy chứng nhận hoàn thành giải chạy ảo (migration 004800: BTC tự thiết kế).
+// Giấy chứng nhận hoàn thành giải chạy (migration 004800: BTC tự thiết kế).
 // Cùng engine lớp với e-BIB: chọn khổ (dọc chia sẻ MXH / ngang A4 in) + mẫu → bố cục tự động → kéo chỉnh, đổi font, hiệu ứng.
 import { distanceLabel, racePace, raceTime } from './race'
 import { bibNumber } from './bib'
@@ -31,7 +31,7 @@ export const CERT_COLOR_LABEL: Record<ColorKey, string> = { bg: 'Nền', band: '
 
 export const CERT_BINDS: Binds = {
   name: { label: 'Tên VĐV', sample: 'Nguyễn Văn An' },
-  race: { label: 'Tên giải', sample: 'Giải chạy ảo mùa thu' },
+  race: { label: 'Tên giải', sample: 'Giải chạy mùa thu' },
   org: { label: 'Đơn vị tổ chức', sample: 'Hồ Tây Runners' },
   distance: { label: 'Cự ly', sample: 'Half Marathon' },
   time: { label: 'Thành tích', sample: '1:52:08' },

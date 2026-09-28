@@ -55,11 +55,11 @@ const SLIDES: Slide[] = [
     ),
   },
   {
-    key: 'compete', kicker: 'COMPETE', title: 'Thử thách, giải chạy ảo, huy hiệu',
+    key: 'compete', kicker: 'COMPETE', title: 'Thử thách, giải chạy, huy hiệu',
     text: 'Tham gia thử thách cá nhân, CLB hay cộng đồng. Hoàn thành để nhận BIB, chứng nhận và huy hiệu.',
     visual: (
       <div className="grid w-full max-w-[280px] grid-cols-3 gap-2 text-center">
-        {[['🎯', 'Thử thách'], ['🏁', 'Giải ảo'], ['🎫', 'BIB'], ['🏅', 'Huy hiệu'], ['📜', 'Chứng nhận'], ['⚔️', 'CLB đấu CLB']].map(([i, t]) => (
+        {[['🎯', 'Thử thách'], ['🏁', 'Giải chạy'], ['🎫', 'BIB'], ['🏅', 'Huy hiệu'], ['📜', 'Chứng nhận'], ['⚔️', 'CLB đấu CLB']].map(([i, t]) => (
           <div key={t} className="rounded-2xl border border-border bg-surface px-1 py-3">
             <p className="text-2xl" aria-hidden>{i}</p><p className="mt-1 text-[11px] font-semibold">{t}</p>
           </div>

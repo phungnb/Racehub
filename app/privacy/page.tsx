@@ -12,7 +12,7 @@ export default async function PrivacyPage() {
   return (
     <LegalPage title="Chính sách quyền riêng tư">
       <p>
-        RaceHub là ứng dụng chạy bộ cộng đồng: ghi nhận bài chạy, thử thách, câu lạc bộ (CLB) và giải chạy ảo. Chính sách này giải thích
+        RaceHub là ứng dụng chạy bộ cộng đồng: ghi nhận bài chạy, thử thách, câu lạc bộ (CLB) và giải chạy. Chính sách này giải thích
         chúng tôi thu thập dữ liệu gì, dùng để làm gì và quyền của bạn với dữ liệu đó.
       </p>
       <section>
