@@ -5,6 +5,7 @@ import { useState, type ReactNode } from 'react'
 import { ChevronRight, Lock } from 'lucide-react'
 import { Button, Sheet } from '@/shared/ui'
 import { routes } from '@/shared/config/routes'
+import { PurchaseOnly } from '@/features/system'
 
 /**
  * Tính năng CLB Pro khi CLB đang ở gói Miễn phí: vẫn hiện nút để ban quản trị biết có tính năng này,
@@ -23,13 +24,15 @@ export function ProLockedButton({ icon, label, feature, onUpgrade }: { icon: Rea
       {open && (
         <Sheet open onClose={() => setOpen(false)} title="CLB chưa đủ điều kiện"
           description={`Hiện tại CLB đang dùng gói Miễn phí nên chưa dùng được ${feature}. Tính năng này dành cho CLB Pro.`}
-          footer={<div className="grid gap-2">
+          footer={<PurchaseOnly><div className="grid gap-2">
             {onUpgrade && <Button block variant="coin" onClick={() => { setOpen(false); onUpgrade() }}>Nâng cấp CLB Pro</Button>}
             <Link href={routes.plans} className="flex h-11 items-center justify-center gap-1 rounded-xl border border-border text-sm font-semibold">
               So sánh gói Miễn phí và Pro<ChevronRight className="size-4" aria-hidden />
             </Link>
-          </div>}>
-          <p className="text-sm text-fg-muted">Nâng cấp xong, mọi tính năng Pro mở ngay cho cả ban quản trị. Dữ liệu CLB giữ nguyên.</p>
+          </div></PurchaseOnly>}>
+          <PurchaseOnly fallback={<p className="text-sm text-fg-muted">Khi CLB lên Pro, mọi tính năng Pro mở ngay cho cả ban quản trị. Dữ liệu CLB giữ nguyên.</p>}>
+            <p className="text-sm text-fg-muted">Nâng cấp xong, mọi tính năng Pro mở ngay cho cả ban quản trị. Dữ liệu CLB giữ nguyên.</p>
+          </PurchaseOnly>
         </Sheet>
       )}
     </>

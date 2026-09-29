@@ -14,6 +14,7 @@ import { routes } from '@/shared/config/routes'
 import { createRace, quoteCapacity, raceErrorMessage, type NewRace } from '../api/raceApi'
 import { distanceLabel } from '../model/race'
 import { useOrganizer } from '../hooks/useOrganizer'
+import { PurchaseOnly } from '@/features/system'
 
 const PRESETS = [5, 10, 21.1, 42.2]
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -158,9 +159,9 @@ export function CreateRaceScreen() {
                       · {q.payer === 'CLUB' ? 'quỹ CLB' : 'ví'} có {formatCoin(q.payer_balance)} Xu{short ? ' — không đủ' : ''}</span>}</>}
             </p>
           )}
-          {short && q?.payer === 'USER' && (
+          {short && q?.payer === 'USER' && (<PurchaseOnly>
             <p className="text-xs text-fg-muted"><Link href={routes.plan} className="font-semibold text-brand">Nạp Xu hoặc mua gói VIP</Link> để có lượt tạo miễn phí mỗi tháng.</p>
-          )}
+          </PurchaseOnly>)}
         </Card>
       )}
       <div className="grid grid-cols-2 gap-3">

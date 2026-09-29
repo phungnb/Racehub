@@ -14,6 +14,8 @@ import { billingErrorMessage, MONTH_LABEL, type Credit, type Order, type OrderIn
 import { useActiveSales, useCreateOrder, useMyPlan, usePricing } from '../hooks/useBilling'
 import { bestSale, saleBonusXu, salePrice, type Sale } from '../model/sale'
 import { OrderSheet, orderTitle, STATUS_META } from './OrderSheet'
+import { useCanPurchase } from '@/features/system'
+import { ContactCard } from '@/features/help'
 
 type Tab = 'vip' | 'xu'
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('vi-VN')
@@ -82,12 +84,15 @@ export function PlanScreen() {
   const [order, setOrder] = useState<Order | null>(null)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
   const [now] = useState(() => Date.now())
+  const canPurchase = useCanPurchase()
 
   const buy = async (input: OrderInput, key: string) => {
     setPendingKey(key)
     try { setOrder(await create.mutateAsync(input)) } catch (e) { toast.error(billingErrorMessage(e)) } finally { setPendingKey(null) }
   }
 
+  // App iOS/Android chưa bật mua trong app: chỉ xem gói đang dùng + lượt còn lại, không giá / không nút mua
+  if (!canPurchase) return <PlanStatus plan={mine.data?.plan ?? null} credits={mine.data?.credits ?? []} loading={mine.isPending} />
   if (pricing.isPending) return <Skeleton className="h-96" />
   if (pricing.isError) return <ErrorState message={billingErrorMessage(pricing.error)} error={pricing.error} onRetry={() => void pricing.refetch()} />
   const vip = pricing.data.plans.filter((p) => p.owner_type === 'USER')
@@ -201,7 +206,39 @@ export function PlanScreen() {
         </section>
       )}
 
+      <ContactCard title="Cần hỗ trợ mua / nâng cấp?" note="Chuyển khoản xong mà chưa kích hoạt, hoặc cần xuất hoá đơn: nhắn admin qua các kênh dưới đây." />
+
       <OrderSheet order={order} onClose={() => { setOrder(null); void mine.refetch() }} />
+    </div>
+  )
+}
+
+/** Xem gói đang dùng (không có giá, không nút mua) — dùng trong app iOS/Android khi chưa bật mua trong app */
+function PlanStatus({ plan, credits, loading }: { plan: { name: string; ends_at: string; plan_code: string } | null; credits: Credit[]; loading: boolean }) {
+  if (loading) return <Skeleton className="h-40" />
+  return (
+    <div className="space-y-4">
+      <Card className="space-y-3">
+        <div className="flex items-center gap-3">
+          <span className={cn('grid size-11 place-items-center rounded-xl', plan ? 'bg-coin/20 text-coin' : 'bg-surface-2 text-fg-muted')}><Crown className="size-5" aria-hidden /></span>
+          <div>
+            <p className="font-bold">{plan ? plan.name : 'Gói miễn phí'}</p>
+            <p className="text-xs text-fg-muted">{plan ? `Hiệu lực đến ${fmtDate(plan.ends_at)}` : 'Bạn đang dùng gói miễn phí'}</p>
+          </div>
+        </div>
+        {(plan || credits.length > 0) && (
+          <>
+            <p className="text-sm font-semibold">Lượt tạo thử thách / giải còn lại</p>
+            <CreditList credits={credits} empty="Đã dùng hết lượt tháng này." />
+          </>
+        )}
+      </Card>
+      {plan?.plan_code.startsWith('VIP') && (
+        <Link href={routes.insights} className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-3 text-sm font-semibold">
+          Mở Phân tích của tôi (quyền lợi VIP)<ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+        </Link>
+      )}
+      <p className="text-xs text-fg-subtle">Chạy mỗi ngày để kiếm Xu — dùng Xu tặng quà, mua trang phục, tạo thử thách.</p>
     </div>
   )
 }

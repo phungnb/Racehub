@@ -11,6 +11,7 @@ import { gameErrorMessage } from '../api/gameApi'
 import { useWallet } from '../hooks/useGame'
 import { walletLabel, type WalletItem } from '../model/game'
 import { PromoCodeForm } from './PromoCodeForm'
+import { PurchaseOnly } from '@/features/system'
 
 const dayLabel = (iso: string) => {
   const d = new Date(iso)
@@ -40,13 +41,13 @@ export function WalletView() {
       <Card className="space-y-3 bg-gradient-to-br from-coin/15 via-surface to-surface">
         <p className="text-sm text-fg-muted">Số dư</p>
         <p className="font-mono text-4xl font-bold text-coin">{formatCoin(head.total)} <span className="text-lg">Xu</span></p>
-        <p className="text-xs text-fg-subtle">Giá trị tham chiếu {xuToVnd(head.total)} · Xu dùng trong app, không đổi ra tiền</p>
+        <p className="text-xs text-fg-subtle"><PurchaseOnly fallback="Chạy mỗi ngày để kiếm thêm Xu">Giá trị tham chiếu {xuToVnd(head.total)}</PurchaseOnly> · Xu dùng trong app, không đổi ra tiền</p>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div className="rounded-xl bg-bg/60 p-2.5"><p className="text-xs text-fg-subtle">Xu thưởng</p><p className="font-mono font-semibold">{formatCoin(head.bonus)}</p></div>
           <div className="rounded-xl bg-bg/60 p-2.5"><p className="text-xs text-fg-subtle">Xu nạp</p><p className="font-mono font-semibold">{formatCoin(head.paid)}</p></div>
         </div>
         <p className="text-xs text-fg-subtle">Khi tiêu, Xu thưởng được dùng trước. Xu không chuyển cho người khác được.</p>
-        <div className="grid grid-cols-2 gap-2">
+        <PurchaseOnly><div className="grid grid-cols-2 gap-2">
           <Link href={`${routes.plan}?tab=xu`} className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-coin font-semibold text-bg">
             <Plus className="size-4" aria-hidden />Nạp Xu
           </Link>
@@ -54,7 +55,7 @@ export function WalletView() {
             <Crown className="size-4 text-coin" aria-hidden />Gói VIP
           </Link>
         </div>
-        <PromoCodeForm />
+        <PromoCodeForm /></PurchaseOnly>
       </Card>
 
       {!items.length ? (

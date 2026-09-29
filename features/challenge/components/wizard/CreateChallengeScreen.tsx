@@ -23,6 +23,7 @@ import {
 } from '../../model/challenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
 import { TemplatePicker } from './TemplatePicker'
+import { PurchaseOnly } from '@/features/system'
 
 const STEPS = ['Loại', 'Luật chơi', 'Thời gian & thưởng', 'Xem lại'] as const
 const DAY = 86_400_000
@@ -722,7 +723,7 @@ function StepTime({ d, set, errors, balance, quote }: StepProps & { balance: num
           )}
           {!quote?.pass && !quote?.plan && fee !== null && fee > 0 && (
             <p className="text-xs text-fg-subtle">
-              Gói VIP / CLB Pro có lượt tạo miễn phí mỗi tháng. <Link href={routes.plan} className="font-semibold text-brand">Xem gói</Link>
+              Gói VIP / CLB Pro có lượt tạo miễn phí mỗi tháng.<PurchaseOnly> <Link href={routes.plan} className="font-semibold text-brand">Xem gói</Link></PurchaseOnly>
             </p>
           )}
           {!quote?.pass && quote?.plan && fee !== null && fee > 0 && (
@@ -846,7 +847,7 @@ function StepReview({ d, quote, bill, loading, failed, quoteError, onRetry, club
               return out
             })()}
             <p className="text-sm text-fg-muted">
-              Hoặc <Link href={routes.plan} className="font-semibold text-brand">{quote.plan ? 'nạp Xu' : 'nạp Xu / mua gói'}</Link>, hay chạy thêm để kiếm Xu ({runPolicyText(quote.policy.run)}).
+              <PurchaseOnly fallback="Chạy thêm để kiếm Xu">Hoặc <Link href={routes.plan} className="font-semibold text-brand">{quote.plan ? 'nạp Xu' : 'nạp Xu / mua gói'}</Link>, hay chạy thêm để kiếm Xu</PurchaseOnly> ({runPolicyText(quote.policy.run)}).
             </p>
           </div>
         </Card>

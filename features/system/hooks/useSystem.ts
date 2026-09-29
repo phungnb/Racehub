@@ -1,6 +1,8 @@
 'use client'
 
+import { useSyncExternalStore } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { isNativeApp } from '@/shared/lib/native'
 import { getClientErrors, getConfigHistory, getOpsPolicy, getSystemNotice, publishOpsPolicy, resolveClientError, rollbackConfig, setSystemNotice, type ConfigKey } from '../api/systemApi'
 import { DEFAULT_OPS, type FeatureKey, type OpsPolicy } from '@/shared/lib/ops'
 
@@ -40,6 +42,20 @@ export function useOpsPolicy(): OpsPolicy {
 
 /** Tính năng đang bật cho người dùng? (mặc định bật khi chưa đọc được máy chủ) */
 export const useFeature = (key: FeatureKey) => useOpsPolicy().features[key] !== false
+
+const noSubscribe = () => () => {}
+/** Đang chạy trong app iOS/Android (vỏ Capacitor)? Lần vẽ trên máy chủ và lúc khớp HTML luôn là false. */
+export const useIsNativeApp = () => useSyncExternalStore(noSubscribe, isNativeApp, () => false)
+
+/**
+ * Được hiện giá / nút mua gói / nạp Xu ở đây không? Web: luôn được. App iOS/Android: chỉ khi admin bật
+ * "Cho phép mua trong app" (sau khi có thanh toán qua Apple / Google) — quy định App Store 3.1.1 / 3.1.3.
+ */
+export function useCanPurchase() {
+  const native = useIsNativeApp()
+  const { features } = useOpsPolicy()
+  return !native || features.nativePurchases === true
+}
 
 export function usePublishOps() {
   const qc = useQueryClient()

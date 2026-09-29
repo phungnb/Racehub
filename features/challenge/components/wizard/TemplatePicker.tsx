@@ -10,6 +10,7 @@ import { formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import { challengeErrorMessage, getChallengeTemplates, type ChallengeTemplate } from '../../api/challengeApi'
 import { FORMAT_META, type ChallengeFormat } from '../../model/challenge'
+import { PurchaseOnly } from '@/features/system'
 
 /** Dùng lại thử thách mình đã tạo làm mẫu (VIP2): giữ luật chơi, quy mô, đội, thời lượng */
 export function TemplatePicker({ onPick }: { onPick: (t: ChallengeTemplate) => void }) {
@@ -19,10 +20,13 @@ export function TemplatePicker({ onPick }: { onPick: (t: ChallengeTemplate) => v
   if (vip.loading) return null
   if (vip.tier < 2) {
     return (
-      <Link href={routes.plan} className="flex items-center gap-3 rounded-xl border border-dashed border-border p-3 text-sm">
-        <Crown className="size-4 shrink-0 text-coin" aria-hidden />
-        <span className="flex-1 text-fg-muted">Nhân bản thử thách cũ làm mẫu — dành cho VIP2</span>
-      </Link>
+      <PurchaseOnly fallback={<p className="flex items-center gap-3 rounded-xl border border-dashed border-border p-3 text-sm text-fg-muted">
+        <Crown className="size-4 shrink-0 text-coin" aria-hidden />Nhân bản thử thách cũ làm mẫu — dành cho VIP2</p>}>
+        <Link href={routes.plan} className="flex items-center gap-3 rounded-xl border border-dashed border-border p-3 text-sm">
+          <Crown className="size-4 shrink-0 text-coin" aria-hidden />
+          <span className="flex-1 text-fg-muted">Nhân bản thử thách cũ làm mẫu — dành cho VIP2</span>
+        </Link>
+      </PurchaseOnly>
     )
   }
   return (

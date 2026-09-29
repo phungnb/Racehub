@@ -876,16 +876,16 @@ Tổng: 111 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 54
 | E49 | success | Đã lưu mục tiêu của bạn | `features/challenge/components/detail/PledgePanel.tsx:52` |
 | E50 | success | Đã lưu thể lệ | `features/challenge/components/detail/RulesInfo.tsx:100` |
 | E51 | success | Đã lưu thiết kế vinh danh | `features/challenge/components/honor/HonorDesigner.tsx:51` |
-| E52 | success | Đã đổi ảnh vinh danh | `features/challenge/components/honor/HonorPanel.tsx:175` |
-| E53 | success | Đã đổi ảnh | `features/challenge/components/honor/HonorPanel.tsx:227` |
+| E52 | success | Đã đổi ảnh vinh danh | `features/challenge/components/honor/HonorPanel.tsx:176` |
+| E53 | success | Đã đổi ảnh | `features/challenge/components/honor/HonorPanel.tsx:228` |
 | E54 | success | Đã lưu hạng mục vinh danh | `features/challenge/components/honor/HonorSetup.tsx:37` |
-| E55 | error | Đã tạo thử thách nhưng chưa bật được mục tiêu tự đăng ký: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:104` |
-| E56 | error | Đã tạo thử thách nhưng chưa lưu được thể lệ (sửa lại ở tab Luật chơi): ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:108` |
-| E57 | error | Đã tạo thử thách nhưng chưa bật được tự lặp lại: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:112` |
-| E58 | success | Đã chép luật từ "${t.title}" — kiểm tra lại rồi tạo | `features/challenge/components/wizard/CreateChallengeScreen.tsx:144` |
-| E59 | error | Kiểm tra lại các ô được đánh dấu. | `features/challenge/components/wizard/CreateChallengeScreen.tsx:75` |
-| E60 | error | Đã tạo thử thách nhưng chưa lưu được hạng mục: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:94` |
-| E61 | error | Đã tạo thử thách nhưng chưa đặt được hạn đăng ký: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:98` |
+| E55 | error | Đã tạo thử thách nhưng chưa bật được mục tiêu tự đăng ký: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:105` |
+| E56 | error | Đã tạo thử thách nhưng chưa lưu được thể lệ (sửa lại ở tab Luật chơi): ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:109` |
+| E57 | error | Đã tạo thử thách nhưng chưa bật được tự lặp lại: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:113` |
+| E58 | success | Đã chép luật từ "${t.title}" — kiểm tra lại rồi tạo | `features/challenge/components/wizard/CreateChallengeScreen.tsx:145` |
+| E59 | error | Kiểm tra lại các ô được đánh dấu. | `features/challenge/components/wizard/CreateChallengeScreen.tsx:76` |
+| E60 | error | Đã tạo thử thách nhưng chưa lưu được hạng mục: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:95` |
+| E61 | error | Đã tạo thử thách nhưng chưa đặt được hạn đăng ký: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:99` |
 | E62 | error | Tối đa 12 lớp in. | `features/character/components/GarmentDesigner.tsx:193` |
 | E63 | error | Tối đa 12 lớp in. | `features/character/components/GarmentDesigner.tsx:198` |
 | E64 | error | Ảnh tối đa 2 MB. | `features/character/components/GarmentDesigner.tsx:199` |
@@ -957,7 +957,7 @@ Tổng: 111 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 54
 | E130 | info | ${shown.name}: vắng mặt — quay lại ${shown.prize} | `features/draw/components/DrawStage.tsx:103` |
 | E131 | success | Đã công bố kết quả và báo người trúng | `features/draw/components/DrawStage.tsx:113` |
 | E132 | info | Trình duyệt này không hỗ trợ toàn màn hình | `features/draw/components/DrawStage.tsx:133` |
-| E133 | success | Đã tặng ${toName} ${qty > 1 ? | `features/game/components/GiftButton.tsx:97` |
+| E133 | success | Đã tặng ${toName} ${qty > 1 ? | `features/game/components/GiftButton.tsx:98` |
 | E134 | success | ${r.title ?? 'Đã nhận khuyến mãi'}${parts.length ? | `features/game/components/PromoCodeForm.tsx:19` |
 | E135 | success | Đã gửi lời cảm ơn tới ${u.display_name ?? 'runner'} 💛 | `features/game/components/ShineScreen.tsx:112` |
 | E136 | success | Đã đổi ${r.name} | `features/game/components/ShineScreen.tsx:138` |
@@ -966,7 +966,7 @@ Tổng: 111 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 54
 | E139 | success | Đã lưu trang | `features/help/components/HelpAdminTab.tsx:123` |
 | E140 | success | Đã xoá trang (nội dung cũ lưu trong nhật ký quản trị) | `features/help/components/HelpAdminTab.tsx:128` |
 | E141 | success | Đã lưu thông tin pháp nhân | `features/help/components/HelpAdminTab.tsx:82` |
-| E142 | error | Trình duyệt chặn cửa sổ in — hãy cho phép popup. | `features/insights/components/InsightsScreen.tsx:210` |
+| E142 | error | Trình duyệt chặn cửa sổ in — hãy cho phép popup. | `features/insights/components/InsightsScreen.tsx:213` |
 | E143 | error | Không lưu được lựa chọn. Thử lại sau. | `features/integrations/strava/components/StravaShareCard.tsx:27` |
 | E144 | success | Đã nhận ${s.imported} bài chạy mới từ Strava | `features/integrations/strava/components/StravaSyncCard.tsx:38` |
 | E145 | warning | Không nhập bài nào: ${skipped.join('; ')}. | `features/integrations/strava/components/StravaSyncCard.tsx:69` |
@@ -1038,7 +1038,7 @@ Tổng: 111 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 54
 | E211 | success | Đã có mạng trở lại | `features/pwa/components/OfflineBanner.tsx:25` |
 | E212 | success | Đã kết nối lại máy chủ | `features/pwa/components/OfflineBanner.tsx:27` |
 | E213 | success | Đã lưu thiết kế BIB — VĐV thấy ngay | `features/race/components/BibDesigner.tsx:40` |
-| E214 | success | Đã tạo giải | `features/race/components/CreateRaceScreen.tsx:61` |
+| E214 | success | Đã tạo giải | `features/race/components/CreateRaceScreen.tsx:62` |
 | E215 | success | Đã hủy giải và báo cho VĐV | `features/race/components/RaceDetailScreen.tsx:283` |
 | E216 | success | Đã rút tên | `features/race/components/RaceDetailScreen.tsx:92` |
 | E217 | success | Đã ghi nhận lời mời của ${x.referrer_name} | `features/referral/components/InviteScreen.tsx:118` |

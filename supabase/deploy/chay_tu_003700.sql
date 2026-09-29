@@ -1,7 +1,7 @@
--- RaceHub: gộp 75 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 76 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -20124,6 +20124,45 @@ grant execute on function public.gift_catalog_for(uuid, uuid), public.gift_catal
 grant execute on function public.admin_save_gift(jsonb) to authenticated;
 
 -- ===================================================================
+-- 20261001011100_app_store_mode.sql
+-- ===================================================================
+-- 011100: CHẾ ĐỘ APP CỬA HÀNG — ẨN MUA BÁN TRONG APP iOS/ANDROID, LIÊN HỆ ADMIN (ZALO / TELEGRAM)
+--   • Chính sách vận hành có thêm công tắc features.nativePurchases (mặc định TẮT): tắt thì app iOS/Android ẩn mọi chỗ mua gói,
+--     nạp Xu, giá tiền (quy định App Store 3.1.1 / 3.1.3, Google Play Payments). Web giữ nguyên. Bật lại khi đã có thanh toán
+--     qua Apple / Google (In-App Purchase). Admin đổi ở Quản trị → Hệ thống → Chính sách vận hành.
+--   • Thông tin công ty có thêm Zalo và Telegram hỗ trợ (cạnh email, điện thoại) — hiện ở menu "Liên hệ hỗ trợ" và trang Gói trên web.
+-- Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT, không RETURNING INTO. Chạy lại an toàn.
+
+create or replace function private.ops_defaults() returns jsonb
+language sql immutable set search_path = public as $$
+  select jsonb_build_object(
+    'features', jsonb_build_object('nearby', true, 'market', true, 'bibMarket', true, 'knowledge', true, 'races', true, 'cups', true, 'orgs', true, 'nativePurchases', false),
+    'tracking', jsonb_build_object('autoPauseAfterS', 10, 'longStopAskMin', 10, 'longStopAutoStopMin', 30, 'trimTailMin', 2),
+    'antiCheat', jsonb_build_object('dailyRunLimit', 20, 'minPaceMin', 3, 'vehicleKmh', 25, 'vehicleS', 30, 'severeKmh', 20, 'severeS', 120,
+                                    'highKmh', 17, 'highS', 180, 'spikeKmh', 43, 'spikeMax', 3, 'autoApproveMaxScore', 0, 'gapReviewPct', 50),
+    'content', jsonb_build_object('enterprise', jsonb_build_object(
+      'title', 'Phong trào chạy bộ cho cả tổ chức',
+      'subtitle', 'Chiến dịch, bảng xếp hạng phòng ban, quản lý nhiều CLB và báo cáo cho nhân sự — tự động từ Strava và GPS, không cần bảng tính.',
+      'features', jsonb_build_array(
+        jsonb_build_object('title', 'Chiến dịch sức khoẻ', 'text', 'Tạo chiến dịch theo tổng km, số buổi hoặc số ngày chạy; mục tiêu chung cả tổ chức và mục tiêu mỗi người.'),
+        jsonb_build_object('title', 'Xếp hạng theo đơn vị', 'text', 'Phòng ban, chi nhánh, lớp hoặc CLB thi đua với nhau — tính cả tổng và bình quân đầu người cho công bằng.'),
+        jsonb_build_object('title', 'Quản lý nhiều CLB', 'text', 'Liên đoàn mời CLB tham gia; thành viên CLB tự được tính vào chiến dịch. Có thể tài trợ CLB Pro cho cả hệ thống.'),
+        jsonb_build_object('title', 'Báo cáo cho nhân sự', 'text', 'km, số buổi, số ngày chạy của từng người theo khoảng ngày; mã nhân viên, đơn vị; xuất Excel.'),
+        jsonb_build_object('title', 'Thương hiệu riêng', 'text', 'Logo, ảnh bìa, màu chủ đề, khẩu hiệu; bảng tin nội bộ như một CLB lớn; chứng nhận hoàn thành thiết kế theo mẫu công ty.'),
+        jsonb_build_object('title', 'Quản lý như phòng nhân sự', 'text', 'Tự duyệt theo email công ty, nhập danh sách từ Excel, đơn vị nhiều cấp, trưởng đơn vị tự quản lý người của mình.'),
+        jsonb_build_object('title', 'Trao giải minh bạch', 'text', 'Chốt kết quả, duyệt top trước khi trao, ngày hội ×2 / ×3, quay thưởng may mắn có mã kiểm chứng.'),
+        jsonb_build_object('title', 'Chống gian lận, tôn trọng riêng tư', 'text', 'Chỉ tính bài chạy hợp lệ (GPS, pace, duyệt); người chạy tắt chia sẻ bài nào thì bài đó không vào bảng.'))),
+      'plans', private.plan_content_defaults()))
+$$;
+
+-- Các khoá thông tin pháp nhân / liên hệ (giữ đồng bộ với features/help/model/help.ts)
+create or replace function private.site_info_keys() returns text[]
+language sql immutable as $$
+  select array['company_name', 'tax_code', 'address', 'support_email', 'support_phone', 'support_zalo', 'support_telegram',
+               'dpo_contact', 'min_age', 'report_email', 'business_license']
+$$;
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -20323,7 +20362,9 @@ begin
     jsonb_build_object('file', '20261001010900', 'label', 'BXH giải chạy theo cự ly (ai hoàn thành, ai chưa), đổi "mốc" thành "mục tiêu"',
       'ok', to_regprocedure('public.race_results_v2(uuid,numeric)') is not null),
     jsonb_build_object('file', '20261001011000', 'label', 'Kho quà v2: quà tĩnh / quà hiệu ứng động, quà theo mốc (5K…Ultra, PR), 45 quà mới, ảnh riêng',
-      'ok', private.sc_col('gift_catalog', 'kind') and to_regprocedure('public.gift_catalog_for(uuid,uuid)') is not null));
+      'ok', private.sc_col('gift_catalog', 'kind') and to_regprocedure('public.gift_catalog_for(uuid,uuid)') is not null),
+    jsonb_build_object('file', '20261001011100', 'label', 'App cửa hàng: ẩn mua bán trong app iOS/Android (công tắc "Cho phép mua trong app"), Zalo / Telegram hỗ trợ',
+      'ok', private.ops_defaults()->'features' ? 'nativePurchases' and 'support_zalo' = any (private.site_info_keys())));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

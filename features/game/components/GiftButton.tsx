@@ -12,6 +12,7 @@ import { formatCoin } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import { gameErrorMessage, giftCost, type Gift, type GiftContext, type GiftKind, type GiftTier } from '../api/gameApi'
 import { useGiftCatalog, useSendGift } from '../hooks/useGame'
+import { PurchaseOnly } from '@/features/system'
 
 const QTY = [1, 5, 10, 99] as const
 const QUICK = ['Cố lên!', 'Đỉnh quá!', 'Pace đẹp quá!', 'Chạy bền thật!']
@@ -172,7 +173,7 @@ export function GiftButton({ toUser, toName, toAvatar, postId, activityId, total
           </div>
           <p className={cn('text-xs', balance < cost || cost > left ? 'text-danger' : 'text-fg-subtle')}>
             Ví của bạn: {formatCoin(balance)} Xu{Number.isFinite(left) ? ` · hôm nay còn tặng được ${formatCoin(left)} Xu` : ''}
-            {balance < cost && <> · <Link href={routes.plan} className="font-semibold text-brand">Nạp Xu</Link></>}
+            {balance < cost && <PurchaseOnly fallback=" · không đủ Xu"> · <Link href={routes.plan} className="font-semibold text-brand">Nạp Xu</Link></PurchaseOnly>}
           </p>
           <Field label="Lời nhắn (không bắt buộc)" htmlFor="gift-msg">
             <Input id="gift-msg" value={msg} maxLength={140} onChange={(e) => setMsg(e.target.value)} placeholder="Cố lên!" />

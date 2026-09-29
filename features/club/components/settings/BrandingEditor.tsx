@@ -61,7 +61,7 @@ export function BrandingEditor({ club, active }: { club: Club; active: boolean }
         </div>
         {!active && (
           <div className="absolute inset-0 grid place-items-center bg-black/55 text-center text-sm font-semibold text-white">
-            <span className="flex items-center gap-2"><Lock className="size-4" aria-hidden />Nâng cấp CLB Pro để trang trí tường nhà</span>
+            <span className="flex items-center gap-2"><Lock className="size-4" aria-hidden />Trang trí tường nhà là tính năng CLB Pro</span>
           </div>
         )}
       </div>

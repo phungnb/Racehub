@@ -2,7 +2,7 @@
 // app đọc qua RPC ops_policy() — không phải sửa code / dựng lại app. Bản mặc định dưới đây GIỐNG private.ops_defaults()
 // và chỉ dùng khi chưa đọc được máy chủ (mất mạng / chưa chạy migration).
 
-export type FeatureKey = 'nearby' | 'market' | 'bibMarket' | 'knowledge' | 'races' | 'cups' | 'orgs'
+export type FeatureKey = 'nearby' | 'market' | 'bibMarket' | 'knowledge' | 'races' | 'cups' | 'orgs' | 'nativePurchases'
 
 export interface TrackingRules { autoPauseAfterS: number; longStopAskMin: number; longStopAutoStopMin: number; trimTailMin: number }
 export interface AntiCheatRules {
@@ -34,7 +34,11 @@ export const FEATURES: { key: FeatureKey; label: string; hint: string }[] = [
   { key: 'races', label: 'Giải chạy', hint: 'Đăng ký, BIB, chứng nhận' },
   { key: 'cups', label: 'Thách đấu CLB', hint: 'CLB đấu CLB, giải nhiều CLB' },
   { key: 'orgs', label: 'Tổ chức / Doanh nghiệp', hint: 'Chiến dịch, BXH phòng ban' },
+  // 011100: mặc định TẮT — app iOS/Android ẩn giá, mua gói, nạp Xu (quy định App Store / Google Play). Web không đổi.
+  { key: 'nativePurchases', label: 'Cho phép mua trong app iOS/Android', hint: 'Chỉ bật khi đã có thanh toán qua Apple / Google. Tắt: app ẩn giá, mua gói, nạp Xu (web vẫn bán)' },
 ]
+/** Tính năng mặc định TẮT khi máy chủ chưa đặt (các tính năng khác mặc định bật) */
+const OFF_BY_DEFAULT: FeatureKey[] = ['nativePurchases']
 
 export const DEFAULT_TRACKING: TrackingRules = { autoPauseAfterS: 10, longStopAskMin: 10, longStopAutoStopMin: 30, trimTailMin: 2 }
 export const DEFAULT_ANTI_CHEAT: AntiCheatRules = {
@@ -150,7 +154,7 @@ export function validatePlanContent(p: PlanContent): string | null {
 
 export const DEFAULT_OPS: OpsPolicy = {
   version: 0,
-  features: { nearby: true, market: true, bibMarket: true, knowledge: true, races: true, cups: true, orgs: true },
+  features: { nearby: true, market: true, bibMarket: true, knowledge: true, races: true, cups: true, orgs: true, nativePurchases: false },
   tracking: DEFAULT_TRACKING,
   content: { enterprise: DEFAULT_ENTERPRISE, plans: DEFAULT_PLAN_CONTENT },
 }
@@ -171,7 +175,7 @@ export function toOps(raw: unknown): OpsPolicy {
     : DEFAULT_ENTERPRISE.features
   return {
     version: num(r.version, 0),
-    features: Object.fromEntries(FEATURES.map(({ key }) => [key, typeof f[key] === 'boolean' ? f[key] : true])) as Record<FeatureKey, boolean>,
+    features: Object.fromEntries(FEATURES.map(({ key }) => [key, typeof f[key] === 'boolean' ? f[key] : !OFF_BY_DEFAULT.includes(key)])) as Record<FeatureKey, boolean>,
     tracking: pickNums(r.tracking, DEFAULT_TRACKING),
     ...(r.antiCheat ? { antiCheat: pickNums(r.antiCheat, DEFAULT_ANTI_CHEAT) } : {}),
     content: {
