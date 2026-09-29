@@ -26,8 +26,9 @@ export function CommentsSheet({ post, meId, isStaff, onClose }: { post: ClubPost
     }
   }
   const add = useMutation({
-    mutationFn: () => addComment(postId, text.trim(), replyTo?.id ?? null),
-    onSuccess: () => { setText(''); setReplyTo(null); refresh() },
+    mutationFn: (t?: string) => addComment(postId, (t ?? text).trim(), replyTo?.id ?? null),
+    // Gửi nhanh (cổ vũ / sticker) không xóa chữ đang gõ dở
+    onSuccess: (_r, t) => { if (t === undefined) setText(''); setReplyTo(null); refresh() },
     onError: (e) => toast.error(clubErrorMessage(e)),
   })
   const del = useMutation({ mutationFn: deleteComment, onSuccess: refresh, onError: (e) => toast.error(clubErrorMessage(e)) })
@@ -44,7 +45,7 @@ export function CommentsSheet({ post, meId, isStaff, onClose }: { post: ClubPost
 
   return (
     <Sheet open={!!post} onClose={close} title="Bình luận"
-      footer={<CommentComposer ref={input} value={text} onChange={setText} onSubmit={() => add.mutate()} pending={add.isPending}
+      footer={<CommentComposer ref={input} value={text} onChange={setText} onSubmit={(t) => add.mutate(t)} pending={add.isPending}
         replyTo={replyTo} onCancelReply={() => setReplyTo(null)} />}>
       {q.isLoading ? (
         <div className="space-y-3">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-12" />)}</div>

@@ -15,6 +15,7 @@ import { cancelClubExchange, getClubExchanges, respondClubExchange, sendClubExch
 import { useClub } from '../../hooks/useClub'
 import { accentOf } from '../../model/roles'
 import { fromVnLocalInput, parseLatLng, toVnLocalInput } from '../../model/events'
+import { PlaceField } from '../events/PlaceField'
 import { ClubAvatar } from '../hub/ClubAvatar'
 
 const STATUS: Record<ExchangeStatus, { label: string; cls: string }> = {
@@ -223,11 +224,9 @@ function ComposeSheet({ clubId, clubName, onClose }: { clubId: string; clubName:
             <Input id="x-dur" type="number" min={15} max={720} value={duration} onChange={(e) => setDuration(Number(e.target.value) || 90)} />
           </Field>
         </div>
-        <Field label="Địa điểm tập trung" htmlFor="x-place">
-          <Input id="x-place" value={place} maxLength={120} onChange={(e) => setPlace(e.target.value)} placeholder="VD: Cổng số 1 công viên Thống Nhất" />
-        </Field>
-        <Field label="Toạ độ / link Google Maps (không bắt buộc)" htmlFor="x-ll" error={coords.trim() && !ll ? 'Không đọc được toạ độ' : null}>
-          <Input id="x-ll" value={coords} onChange={(e) => setCoords(e.target.value)} placeholder="21.0123, 105.8456" />
+        <Field label="Địa điểm tập trung" htmlFor="x-place" hint="Chọn từ gợi ý hoặc bấm “Vị trí của tôi” để có vị trí trên bản đồ">
+          <PlaceField id="x-place" place={place} onPlace={setPlace} coords={coords} onCoords={setCoords}
+            coordsError={coords.trim() && !ll ? 'Không đọc được toạ độ' : null} />
         </Field>
         <div className="grid grid-cols-3 gap-3">
           <Field label="Cự ly (km)" htmlFor="x-km"><Input id="x-km" inputMode="decimal" value={distance} onChange={(e) => setDistance(e.target.value)} placeholder="10" /></Field>

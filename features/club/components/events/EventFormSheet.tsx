@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Copy, LocateFixed, Plus, Share2, X } from 'lucide-react'
+import { Copy, Plus, Share2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Field, Input, Sheet, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -9,6 +9,7 @@ import { EventVisibilityToggle, nearbyErrorMessage, setEventVisibility, type Eve
 import { createEvent, eventRoutes, eventsErrorMessage, updateEvent, type ClubEvent, type EventInput } from '../../api/eventsApi'
 import { useClubMutation } from '../../hooks/useEvents'
 import { fromVnLocalInput, parseLatLng, toVnLocalInput } from '../../model/events'
+import { PlaceField } from './PlaceField'
 
 const DURATIONS = [60, 90, 120, 180]
 
@@ -34,7 +35,6 @@ export function EventFormSheet({ clubId, event, open, onClose, onSaved }: {
   const [created, setCreated] = useState<ClubEvent | null>(null)
   const [capacity, setCapacity] = useState(event?.capacity ? String(event.capacity) : '')
   const [desc, setDesc] = useState(event?.description ?? '')
-  const [locating, setLocating] = useState(false)
   const [visibility, setVisibility] = useState<EventVisibility>(event?.visibility ?? 'CLUB')
 
   const ll = coords.trim() ? parseLatLng(coords) : null
@@ -49,7 +49,7 @@ export function EventFormSheet({ clubId, event, open, onClose, onSaved }: {
   const err = (k: string, msg: string) => (showErrors && problems.includes(k) ? msg : null)
   const MESSAGES: Record<string, string> = {
     title: 'Tên sự kiện cần ít nhất 3 ký tự', start: 'Chọn ngày giờ bắt đầu', coords: 'Tọa độ chưa đúng',
-    public: 'Buổi chạy công khai cần tọa độ điểm hẹn', routes: 'Cự ly từ 0,1 đến 200 km',
+    public: 'Buổi chạy công khai cần vị trí điểm hẹn', routes: 'Cự ly từ 0,1 đến 200 km',
   }
 
   const save = useClubMutation(clubId, (input: EventInput) => (event ? updateEvent(event.id, input) : createEvent(clubId, input)))
@@ -81,16 +81,6 @@ export function EventFormSheet({ clubId, event, open, onClose, onSaved }: {
     }
   }
 
-  const locate = () => {
-    if (!navigator.geolocation) { toast.error('Máy không hỗ trợ định vị.'); return }
-    setLocating(true)
-    navigator.geolocation.getCurrentPosition(
-      (p) => { setCoords(`${p.coords.latitude.toFixed(6)}, ${p.coords.longitude.toFixed(6)}`); setLocating(false) },
-      () => { toast.error('Không lấy được vị trí. Hãy dán link Google Maps.'); setLocating(false) },
-      { enableHighAccuracy: true, timeout: 10_000 },
-    )
-  }
-
   if (created) return <EventLinkSheet event={created} onClose={() => { setCreated(null); onClose() }} />
 
   return (
@@ -112,22 +102,15 @@ export function EventFormSheet({ clubId, event, open, onClose, onSaved }: {
             </select>
           </Field>
         </div>
-        <Field label="Điểm hẹn" htmlFor="ev-place">
-          <Input id="ev-place" value={place} onChange={(e) => setPlace(e.target.value)} maxLength={120} placeholder="Cổng công viên Thống Nhất" />
-        </Field>
-        <Field label={visibility === 'PUBLIC' ? 'Tọa độ điểm hẹn' : 'Tọa độ (không bắt buộc)'} htmlFor="ev-ll"
-          error={problems.includes('coords') ? 'Dán link Google Maps hoặc "21.05, 105.82"' : err('public', MESSAGES.public)}
-          hint="Có tọa độ thì bài chạy xuất phát trong 500 m quanh điểm hẹn sẽ tự điểm danh">
-          <div className="flex gap-2">
-            <Input id="ev-ll" value={coords} onChange={(e) => setCoords(e.target.value)} placeholder="Dán link Google Maps" />
-            <Button variant="secondary" className="shrink-0" onClick={locate} loading={locating} aria-label="Dùng vị trí hiện tại">
-              <LocateFixed className="size-4" aria-hidden />
-            </Button>
-          </div>
+        <Field label={visibility === 'PUBLIC' ? 'Điểm hẹn (cần vị trí trên bản đồ)' : 'Điểm hẹn'} htmlFor="ev-place"
+          error={err('public', MESSAGES.public)}
+          hint="Chọn từ gợi ý hoặc bấm “Vị trí của tôi”: bài chạy xuất phát trong 500 m quanh điểm hẹn sẽ tự điểm danh">
+          <PlaceField place={place} onPlace={setPlace} coords={coords} onCoords={setCoords}
+            coordsError={problems.includes('coords') ? 'Chưa đọc được tọa độ. Dán link Google Maps hoặc "21.05, 105.82"' : null} />
         </Field>
         <EventVisibilityToggle value={visibility} onChange={setVisibility} hasCoords={!!ll} />
         {visibility === 'PUBLIC' && !ll && (
-          <p role="alert" className="-mt-2 text-xs text-warning">Buổi chạy công khai cần tọa độ điểm hẹn: dán link Google Maps hoặc bấm nút định vị ở trên. Không có tọa độ thì chọn “Chỉ thành viên”.</p>
+          <p role="alert" className="-mt-2 text-xs text-warning">Buổi chạy công khai cần vị trí điểm hẹn: chọn một gợi ý hoặc bấm “Vị trí của tôi” ở trên. Không có tọa độ thì chọn “Chỉ thành viên”.</p>
         )}
         <fieldset className="space-y-2">
           <legend className="mb-1.5 text-sm font-medium">Cự ly & pace nhóm</legend>
