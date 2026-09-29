@@ -175,7 +175,7 @@ export interface OrgPost {
   meta: { campaign_id?: string; draw_id?: string }; is_pinned: boolean; created_at: string
   author_name: string | null; author_avatar: string | null; likes: number; liked: boolean; comments: number; can_delete: boolean
 }
-export interface OrgComment { id: string; body: string; created_at: string; author_id: string | null; author_name: string | null; author_avatar: string | null; can_delete: boolean }
+export interface OrgComment { id: string; parent_id?: string | null; body: string; created_at: string; author_id: string | null; author_name: string | null; author_avatar: string | null; can_delete: boolean; like_count?: number; liked?: boolean }
 export const getOrgFeed = (orgId: string, before?: string | null) => call<OrgPost[]>('org_feed', { p_org: orgId, p_before: before ?? null })
 export const createOrgPost = (orgId: string, body: string, imageUrl: string | null, announce: boolean) =>
   call<OrgPost>('create_org_post', { p_org: orgId, p_body: body, p_image_url: imageUrl, p_announce: announce })
@@ -183,7 +183,9 @@ export const deleteOrgPost = (id: string) => call<void>('delete_org_post', { p_i
 export const pinOrgPost = (id: string, pin: boolean) => call<void>('pin_org_post', { p_id: id, p_pin: pin })
 export const toggleOrgPostLike = (id: string) => call<boolean>('toggle_org_post_like', { p_id: id })
 export const listOrgComments = (postId: string) => call<OrgComment[]>('org_post_comments', { p_id: postId })
-export const addOrgComment = (postId: string, body: string) => call<void>('add_org_post_comment', { p_id: postId, p_body: body })
+export const addOrgComment = (postId: string, body: string, parentId: string | null = null) =>
+  parentId ? call<void>('add_org_post_comment', { p_id: postId, p_body: body, p_parent_id: parentId }) : call<void>('add_org_post_comment', { p_id: postId, p_body: body })
+export const toggleOrgCommentLike = (id: string) => call<{ liked: boolean; count: number }>('toggle_org_comment_like', { p_id: id })
 export const deleteOrgComment = (id: string) => call<void>('delete_org_post_comment', { p_id: id })
 
 export const getOrgReport = (orgId: string, from: string, to: string) => call<ReportRow[]>('org_report', { p_org: orgId, p_from: from, p_to: to })

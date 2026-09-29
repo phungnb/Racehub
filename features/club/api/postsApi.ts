@@ -1,5 +1,7 @@
 // Bảng tin CLB: bài đăng, thông báo ghim, bài tự sinh, cổ vũ, bình luận.
 import { supabase } from '@/shared/lib/supabase'
+import { errorKind } from '@/shared/lib/errors'
+import type { ThreadComment } from '@/shared/ui'
 import type { MemberProfile } from './clubApi'
 
 export type PostKind = 'POST' | 'ANNOUNCEMENT' | 'AUTO_RUN' | 'AUTO_JOIN' | 'RECAP' | 'CHALLENGE' | 'NEWS' | 'MILESTONE'
@@ -126,18 +128,39 @@ export async function toggleReaction(postId: string): Promise<{ reacted: boolean
   return data as { reacted: boolean; count: number }
 }
 
-export async function listComments(postId: string): Promise<PostComment[]> {
-  const { data, error } = await supabase.from('club_post_comments')
+/** Bình luận của một bài, kèm lượt thích + trả lời (migration 010400); máy chủ chưa cập nhật thì đọc kiểu cũ */
+export async function listComments(postId: string, meId: string, isStaff: boolean): Promise<ThreadComment[]> {
+  const { data, error } = await supabase.rpc('club_post_comment_thread', { p_post_id: postId })
+  if (!error) {
+    return ((data ?? []) as { id: string; parent_id: string | null; author_id: string | null; author_name: string | null; author_avatar: string | null
+      body: string; created_at: string; like_count: number; liked: boolean; can_delete: boolean }[]).map((c) => ({
+      id: c.id, parentId: c.parent_id, authorName: c.author_name, authorAvatar: c.author_avatar, body: c.body, createdAt: c.created_at,
+      likeCount: c.like_count ?? 0, liked: !!c.liked, canDelete: c.can_delete, mine: c.author_id === meId,
+    }))
+  }
+  if (errorKind(error) !== 'NOT_DEPLOYED') throw error
+  const old = await supabase.from('club_post_comments')
     .select('id, post_id, author_id, body, created_at, author:profiles!club_post_comments_author_id_fkey ( id, display_name, level, avatar_url )')
     .eq('post_id', postId).order('created_at', { ascending: true }).limit(200)
-  if (error) throw error
-  return ((data ?? []) as unknown as (Omit<PostComment, 'author'> & { author: MemberProfile | MemberProfile[] | null })[])
-    .map((c) => ({ ...c, author: one(c.author) }))
+  if (old.error) throw old.error
+  return ((old.data ?? []) as unknown as (Omit<PostComment, 'author'> & { author: MemberProfile | MemberProfile[] | null })[]).map((c) => {
+    const a = one(c.author)
+    return { id: c.id, parentId: null, authorName: a?.display_name ?? null, authorAvatar: a?.avatar_url ?? null, body: c.body, createdAt: c.created_at,
+      likeCount: 0, liked: false, canDelete: c.author_id === meId || isStaff, mine: c.author_id === meId }
+  })
 }
 
-export async function addComment(postId: string, body: string) {
-  const { error } = await supabase.rpc('add_post_comment', { p_post_id: postId, p_body: body })
+export async function addComment(postId: string, body: string, parentId: string | null = null) {
+  const { error } = parentId
+    ? await supabase.rpc('add_post_comment', { p_post_id: postId, p_body: body, p_parent_id: parentId })
+    : await supabase.rpc('add_post_comment', { p_post_id: postId, p_body: body })
   if (error) throw error
+}
+
+export async function toggleCommentLike(commentId: string) {
+  const { data, error } = await supabase.rpc('toggle_post_comment_like', { p_comment_id: commentId })
+  if (error) throw error
+  return data as { liked: boolean; count: number }
 }
 
 export async function deleteComment(commentId: string) {

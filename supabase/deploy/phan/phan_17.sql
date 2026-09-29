@@ -186,7 +186,9 @@ begin
     jsonb_build_object('file', '20261001010200', 'label', 'Đổi tên "Giải chạy ảo" thành "Giải chạy" (trang hướng dẫn, bài Kiến thức, thông báo, thẻ gói)',
       'ok', not exists (select 1 from public.help_pages h where h.body ilike '%giải chạy ảo%')),
     jsonb_build_object('file', '20261001010300', 'label', 'Tài khoản bất thường cho admin: hai nơi cùng lúc, chung thiết bị, bài trùng giờ, nuôi lời mời',
-      'ok', to_regprocedure('public.admin_account_risks(integer)') is not null and to_regclass('private.device_links') is not null));
+      'ok', to_regprocedure('public.admin_account_risks(integer)') is not null and to_regclass('private.device_links') is not null),
+    jsonb_build_object('file', '20261001010400', 'label', 'Bình luận có Thích và Trả lời (bảng tin CLB + Doanh nghiệp), thông báo khi được trả lời / thích',
+      'ok', to_regprocedure('public.toggle_post_comment_like(uuid)') is not null and to_regprocedure('public.toggle_org_comment_like(uuid)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

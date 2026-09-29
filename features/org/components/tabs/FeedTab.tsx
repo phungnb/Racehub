@@ -5,13 +5,13 @@ import { useRef, useState } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Flag, Gift, Heart, ImagePlus, Megaphone, MessageCircle, Pin, Send, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, EmptyState, ErrorState, Input, Skeleton, Textarea } from '@/shared/ui'
+import { Avatar, Button, Card, CommentComposer, ConfirmSheet, CommentList, EmptyState, ErrorState, Skeleton, Textarea, type ReplyTarget, type ThreadComment } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatRelative } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import { useSession } from '@/features/auth'
 import {
-  addOrgComment, createOrgPost, deleteOrgComment, deleteOrgPost, getOrgFeed, listOrgComments, orgErrorMessage, pinOrgPost, toggleOrgPostLike,
+  addOrgComment, toggleOrgCommentLike, createOrgPost, deleteOrgComment, deleteOrgPost, getOrgFeed, listOrgComments, orgErrorMessage, pinOrgPost, toggleOrgPostLike,
   uploadOrgImage, type OrgDetail, type OrgPost,
 } from '../../api/orgApi'
 
@@ -97,6 +97,7 @@ function Composer({ org }: { org: OrgDetail }) {
 function PostCard({ org, p }: { org: OrgDetail; p: OrgPost }) {
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
+  const [confirmDel, setConfirmDel] = useState(false)
   const [liked, setLiked] = useState({ on: p.liked, n: p.likes })
   const refresh = () => void qc.invalidateQueries({ queryKey: ['org', org.id, 'feed'] })
   const like = useMutation({
@@ -120,7 +121,7 @@ function PostCard({ org, p }: { org: OrgDetail; p: OrgPost }) {
           </p>
         </div>
         {org.is_admin && <Button size="sm" variant="ghost" aria-label={p.is_pinned ? 'Bỏ ghim' : 'Ghim'} onClick={() => pin.mutate()}><Pin className={cn('size-4', p.is_pinned && 'text-coin')} aria-hidden /></Button>}
-        {p.can_delete && <Button size="sm" variant="ghost" aria-label="Xoá bài" onClick={() => del.mutate()}><Trash2 className="size-4" aria-hidden /></Button>}
+        {p.can_delete && <Button size="sm" variant="ghost" aria-label="Xoá bài" onClick={() => setConfirmDel(true)}><Trash2 className="size-4" aria-hidden /></Button>}
       </div>
       <p className="whitespace-pre-line text-[15px]">{p.body}</p>
       {p.meta?.campaign_id && <Link href={routes.orgCampaign(org.id, p.meta.campaign_id)} className="inline-block text-sm font-semibold text-brand">Xem chiến dịch →</Link>}
@@ -135,33 +136,36 @@ function PostCard({ org, p }: { org: OrgDetail; p: OrgPost }) {
         <Button size="sm" variant="ghost" onClick={() => setOpen((x) => !x)} aria-expanded={open}><MessageCircle className="size-4" aria-hidden />{p.comments || ''}</Button>
       </div>
       {open && <Comments postId={p.id} onChange={refresh} />}
+      <ConfirmSheet open={confirmDel} onClose={() => setConfirmDel(false)} title="Xóa bài đăng này?" confirmLabel="Xóa bài"
+        description="Bài và các bình luận sẽ biến mất khỏi bảng tin." loading={del.isPending}
+        onConfirm={() => del.mutate(undefined, { onSettled: () => setConfirmDel(false) })} />
     </Card>
   )
 }
 
+/** Bình luận bài tổ chức: thích, trả lời; xóa trong nút ⋯ (người viết / quản trị tổ chức), luôn hỏi lại */
 function Comments({ postId, onChange }: { postId: string; onChange: () => void }) {
   const qc = useQueryClient()
-  const q = useQuery({ queryKey: ['org-comments', postId], queryFn: () => listOrgComments(postId) })
+  const uid = useSession().session?.user.id
+  const key = ['org-comments', postId]
+  const q = useQuery({ queryKey: key, queryFn: () => listOrgComments(postId) })
   const [text, setText] = useState('')
-  const after = () => { void qc.invalidateQueries({ queryKey: ['org-comments', postId] }); onChange() }
-  const add = useMutation({ mutationFn: () => addOrgComment(postId, text.trim()), onSuccess: () => { setText(''); after() }, onError: (e) => toast.error(orgErrorMessage(e)) })
+  const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null)
+  const input = useRef<HTMLInputElement>(null)
+  const after = () => { void qc.invalidateQueries({ queryKey: key }); onChange() }
+  const add = useMutation({ mutationFn: () => addOrgComment(postId, text.trim(), replyTo?.id ?? null), onSuccess: () => { setText(''); setReplyTo(null); after() }, onError: (e) => toast.error(orgErrorMessage(e)) })
   const del = useMutation({ mutationFn: (id: string) => deleteOrgComment(id), onSuccess: after, onError: (e) => toast.error(orgErrorMessage(e)) })
+  const like = useMutation({ mutationFn: (id: string) => toggleOrgCommentLike(id), onSuccess: () => void qc.invalidateQueries({ queryKey: key }), onError: (e) => toast.error(orgErrorMessage(e)) })
+  const comments: ThreadComment[] = (q.data ?? []).map((c) => ({
+    id: c.id, parentId: c.parent_id ?? null, authorName: c.author_name, authorAvatar: c.author_avatar, body: c.body, createdAt: c.created_at,
+    likeCount: c.like_count ?? 0, liked: !!c.liked, canDelete: c.can_delete, mine: c.author_id === uid,
+  }))
   return (
-    <div className="space-y-2">
-      {(q.data ?? []).map((c) => (
-        <div key={c.id} className="flex gap-2">
-          <Avatar src={c.author_avatar} name={c.author_name ?? '?'} size="xs" />
-          <div className="min-w-0 flex-1 rounded-xl bg-surface-2 px-3 py-1.5 text-sm">
-            <p className="text-xs font-semibold">{c.author_name}</p>
-            <p className="whitespace-pre-line">{c.body}</p>
-          </div>
-          {c.can_delete && <button type="button" onClick={() => del.mutate(c.id)} aria-label="Xoá bình luận" className="text-fg-subtle"><Trash2 className="size-3.5" aria-hidden /></button>}
-        </div>
-      ))}
-      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (text.trim()) add.mutate() }}>
-        <Input value={text} maxLength={1000} onChange={(e) => setText(e.target.value)} placeholder="Viết bình luận…" aria-label="Bình luận" />
-        <Button type="submit" size="sm" className="h-11 shrink-0" loading={add.isPending} disabled={!text.trim()} aria-label="Gửi"><Send className="size-4" aria-hidden /></Button>
-      </form>
+    <div className="space-y-3">
+      <CommentList compact comments={comments} onLike={(c) => like.mutate(c.id)} onDelete={(c) => del.mutate(c.id)}
+        onReply={(t) => { setReplyTo(t); requestAnimationFrame(() => input.current?.focus()) }} />
+      <CommentComposer compact ref={input} value={text} onChange={setText} onSubmit={() => add.mutate()} pending={add.isPending}
+        replyTo={replyTo} onCancelReply={() => setReplyTo(null)} />
     </div>
   )
 }
