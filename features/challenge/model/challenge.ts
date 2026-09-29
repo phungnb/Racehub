@@ -11,16 +11,17 @@ export type RewardSplit = 'WINNER' | 'TOP3' | 'FINISHERS' | 'TEAM'
 
 export const FORMAT_META: Record<ChallengeFormat, { label: string; short: string; description: string }> = {
   SOLO_GOAL: { label: 'Chinh phục cá nhân', short: 'Cá nhân', description: 'Quãng đường, thời gian (5K, 10K, Half, Full…), pace hoặc chuỗi ngày — cho riêng bạn hoặc rủ nhiều người' },
-  RANKED: { label: 'Cộng đồng', short: 'Cộng đồng', description: 'Mọi người cùng chạy, BXH theo km hoặc số ngày chạy' },
+  RANKED: { label: 'Cộng đồng · Đua xếp hạng', short: 'Xếp hạng', description: 'Mọi người cùng chạy, BXH theo km hoặc số ngày chạy' },
   DUEL: { label: 'Thách đấu 1-1', short: '1-1', description: 'Rủ một người bạn so tài, ai hơn thì thắng' },
   TEAM: { label: 'Đồng đội', short: 'Đồng đội', description: 'Chia đội thi đấu, tính điểm theo cả đội' },
-  COLLECTIVE: { label: 'Cộng đồng', short: 'Cộng đồng', description: 'Cùng nhau chinh phục: cộng dồn km, có BXH theo km hoặc số ngày chạy' },
+  COLLECTIVE: { label: 'Cộng đồng · Cùng nhau chinh phục', short: 'Cộng đồng', description: 'Cùng nhau chinh phục: cộng dồn km, có BXH theo km hoặc số ngày chạy' },
 }
 
 /** Nhóm thử thách "Cộng đồng" gồm các kiểu con — thêm kiểu mới ở đây khi phát triển (Cùng nhau chinh phục, …) */
 export const COMMUNITY_KINDS = [
-  { id: 'TOGETHER', label: 'Cùng nhau chinh phục', description: 'Cộng dồn km của mọi người; đặt mục tiêu chung (không bắt buộc). BXH lọc theo km, số ngày chạy, số buổi' },
-] as const
+  { id: 'TOGETHER', format: 'COLLECTIVE', label: 'Cùng nhau chinh phục', description: 'Cộng dồn km của mọi người để chạm một mục tiêu chung. BXH lọc theo km, số ngày chạy, số buổi' },
+  { id: 'RANKED', format: 'RANKED', label: 'Đua xếp hạng', description: 'Không đặt mục tiêu — chỉ thời gian và luật. Xếp theo tổng km, bảng có số ngày chạy, số buổi, pace TB (như giải chạy online)' },
+] as const satisfies readonly { id: string; format: ChallengeFormat; label: string; description: string }[]
 export const isCommunity = (f: ChallengeFormat | string) => f === 'COLLECTIVE' || f === 'RANKED'
 export const isConquest = (o: Objective | string | null | undefined) => o === 'BEST_TIME' || o === 'BEST_PACE'
 
@@ -390,7 +391,7 @@ export function validateDraft(d: ChallengeDraft, step: 1 | 2 | 3, now = new Date
     const pledge = d.pledge.enabled && pledgeSupported(d)
     if (pledge) { const pe = validatePledge(d.pledge); if (pe) e.pledge = pe }
     if (isConquest(d.objective)) { const ce = validateConquest(d.conquest, d.objective); if (ce) e.conquest = ce }
-    else if (!pledge && d.format === 'SOLO_GOAL' && !(d.targetValue > 0)) e.targetValue = 'Hãy đặt mục tiêu'
+    else if (!pledge && (d.format === 'SOLO_GOAL' || d.format === 'COLLECTIVE') && !(d.targetValue > 0)) e.targetValue = 'Hãy đặt mục tiêu'
     if (d.targetValue < 0) e.targetValue = 'Mục tiêu không hợp lệ'
     if (d.minKm < 0 || d.minKm > 100) e.minKm = 'Từ 0 đến 100 km'
     if (d.objective === 'STREAK_DAYS' && !(d.minKm > 0)) e.minKm = 'Chuỗi ngày cần cự ly tối thiểu mỗi ngày'
@@ -494,7 +495,7 @@ export function draftFromTemplate(t: {
 }, allowedClubs: string[], now = new Date()): ChallengeDraft {
   const base = defaultDraft(now, null)
   const num = (v: unknown, d: number) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Number(v))
-  const format = t.format === 'RANKED' ? 'COLLECTIVE' : (['SOLO_GOAL', 'TEAM', 'DUEL', 'COLLECTIVE'] as string[]).includes(t.format) ? (t.format as ChallengeFormat) : base.format
+  const format = (['SOLO_GOAL', 'RANKED', 'TEAM', 'DUEL', 'COLLECTIVE'] as string[]).includes(t.format) ? (t.format as ChallengeFormat) : base.format
   const club = t.audience === 'CLUB_ONLY' && t.club_id && allowedClubs.includes(t.club_id) ? t.club_id : null
   const start = new Date(base.start)
   return {

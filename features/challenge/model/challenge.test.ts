@@ -156,7 +156,9 @@ describe('chinh phục thời gian / pace (010700)', () => {
     expect(ranked.format).toBe('RANKED')
     const together = draftToPayload({ ...defaultDraft(now), format: 'COLLECTIVE', targetValue: 1000, title: 'Cùng 1000 km' })
     expect(together.format).toBe('COLLECTIVE')
-    expect(validateDraft({ ...defaultDraft(now), format: 'COLLECTIVE', targetValue: 0 }, 2, now).targetValue).toBeUndefined()
+    expect(validateDraft({ ...defaultDraft(now), format: 'COLLECTIVE', targetValue: 0 }, 2, now).targetValue).toBeDefined()
+    expect(validateDraft({ ...defaultDraft(now), format: 'RANKED', targetValue: 0 }, 2, now).targetValue).toBeUndefined()
+    expect(draftToPayload({ ...defaultDraft(now), format: 'RANKED', title: 'Đua tháng 10' }).format).toBe('RANKED')
   })
   it('mỗi loại thử thách có mô tả cách tính điểm riêng', () => {
     expect(m.scoringLines({ format: 'SOLO_GOAL', objective: 'BEST_TIME', conquest_mode: 'SELF' }).join(' ')).toContain('tự đăng ký')
