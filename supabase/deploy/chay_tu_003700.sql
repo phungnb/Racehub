@@ -1,7 +1,7 @@
--- RaceHub: gộp 76 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 77 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -20163,6 +20163,33 @@ language sql immutable as $$
 $$;
 
 -- ===================================================================
+-- 20261001011200_cancelled_challenge_posts.sql
+-- ===================================================================
+-- 011200: THỬ THÁCH ĐÃ HỦY KHÔNG CÒN HIỆN TRÊN TRANG CHỦ / BẢNG TIN CLB
+--   • Hủy thử thách (người tạo, ban quản trị CLB hay admin — mọi đường hủy) → bài "Thử thách mới" trên bảng tin CLB tự ẩn,
+--     nên không còn hiện ở Bảng tin cộng đồng (trang chủ) và bảng tin CLB. Trang chi tiết thử thách vẫn mở được (báo "đã bị hủy").
+--   • Dọn luôn bài của các thử thách đã hủy trước đây.
+-- Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT, không RETURNING INTO. Chạy lại an toàn.
+
+create or replace function private.hide_cancelled_challenge_posts() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  update public.club_posts set deleted_at = now()
+   where kind = 'CHALLENGE' and deleted_at is null and meta->>'challenge_id' = new.id::text;
+  return null;
+end $$;
+revoke all on function private.hide_cancelled_challenge_posts() from public, anon, authenticated;
+
+drop trigger if exists trg_hide_cancelled_challenge_posts on public.challenges;
+create trigger trg_hide_cancelled_challenge_posts after update of status on public.challenges
+  for each row when (new.status = 'CANCELLED' and old.status is distinct from 'CANCELLED')
+  execute function private.hide_cancelled_challenge_posts();
+
+update public.club_posts p set deleted_at = now()
+  from public.challenges c
+ where p.kind = 'CHALLENGE' and p.deleted_at is null and c.status = 'CANCELLED' and p.meta->>'challenge_id' = c.id::text;
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -20364,7 +20391,9 @@ begin
     jsonb_build_object('file', '20261001011000', 'label', 'Kho quà v2: quà tĩnh / quà hiệu ứng động, quà theo mốc (5K…Ultra, PR), 45 quà mới, ảnh riêng',
       'ok', private.sc_col('gift_catalog', 'kind') and to_regprocedure('public.gift_catalog_for(uuid,uuid)') is not null),
     jsonb_build_object('file', '20261001011100', 'label', 'App cửa hàng: ẩn mua bán trong app iOS/Android (công tắc "Cho phép mua trong app"), Zalo / Telegram hỗ trợ',
-      'ok', private.ops_defaults()->'features' ? 'nativePurchases' and 'support_zalo' = any (private.site_info_keys())));
+      'ok', private.ops_defaults()->'features' ? 'nativePurchases' and 'support_zalo' = any (private.site_info_keys())),
+    jsonb_build_object('file', '20261001011200', 'label', 'Thử thách bị hủy tự ẩn khỏi bảng tin CLB và trang chủ',
+      'ok', exists (select 1 from pg_trigger where tgname = 'trg_hide_cancelled_challenge_posts')));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
