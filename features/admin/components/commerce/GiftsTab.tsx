@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ShineAdmin } from './ShineAdmin'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Flag, Plus, Trash2 } from 'lucide-react'
+import { Flag, ImageUp, Plus, Sparkles, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, EmptyState, ErrorState, Field, Input, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -11,17 +11,30 @@ import { formatCoin } from '@/shared/lib/format'
 import { adminErrorMessage, type AccountHit } from '../../api/adminApi'
 import { listGifts, listOrganizers, saveGift, setOrganizer, type AdminGift } from '../../api/commerceApi'
 import { AccountPicker } from '../economy/AccountPicker'
+import { uploadContentImage } from '@/features/knowledge'
+import { GiftArt } from '@/features/game'
 
 const TIERS: AdminGift['tier'][] = ['CHEER', 'BOOST', 'HYPE', 'LEGEND']
 const TIER_LABEL: Record<AdminGift['tier'], string> = { CHEER: 'Cổ vũ', BOOST: 'Tiếp sức', HYPE: 'Bùng nổ', LEGEND: 'Huyền thoại' }
 type Draft = Omit<AdminGift, 'sent_30d' | 'burn_30d'>
-const EMPTY: Draft = { code: '', name: '', emoji: '🎁', price_xu: 10, tier: 'CHEER', description: '', vip_tier: 0, season_from: null, season_to: null, is_active: true, sort: 50 }
+const EMPTY: Draft = { code: '', name: '', emoji: '🎁', price_xu: 10, tier: 'CHEER', description: '', vip_tier: 0, season_from: null, season_to: null, is_active: true, sort: 50,
+  kind: 'STATIC', art_url: null, context: null }
+const KINDS: [AdminGift['kind'], string][] = [['STATIC', 'Quà tĩnh'], ['ANIMATED', 'Quà hiệu ứng động']]
+const CONTEXTS: [AdminGift['context'], string][] = [[null, 'Mọi bài'], ['KM5', '≥ 5 km'], ['KM10', '≥ 10 km'], ['HALF', '≥ 21 km'], ['FULL', '≥ 42 km'], ['ULTRA', '≥ 45 km'], ['PR', 'Kỷ lục cá nhân']]
 
 /** Kho quà: sửa giá / tên / biểu tượng / tầng / VIP / mùa, bật tắt, thêm quà mới — kèm số liệu 30 ngày */
 export function GiftsTab() {
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['admin', 'gifts'], queryFn: listGifts })
   const [edit, setEdit] = useState<{ draft: Draft; isNew: boolean } | null>(null)
+  const [kind, setKind] = useState<AdminGift['kind']>('STATIC')
+  const file = useRef<HTMLInputElement>(null)
+  const upload = useMutation({
+    mutationFn: uploadContentImage,
+    onSuccess: (url) => setEdit((e) => (e ? { ...e, draft: { ...e.draft, art_url: url } } : e)),
+    onError: (e) => toast.error((e as Error).message === 'IMAGE_TYPE' ? 'Chỉ nhận PNG, JPG hoặc WebP (WebP động được).'
+      : (e as Error).message === 'IMAGE_SIZE' ? 'Ảnh tối đa 5 MB.' : adminErrorMessage(e)),
+  })
   const save = useMutation({
     mutationFn: (g: Draft) => saveGift({ ...g, description: g.description?.trim() || null }),
     onSuccess: () => { toast.success('Đã lưu quà'); setEdit(null); void qc.invalidateQueries({ queryKey: ['admin', 'gifts'] }); void qc.invalidateQueries({ queryKey: ['game', 'gifts'] }) },
@@ -40,22 +53,30 @@ export function GiftsTab() {
         <span className="font-mono font-bold text-coin">{formatCoin(burn)} Xu</span>
       </Card>
       <p className="text-xs text-fg-muted">Người tặng mất Xu (về hệ thống), người nhận chỉ nhận quà + điểm Tỏa sáng — không có đường chuyển Xu giữa người dùng.</p>
+      <div role="tablist" aria-label="Loại quà" className="grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1">
+        {KINDS.map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={kind === k} onClick={() => setKind(k)}
+            className={cn('rounded-lg py-2 text-sm font-semibold', kind === k ? 'bg-surface shadow-sm' : 'text-fg-muted')}>
+            {label} <span className="font-mono text-xs font-normal text-fg-subtle">{q.data.filter((g) => g.kind === k).length}</span>
+          </button>
+        ))}
+      </div>
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {q.data.map((g) => (
+        {q.data.filter((g) => g.kind === kind).sort((a, b) => a.price_xu - b.price_xu).map((g) => (
           <li key={g.code}>
             <button onClick={() => setEdit({ draft: g, isNew: false })}
               className={cn('flex w-full items-center gap-2 rounded-xl border bg-surface p-2.5 text-left', g.is_active ? 'border-border' : 'border-dashed border-border opacity-60')}>
-              <span className="text-3xl" aria-hidden>{g.emoji}</span>
+              <GiftArt g={g} className="size-9 text-3xl" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold">{g.name}</span>
                 <span className="block font-mono text-xs text-coin">{formatCoin(g.price_xu)} Xu</span>
-                <span className="block text-[11px] text-fg-subtle">{TIER_LABEL[g.tier]}{g.vip_tier ? ` · VIP${g.vip_tier}` : ''}{g.season_from ? ' · mùa' : ''} · {formatCoin(g.sent_30d)} lượt</span>
+                <span className="block text-[11px] text-fg-subtle">{TIER_LABEL[g.tier]}{g.vip_tier ? ` · VIP${g.vip_tier}` : ''}{g.season_from ? ' · mùa' : ''}{g.context ? ` · mốc ${g.context}` : ''}{g.art_url ? ' · có ảnh' : ''} · {formatCoin(g.sent_30d)} lượt</span>
               </span>
             </button>
           </li>
         ))}
       </ul>
-      <Button block variant="secondary" onClick={() => setEdit({ draft: EMPTY, isNew: true })}><Plus className="size-4" aria-hidden />Thêm quà</Button>
+      <Button block variant="secondary" onClick={() => setEdit({ draft: { ...EMPTY, kind }, isNew: true })}><Plus className="size-4" aria-hidden />Thêm quà</Button>
 
       <Sheet open={!!edit} onClose={() => setEdit(null)} title={edit?.isNew ? 'Thêm quà' : `Sửa quà ${d?.name ?? ''}`}
         footer={<Button block onClick={() => d && save.mutate(d)} loading={save.isPending} disabled={!d || d.name.trim().length < 2 || !/^[a-z0-9_]{2,40}$/.test(d.code) || !(d.price_xu >= 1)}>Lưu</Button>}>
@@ -71,6 +92,30 @@ export function GiftsTab() {
               <Field label="Giá" htmlFor="g-price"><Input id="g-price" inputMode="numeric" className="font-mono" value={d.price_xu || ''}
                 onChange={(e) => set({ price_xu: Number(e.target.value.replace(/\D/g, '') || 0) })} /></Field>
             </div>
+            <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Loại quà">
+              {KINDS.map(([k, label]) => (
+                <button key={k} role="radio" aria-checked={d.kind === k} onClick={() => set({ kind: k })}
+                  className={cn('flex items-center justify-center gap-1 rounded-lg border py-2 text-xs font-semibold', d.kind === k ? 'border-brand bg-brand/10' : 'border-border text-fg-muted')}>
+                  {k === 'ANIMATED' && <Sparkles className="size-3.5" aria-hidden />}{label}
+                </button>
+              ))}
+            </div>
+            <p className="-mt-1 text-[11px] text-fg-subtle">Quà động: dưới 1.000 Xu hiệu ứng vừa, từ 1.000 Xu hiệu ứng toàn màn hình.</p>
+            <Field label="Ảnh riêng (không bắt buộc)" hint="PNG/WebP nền trong suốt, vuông, ≥ 256 px. Quà động dùng WebP động ≤ 500 KB. Chưa có ảnh → dùng biểu tượng.">
+              <div className="flex items-center gap-3">
+                <span className="grid size-16 shrink-0 place-items-center rounded-xl bg-surface-2"><GiftArt g={d} className="size-12 text-4xl" /></span>
+                <Button size="sm" variant="secondary" loading={upload.isPending} onClick={() => file.current?.click()}><ImageUp className="size-4" aria-hidden />Tải ảnh</Button>
+                {d.art_url && <Button size="sm" variant="ghost" onClick={() => set({ art_url: null })}><X className="size-4" aria-hidden />Bỏ ảnh</Button>}
+                <input ref={file} type="file" accept="image/png,image/webp,image/jpeg" hidden
+                  onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) upload.mutate(f) }} />
+              </div>
+            </Field>
+            <Field label="Chỉ tặng trên bài đạt mốc" htmlFor="g-ctx">
+              <select id="g-ctx" value={d.context ?? ''} onChange={(e) => set({ context: (e.target.value || null) as AdminGift['context'] })}
+                className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm">
+                {CONTEXTS.map(([c, label]) => <option key={c ?? ''} value={c ?? ''}>{label}</option>)}
+              </select>
+            </Field>
             <Field label="Mô tả" htmlFor="g-desc"><Input id="g-desc" value={d.description ?? ''} maxLength={120} onChange={(e) => set({ description: e.target.value })} /></Field>
             <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Tầng quà">
               {TIERS.map((t) => (

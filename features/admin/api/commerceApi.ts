@@ -37,9 +37,12 @@ export const setOrganizer = (kind: AccountKind, id: string, allow: boolean, note
 export interface AdminGift {
   code: string; name: string; emoji: string; price_xu: number; tier: 'CHEER' | 'BOOST' | 'HYPE' | 'LEGEND'; description: string | null
   vip_tier: number; season_from: string | null; season_to: string | null; is_active: boolean; sort: number; sent_30d: number; burn_30d: number
+  /** Quà tĩnh / quà hiệu ứng động, ảnh riêng, quà theo mốc (migration 011000) */
+  kind: 'STATIC' | 'ANIMATED'; art_url: string | null; context: 'KM5' | 'KM10' | 'HALF' | 'FULL' | 'ULTRA' | 'PR' | null
 }
 export const listGifts = async () => ((await call<AdminGift[]>('admin_list_gifts')) ?? []).map((g) => ({
   ...g, price_xu: Number(g.price_xu), vip_tier: Number(g.vip_tier), sort: Number(g.sort), sent_30d: Number(g.sent_30d ?? 0), burn_30d: Number(g.burn_30d ?? 0),
+  kind: g.kind ?? 'STATIC', art_url: g.art_url ?? null, context: g.context ?? null,
 }))
 export const saveGift = (g: Omit<AdminGift, 'sent_30d' | 'burn_30d'>) => call<void>('admin_save_gift', { p: g })
 

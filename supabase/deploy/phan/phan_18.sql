@@ -201,7 +201,9 @@ begin
       'ok', to_regclass('public.ledger_transactions_idempotency_uidx') is not null and private.sc_fn('private', 'is_admin_account')
             and exists (select 1 from pg_trigger where tgname = 'trg_ledger_no_negative')),
     jsonb_build_object('file', '20261001010900', 'label', 'BXH giải chạy theo cự ly (ai hoàn thành, ai chưa), đổi "mốc" thành "mục tiêu"',
-      'ok', to_regprocedure('public.race_results_v2(uuid,numeric)') is not null));
+      'ok', to_regprocedure('public.race_results_v2(uuid,numeric)') is not null),
+    jsonb_build_object('file', '20261001011000', 'label', 'Kho quà v2: quà tĩnh / quà hiệu ứng động, quà theo mốc (5K…Ultra, PR), 45 quà mới, ảnh riêng',
+      'ok', private.sc_col('gift_catalog', 'kind') and to_regprocedure('public.gift_catalog_for(uuid,uuid)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
