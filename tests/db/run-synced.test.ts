@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import { createDb } from './load-schema'
 
-// Migration 004500: bài từ Strava được cộng thưởng → thông báo "Bài chạy … km đã về RaceHub"
+// Migration 004500: bài từ Strava được cộng thưởng → thông báo (011500: câu chúc mừng "Bạn có hoạt động mới")
 const U = '00000000-0000-0000-0000-0000000045a1'
 
 async function seed(db: PGlite) {
@@ -43,8 +43,9 @@ describe('Bài chạy đã về (004500)', () => {
     await ingest('45001', run())
     const n = await notes()
     expect(n).toHaveLength(1)
-    expect(n[0].title).toBe('Bài chạy 10,00 km đã về RaceHub')
-    expect(n[0].body).toMatch(/^Pace 5:00\/km · \+[\d,]+ Xu · \+100 XP/)
+    // 011500: câu chúc mừng (chọn ngẫu nhiên), km chuyển xuống nội dung
+    expect(n[0].title).toMatch(/chúc mừng/i)
+    expect(n[0].body).toMatch(/^10,00 km · Pace 5:00\/km · \+[\d,]+ Xu · \+100 XP/)
     expect(n[0].link).toBe('/feed?rewards=1')
   })
 

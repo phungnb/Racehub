@@ -382,6 +382,8 @@ const MESSAGES: Record<string, string> = {
   IMAGE_SIZE: 'Mỗi ảnh tối đa 5 MB.',
   EMPTY_POST: 'Hãy viết gì đó hoặc thêm ảnh.',
   EMPTY_COMMENT: 'Hãy viết bình luận.',
+  NOT_AUTHOR: 'Chỉ người viết mới sửa được bình luận này.',
+  COMMENT_NOT_FOUND: 'Bình luận không còn nữa.',
   EMPTY_MESSAGE: 'Tin nhắn đang trống.',
   POST_TOO_LONG: 'Nội dung quá dài.',
   POST_NOT_FOUND: 'Bài đăng không còn tồn tại.',

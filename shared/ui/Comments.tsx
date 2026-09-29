@@ -1,13 +1,13 @@
 'use client'
 
 import { forwardRef, useState, type FormEvent } from 'react'
-import { MoreHorizontal, SendHorizontal, ThumbsUp, X } from 'lucide-react'
+import { MoreHorizontal, Pencil, SendHorizontal, ThumbsUp, Trash2, X } from 'lucide-react'
 import { cn } from '@/shared/lib/cn'
 import { formatRelative } from '@/shared/lib/format'
 import { Avatar } from './Avatar'
 import { Button } from './Button'
-import { Input } from './Field'
-import { ConfirmSheet } from './Sheet'
+import { Input, Textarea } from './Field'
+import { ConfirmSheet, Sheet } from './Sheet'
 import { ExpressionPanel, ExpressionToggle, ExpressiveBody, QuickCheers } from './Expressions'
 
 /** Một bình luận (dùng chung bảng tin CLB, Doanh nghiệp…) */
@@ -23,27 +23,46 @@ export interface ThreadComment {
   /** người viết hoặc ban quản trị */
   canDelete: boolean
   mine: boolean
+  /** chỉ người viết (migration 011500) */
+  canEdit?: boolean
+  editedAt?: string | null
 }
 export interface ReplyTarget { id: string; name: string }
 
 /**
  * Danh sách bình luận kiểu mạng xã hội: dưới mỗi bình luận là "Thích · Trả lời · thời gian";
- * trả lời thụt vào dưới bình luận gốc; xóa nằm trong nút ⋯ (chỉ người viết / ban quản trị) và luôn hỏi lại.
+ * trả lời thụt vào dưới bình luận gốc; nút ⋯: Sửa (chỉ người viết) · Xóa (người viết / ban quản trị, luôn hỏi lại).
  */
-export function CommentList({ comments, onLike, onReply, onDelete, compact = false }: {
+export function CommentList({ comments, onLike, onReply, onDelete, onEdit, compact = false }: {
   comments: ThreadComment[]
   onLike: (c: ThreadComment) => void
   onReply: (target: ReplyTarget) => void
   onDelete: (c: ThreadComment) => void
+  /** có thì người viết sửa được bình luận của mình */
+  onEdit?: (c: ThreadComment, body: string) => Promise<unknown>
   compact?: boolean
 }) {
+  const [menu, setMenu] = useState<ThreadComment | null>(null)
   const [confirm, setConfirm] = useState<ThreadComment | null>(null)
+  const [editing, setEditing] = useState<ThreadComment | null>(null)
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const canEdit = (c: ThreadComment) => !!onEdit && !!c.canEdit
+  const more = (c: ThreadComment) => {
+    if (canEdit(c)) setMenu(c)
+    else setConfirm(c)
+  }
+  const saveEdit = async () => {
+    if (!editing || !onEdit || !draft.trim()) return
+    setSaving(true)
+    try { await onEdit(editing, draft.trim()); setEditing(null) } catch { /* nơi gọi đã báo lỗi */ } finally { setSaving(false) }
+  }
   const ids = new Set(comments.map((c) => c.id))
   // Bình luận gốc đã bị xóa → câu trả lời hiện như bình luận thường
   const roots = comments.filter((c) => !c.parentId || !ids.has(c.parentId))
   const replies = (id: string) => comments.filter((c) => c.parentId === id)
   const item = (c: ThreadComment, reply: boolean) => (
-    <CommentItem key={c.id} c={c} reply={reply} compact={compact} onLike={onLike} onMore={setConfirm}
+    <CommentItem key={c.id} c={c} reply={reply} compact={compact} onLike={onLike} onMore={more} showMore={c.canDelete || canEdit(c)}
       onReply={() => onReply({ id: c.id, name: c.authorName ?? 'Thành viên' })} />
   )
   return (
@@ -60,12 +79,33 @@ export function CommentList({ comments, onLike, onReply, onDelete, compact = fal
         title={confirm?.mine ? 'Xóa bình luận của bạn?' : `Xóa bình luận của ${confirm?.authorName ?? 'thành viên'}?`}
         description={confirm?.mine ? 'Bình luận sẽ biến mất khỏi bài viết.' : 'Bạn đang xóa với quyền quản trị. Bình luận sẽ bị gỡ khỏi bài viết.'}
         onConfirm={() => { if (confirm) onDelete(confirm); setConfirm(null) }} />
+      <Sheet open={!!menu} onClose={() => setMenu(null)} title="Bình luận của bạn">
+        <div className="grid gap-2">
+          <Button variant="secondary" block onClick={() => { if (menu) { setDraft(menu.body); setEditing(menu) } setMenu(null) }}>
+            <Pencil className="size-4" aria-hidden />Sửa bình luận
+          </Button>
+          {menu?.canDelete && (
+            <Button variant="danger" block onClick={() => { setConfirm(menu); setMenu(null) }}>
+              <Trash2 className="size-4" aria-hidden />Xóa bình luận
+            </Button>
+          )}
+        </div>
+      </Sheet>
+      <Sheet open={!!editing} onClose={() => setEditing(null)} title="Sửa bình luận"
+        footer={
+          <div className="flex gap-2">
+            <Button variant="secondary" block onClick={() => setEditing(null)} disabled={saving}>Hủy</Button>
+            <Button block onClick={saveEdit} loading={saving} disabled={!draft.trim() || draft.trim() === editing?.body}>Lưu</Button>
+          </div>
+        }>
+        <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={1000} rows={4} aria-label="Nội dung bình luận" />
+      </Sheet>
     </>
   )
 }
 
-function CommentItem({ c, reply, compact, onLike, onReply, onMore }: {
-  c: ThreadComment; reply: boolean; compact: boolean; onLike: (c: ThreadComment) => void; onReply: () => void; onMore: (c: ThreadComment) => void
+function CommentItem({ c, reply, compact, onLike, onReply, onMore, showMore }: {
+  c: ThreadComment; reply: boolean; compact: boolean; onLike: (c: ThreadComment) => void; onReply: () => void; onMore: (c: ThreadComment) => void; showMore: boolean
 }) {
   const expressive = ExpressiveBody({ body: c.body })
   return (
@@ -82,10 +122,10 @@ function CommentItem({ c, reply, compact, onLike, onReply, onMore }: {
           )}
         </div>
         <div className="mt-1 flex items-center gap-4 px-1 text-xs font-semibold text-fg-subtle">
-          <span className="font-normal">{formatRelative(c.createdAt)}</span>
+          <span className="font-normal">{formatRelative(c.createdAt)}{c.editedAt && ' · đã sửa'}</span>
           <button type="button" onClick={() => onLike(c)} aria-pressed={c.liked} className={cn('py-1', c.liked && 'text-brand')}>Thích</button>
           <button type="button" onClick={onReply} className="py-1">Trả lời</button>
-          {c.canDelete && (
+          {showMore && (
             <button type="button" onClick={() => onMore(c)} aria-label="Tùy chọn bình luận" className="ml-auto grid size-7 place-items-center rounded-full hover:bg-surface-2">
               <MoreHorizontal className="size-4" aria-hidden />
             </button>

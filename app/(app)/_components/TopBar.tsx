@@ -5,6 +5,7 @@ import { ShieldCheck } from 'lucide-react'
 import { isSystemAdmin } from '@/features/admin'
 import { NotificationBell, unsubscribeThisDevice } from '@/features/notification'
 import { MenuDrawer } from '@/features/help'
+import { MessagesButton } from '@/features/social'
 import { CoinAmount } from '@/shared/ui'
 import { routes } from '@/shared/config/routes'
 import { ICONS } from '@/shared/config/brand'
@@ -18,10 +19,10 @@ export function TopBar({ profile }: { profile: Profile | null }) {
         <div className="flex min-w-0 items-center gap-1">
         {/* ☰ Hướng dẫn chơi + Chính sách + Hỗ trợ (migration 007300) */}
         <MenuDrawer profile={profile} onSignOut={unsubscribeThisDevice} className="-ml-2" />
-        <Link href={routes.home} className="flex items-center gap-2 text-lg font-extrabold tracking-wide">
+        <Link href={routes.home} aria-label="RaceHub — Trang chủ" className="flex items-center gap-2 text-lg font-extrabold tracking-wide">
           {/* eslint-disable-next-line @next/next/no-img-element -- biểu tượng tĩnh nhỏ */}
           <img src={ICONS.mark} alt="" width={28} height={28} className="size-7" />
-          <span>RACE<span className="text-brand">HUB</span></span>
+          <span className="hidden min-[400px]:inline">RACE<span className="text-brand">HUB</span></span>
         </Link>
         </div>
         {profile && (
@@ -32,6 +33,7 @@ export function TopBar({ profile }: { profile: Profile | null }) {
                 <ShieldCheck className="size-5" aria-hidden />
               </Link>
             )}
+            <MessagesButton />
             <NotificationBell userId={profile.id} />
             {/* Chỉ hiện số Xu (ví dùng ở mọi màn); cấp độ + thanh XP nằm ở trang Tôi */}
             <Link href={routes.wallet} className="flex min-h-11 items-center rounded-full border border-border bg-surface px-3" aria-label="Ví Xu của tôi">

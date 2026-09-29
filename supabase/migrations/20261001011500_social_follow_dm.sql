@@ -1,11 +1,3 @@
--- RaceHub — PHẦN 18/19 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 011500
--- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
--- Xong thì chạy phần tiếp theo.
-begin;
--- ===================================================================
--- 20261001011500_social_follow_dm.sql
--- ===================================================================
 -- 011500: MẠNG XÃ HỘI RUNNER — THÔNG BÁO HOẠT ĐỘNG MỚI, SỬA BÌNH LUẬN, THEO DÕI RUNNER, TIN NHẮN 1-1
 --   1. Thông báo khi bài chạy từ Strava / đồng hồ về: câu chúc mừng thay cho "Bài chạy … đã về RaceHub".
 --   2. Người viết bình luận được SỬA bình luận của mình (hiện "đã sửa"); xóa như cũ (người viết hoặc ban quản trị).
@@ -410,5 +402,3 @@ grant execute on function public.edit_post_comment(uuid, text), public.edit_org_
   public.unfollow_runner(uuid), public.follow_status(uuid), public.follow_list(uuid, text), public.following_feed(timestamptz, integer),
   public.follow_suggestions(), public.send_direct_message(uuid, text), public.direct_thread(uuid, timestamptz), public.direct_inbox(),
   public.direct_unread_count(), public.delete_direct_message(uuid) to authenticated;
-
-commit;

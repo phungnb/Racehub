@@ -42,6 +42,8 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   RACE_CANCELLED: { icon: Flag, tone: 'text-danger' },
   RUN_REVIEW: { icon: ShieldAlert, tone: 'text-warning' },
   RUN_SYNCED: { icon: Footprints, tone: 'text-brand' },
+  FOLLOW: { icon: UserPlus, tone: 'text-xp' },
+  DM: { icon: MessageCircle, tone: 'text-brand' },
   CLUB_RUN_REVIEW: { icon: ShieldAlert, tone: 'text-warning' },
   CLUB_PRO: { icon: Crown, tone: 'text-coin' },
   VIP: { icon: Crown, tone: 'text-coin' },

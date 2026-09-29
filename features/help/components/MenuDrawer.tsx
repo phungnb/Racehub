@@ -155,6 +155,18 @@ function Drawer({ profile, onSignOut, onClose }: { profile: Profile | null; onSi
           ))}
           {menu.isPending && <p className="px-3 text-xs text-fg-subtle">Đang tải hướng dẫn…</p>}
 
+          {profile && (
+            <section className="mb-3">
+              <h2 className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-fg-subtle">Kết nối runner</h2>
+              <ul>
+                <li><Link href={routes.messages} onClick={onClose} className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 hover:bg-surface-2">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-base" aria-hidden>💬</span>
+                  <span className="min-w-0 flex-1 text-sm font-medium">Tin nhắn</span><ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+                </Link></li>
+              </ul>
+            </section>
+          )}
+
           {profile && canPurchase && (
             <section className="mb-3">
               <h2 className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-fg-subtle">Gói</h2>

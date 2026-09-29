@@ -162,9 +162,10 @@ export async function listComments(postId: string, meId: string, isStaff: boolea
   const { data, error } = await supabase.rpc('club_post_comment_thread', { p_post_id: postId })
   if (!error) {
     return ((data ?? []) as { id: string; parent_id: string | null; author_id: string | null; author_name: string | null; author_avatar: string | null
-      body: string; created_at: string; like_count: number; liked: boolean; can_delete: boolean }[]).map((c) => ({
+      body: string; created_at: string; like_count: number; liked: boolean; can_delete: boolean; can_edit?: boolean; edited_at?: string | null }[]).map((c) => ({
       id: c.id, parentId: c.parent_id, authorName: c.author_name, authorAvatar: c.author_avatar, body: c.body, createdAt: c.created_at,
       likeCount: c.like_count ?? 0, liked: !!c.liked, canDelete: c.can_delete, mine: c.author_id === meId,
+      canEdit: c.can_edit ?? false, editedAt: c.edited_at ?? null,
     }))
   }
   if (errorKind(error) !== 'NOT_DEPLOYED') throw error
@@ -190,6 +191,12 @@ export async function toggleCommentLike(commentId: string) {
   const { data, error } = await supabase.rpc('toggle_post_comment_like', { p_comment_id: commentId })
   if (error) throw error
   return data as { liked: boolean; count: number }
+}
+
+/** Sửa bình luận của mình (migration 011500) */
+export async function editComment(commentId: string, body: string) {
+  const { error } = await supabase.rpc('edit_post_comment', { p_comment_id: commentId, p_body: body })
+  if (error) throw error
 }
 
 export async function deleteComment(commentId: string) {

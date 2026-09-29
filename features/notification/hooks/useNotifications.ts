@@ -58,13 +58,15 @@ export function useNotificationStream(userId: string | undefined) {
             qc.invalidateQueries({ queryKey: ['club', n.club_id] })
             qc.invalidateQueries({ queryKey: ['clubs'] })
           }
+          // Tin nhắn / theo dõi mới → làm mới hộp thư, số chưa đọc, trạng thái theo dõi
+          if (n.kind === 'DM' || n.kind === 'FOLLOW') qc.invalidateQueries({ queryKey: ['social'] })
           // Không làm phiền khi đang ở đúng màn hình mà thông báo trỏ tới
           if (n.link && window.location.pathname === n.link.split('?')[0]) return
           const link = n.link
           toast(n.title, {
             description: n.body ?? undefined,
             duration: n.kind === 'RUN_SYNCED' ? 10_000 : undefined,
-            action: link ? { label: n.kind === 'RUN_SYNCED' ? 'Nhận thưởng' : 'Xem', onClick: () => router.push(link) } : undefined,
+            action: link ? { label: n.kind === 'RUN_SYNCED' ? 'Nhận thưởng' : n.kind === 'DM' ? 'Trả lời' : 'Xem', onClick: () => router.push(link) } : undefined,
           })
         })
       .subscribe()
