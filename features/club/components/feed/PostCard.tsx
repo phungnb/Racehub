@@ -103,7 +103,7 @@ function milestoneOf(post: ClubPost) {
     emoji: code === 'FIRST_FM' ? '🏅' : code === 'FIRST_HM' ? '🥈' : code === 'FIRST_ULTRA' ? '🦾' : '🎉',
     detail: single
       ? `${formatKm(Number(m.distance_m ?? 0))} km${m.moving_s ? ` trong ${formatDuration(Number(m.moving_s))}` : ''} — vào Đại sảnh CLB!`
-      : `Tổng ${formatNumber(Number(m.total_km ?? 0))} km cùng RaceHub. Cổ vũ một câu nào!`,
+      : `Tổng ${formatNumber(Number(m.total_km ?? 0))} km cùng RaceHub. Gửi lời chúc mừng nào!`,
   }
 }
 

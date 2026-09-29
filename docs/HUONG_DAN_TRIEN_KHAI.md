@@ -33,13 +33,13 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
 > ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
-> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 010400** + chạy lại 003500),
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 010700** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
 >
 > 📦 **File gộp quá dài, copy không hết?** Dùng bản **chia nhỏ** [`supabase/deploy/phan/`](../supabase/deploy/phan/README.md): 10 phần, mỗi phần ≤ ~90 KB.
-> Chạy **lần lượt** `phan_01.sql` → `phan_17.sql` (mỗi phần: SQL Editor → New query → dán → Run). Đã chạy một số rồi thì bắt đầu từ phần chứa
-> migration đầu tiên bị ✗ trong **Kiểm tra hệ thống**, và **luôn chạy phần cuối** (`phan_17.sql`, chạy lại kiểm tra hệ thống). Mẹo copy trên GitHub: mở file → nút **Raw** → Ctrl+A → Ctrl+C.
+> Chạy **lần lượt** `phan_01.sql` → `phan_18.sql` (mỗi phần: SQL Editor → New query → dán → Run). Đã chạy một số rồi thì bắt đầu từ phần chứa
+> migration đầu tiên bị ✗ trong **Kiểm tra hệ thống**, và **luôn chạy phần cuối** (`phan_18.sql`, chạy lại kiểm tra hệ thống). Mẹo copy trên GitHub: mở file → nút **Raw** → Ctrl+A → Ctrl+C.
 > File gộp tạo bằng `npm run db:bundle` (hoặc `node scripts/db-bundle.mjs <mốc>` để gộp từ mốc khác); test tự động bảo đảm file luôn khớp migration.
 
 Chạy các file trong `supabase/migrations/`, đúng thứ tự:
@@ -150,6 +150,9 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001010200_race_rename.sql` | **Đổi tên "Giải chạy ảo" → "Giải chạy"** trong trang Hướng dẫn / Điều khoản / Quyền riêng tư, bài Kiến thức, thông báo cấp quyền tổ chức giải, lý do trừ phí tạo giải, thẻ gói mặc định (thông báo / giao dịch cũ giữ nguyên chữ) | Chạy lại 3500 |
 | `20261001010300_account_risks.sql` | **Tài khoản bất thường** (Quản trị → Người dùng): hai bài cùng giờ ở hai nơi cách > 2 km, một thiết bị nhiều tài khoản (theo đăng ký thông báo, chỉ lưu mã băm), bài trùng giờ, nghi nuôi lời mời, nhiều bài nghi vấn — chấm điểm 0–100, admin xem hồ sơ và khóa ngay tại chỗ; không tự khóa ai | Chạy lại 3500 |
 | `20261001010400_comment_likes_replies.sql` | **Bình luận có Thích và Trả lời** (bảng tin CLB + Doanh nghiệp): thích / bỏ thích, trả lời thụt dưới bình luận gốc, người được trả lời / được thích nhận thông báo; xóa bình luận chuyển vào nút ⋯ và luôn hỏi lại | Chạy lại 3500 |
+| `20261001010500_social_engagement.sql` | **Thích + quà tặng minh bạch**: bài đăng đếm lượt quà, ai cũng xem được ai đã thích / ai tặng quà gì (lời nhắn chỉ người tặng & người nhận đọc); **bảng tin cộng đồng** ở Trang chủ (bài từ mọi CLB mình tham gia, bài chạy nhiều CLB chỉ hiện một lần); "cổ vũ" → "thích"; **xóa thông báo** | Chạy lại 3500 |
+| `20261001010600_club_events_routes.sql` | **Sự kiện chạy nhóm nhiều cự ly** (VD 5 · 10 · 21 km, mỗi cự ly một pace nhóm); đổi giờ / điểm hẹn / cự ly thì cả CLB được báo | Chạy lại 3500 |
+| `20261001010700_challenge_conquest.sql` | **Thử thách chinh phục thời gian / pace** nhiều hạng mục (5K, 10K, Half, Full, tự đặt; người tạo đặt mục tiêu hoặc người chơi tự đăng ký); **hạn đăng ký** sửa được; **BXH chi tiết từng ngày**; **ngày vàng riêng từng thử thách** | Chạy lại 3500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 
