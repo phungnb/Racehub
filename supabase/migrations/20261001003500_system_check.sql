@@ -199,7 +199,9 @@ begin
     jsonb_build_object('file', '20261001011100', 'label', 'App cửa hàng: ẩn mua bán trong app iOS/Android (công tắc "Cho phép mua trong app"), Zalo / Telegram hỗ trợ',
       'ok', private.ops_defaults()->'features' ? 'nativePurchases' and 'support_zalo' = any (private.site_info_keys())),
     jsonb_build_object('file', '20261001011200', 'label', 'Thử thách bị hủy tự ẩn khỏi bảng tin CLB và trang chủ',
-      'ok', exists (select 1 from pg_trigger where tgname = 'trg_hide_cancelled_challenge_posts')));
+      'ok', exists (select 1 from pg_trigger where tgname = 'trg_hide_cancelled_challenge_posts')),
+    jsonb_build_object('file', '20261001011300', 'label', 'Admin cũng là VĐV: nhận Xu chạy bộ / nạp tiền, chặn Xu tự cấp (khuyến mãi, cộng tay, giới thiệu, nhiệm vụ)',
+      'ok', private.sc_fn('private', 'admin_credit_allowed')));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
