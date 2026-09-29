@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+import { routes } from '@/shared/config/routes'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Crown, Trophy } from 'lucide-react'
@@ -159,14 +161,16 @@ function RankRow({ r, me, floating, ref }: { r: LeaderboardRow; me?: boolean; fl
       floating ? 'border-brand/60 bg-surface shadow-lg shadow-black/50 ring-1 ring-brand/30'   // nổi trên danh sách: nền đặc, không lộ dòng bên dưới
         : me ? 'border-brand/50 bg-brand/10' : 'border-border bg-surface')}>
       <span className="w-7 text-center font-mono text-sm font-bold text-fg-muted">{r.run_count > 0 ? r.rank : '—'}</span>
-      <Avatar src={r.avatar_url} name={r.display_name} size="sm" />
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5">
-          <span className="truncate text-sm font-semibold">{me ? 'Bạn' : r.display_name}</span>
-          <LevelBadge level={r.level} />
+      <Link href={routes.athlete(r.user_id)} className="flex min-w-0 flex-1 items-center gap-3">
+        <Avatar src={r.avatar_url} name={r.display_name} size="sm" />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-semibold">{me ? 'Bạn' : r.display_name}</span>
+            <LevelBadge level={r.level} />
+          </span>
+          <span className="text-xs text-fg-subtle">{r.run_count} buổi · {formatDuration(r.moving_s)}</span>
         </span>
-        <span className="text-xs text-fg-subtle">{r.run_count} buổi · {formatDuration(r.moving_s)}</span>
-      </span>
+      </Link>
       <span className="text-right">
         <span className="block font-mono tabular font-bold">{formatKm(r.distance_m + r.bonus_m)}<span className="ml-0.5 text-xs text-fg-muted">km</span></span>
         {r.bonus_m > 0 && <span className="block text-[11px] font-semibold text-coin">+{formatKm(r.bonus_m)} vàng</span>}

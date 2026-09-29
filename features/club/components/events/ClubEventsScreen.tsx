@@ -6,7 +6,7 @@ import { CalendarPlus, CalendarX2, CheckCircle2, Handshake, MapPin, Plus, Route,
 import { Button, EmptyState, ErrorState, SectionTitle, SegmentedControl, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
-import type { ClubEvent } from '../../api/eventsApi'
+import { eventRoutes, type ClubEvent } from '../../api/eventsApi'
 import { useClub } from '../../hooks/useClub'
 import { useEvents, usePolls } from '../../hooks/useEvents'
 import { eventCountdown, eventDateBadge, eventWhen } from '../../model/events'
@@ -97,8 +97,8 @@ function EventCard({ clubId, event: e }: { clubId: string; event: ClubEvent }) {
         <span className="block text-sm text-fg-muted">{eventWhen(e.starts_at)}</span>
         <span className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-fg-subtle">
           {e.location_name && <span className="flex min-w-0 items-center gap-1"><MapPin className="size-3.5 shrink-0" aria-hidden /><span className="truncate">{e.location_name}</span></span>}
-          {e.distance_km && <span className="flex items-center gap-1"><Route className="size-3.5" aria-hidden />{String(e.distance_km).replace('.', ',')} km</span>}
-          {e.pace_text && <span className="flex items-center gap-1"><Timer className="size-3.5" aria-hidden />{e.pace_text}</span>}
+          {eventRoutes(e).some((r) => r.km) && <span className="flex items-center gap-1"><Route className="size-3.5" aria-hidden />{eventRoutes(e).filter((r) => r.km).map((r) => String(r.km).replace('.', ',')).join(' · ')} km</span>}
+          {eventRoutes(e).length === 1 && e.pace_text && <span className="flex items-center gap-1"><Timer className="size-3.5" aria-hidden />{e.pace_text}</span>}
           <span className="flex items-center gap-1"><Users className="size-3.5" aria-hidden />{e.going_count}{e.capacity ? `/${e.capacity}` : ''} tham gia</span>
         </span>
         {e.my_checked_in_at ? (

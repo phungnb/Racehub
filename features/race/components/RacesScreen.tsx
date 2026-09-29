@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Flag, Plus } from 'lucide-react'
-import { Button, EmptyState, ErrorState, SegmentedControl, Skeleton } from '@/shared/ui'
+import { Button, EmptyState, ErrorState, PageHeader, SegmentedControl, Skeleton } from '@/shared/ui'
 import { listRaces, type RaceScope } from '../api/raceApi'
 import { RaceCard } from './RaceCard'
 
@@ -20,13 +20,8 @@ export function RacesScreen({ canCreate }: { canCreate: boolean }) {
   const q = useQuery({ queryKey: ['races', scope], queryFn: () => listRaces(scope) })
   return (
     <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Giải chạy</h1>
-          <p className="text-sm text-fg-muted">Đăng ký, nhận BIB, chạy ở đâu cũng được</p>
-        </div>
-        {canCreate && <Link href="/races/new"><Button size="sm"><Plus className="size-4" aria-hidden />Tạo giải</Button></Link>}
-      </div>
+      <PageHeader title="Giải chạy" subtitle="Đăng ký, nhận BIB, chạy ở đâu cũng được"
+        action={canCreate ? <Link href="/races/new" className="shrink-0 pt-1"><Button size="sm"><Plus className="size-4" aria-hidden />Tạo giải</Button></Link> : undefined} />
       <SegmentedControl value={scope} onChange={setScope} options={TABS} />
       {q.isPending ? <div className="space-y-3">{[0, 1].map((i) => <Skeleton key={i} className="h-36" />)}</div>
         : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} />

@@ -2,9 +2,9 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { AlertTriangle, BatteryWarning, Clock3, CloudUpload, Coffee, FlaskConical, Footprints, Gift, History, Gauge, Hourglass, Loader2, Lock, MapPin, Pause, PauseCircle, Play, Satellite, Smartphone, Square, Timer, Unlock, Volume2, VolumeX, Watch } from 'lucide-react'
+import { AlertTriangle, BatteryWarning, Clock3, CloudUpload, Coffee, FlaskConical, Footprints, Gift, HelpCircle, History, Gauge, Hourglass, Loader2, Lock, MapPin, Pause, PauseCircle, Play, Satellite, Smartphone, Square, Timer, Unlock, Volume2, VolumeX, Watch } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Card, CoinAmount, ConfirmSheet, HoldButton, XpAmount } from '@/shared/ui'
+import { Button, Card, CoinAmount, ConfirmSheet, HoldButton, Sheet, XpAmount } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatDuration, formatKm, formatPace } from '@/shared/lib/format'
 import { RewardCascade, useActivityRewards, useMarkSeen } from '@/features/game'
@@ -81,6 +81,7 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [locked, setLocked] = useState(false)
   const [disclose, setDisclose] = useState(false)
+  const [tipsOpen, setTipsOpen] = useState(false)
   // App cài: lần đầu giải thích rõ vì sao cần vị trí khi tắt màn hình, rồi mới để hệ điều hành hỏi quyền
   const begin = () => {
     let seen = true
@@ -162,17 +163,24 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
             {pending} bài chạy đang lưu trên máy, sẽ tự gửi lên RaceHub khi có mạng.
           </p>
         )}
-        <Card className="space-y-2 text-sm text-fg-muted">
-          <p className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-brand" /><span>Chạy ngoài trời. Dừng nghỉ (đèn đỏ, uống nước): app <b className="text-fg">tự tạm dừng đồng hồ chạy</b> và không cộng km — pace không bị chậm vì lúc nghỉ, như Strava / Garmin. Đi bộ hay chạy biến tốc nhiều thì có thể tắt Tự tạm dừng.</span></p>
-          {t.background ? (
-            <p className="flex gap-2"><Smartphone className="mt-0.5 size-4 shrink-0 text-brand" /><span>Bấm Bắt đầu rồi <b className="text-fg">cứ tắt màn hình, bỏ túi</b> — app vẫn ghi GPS. Lần đầu, hãy cho phép RaceHub dùng vị trí (iPhone: chọn <b className="text-fg">Luôn luôn</b> nếu được hỏi).</span></p>
-          ) : (
-            <>
-              <p className="flex gap-2"><Smartphone className="mt-0.5 size-4 shrink-0 text-brand" /><span>Trình duyệt chỉ ghi GPS khi màn hình còn bật: bấm <b className="text-fg">Khóa màn hình</b> rồi bỏ túi — màn hình đen, ít tốn pin, chạm nhầm không sao. <b className="text-fg">Đừng bấm nút nguồn</b>, GPS sẽ dừng. Muốn tắt hẳn màn hình: cài app RaceHub.</span></p>
-              <p className="flex gap-2"><Watch className="mt-0.5 size-4 shrink-0 text-brand" /> Hoặc dùng đồng hồ Garmin / COROS / Apple Watch, app Strava — bài chạy tự về RaceHub.</p>
-            </>
-          )}
-        </Card>
+        {/* Hướng dẫn chỉ hiện khi người dùng bấm "Mẹo ghi bài chạy" — màn chạy gọn như app chuyên nghiệp */}
+        <button type="button" onClick={() => setTipsOpen(true)}
+          className="mx-auto flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-fg-muted hover:bg-surface-2 hover:text-fg">
+          <HelpCircle className="size-4" aria-hidden />Mẹo ghi bài chạy
+        </button>
+        <Sheet open={tipsOpen} onClose={() => setTipsOpen(false)} title="Mẹo ghi bài chạy">
+          <div className="space-y-3 text-sm text-fg-muted">
+            <p className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-brand" /><span>Chạy ngoài trời. Dừng nghỉ (đèn đỏ, uống nước): app <b className="text-fg">tự tạm dừng đồng hồ chạy</b> và không cộng km — pace không bị chậm vì lúc nghỉ, như Strava / Garmin. Đi bộ hay chạy biến tốc nhiều thì có thể tắt Tự tạm dừng.</span></p>
+            {t.background ? (
+              <p className="flex gap-2"><Smartphone className="mt-0.5 size-4 shrink-0 text-brand" /><span>Bấm Bắt đầu rồi <b className="text-fg">cứ tắt màn hình, bỏ túi</b> — app vẫn ghi GPS. Lần đầu, hãy cho phép RaceHub dùng vị trí (iPhone: chọn <b className="text-fg">Luôn luôn</b> nếu được hỏi).</span></p>
+            ) : (
+              <>
+                <p className="flex gap-2"><Smartphone className="mt-0.5 size-4 shrink-0 text-brand" /><span>Trình duyệt chỉ ghi GPS khi màn hình còn bật: bấm <b className="text-fg">Khóa màn hình</b> rồi bỏ túi — màn hình đen, ít tốn pin, chạm nhầm không sao. <b className="text-fg">Đừng bấm nút nguồn</b>, GPS sẽ dừng. Muốn tắt hẳn màn hình: cài app RaceHub.</span></p>
+                <p className="flex gap-2"><Watch className="mt-0.5 size-4 shrink-0 text-brand" /> Hoặc dùng đồng hồ Garmin / COROS / Apple Watch, app Strava — bài chạy tự về RaceHub.</p>
+              </>
+            )}
+          </div>
+        </Sheet>
         <BatteryTip />
       </div>
     )

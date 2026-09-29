@@ -10,8 +10,8 @@ import { formatDuration, formatKm, formatPace, formatRelative, paceFrom } from '
 
 const SOURCE_LABEL: Record<string, string> = { STRAVA: 'Strava', DIRECT_GPS: 'GPS RaceHub', GARMIN: 'Garmin', COROS: 'COROS' }
 
-export function ActivityList({ userId }: { userId: string }) {
-  const q = useQuery({ queryKey: ['activities', 'mine', userId], queryFn: () => listMyRecentActivities(userId) })
+export function ActivityList({ userId, limit = 10 }: { userId: string; limit?: number }) {
+  const q = useQuery({ queryKey: ['activities', 'mine', userId, limit], queryFn: () => listMyRecentActivities(userId, limit) })
 
   if (q.isPending) return <div className="space-y-2"><Skeleton className="h-16" /><Skeleton className="h-16" /></div>
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />

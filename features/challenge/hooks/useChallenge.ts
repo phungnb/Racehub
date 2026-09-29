@@ -15,6 +15,9 @@ export const challengeKeys = {
   leaderboard: (id: string) => ['challenge', id, 'leaderboard'] as const,
   teams: (id: string) => ['challenge', id, 'teams'] as const,
   pledge: (id: string) => ['challenge', id, 'pledge'] as const,
+  conquest: (id: string) => ['challenge', id, 'conquest'] as const,
+  memberDays: (id: string, userId: string) => ['challenge', id, 'member-days', userId] as const,
+  boostDays: (id: string) => ['challenge', id, 'boost-days'] as const,
 }
 
 export function useChallengeList(tab: ChallengeTab, clubId?: string) {
@@ -41,6 +44,7 @@ export function useChallenge(id: string, code?: string | null) {
         void qc.invalidateQueries({ queryKey: challengeKeys.leaderboard(id) })
         void qc.invalidateQueries({ queryKey: challengeKeys.teams(id) })
         void qc.invalidateQueries({ queryKey: challengeKeys.pledge(id) })
+        void qc.invalidateQueries({ queryKey: challengeKeys.conquest(id) })
       }, 1000)
     }
     const ch = supabase.channel(`challenge:${id}`)

@@ -79,7 +79,7 @@ export function GiftButton({ toUser, toName, toAvatar, postId, activityId, total
   return (
     <>
       <button onClick={() => setOpen(true)}
-        className={cn('flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-coin transition-colors hover:bg-surface-2', className)}>
+        className={cn('flex min-h-11 items-center gap-2 whitespace-nowrap rounded-xl px-2 text-sm font-semibold text-coin transition-colors hover:bg-surface-2', className)}>
         <GiftIcon className="size-5" aria-hidden />Tặng quà
         {!!total && total > 0 && <span className="font-mono tabular">{formatCoin(total)}</span>}
       </button>

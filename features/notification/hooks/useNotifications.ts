@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/shared/lib/supabase'
-import { countUnread, listNotifications, markNotificationsRead, type AppNotification } from '../api/notificationApi'
+import { countUnread, deleteNotifications, listNotifications, markNotificationsRead, type AppNotification } from '../api/notificationApi'
 
 export const notificationKeys = {
   all: ['notifications'] as const,
@@ -26,6 +26,18 @@ export function useMarkNotificationsRead() {
   return useMutation({
     mutationFn: (ids?: string[]) => markNotificationsRead(ids),
     onSuccess: () => qc.invalidateQueries({ queryKey: notificationKeys.all }),
+  })
+}
+
+/** Xóa thông báo: bỏ khỏi danh sách ngay, lỗi thì tải lại */
+export function useDeleteNotifications() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (v: { ids: string[] | null; readOnly?: boolean }) => deleteNotifications(v.ids, v.readOnly),
+    onMutate: (v) => qc.setQueryData<AppNotification[]>(notificationKeys.list, (list) =>
+      list?.filter((n) => (v.ids ? !v.ids.includes(n.id) : !(v.readOnly && n.read_at)))),
+    onError: () => { toast.error('Chưa xóa được thông báo. Thử lại sau.') },
+    onSettled: () => qc.invalidateQueries({ queryKey: notificationKeys.all }),
   })
 }
 

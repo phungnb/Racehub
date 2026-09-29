@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import QRCode from 'qrcode'
 import {
-  ArrowLeft, Ban, Camera, ExternalLink, CheckCircle2, Circle, MapPin, Navigation, Pencil, QrCode, RefreshCw, Route, ScanLine, Timer, Users,
+  ArrowLeft, Ban, Camera, ExternalLink, CheckCircle2, Circle, MapPin, Navigation, Pencil, QrCode, RefreshCw, Route, ScanLine, Timer, Users, Share2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, EmptyState, ErrorState, Field, Input, SectionTitle, SegmentedControl, Sheet, Skeleton } from '@/shared/ui'
@@ -13,7 +13,7 @@ import { cn } from '@/shared/lib/cn'
 import { formatRelative } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import {
-  cancelEvent, checkinToken, eventsErrorMessage, rsvpEvent, staffCheckin, type ClubEventDetail, type RsvpStatus,
+  cancelEvent, checkinToken, eventsErrorMessage, rsvpEvent, staffCheckin, type ClubEventDetail, type RsvpStatus, eventRoutes,
 } from '../../api/eventsApi'
 import { useClubMutation, useEvent } from '../../hooks/useEvents'
 import { eventCountdown, eventWhen, mapsUrl } from '../../model/events'
@@ -40,6 +40,16 @@ export function ClubEventScreen({ clubId, eventId }: { clubId: string; eventId: 
   )
 }
 
+/** Link tham gia (buổi công khai: link Quanh đây, ai cũng mở được) → gửi vào nhóm chat */
+async function shareEvent(e: ClubEventDetail) {
+  const link = `${window.location.origin}${e.visibility === 'PUBLIC' ? `/nearby/events/${e.id}` : `/clubs/${e.club_id}/events/${e.id}`}`
+  if (navigator.share) {
+    try { await navigator.share({ title: e.title, text: `Cùng chạy "${e.title}" nhé!`, url: link }) } catch { /* người dùng hủy */ }
+    return
+  }
+  try { await navigator.clipboard.writeText(link); toast.success('Đã sao chép link tham gia') } catch { toast.error('Không sao chép được link.') }
+}
+
 function Detail({ clubId, e }: { clubId: string; e: ClubEventDetail }) {
   const [qrOpen, setQrOpen] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -57,6 +67,9 @@ function Detail({ clubId, e }: { clubId: string; e: ClubEventDetail }) {
         <div>
           <div className="flex items-start gap-2">
             <h1 className={cn('min-w-0 flex-1 text-xl font-bold', cancelled && 'line-through opacity-70')}>{e.title}</h1>
+            {!cancelled && !ended && (
+              <Button size="sm" variant="secondary" aria-label="Chia sẻ link tham gia" onClick={() => void shareEvent(e)}><Share2 className="size-4" aria-hidden /></Button>
+            )}
             {e.can_manage && !cancelled && !ended && (
               <Button size="sm" variant="secondary" aria-label="Sửa sự kiện" onClick={() => setEditing(true)}><Pencil className="size-4" aria-hidden /></Button>
             )}
@@ -76,8 +89,17 @@ function Detail({ clubId, e }: { clubId: string; e: ClubEventDetail }) {
               {map && <a href={map} target="_blank" rel="noreferrer" className="ml-2 inline-flex items-center gap-1 font-semibold text-brand"><Navigation className="size-3.5" aria-hidden />Chỉ đường</a>}
             </Info>
           )}
-          {e.distance_km && <Info icon={Route} label="Cự ly">{String(e.distance_km).replace('.', ',')} km</Info>}
-          {e.pace_text && <Info icon={Timer} label="Pace nhóm">{e.pace_text}</Info>}
+          {eventRoutes(e).length > 0 && (
+            <Info icon={Route} label={eventRoutes(e).length > 1 ? 'Các cự ly' : 'Cự ly · pace nhóm'} className="col-span-2">
+              <span className="flex flex-wrap gap-1.5">
+                {eventRoutes(e).map((r, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2.5 py-1 text-xs font-semibold">
+                    {r.km ? `${String(r.km).replace('.', ',')} km` : 'Cự ly tự do'}{r.pace && <span className="flex items-center gap-0.5 font-normal text-fg-muted"><Timer className="size-3" aria-hidden />{r.pace}</span>}
+                  </span>
+                ))}
+              </span>
+            </Info>
+          )}
           <Info icon={Users} label="Tham gia">{e.going_count}{e.capacity ? ` / ${e.capacity} chỗ` : ''}{e.maybe_count ? ` · ${e.maybe_count} có thể` : ''}</Info>
           <Info icon={CheckCircle2} label="Đã điểm danh">{e.checked_in_count}</Info>
         </dl>

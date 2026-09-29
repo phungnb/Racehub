@@ -8,13 +8,13 @@ import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { BarChart3, ChevronRight, Crown, Gift, Pencil, Settings, Sparkles, Watch, Ticket, Store, Building2, Scale } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Card, LevelBadge, ProgressBar, SegmentedControl, Skeleton } from '@/shared/ui'
-import { StravaConnectButton } from '@/features/integrations'
+import { Button, Card, ConfirmSheet, LevelBadge, ProgressBar, SegmentedControl, Skeleton } from '@/shared/ui'
+import { StravaConnectButton, StravaSyncButton } from '@/features/integrations'
 import { formatKm, formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import { levelProgress } from '@/features/progression'
 import { CharacterHub } from '@/features/character'
-import { BadgeGrid, GiftWall } from '@/features/game'
+import { BadgeGrid, GiftWall, LeagueEntry } from '@/features/game'
 import { getAthleteProfile } from '../api/athleteApi'
 import { AvatarPicker } from './AvatarPicker'
 import type { Profile } from '@/shared/types/profile'
@@ -81,6 +81,7 @@ function Header({ profile }: { profile: Profile }) {
 
 function Devices({ profile }: { profile: Profile }) {
   const [busy, setBusy] = useState(false)
+  const [confirm, setConfirm] = useState(false)
   const disconnect = async () => {
     setBusy(true)
     const res = await fetch('/api/connect/strava/disconnect', { method: 'POST' })
@@ -90,6 +91,10 @@ function Devices({ profile }: { profile: Profile }) {
     window.location.reload()
   }
   return (
+    <>
+    <ConfirmSheet open={confirm} onClose={() => setConfirm(false)} title="Ngắt kết nối Strava?" confirmLabel="Ngắt kết nối" loading={busy}
+      description="Bài chạy mới trên Strava sẽ không tự về RaceHub nữa. Bài đã nhận vẫn giữ nguyên. Kết nối lại được bất cứ lúc nào."
+      onConfirm={() => { void disconnect() }} />
     <ul className="divide-y divide-border">
       <li className="flex items-center gap-3 py-3">
         <span className="grid size-9 place-items-center rounded-lg bg-[#fc4c02]/15 font-black text-[#fc4c02]" aria-hidden>S</span>
@@ -98,7 +103,7 @@ function Devices({ profile }: { profile: Profile }) {
           <p className="text-xs text-fg-muted">{profile.strava_connected ? 'Đã kết nối · bài chạy tự đồng bộ' : 'Nhận bài chạy từ Garmin, COROS, Apple Watch… Bài hiện cho CLB & BXH (tắt được trong Cài đặt).'}</p>
         </div>
         {profile.strava_connected
-          ? <Button size="sm" variant="secondary" loading={busy} onClick={disconnect}>Ngắt</Button>
+          ? <span className="flex shrink-0 gap-1.5"><StravaSyncButton /><Button size="sm" variant="ghost" loading={busy} onClick={() => setConfirm(true)}>Ngắt</Button></span>
           : <StravaConnectButton href="/api/connect/strava" size="sm" className="shrink-0" />}
       </li>
       {['Garmin Connect', 'COROS', 'Apple Health'].map((n) => (
@@ -109,6 +114,7 @@ function Devices({ profile }: { profile: Profile }) {
         </li>
       ))}
     </ul>
+    </>
   )
 }
 
@@ -142,7 +148,7 @@ export function MeScreen({ profile }: { profile: Profile }) {
       <Header profile={profile} />
       <SegmentedControl value={tab} onChange={setTab} options={TABS} />
 
-      {tab === 'badges' && <div className="space-y-4"><GiftWall userId={profile.id} isMe /><BadgeGrid /></div>}
+      {tab === 'badges' && <div className="space-y-4"><LeagueEntry userId={profile.id} /><GiftWall userId={profile.id} isMe /><BadgeGrid /></div>}
 
       {tab === 'overview' && (
         <div className="space-y-3">

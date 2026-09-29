@@ -1,5 +1,5 @@
--- RaceHub — PHẦN 16/17 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 010000, 010100, 010200, 010300
+-- RaceHub — PHẦN 16/18 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- Gồm: 010000, 010100, 010200, 010300, 010400, 010500, 010600
 -- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
 -- Xong thì chạy phần tiếp theo.
 begin;
@@ -654,5 +654,514 @@ revoke all on function public.admin_account_risks(integer) from public, anon;
 grant execute on function public.admin_account_risks(integer) to authenticated;
 
 notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001010400_comment_likes_replies.sql
+-- ===================================================================
+-- 010400: BÌNH LUẬN CÓ "THÍCH" VÀ "TRẢ LỜI" (bảng tin CLB + bảng tin Doanh nghiệp)
+--   • Thích một bình luận (bấm lại để bỏ); người viết bình luận nhận thông báo (tối đa một lần / người thích / ngày).
+--   • Trả lời một bình luận: hiện thụt vào dưới bình luận gốc (một tầng, trả lời một câu trả lời vẫn về cùng bình luận gốc);
+--     người được trả lời nhận thông báo.
+--   • Danh sách bình luận trả kèm số lượt thích, mình đã thích chưa, mình có quyền xóa không (người viết / ban quản trị).
+-- Hàm cũ add_post_comment(p_post_id, p_body) và add_org_post_comment(p_id, p_body) giữ nguyên cho app bản cũ.
+-- Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT, không RETURNING INTO. Chạy lại an toàn.
+
+-- ---------------------------------------------------------------------
+-- 1. CLB
+-- ---------------------------------------------------------------------
+alter table public.club_post_comments add column if not exists parent_id uuid references public.club_post_comments(id) on delete set null;
+alter table public.club_post_comments add column if not exists like_count integer not null default 0;
+create index if not exists club_post_comments_parent_idx on public.club_post_comments (parent_id) where parent_id is not null;
+
+create table if not exists public.club_comment_likes (
+  comment_id uuid not null references public.club_post_comments(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (comment_id, user_id)
+);
+alter table public.club_comment_likes enable row level security;
+revoke all on public.club_comment_likes from public, anon, authenticated;
+
+/** Danh sách bình luận của một bài (thành viên CLB), cũ → mới */
+create or replace function public.club_post_comment_thread(p_post_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_uid uuid := private.require_uid(); p public.club_posts := (select x from public.club_posts x where x.id = p_post_id and x.deleted_at is null);
+begin
+  if p.id is null then raise exception 'POST_NOT_FOUND'; end if;
+  if not public.club_is_member(p.club_id) and not public.is_system_admin() then raise exception 'NOT_A_MEMBER'; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object(
+      'id', c.id, 'parent_id', c.parent_id, 'author_id', c.author_id, 'body', c.body, 'created_at', c.created_at,
+      'author_name', pr.display_name, 'author_avatar', pr.avatar_url, 'author_level', pr.level,
+      'like_count', c.like_count,
+      'liked', exists (select 1 from public.club_comment_likes l where l.comment_id = c.id and l.user_id = v_uid),
+      'can_delete', c.author_id = v_uid or public.club_is_staff(p.club_id)) order by c.created_at)
+    from public.club_post_comments c left join public.profiles pr on pr.id = c.author_id
+   where c.post_id = p_post_id and c.deleted_at is null), '[]'::jsonb);
+end $$;
+
+/** Viết bình luận / trả lời một bình luận (p_parent_id) */
+create or replace function public.add_post_comment(p_post_id uuid, p_body text, p_parent_id uuid) returns public.club_post_comments
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  p public.club_posts := (select x from public.club_posts x where x.id = p_post_id and x.deleted_at is null);
+  v_body text := trim(coalesce(p_body, ''));
+  v_parent public.club_post_comments;
+  v_to uuid;                            -- người được trả lời trực tiếp (nhận thông báo)
+  c public.club_post_comments;
+  v_id uuid := gen_random_uuid();
+  v_link text;
+begin
+  if p.id is null then raise exception 'POST_NOT_FOUND'; end if;
+  if not public.club_is_member(p.club_id) then raise exception 'NOT_A_MEMBER'; end if;
+  if char_length(v_body) = 0 then raise exception 'EMPTY_COMMENT'; end if;
+  if char_length(v_body) > 1000 then raise exception 'POST_TOO_LONG'; end if;
+  if (select count(*) from public.club_post_comments where author_id = v_uid and created_at > now() - interval '1 minute') >= 10 then
+    raise exception 'RATE_LIMITED';
+  end if;
+  if p_parent_id is not null then
+    v_parent := (select x from public.club_post_comments x where x.id = p_parent_id and x.post_id = p_post_id and x.deleted_at is null);
+    if v_parent.id is null then raise exception 'COMMENT_NOT_FOUND'; end if;
+    v_to := v_parent.author_id;
+    -- một tầng: trả lời một câu trả lời thì gắn vào bình luận gốc (thông báo vẫn gửi người mình trả lời)
+    if v_parent.parent_id is not null then
+      v_parent := coalesce((select x from public.club_post_comments x where x.id = v_parent.parent_id and x.deleted_at is null), v_parent);
+    end if;
+  end if;
+
+  insert into public.club_post_comments (id, post_id, author_id, body, parent_id) values (v_id, p_post_id, v_uid, v_body, v_parent.id);
+  c := (select x from public.club_post_comments x where x.id = v_id);
+  update public.club_posts
+     set comment_count = (select count(*) from public.club_post_comments where post_id = p_post_id and deleted_at is null)
+   where id = p_post_id;
+
+  v_link := '/clubs/' || p.club_id || '?post=' || p.id;
+  if v_to is not null then
+    perform private.notify(v_to, p.club_id, 'COMMENT_REPLY',
+      private.display_name(v_uid) || ' đã trả lời bình luận của bạn', left(v_body, 140), v_link, v_uid, false);
+  end if;
+  if p.author_id is distinct from v_to then
+    perform private.notify(p.author_id, p.club_id, 'POST_COMMENT',
+      private.display_name(v_uid) || ' đã bình luận bài của bạn', left(v_body, 140), v_link, v_uid, false);
+  end if;
+  return c;
+end $$;
+
+/** Thích / bỏ thích một bình luận */
+create or replace function public.toggle_post_comment_like(p_comment_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  c public.club_post_comments := (select x from public.club_post_comments x where x.id = p_comment_id and x.deleted_at is null);
+  p public.club_posts := (select x from public.club_posts x where x.id = c.post_id);
+  v_liked boolean;
+  v_count integer;
+begin
+  if c.id is null or p.id is null or p.deleted_at is not null then raise exception 'COMMENT_NOT_FOUND'; end if;
+  if not public.club_is_member(p.club_id) then raise exception 'NOT_A_MEMBER'; end if;
+  if exists (select 1 from public.club_comment_likes l where l.comment_id = c.id and l.user_id = v_uid) then
+    delete from public.club_comment_likes where comment_id = c.id and user_id = v_uid;
+    v_liked := false;
+  else
+    insert into public.club_comment_likes (comment_id, user_id) values (c.id, v_uid) on conflict do nothing;
+    v_liked := true;
+    if not exists (select 1 from public.notifications n where n.user_id = c.author_id and n.actor_id = v_uid and n.kind = 'COMMENT_LIKE'
+                     and n.link = '/clubs/' || p.club_id || '?post=' || p.id and n.created_at > now() - interval '1 day') then
+      perform private.notify(c.author_id, p.club_id, 'COMMENT_LIKE', private.display_name(v_uid) || ' đã thích bình luận của bạn',
+        left(c.body, 140), '/clubs/' || p.club_id || '?post=' || p.id, v_uid, false);
+    end if;
+  end if;
+  v_count := (select count(*) from public.club_comment_likes l where l.comment_id = c.id);
+  update public.club_post_comments set like_count = v_count where id = c.id;
+  return jsonb_build_object('liked', v_liked, 'count', v_count);
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 2. Doanh nghiệp / tổ chức
+-- ---------------------------------------------------------------------
+alter table public.org_post_comments add column if not exists parent_id uuid references public.org_post_comments(id) on delete cascade;
+create table if not exists public.org_comment_likes (
+  comment_id uuid not null references public.org_post_comments(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (comment_id, user_id)
+);
+alter table public.org_comment_likes enable row level security;
+revoke all on public.org_comment_likes from public, anon, authenticated;
+
+-- Giữ kiểu trả về jsonb như bản 008400, thêm trả lời + lượt thích
+create or replace function public.org_post_comments(p_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_org uuid := (select p.org_id from public.org_posts p where p.id = p_id);
+begin
+  if v_org is null or not public.org_is_member(v_org) then raise exception 'NOT_A_MEMBER'; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object('id', cm.id, 'parent_id', cm.parent_id, 'body', cm.body, 'created_at', cm.created_at,
+             'author_id', cm.author_id, 'author_name', private.display_name(cm.author_id), 'author_avatar', pr.avatar_url,
+             'like_count', (select count(*)::int from public.org_comment_likes l where l.comment_id = cm.id),
+             'liked', exists (select 1 from public.org_comment_likes l where l.comment_id = cm.id and l.user_id = auth.uid()),
+             'can_delete', cm.author_id = auth.uid() or public.org_is_admin(v_org)) order by cm.created_at)
+           from public.org_post_comments cm left join public.profiles pr on pr.id = cm.author_id where cm.post_id = p_id), '[]'::jsonb);
+end $$;
+
+create or replace function public.add_org_post_comment(p_id uuid, p_body text, p_parent_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  x public.org_posts := (select p from public.org_posts p where p.id = p_id);
+  v_parent public.org_post_comments;
+  v_to uuid;
+  v_link text;
+begin
+  if x.id is null or not public.org_is_member(x.org_id) then raise exception 'NOT_A_MEMBER'; end if;
+  if char_length(trim(coalesce(p_body, ''))) not between 1 and 1000 then raise exception 'EMPTY_COMMENT'; end if;
+  if (select count(*) from public.org_post_comments where author_id = v_uid and created_at > now() - interval '1 minute') >= 10 then
+    raise exception 'RATE_LIMITED';
+  end if;
+  if p_parent_id is not null then
+    v_parent := (select c from public.org_post_comments c where c.id = p_parent_id and c.post_id = p_id);
+    if v_parent.id is null then raise exception 'COMMENT_NOT_FOUND'; end if;
+    v_to := v_parent.author_id;
+    if v_parent.parent_id is not null then
+      v_parent := coalesce((select c from public.org_post_comments c where c.id = v_parent.parent_id), v_parent);
+    end if;
+  end if;
+  insert into public.org_post_comments (post_id, author_id, body, parent_id) values (p_id, v_uid, trim(p_body), v_parent.id);
+  v_link := '/orgs/' || x.org_id || '?tab=feed';
+  if v_to is not null then
+    perform private.notify(v_to, null, 'COMMENT_REPLY', private.display_name(v_uid) || ' đã trả lời bình luận của bạn',
+      left(trim(p_body), 120), v_link, v_uid, false);
+  end if;
+  if x.author_id is distinct from v_to then
+    perform private.notify(x.author_id, null, 'ORG_POST_COMMENT', private.display_name(v_uid) || ' bình luận bài của bạn',
+      left(trim(p_body), 120), v_link, v_uid, false);
+  end if;
+end $$;
+
+create or replace function public.toggle_org_comment_like(p_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  cm public.org_post_comments := (select c from public.org_post_comments c where c.id = p_id);
+  v_org uuid := (select p.org_id from public.org_posts p where p.id = cm.post_id);
+  v_liked boolean;
+begin
+  if cm.id is null then raise exception 'COMMENT_NOT_FOUND'; end if;
+  if not public.org_is_member(v_org) then raise exception 'NOT_A_MEMBER'; end if;
+  if exists (select 1 from public.org_comment_likes l where l.comment_id = cm.id and l.user_id = v_uid) then
+    delete from public.org_comment_likes where comment_id = cm.id and user_id = v_uid;
+    v_liked := false;
+  else
+    insert into public.org_comment_likes (comment_id, user_id) values (cm.id, v_uid) on conflict do nothing;
+    v_liked := true;
+    if not exists (select 1 from public.notifications n where n.user_id = cm.author_id and n.actor_id = v_uid and n.kind = 'COMMENT_LIKE'
+                     and n.link = '/orgs/' || v_org || '?tab=feed' and n.created_at > now() - interval '1 day') then
+      perform private.notify(cm.author_id, null, 'COMMENT_LIKE', private.display_name(v_uid) || ' đã thích bình luận của bạn',
+        left(cm.body, 120), '/orgs/' || v_org || '?tab=feed', v_uid, false);
+    end if;
+  end if;
+  return jsonb_build_object('liked', v_liked, 'count', (select count(*)::int from public.org_comment_likes l where l.comment_id = cm.id));
+end $$;
+
+revoke all on function public.club_post_comment_thread(uuid), public.add_post_comment(uuid, text, uuid), public.toggle_post_comment_like(uuid),
+  public.add_org_post_comment(uuid, text, uuid), public.toggle_org_comment_like(uuid) from public, anon;
+grant execute on function public.club_post_comment_thread(uuid), public.add_post_comment(uuid, text, uuid), public.toggle_post_comment_like(uuid),
+  public.add_org_post_comment(uuid, text, uuid), public.toggle_org_comment_like(uuid) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001010500_social_engagement.sql
+-- ===================================================================
+-- 010500: THÍCH + QUÀ TẶNG MINH BẠCH, BẢNG TIN CỘNG ĐỒNG, XÓA THÔNG BÁO
+--   • Bài đăng CLB đếm số lượt tặng quà (gift_count, tự cộng khi có quà mới) — ai cũng thấy bao nhiêu lượt thích, bao nhiêu lượt quà.
+--   • post_engagement(post): ai đã thích, ai đã tặng quà gì (lời nhắn kèm quà chỉ người tặng / người nhận đọc được).
+--   • community_feed(): bảng tin cộng đồng ở Trang chủ = bài chạy, cột mốc, bài viết từ mọi CLB mình tham gia
+--     (một bài chạy đăng ở nhiều CLB chỉ hiện một lần).
+--   • "Cổ vũ" đổi thành "Thích": thông báo "… đã thích buổi chạy của bạn".
+--   • Xóa thông báo: từng cái, hoặc xóa hết thông báo đã đọc.
+-- Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT, không RETURNING INTO. Chạy lại an toàn.
+
+-- ---------------------------------------------------------------------
+-- 1. Số lượt tặng quà trên bài đăng
+-- ---------------------------------------------------------------------
+alter table public.club_posts add column if not exists gift_count integer not null default 0;
+
+create or replace function private.cheer_count_post_gift() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.post_id is not null and new.gift_code is not null then
+    update public.club_posts set gift_count = gift_count + greatest(coalesce(new.qty, 1), 1) where id = new.post_id;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists trg_cheer_count_post_gift on public.cheers;
+create trigger trg_cheer_count_post_gift after insert on public.cheers
+  for each row execute function private.cheer_count_post_gift();
+
+-- Số liệu cũ: đếm lại từ các lượt quà đã gửi
+update public.club_posts p
+   set gift_count = s.n
+  from (select c.post_id, sum(greatest(coalesce(c.qty, 1), 1))::int as n
+          from public.cheers c where c.post_id is not null and c.gift_code is not null group by c.post_id) s
+ where p.id = s.post_id and p.gift_count is distinct from s.n;
+
+-- ---------------------------------------------------------------------
+-- 2. Ai đã thích, ai đã tặng quà (thành viên CLB của bài)
+-- ---------------------------------------------------------------------
+create or replace function public.post_engagement(p_post_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  p public.club_posts := (select x from public.club_posts x where x.id = p_post_id and x.deleted_at is null);
+begin
+  if p.id is null then raise exception 'POST_NOT_FOUND'; end if;
+  if not public.club_is_member(p.club_id) then raise exception 'NOT_A_MEMBER'; end if;
+  return jsonb_build_object(
+    'like_count', p.reaction_count,
+    'gift_count', p.gift_count,
+    'likes', (select coalesce(jsonb_agg(jsonb_build_object(
+                'user_id', t.user_id, 'display_name', pr.display_name, 'avatar_url', pr.avatar_url, 'level', coalesce(pr.level, 1),
+                'at', t.created_at, 'me', t.user_id = v_uid) order by t.created_at desc), '[]'::jsonb)
+                from (select r.user_id, r.created_at, row_number() over (order by r.created_at desc) as rn
+                        from public.club_post_reactions r where r.post_id = p.id) t
+                join public.profiles pr on pr.id = t.user_id
+               where t.rn <= 500),
+    'gifts', (select coalesce(jsonb_agg(jsonb_build_object(
+                'id', t.id, 'user_id', t.from_user, 'display_name', pr.display_name, 'avatar_url', pr.avatar_url, 'level', coalesce(pr.level, 1),
+                'emoji', g.emoji, 'name', g.name, 'tier', g.tier, 'qty', t.qty, 'at', t.created_at, 'me', t.from_user = v_uid,
+                -- lời nhắn là chuyện riêng của người tặng và người nhận
+                'message', case when v_uid in (t.from_user, t.to_user) then t.message end) order by t.created_at desc), '[]'::jsonb)
+                from (select c.id, c.from_user, c.to_user, c.gift_code, greatest(coalesce(c.qty, 1), 1) as qty, c.message, c.created_at,
+                             row_number() over (order by c.created_at desc) as rn
+                        from public.cheers c where c.post_id = p.id and c.gift_code is not null) t
+                join public.profiles pr on pr.id = t.from_user
+                join public.gift_catalog g on g.code = t.gift_code
+               where t.rn <= 500),
+    'gift_summary', (select coalesce(jsonb_agg(jsonb_build_object('emoji', s.emoji, 'name', s.name, 'qty', s.n) order by s.n desc, s.price desc), '[]'::jsonb)
+                       from (select g.emoji, g.name, g.price_xu as price, sum(greatest(coalesce(c.qty, 1), 1)) as n
+                               from public.cheers c join public.gift_catalog g on g.code = c.gift_code
+                              where c.post_id = p.id group by g.emoji, g.name, g.price_xu) s),
+    'gift_senders', (select count(distinct c.from_user) from public.cheers c where c.post_id = p.id and c.gift_code is not null)
+  );
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 3. Bảng tin cộng đồng (Trang chủ): bài từ mọi CLB mình tham gia, mới nhất trước
+-- ---------------------------------------------------------------------
+create or replace function public.community_feed(p_before timestamptz default null, p_limit integer default 15) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_limit integer := least(greatest(coalesce(p_limit, 15), 1), 30);
+begin
+  return (
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'id', x.id, 'club_id', x.club_id, 'author_id', x.author_id, 'kind', x.kind, 'title', x.title, 'body', x.body,
+             'image_paths', coalesce(to_jsonb(x.image_paths), '[]'::jsonb), 'activity_id', x.activity_id, 'meta', coalesce(x.meta, '{}'::jsonb),
+             'is_pinned', false, 'reaction_count', x.reaction_count, 'comment_count', x.comment_count, 'cheer_xu', x.cheer_xu,
+             'gift_count', x.gift_count, 'created_at', x.created_at,
+             'reacted', exists (select 1 from public.club_post_reactions r where r.post_id = x.id and r.user_id = v_uid),
+             'author', case when pr.id is null then null else jsonb_build_object('id', pr.id, 'display_name', pr.display_name,
+                                                                                 'level', coalesce(pr.level, 1), 'avatar_url', pr.avatar_url) end,
+             'club', jsonb_build_object('id', cl.id, 'name', cl.name, 'avatar_url', cl.avatar_url, 'accent_color', cl.accent_color))
+             order by x.created_at desc), '[]'::jsonb)
+      from (
+        select d.*, row_number() over (order by d.created_at desc, d.id) as page_rn
+          from (
+            select cp.*,
+                   -- một bài chạy / cột mốc đăng ở nhiều CLB chỉ hiện một lần (bài đầu tiên)
+                   row_number() over (partition by coalesce(cp.activity_id::text,
+                                        case when cp.kind = 'MILESTONE' then cp.author_id::text || ':' || coalesce(cp.meta->>'code', '') || ':' || coalesce(cp.meta->>'total_km', '') end,
+                                        cp.id::text)
+                                      order by cp.created_at, cp.id) as dup_rn
+              from public.club_posts cp
+              join public.club_members m on m.club_id = cp.club_id and m.user_id = v_uid and m.status = 'APPROVED'
+             where cp.deleted_at is null
+               and cp.kind in ('AUTO_RUN', 'MILESTONE', 'POST', 'NEWS', 'ANNOUNCEMENT', 'CHALLENGE')
+               and cp.created_at > now() - interval '60 days'
+          ) d
+         where d.dup_rn = 1 and (p_before is null or d.created_at < p_before)
+      ) x
+      left join public.profiles pr on pr.id = x.author_id
+      join public.clubs cl on cl.id = x.club_id
+     where x.page_rn <= v_limit
+  );
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 4. "Cổ vũ" → "Thích" trong thông báo
+-- ---------------------------------------------------------------------
+create or replace function public.toggle_post_reaction(p_post_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := private.require_uid(); p public.club_posts; v_on boolean;
+begin
+  perform 1 from public.club_posts where id = p_post_id and deleted_at is null for update;
+  p := (select x from public.club_posts x where x.id = p_post_id and x.deleted_at is null);
+  if p.id is null then raise exception 'POST_NOT_FOUND'; end if;
+  if not public.club_is_member(p.club_id) then raise exception 'NOT_A_MEMBER'; end if;
+
+  delete from public.club_post_reactions where post_id = p_post_id and user_id = v_uid;
+  if found then
+    v_on := false;
+  else
+    insert into public.club_post_reactions (post_id, user_id) values (p_post_id, v_uid);
+    v_on := true;
+    -- Chỉ báo một lần cho mỗi người thích mỗi bài
+    if not exists (select 1 from public.notifications
+                    where user_id = p.author_id and actor_id = v_uid and kind = 'POST_CHEER'
+                      and link = '/clubs/' || p.club_id || '?post=' || p.id) then
+      perform private.notify(p.author_id, p.club_id, 'POST_CHEER',
+        private.display_name(v_uid) || case when p.kind = 'AUTO_RUN' then ' đã thích buổi chạy của bạn'
+                                            when p.kind = 'AUTO_JOIN' then ' chào mừng bạn vào CLB'
+                                            else ' đã thích bài đăng của bạn' end,
+        null, '/clubs/' || p.club_id || '?post=' || p.id, v_uid, false);
+    end if;
+  end if;
+
+  update public.club_posts
+     set reaction_count = (select count(*) from public.club_post_reactions where post_id = p_post_id)
+   where id = p_post_id;
+  return jsonb_build_object('reacted', v_on, 'count', (select x.reaction_count from public.club_posts x where x.id = p_post_id));
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 5. Xóa thông báo: theo danh sách, hoặc tất cả thông báo đã đọc
+-- ---------------------------------------------------------------------
+create or replace function public.delete_notifications(p_ids uuid[] default null, p_read_only boolean default false) returns integer
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := private.require_uid(); n integer;
+begin
+  if p_ids is null and not coalesce(p_read_only, false) then raise exception 'NOTHING_SELECTED'; end if;
+  delete from public.notifications
+   where user_id = v_uid
+     and (p_ids is null or id = any(p_ids))
+     and (not coalesce(p_read_only, false) or read_at is not null);
+  get diagnostics n = row_count;
+  return n;
+end $$;
+
+revoke all on function public.post_engagement(uuid), public.community_feed(timestamptz, integer),
+  public.delete_notifications(uuid[], boolean) from public, anon;
+grant execute on function public.post_engagement(uuid), public.community_feed(timestamptz, integer),
+  public.delete_notifications(uuid[], boolean) to authenticated;
+revoke all on function private.cheer_count_post_gift() from public, anon, authenticated;
+
+-- ===================================================================
+-- 20261001010600_club_events_routes.sql
+-- ===================================================================
+-- 010600: SỰ KIỆN CHẠY NHÓM — NHIỀU CỰ LY, BÁO THÀNH VIÊN KHI ĐỔI LỊCH
+--   • Một buổi chạy có nhiều cự ly (VD 5 km pace 7:00, 10 km pace 6:00, 21 km pace 5:30): cột routes [{km, pace}], tối đa 6.
+--     distance_km / pace_text giữ cự ly đầu tiên cho app bản cũ.
+--   • Tạo sự kiện: cả CLB nhận thông báo (như trước). Sửa giờ / điểm hẹn / cự ly: cả CLB nhận thông báo "Đổi lịch".
+-- Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT, không RETURNING INTO. Chạy lại an toàn.
+
+alter table public.club_events add column if not exists routes jsonb not null default '[]'::jsonb;
+
+-- Chuẩn hóa danh sách cự ly: [{km: 10, pace: "6:00–6:30"}] — bỏ dòng trống, km 0–200, pace ≤ 40 ký tự, tối đa 6
+create or replace function private.event_routes(p jsonb) returns jsonb
+language plpgsql immutable as $$
+declare v jsonb;
+begin
+  begin
+    v := (select coalesce(jsonb_agg(jsonb_build_object('km', round((x->>'km')::numeric, 1),
+                                                       'pace', nullif(left(trim(coalesce(x->>'pace', '')), 40), '')) order by t.ord), '[]'::jsonb)
+            from jsonb_array_elements(case when jsonb_typeof(p) = 'array' then p else '[]'::jsonb end) with ordinality as t(x, ord)
+           where nullif(trim(coalesce(x->>'km', '')), '') is not null);
+  exception when others then
+    raise exception 'INVALID_EVENT';
+  end;
+  if jsonb_array_length(v) > 6 then raise exception 'INVALID_EVENT'; end if;
+  if exists (select 1 from jsonb_array_elements(v) x where (x->>'km')::numeric <= 0 or (x->>'km')::numeric > 200) then
+    raise exception 'INVALID_EVENT';
+  end if;
+  return v;
+end $$;
+
+-- Sự kiện CLB: kèm chế độ công khai + các cự ly
+create or replace function private.event_json(e public.club_events, p_uid uuid) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'id', e.id, 'club_id', e.club_id, 'title', e.title, 'description', e.description, 'starts_at', e.starts_at,
+    'ends_at', e.starts_at + make_interval(mins => e.duration_min), 'duration_min', e.duration_min,
+    'location_name', e.location_name, 'lat', e.lat, 'lng', e.lng, 'distance_km', e.distance_km, 'pace_text', e.pace_text,
+    'routes', case when jsonb_array_length(coalesce(e.routes, '[]'::jsonb)) > 0 then e.routes
+                   when e.distance_km is not null or e.pace_text is not null then jsonb_build_array(jsonb_build_object('km', e.distance_km, 'pace', e.pace_text))
+                   else '[]'::jsonb end,
+    'capacity', e.capacity, 'status', e.status, 'visibility', e.visibility, 'cancel_reason', e.cancel_reason,
+    'created_by', e.created_by, 'creator_name', (select display_name from public.profiles where id = e.created_by),
+    'going_count', (select count(*) from public.club_event_rsvps r where r.event_id = e.id and r.status = 'GOING'),
+    'maybe_count', (select count(*) from public.club_event_rsvps r where r.event_id = e.id and r.status = 'MAYBE'),
+    'checked_in_count', (select count(*) from public.club_event_rsvps r where r.event_id = e.id and r.checked_in_at is not null),
+    'my_status', (select r.status from public.club_event_rsvps r where r.event_id = e.id and r.user_id = p_uid),
+    'my_checked_in_at', (select r.checked_in_at from public.club_event_rsvps r where r.event_id = e.id and r.user_id = p_uid))
+$$;
+
+create or replace function public.create_club_event(p_club_id uuid, p jsonb) returns jsonb
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  v_uid uuid := private.require_staff(p_club_id);
+  f public.club_events := private.event_fields(p);
+  v_routes jsonb := private.event_routes(p->'routes');
+  v_id uuid := gen_random_uuid();
+  m record;
+begin
+  if f.starts_at < now() - interval '1 hour' then raise exception 'INVALID_TIME'; end if;
+  if jsonb_array_length(v_routes) > 0 then
+    f.distance_km := (v_routes->0->>'km')::numeric;
+    f.pace_text := v_routes->0->>'pace';
+  end if;
+  insert into public.club_events (id, club_id, created_by, title, description, starts_at, duration_min, location_name, lat, lng,
+                                  distance_km, pace_text, capacity, routes)
+  values (v_id, p_club_id, v_uid, f.title, f.description, f.starts_at, f.duration_min, f.location_name, f.lat, f.lng,
+          f.distance_km, f.pace_text, f.capacity, v_routes);
+  insert into private.club_event_secrets (event_id, secret) values (v_id, encode(extensions.gen_random_bytes(24), 'hex'));
+  -- người tạo mặc định tham gia
+  insert into public.club_event_rsvps (event_id, user_id, status) values (v_id, v_uid, 'GOING');
+  -- cả CLB nhận thông báo (thông báo quan trọng: vẫn tới cả người chỉ nhận tin quan trọng)
+  for m in select user_id from public.club_members where club_id = p_club_id and status = 'APPROVED' and user_id <> v_uid loop
+    perform private.notify(m.user_id, p_club_id, 'CLUB_EVENT', 'Sự kiện mới: ' || f.title,
+      to_char(f.starts_at at time zone 'Asia/Ho_Chi_Minh', 'HH24:MI DD/MM') || coalesce(' · ' || f.location_name, ''),
+      '/clubs/' || p_club_id || '/events/' || v_id, v_uid, true);
+  end loop;
+  return private.event_json((select e from public.club_events e where e.id = v_id), v_uid);
+end $$;
+
+create or replace function public.update_club_event(p_event_id uuid, p jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  e public.club_events := (select x from public.club_events x where x.id = p_event_id);
+  v_uid uuid;
+  f public.club_events := private.event_fields(p);
+  v_routes jsonb := private.event_routes(p->'routes');
+  v_changed boolean;
+  m record;
+begin
+  if e.id is null then raise exception 'EVENT_NOT_FOUND'; end if;
+  v_uid := private.require_staff(e.club_id);
+  if e.status = 'CANCELLED' then raise exception 'EVENT_CANCELLED'; end if;
+  if jsonb_array_length(v_routes) > 0 then
+    f.distance_km := (v_routes->0->>'km')::numeric;
+    f.pace_text := v_routes->0->>'pace';
+  end if;
+  v_changed := f.starts_at is distinct from e.starts_at or f.location_name is distinct from e.location_name
+            or f.lat is distinct from e.lat or f.lng is distinct from e.lng or v_routes is distinct from coalesce(e.routes, '[]'::jsonb);
+  update public.club_events set title = f.title, description = f.description, starts_at = f.starts_at,
+         duration_min = f.duration_min, location_name = f.location_name, lat = f.lat, lng = f.lng,
+         distance_km = f.distance_km, pace_text = f.pace_text, capacity = f.capacity, routes = v_routes,
+         reminded_at = case when f.starts_at <> e.starts_at then null else reminded_at end
+   where id = p_event_id;
+  -- Đổi giờ / điểm hẹn / cự ly của buổi sắp diễn ra → báo cả CLB
+  if v_changed and f.starts_at > now() then
+    for m in select user_id from public.club_members where club_id = e.club_id and status = 'APPROVED' and user_id <> v_uid loop
+      perform private.notify(m.user_id, e.club_id, 'CLUB_EVENT', 'Đổi lịch: ' || f.title,
+        to_char(f.starts_at at time zone 'Asia/Ho_Chi_Minh', 'HH24:MI DD/MM') || coalesce(' · ' || f.location_name, ''),
+        '/clubs/' || e.club_id || '/events/' || e.id, v_uid, true);
+    end loop;
+  end if;
+  return private.event_json((select x from public.club_events x where x.id = p_event_id), v_uid);
+end $$;
+
+revoke all on function private.event_routes(jsonb) from public, anon, authenticated;
 
 commit;

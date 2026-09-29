@@ -1,8 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronRight, GraduationCap, Newspaper } from 'lucide-react'
+import { ChevronDown, ChevronRight, GraduationCap, Newspaper } from 'lucide-react'
 import { Card, Skeleton } from '@/shared/ui'
+import { cn } from '@/shared/lib/cn'
+import { useStoredFlag } from '@/shared/lib/useStoredFlag'
 import { routes } from '@/shared/config/routes'
 import { useKnowledgeHome } from '../hooks/useKnowledge'
 import { categoryIcon, HOME_CHIPS } from '../model/knowledge'
@@ -11,7 +13,9 @@ import { ArticleRow } from './ArticleCard'
 /** Khu "Kiến thức Runner" trên Trang chủ: lối vào chuyên mục, đọc tiếp, chuỗi người mới, bài nổi bật, tin mới */
 export function KnowledgeHomeSection() {
   const q = useKnowledgeHome()
-  if (q.isPending) return <Skeleton className="h-72" />
+  // Mặc định thu gọn (chỉ tiêu đề + chuyên mục); mở ra thì nhớ lựa chọn trên máy
+  const [open, setOpen] = useStoredFlag('rh:home:knowledge-open', false)
+  if (q.isPending) return <Skeleton className="h-28" />
   if (q.isError || !q.data) return null
   const d = q.data
   if (d.featured.length + d.news.length === 0) return null
@@ -21,12 +25,15 @@ export function KnowledgeHomeSection() {
   const featured = d.featured.filter((a) => a.id !== reading?.id).slice(0, 4)
 
   return (
-    <Card className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold">RaceHub Knowledge</h2>
-          <p className="text-sm text-fg-muted">Kiến thức để chạy tốt hơn mỗi ngày.</p>
-        </div>
+    <Card className={cn(open ? 'space-y-4' : 'space-y-2')}>
+      <div className="flex items-center justify-between gap-3">
+        <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left">
+          <span className="min-w-0">
+            <span className="block text-lg font-bold">RaceHub Knowledge</span>
+            <span className="block text-sm text-fg-muted">{open ? 'Kiến thức để chạy tốt hơn mỗi ngày.' : 'Bài nổi bật, tin chạy bộ · bấm để xem'}</span>
+          </span>
+          <ChevronDown className={cn('size-5 shrink-0 text-fg-subtle transition-transform', open && 'rotate-180')} aria-hidden />
+        </button>
         <Link href={routes.learn} className="inline-flex min-h-11 shrink-0 items-center gap-0.5 text-sm font-semibold text-brand">Tất cả<ChevronRight className="size-4" aria-hidden /></Link>
       </div>
 
@@ -42,7 +49,7 @@ export function KnowledgeHomeSection() {
         })}
       </nav>
 
-      {series && (
+      {open && series && (
         <Link href={series.next_slug ? routes.learnArticle(series.next_slug) : routes.learn}
           className="flex items-center gap-3 rounded-2xl border border-brand/30 bg-brand/8 p-3 hover:border-brand/60">
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand/20 text-brand"><GraduationCap className="size-5" aria-hidden /></span>
@@ -57,21 +64,21 @@ export function KnowledgeHomeSection() {
         </Link>
       )}
 
-      {reading && (
+      {open && reading && (
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">Đọc tiếp</p>
           <ArticleRow a={reading} />
         </div>
       )}
 
-      {featured.length > 0 && (
+      {open && featured.length > 0 && (
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">Bài viết nổi bật</p>
           <div className="space-y-1">{featured.map((a) => <ArticleRow key={a.id} a={a} />)}</div>
         </div>
       )}
 
-      {d.news.length > 0 && (
+      {open && d.news.length > 0 && (
         <div>
           <p className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle"><Newspaper className="size-3.5" aria-hidden />Tin mới</p>
           <div className="space-y-1">{d.news.slice(0, 2).map((a) => <ArticleRow key={a.id} a={a} />)}</div>

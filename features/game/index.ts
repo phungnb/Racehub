@@ -1,5 +1,5 @@
 // Cổng công khai của module game. Code ngoài module chỉ import từ '@/features/game'.
-export { GameHub } from './components/GameHub'
+export { GameHub, LeagueEntry } from './components/GameHub'
 export { RewardCascade } from './components/RewardCascade'
 export { BadgeGrid } from './components/BadgeGrid'
 export { WalletView } from './components/WalletView'

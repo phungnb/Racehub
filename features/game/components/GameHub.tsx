@@ -1,14 +1,16 @@
 'use client'
 
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useState } from 'react'
-import { CalendarCheck, Check, ChevronRight, ChevronUp, Flame, Gift, ShieldCheck, Trophy } from 'lucide-react'
+import { CalendarCheck, Check, ChevronRight, ChevronUp, Flame, Footprints, Gift, ShieldCheck, Trophy } from 'lucide-react'
 import { Avatar, Card, ErrorState, LevelBadge, ProgressBar, ProgressRing, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { levelProgress } from '@/features/progression'
 import { shineTier } from '@/shared/lib/shine'
 import type { Profile } from '@/shared/types/profile'
+import { routes } from '@/shared/config/routes'
 import { gameErrorMessage } from '../api/gameApi'
 import { FormChip } from './FormChip'
 import { useGameState, useMarkSeen, useMyQuests } from '../hooks/useGame'
@@ -30,7 +32,7 @@ function Hub({ profile, s }: { profile: Profile; s: GameState }) {
   // ?goal=1 (từ bài Knowledge "Đặt mục tiêu tuần") → mở ngay sheet chuỗi ngày & mục tiêu
   const params = useSearchParams()
   const [streakOpen, setStreakOpen] = useState(() => params.has('goal'))
-  const [leagueOpen, setLeagueOpen] = useState(false)
+  const [showDaily, setShowDaily] = useState(false)
   const [showWeekly, setShowWeekly] = useState(false)
   const mq = useMyQuests()
   const quests = mq.data ?? s.quests
@@ -56,25 +58,29 @@ function Hub({ profile, s }: { profile: Profile; s: GameState }) {
         </Card>
       )}
 
-      <Card className="space-y-1">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Nhiệm vụ hôm nay</h2>
-          <span className="font-mono text-xs text-fg-muted">{dailyDone}/{daily.length}</span>
-        </div>
-        <QuestList quests={daily} />
-        <button onClick={() => setShowWeekly((v) => !v)} aria-expanded={showWeekly}
-          className="-mx-1 mt-1 flex min-h-11 w-[calc(100%+0.5rem)] items-center justify-between rounded-xl px-1 text-sm font-semibold text-fg-muted hover:text-fg">
-          <span>Nhiệm vụ tuần & tháng <span className="font-mono text-xs">· {weeklyDone}/{weekly.length}</span></span>
-          <ChevronRight className={cn('size-4 transition-transform', showWeekly && 'rotate-90')} aria-hidden />
-        </button>
+      {/* Nhiệm vụ: thu gọn thành 2 dòng (hôm nay, tuần & tháng), bấm để mở */}
+      <Card className="space-y-1 py-2">
+        <QuestToggle label="Nhiệm vụ hôm nay" done={dailyDone} total={daily.length} open={showDaily} onToggle={() => setShowDaily((v) => !v)} />
+        {showDaily && <QuestList quests={daily} />}
+        <QuestToggle label="Nhiệm vụ tuần & tháng" done={weeklyDone} total={weekly.length} open={showWeekly} onToggle={() => setShowWeekly((v) => !v)} />
         {showWeekly && <QuestList quests={weekly} />}
       </Card>
 
-      <LeagueCard s={s} onOpen={() => setLeagueOpen(true)} />
-
       <StreakSheet open={streakOpen} onClose={() => setStreakOpen(false)} streak={s.streak} balance={Number(profile.xu ?? 0)} />
-      {s.league.group_id && <LeagueSheet open={leagueOpen} onClose={() => setLeagueOpen(false)} league={s.league} />}
     </div>
+  )
+}
+
+function QuestToggle({ label, done, total, open, onToggle }: { label: string; done: number; total: number; open: boolean; onToggle: () => void }) {
+  return (
+    <button onClick={onToggle} aria-expanded={open}
+      className="-mx-1 flex min-h-11 w-[calc(100%+0.5rem)] items-center justify-between gap-2 rounded-xl px-1 text-left">
+      <span className="font-semibold">{label}</span>
+      <span className="flex items-center gap-1.5">
+        <span className={cn('font-mono text-xs', total > 0 && done === total ? 'text-brand' : 'text-fg-muted')}>{done}/{total}</span>
+        <ChevronRight className={cn('size-4 text-fg-subtle transition-transform', open && 'rotate-90')} aria-hidden />
+      </span>
+    </button>
   )
 }
 
@@ -126,6 +132,11 @@ function TodayCard({ profile, s, onStreak }: { profile: Profile; s: GameState; o
         </div>
       </div>
 
+      <Link href={routes.activities} className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface-2/60 px-3 text-sm font-semibold hover:border-fg-subtle">
+        <Footprints className="size-4 shrink-0 text-brand" aria-hidden /><span className="flex-1">Hoạt động của bạn</span>
+        <span className="text-xs font-normal text-fg-muted">Chi tiết từng bài</span><ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+      </Link>
+
       {s.checked_in ? (
         <p className="flex h-11 items-center justify-center gap-2 rounded-xl bg-surface-2 text-sm font-semibold text-fg-muted">
           <Check className="size-4 text-brand" aria-hidden />Đã điểm danh hôm nay bằng bài chạy
@@ -136,6 +147,19 @@ function TodayCard({ profile, s, onStreak }: { profile: Profile; s: GameState; o
         </p>
       )}
     </Card>
+  )
+}
+
+/** League tuần (đưa từ trang chủ sang trang Tôi → Huy hiệu) */
+export function LeagueEntry({ userId }: { userId: string }) {
+  const q = useGameState(userId)
+  const [open, setOpen] = useState(false)
+  if (!q.data) return null
+  return (
+    <>
+      <LeagueCard s={q.data} onOpen={() => setOpen(true)} />
+      {q.data.league.group_id && <LeagueSheet open={open} onClose={() => setOpen(false)} league={q.data.league} />}
+    </>
   )
 }
 

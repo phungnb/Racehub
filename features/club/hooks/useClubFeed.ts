@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { supabase } from '@/shared/lib/supabase'
-import { createPost, deletePost, listPinnedPosts, listPosts, pinPost, toggleReaction, type ClubPost } from '../api/postsApi'
+import { createPost, deletePost, getPostEngagement, listCommunityFeed, listPinnedPosts, listPosts, pinPost, toggleReaction, type ClubPost } from '../api/postsApi'
 import { clubKeys } from './keys'
 
 const PAGE = 15
@@ -39,6 +39,8 @@ export function useClubFeed(clubId: string, userId: string | undefined) {
 
 /** Cập nhật một bài trong mọi cache bảng tin của CLB */
 function patchPost(qc: ReturnType<typeof useQueryClient>, clubId: string, postId: string, patch: (p: ClubPost) => ClubPost) {
+  qc.setQueryData<InfiniteData<ClubPost[]>>(clubKeys.community, (d) =>
+    d && { ...d, pages: d.pages.map((pg) => pg.map((p) => (p.id === postId ? patch(p) : p))) })
   qc.setQueryData<InfiniteData<ClubPost[]>>(clubKeys.posts(clubId), (d) =>
     d && { ...d, pages: d.pages.map((pg) => pg.map((p) => (p.id === postId ? patch(p) : p))) })
   qc.setQueryData<ClubPost[]>(clubKeys.pinned(clubId), (d) => d?.map((p) => (p.id === postId ? patch(p) : p)))
@@ -48,6 +50,7 @@ function patchPost(qc: ReturnType<typeof useQueryClient>, clubId: string, postId
 export function usePostActions(clubId: string) {
   const qc = useQueryClient()
   const refresh = () => {
+    void qc.invalidateQueries({ queryKey: clubKeys.community })
     void qc.invalidateQueries({ queryKey: clubKeys.posts(clubId) })
     void qc.invalidateQueries({ queryKey: clubKeys.pinned(clubId) })
     void qc.invalidateQueries({ queryKey: clubKeys.news(clubId) })
@@ -58,11 +61,29 @@ export function usePostActions(clubId: string) {
     onMutate: (post) => patchPost(qc, clubId, post.id, (p) => ({
       ...p, reacted: !p.reacted, reaction_count: Math.max(0, p.reaction_count + (p.reacted ? -1 : 1)),
     })),
-    onSuccess: (r, post) => patchPost(qc, clubId, post.id, (p) => ({ ...p, reacted: r.reacted, reaction_count: r.count })),
+    onSuccess: (r, post) => {
+      patchPost(qc, clubId, post.id, (p) => ({ ...p, reacted: r.reacted, reaction_count: r.count }))
+      void qc.invalidateQueries({ queryKey: clubKeys.engagement(post.id) })
+    },
     onError: refresh,
   })
   const create = useMutation({ mutationFn: createPost, onSuccess: refresh })
   const remove = useMutation({ mutationFn: (id: string) => deletePost(id), onSuccess: refresh })
   const pin = useMutation({ mutationFn: (v: { id: string; pinned: boolean }) => pinPost(v.id, v.pinned), onSuccess: refresh })
   return { react, create, remove, pin }
+}
+
+/** Bảng tin cộng đồng ở Trang chủ (migration 010500) */
+export function useCommunityFeed(enabled = true) {
+  return useInfiniteQuery({
+    queryKey: clubKeys.community,
+    queryFn: ({ pageParam }) => listCommunityFeed(pageParam, PAGE),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => (last.length === PAGE ? last[last.length - 1].created_at : undefined),
+    enabled,
+  })
+}
+
+export function usePostEngagement(postId: string | null) {
+  return useQuery({ queryKey: clubKeys.engagement(postId ?? ''), queryFn: () => getPostEngagement(postId!), enabled: !!postId })
 }

@@ -1,44 +1,51 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { SendHorizontal, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, ErrorState, Input, Sheet, Skeleton } from '@/shared/ui'
-import { formatRelative } from '@/shared/lib/format'
+import { CommentComposer, CommentList, ErrorState, Sheet, Skeleton, type ReplyTarget, type ThreadComment } from '@/shared/ui'
 import { clubErrorMessage } from '../../api/clubApi'
-import { addComment, deleteComment, listComments, type ClubPost } from '../../api/postsApi'
+import { addComment, deleteComment, listComments, toggleCommentLike, type ClubPost } from '../../api/postsApi'
 import { clubKeys } from '../../hooks/keys'
 
+/** Bình luận một bài trên bảng tin CLB: thích, trả lời; xóa trong nút ⋯ (người viết / ban quản trị), luôn hỏi lại */
 export function CommentsSheet({ post, meId, isStaff, onClose }: { post: ClubPost | null; meId: string; isStaff: boolean; onClose: () => void }) {
   const qc = useQueryClient()
   const [text, setText] = useState('')
+  const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null)
+  const input = useRef<HTMLInputElement>(null)
   const postId = post?.id ?? ''
-  const q = useQuery({ queryKey: clubKeys.comments(postId), queryFn: () => listComments(postId), enabled: !!post })
+  const key = clubKeys.comments(postId)
+  const q = useQuery({ queryKey: key, queryFn: () => listComments(postId, meId, isStaff), enabled: !!post })
   const refresh = () => {
-    void qc.invalidateQueries({ queryKey: clubKeys.comments(postId) })
+    void qc.invalidateQueries({ queryKey: key })
+    void qc.invalidateQueries({ queryKey: clubKeys.community })
     if (post) {
       void qc.invalidateQueries({ queryKey: clubKeys.posts(post.club_id) })
       void qc.invalidateQueries({ queryKey: clubKeys.pinned(post.club_id) })
     }
   }
   const add = useMutation({
-    mutationFn: () => addComment(postId, text.trim()),
-    onSuccess: () => { setText(''); refresh() },
+    mutationFn: () => addComment(postId, text.trim(), replyTo?.id ?? null),
+    onSuccess: () => { setText(''); setReplyTo(null); refresh() },
     onError: (e) => toast.error(clubErrorMessage(e)),
   })
   const del = useMutation({ mutationFn: deleteComment, onSuccess: refresh, onError: (e) => toast.error(clubErrorMessage(e)) })
+  // Thích: đổi ngay trên màn hình, máy chủ trả số chính xác sau
+  const like = useMutation({
+    mutationFn: (c: ThreadComment) => toggleCommentLike(c.id),
+    onMutate: (c) => qc.setQueryData<ThreadComment[]>(key, (list) => list?.map((x) => x.id === c.id
+      ? { ...x, liked: !x.liked, likeCount: Math.max(0, x.likeCount + (x.liked ? -1 : 1)) } : x)),
+    onSuccess: (r, c) => qc.setQueryData<ThreadComment[]>(key, (list) => list?.map((x) => (x.id === c.id ? { ...x, liked: r.liked, likeCount: r.count } : x))),
+    onError: (e) => { toast.error(clubErrorMessage(e)); void qc.invalidateQueries({ queryKey: key }) },
+  })
+  const reply = (t: ReplyTarget) => { setReplyTo(t); requestAnimationFrame(() => input.current?.focus()) }
+  const close = () => { setReplyTo(null); onClose() }
 
   return (
-    <Sheet open={!!post} onClose={onClose} title="Bình luận"
-      footer={
-        <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (text.trim()) add.mutate() }}>
-          <Input value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder="Viết bình luận…" aria-label="Bình luận" />
-          <Button type="submit" aria-label="Gửi" loading={add.isPending} disabled={!text.trim()} className="w-11 shrink-0 px-0">
-            {!add.isPending && <SendHorizontal className="size-5" aria-hidden />}
-          </Button>
-        </form>
-      }>
+    <Sheet open={!!post} onClose={close} title="Bình luận"
+      footer={<CommentComposer ref={input} value={text} onChange={setText} onSubmit={() => add.mutate()} pending={add.isPending}
+        replyTo={replyTo} onCancelReply={() => setReplyTo(null)} />}>
       {q.isLoading ? (
         <div className="space-y-3">{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-12" />)}</div>
       ) : q.isError ? (
@@ -46,26 +53,7 @@ export function CommentsSheet({ post, meId, isStaff, onClose }: { post: ClubPost
       ) : !q.data?.length ? (
         <p className="py-8 text-center text-sm text-fg-muted">Chưa có bình luận. Hãy là người đầu tiên!</p>
       ) : (
-        <ul className="space-y-3">
-          {q.data.map((c) => (
-            <li key={c.id} className="flex gap-3">
-              <Avatar src={c.author?.avatar_url} name={c.author?.display_name} size="sm" />
-              <div className="min-w-0 flex-1">
-                <div className="rounded-2xl rounded-tl-md bg-surface-2 px-3 py-2">
-                  <p className="text-sm font-semibold">{c.author?.display_name ?? 'Thành viên cũ'}</p>
-                  <p className="whitespace-pre-line break-words text-[15px]">{c.body}</p>
-                </div>
-                <p className="mt-1 px-1 text-xs text-fg-subtle">{formatRelative(c.created_at)}</p>
-              </div>
-              {(c.author_id === meId || isStaff) && (
-                <button onClick={() => del.mutate(c.id)} aria-label="Xóa bình luận"
-                  className="grid size-9 shrink-0 place-items-center rounded-full text-fg-subtle hover:bg-surface-2 hover:text-danger">
-                  <Trash2 className="size-4" aria-hidden />
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
+        <CommentList comments={q.data} onLike={(c) => like.mutate(c)} onReply={reply} onDelete={(c) => del.mutate(c.id)} />
       )}
     </Sheet>
   )

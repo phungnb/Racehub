@@ -13,7 +13,7 @@ import { ENGINE, type GpsGap, type Split } from '../model/tracker'
 import { coachLine, persistsNow } from '../model/coach'
 import { deviceLabel, errorPct, QA_KEY, type QaInput } from '../model/qa'
 import { submitRun, type SaveResult } from '../api/submitRun'
-import { useStoredFlag } from './useStoredFlag'
+import { useStoredFlag } from '@/shared/lib/useStoredFlag'
 import { setRunActive } from './useRunActive'
 
 export type { SaveResult }

@@ -1,19 +1,21 @@
 'use client'
 
 import Link from 'next/link'
-import { AtSign, BookOpen, Images, Newspaper, Award, Bell, BellRing, CalendarDays, CheckCheck, Coins, Crown, Flag, Footprints, Gift, HandCoins, Heart, Medal, Megaphone, MessageCircle, Radar, ShieldAlert, Shirt, Sparkles, Store, Swords, Ticket, TrendingUp, Trophy, UserCheck, UserPlus, Vote, X, type LucideIcon } from 'lucide-react'
+import { AtSign, BookOpen, Images, Newspaper, Award, Bell, BellRing, CalendarDays, CheckCheck, Coins, Trash2, Crown, Flag, Footprints, Gift, HandCoins, Heart, Medal, Megaphone, MessageCircle, Radar, ShieldAlert, Shirt, Sparkles, Store, Swords, Ticket, TrendingUp, ThumbsUp, Trophy, UserCheck, UserPlus, Vote, X, type LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { routes } from '@/shared/config/routes'
 import { usePush } from '../hooks/usePush'
-import { Avatar, Button, EmptyState, ErrorState, Skeleton } from '@/shared/ui'
+import { Avatar, Button, ConfirmSheet, EmptyState, ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatRelative } from '@/shared/lib/format'
-import { useMarkNotificationsRead, useNotifications } from '../hooks/useNotifications'
+import { useDeleteNotifications, useMarkNotificationsRead, useNotifications } from '../hooks/useNotifications'
 
 const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   CLUB_ANNOUNCEMENT: { icon: Megaphone, tone: 'text-coin' },
   CHAT_MENTION: { icon: AtSign, tone: 'text-xp' },
-  POST_CHEER: { icon: Heart, tone: 'text-live' },
+  POST_CHEER: { icon: ThumbsUp, tone: 'text-brand' },
+  COMMENT_LIKE: { icon: ThumbsUp, tone: 'text-brand' },
+  COMMENT_REPLY: { icon: MessageCircle, tone: 'text-xp' },
   POST_COMMENT: { icon: MessageCircle, tone: 'text-xp' },
   CLUB_JOIN_REQUEST: { icon: UserPlus, tone: 'text-brand' },
   CLUB_APPROVED: { icon: UserCheck, tone: 'text-brand' },
@@ -84,18 +86,31 @@ function PushPrompt() {
 export function NotificationsScreen() {
   const { data, isLoading, isError, error, refetch } = useNotifications()
   const markRead = useMarkNotificationsRead()
+  const del = useDeleteNotifications()
+  const [confirmClear, setConfirmClear] = useState(false)
   const unread = (data ?? []).filter((n) => !n.read_at).length
+  const read = (data ?? []).length - unread
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Thông báo</h1>
-        {unread > 0 && (
-          <Button variant="ghost" size="sm" onClick={() => markRead.mutate(undefined)} loading={markRead.isPending}>
-            <CheckCheck className="size-4" aria-hidden /> Đọc hết
-          </Button>
-        )}
+        <span className="flex gap-1">
+          {unread > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => markRead.mutate(undefined)} loading={markRead.isPending}>
+              <CheckCheck className="size-4" aria-hidden /> Đọc hết
+            </Button>
+          )}
+          {read > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => setConfirmClear(true)}>
+              <Trash2 className="size-4" aria-hidden /> Xóa đã đọc
+            </Button>
+          )}
+        </span>
       </div>
+      <ConfirmSheet open={confirmClear} onClose={() => setConfirmClear(false)} title={`Xóa ${read} thông báo đã đọc?`} confirmLabel="Xóa"
+        description="Thông báo chưa đọc vẫn giữ lại." loading={del.isPending}
+        onConfirm={() => del.mutate({ ids: null, readOnly: true }, { onSettled: () => setConfirmClear(false) })} />
 
       <PushPrompt />
 
@@ -105,7 +120,7 @@ export function NotificationsScreen() {
         <ErrorState error={error} onRetry={() => refetch()} />
       ) : !data?.length ? (
         <EmptyState icon={Bell} title="Chưa có thông báo"
-          description="Khi CLB có thông báo mới, ai đó nhắc tên hay cổ vũ bạn, bạn sẽ thấy ở đây." />
+          description="Khi CLB có thông báo mới, ai đó nhắc tên, thích hay tặng quà cho bạn, bạn sẽ thấy ở đây." />
       ) : (
         <ul className="divide-y divide-border overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface">
           {data.map((n) => {
@@ -128,10 +143,14 @@ export function NotificationsScreen() {
               </div>
             )
             return (
-              <li key={n.id}>
+              <li key={n.id} className="relative">
                 {n.link
-                  ? <Link href={n.link} onClick={() => !n.read_at && markRead.mutate([n.id])} className="block hover:bg-surface-2">{content}</Link>
-                  : content}
+                  ? <Link href={n.link} onClick={() => !n.read_at && markRead.mutate([n.id])} className="block pr-10 hover:bg-surface-2">{content}</Link>
+                  : <div className="pr-10">{content}</div>}
+                <button type="button" onClick={() => del.mutate({ ids: [n.id] })} aria-label="Xóa thông báo"
+                  className="absolute right-1.5 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full text-fg-subtle hover:bg-surface-2 hover:text-danger">
+                  <X className="size-4" aria-hidden />
+                </button>
               </li>
             )
           })}

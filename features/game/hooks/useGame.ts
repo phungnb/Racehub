@@ -96,6 +96,9 @@ export function useSendGift() {
       refresh()   // gồm cả ['game', 'gifts'] và ['game', 'gift-wall']
       // Tổng quà trên bài đăng CLB (chỉ làm mới bảng tin, không đụng chat)
       void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'club' && q.queryKey[2] === 'posts' })
+      // Bảng tin cộng đồng + danh sách "ai đã tặng" của bài
+      void qc.invalidateQueries({ queryKey: ['community-feed'] })
+      void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'club-post' && q.queryKey[2] === 'engagement' })
     },
   })
 }
