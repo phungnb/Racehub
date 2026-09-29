@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { Button, ErrorState, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatVnd } from '@/shared/lib/economy'
+import { useCanPurchase } from '@/features/system'
 import { formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import { renderPerks, toPlanContent, type PlanVars } from '@/shared/lib/ops'
@@ -124,6 +125,7 @@ export function PlanCompare({ signedIn = true }: { signedIn?: boolean }) {
   const free = useQuery({ queryKey: ['billing', 'free-slots', signedIn], queryFn: () => (signedIn ? getFreeChallengeSlots() : Promise.resolve(5)), staleTime: 10 * 60_000 })
   const freeN = free.data ?? 5
   const [upgrade, setUpgrade] = useState<{ plan: ComparePlan; club: boolean } | null>(null)
+  const canPurchase = useCanPurchase()
   if (q.isPending) return <Skeleton className="h-96" />
   if (q.isError) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />
   const d: PlanCompareData = q.data
@@ -131,7 +133,8 @@ export function PlanCompare({ signedIn = true }: { signedIn?: boolean }) {
   const pro = d.plans.find((p) => p.code === 'CLUB_PRO')
   const myCode = signedIn ? mine.data?.plan?.plan_code ?? null : null
   const login = `${routes.login}?next=${encodeURIComponent(routes.plans)}`
-  const upgradeBtn = (plan: ComparePlan, club: boolean, label: string) => signedIn
+  // App iOS/Android chưa bật mua trong app: chỉ nêu quyền lợi, không nút nâng cấp
+  const upgradeBtn = (plan: ComparePlan, club: boolean, label: string) => !canPurchase ? undefined : signedIn
     ? <Button block variant={club ? 'primary' : 'coin'} onClick={() => setUpgrade({ plan, club })}>{label}</Button>
     : <Link href={login} className="flex h-11 items-center justify-center rounded-xl bg-coin text-sm font-bold text-brand-fg">Đăng nhập để nâng cấp</Link>
   const c = d.club

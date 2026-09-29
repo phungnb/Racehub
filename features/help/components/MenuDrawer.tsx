@@ -13,7 +13,8 @@ import { routes } from '@/shared/config/routes'
 import { ICONS } from '@/shared/config/brand'
 import type { Profile } from '@/shared/types/profile'
 import { helpMenu } from '../api/helpApi'
-import { useOpsPolicy } from '@/features/system'
+import { useCanPurchase, useOpsPolicy } from '@/features/system'
+import { ContactCard } from './ContactCard'
 import { companyLine, featuredMenu, groupMenu, SECTION_LABEL, STATIC_POLICIES, staticHref } from '../model/help'
 
 /**
@@ -47,7 +48,9 @@ function Drawer({ profile, onSignOut, onClose }: { profile: Profile | null; onSi
   // Chưa chạy migration 007300 / mất mạng: vẫn luôn có Điều khoản + Quyền riêng tư
   const groups = menu.data ? groupMenu(menu.data.pages) : [{ section: 'POLICY' as const, items: STATIC_POLICIES }]
   const company = companyLine(menu.data?.site ?? {})
-  const featured = featuredMenu(menu.data?.pages ?? [])
+  const canPurchase = useCanPurchase()
+  // App iOS/Android chưa bật mua trong app: không hiện thẻ "Gói & quyền lợi" (quy định App Store / Google Play)
+  const featured = featuredMenu(menu.data?.pages ?? []).filter((f) => canPurchase || f.slug !== 'vip-pro')
   const ops = useOpsPolicy()
 
   useEffect(() => {
@@ -151,6 +154,20 @@ function Drawer({ profile, onSignOut, onClose }: { profile: Profile | null; onSi
             </section>
           ))}
           {menu.isPending && <p className="px-3 text-xs text-fg-subtle">Đang tải hướng dẫn…</p>}
+
+          {profile && canPurchase && (
+            <section className="mb-3">
+              <h2 className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-fg-subtle">Gói</h2>
+              <ul>
+                <li><Link href={routes.plan} onClick={onClose} className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 hover:bg-surface-2">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-base" aria-hidden>👑</span>
+                  <span className="min-w-0 flex-1 text-sm font-medium">Gói VIP & Nạp Xu</span><ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+                </Link></li>
+              </ul>
+            </section>
+          )}
+
+          <ContactCard className="mb-3 px-3" />
 
           {profile && ops.features.orgs && (
             <section className="mb-3">

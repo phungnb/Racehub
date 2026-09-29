@@ -99,7 +99,7 @@ function Editor({ current, onGo }: { current: OpsPolicy; onGo: (tab: string) => 
   const publish = usePublishOps()
   const error = validateOps({ tracking, antiCheat: anti, content: { enterprise: ent } })
   const changed = JSON.stringify({ features, tracking, anti, ent }) !== JSON.stringify({ features: current.features, tracking: current.tracking, anti: current.antiCheat ?? DEFAULT_ANTI_CHEAT, ent: current.content.enterprise })
-  const off = FEATURES.filter((f) => !features[f.key])
+  const off = FEATURES.filter((f) => f.key !== 'nativePurchases' && !features[f.key])
   const save = () => publish.mutate({ p: { features, tracking, antiCheat: anti, content: { enterprise: ent } }, note }, {
     onSuccess: (v) => { toast.success(`Đã áp dụng chính sách vận hành bản v${v}`); setConfirm(false); setNote('') },
     onError: (e) => toast.error(consoleErrorMessage(e)),

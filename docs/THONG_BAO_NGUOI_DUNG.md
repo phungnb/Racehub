@@ -4,7 +4,7 @@ Tạo tự động bằng `python3 scripts/list-messages.py` — **không sửa 
 
 `{…}` là phần tự điền (tên người, số km, số Xu…). Một số câu ghép theo điều kiện nên hiện dạng `{case when …}`.
 
-Tổng: 111 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 544 câu báo lỗi · 228 thông báo nhanh (toast).
+Tổng: 111 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 544 câu báo lỗi · 229 thông báo nhanh (toast).
 
 ## A. Thông báo (chuông + thông báo đẩy)
 
@@ -834,222 +834,223 @@ Tổng: 111 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 54
 | E7 | error | Không thực hiện được. Hãy thử lại. | `features/activity/components/ReviewNotice.tsx:31` |
 | E8 | error | Không tạo được ảnh. Thử lại. | `features/activity/components/ShareActivity.tsx:43` |
 | E9 | error | Không chia sẻ được. Hãy tải ảnh về rồi đăng. | `features/activity/components/ShareActivity.tsx:57` |
-| E10 | success | Đã chép | `features/admin/components/SystemTab.tsx:220` |
-| E11 | success | Đã cập nhật trang Gói (chính sách vận hành bản v${v}) | `features/admin/components/commerce/FreePlansEditor.tsx:51` |
-| E12 | success | Đã lưu quà | `features/admin/components/commerce/GiftsTab.tsx:40` |
-| E13 | success | Đã kết thúc chương trình — giá về giá gốc | `features/admin/components/commerce/ItemPromos.tsx:48` |
-| E14 | success | Đã lưu gói nạp Xu | `features/admin/components/commerce/PlansTab.tsx:149` |
-| E15 | success | Đã cấp ${code} ${MONTH_LABEL[months]} cho ${target?.name} | `features/admin/components/commerce/PlansTab.tsx:191` |
-| E16 | success | Đã lưu tài khoản nhận tiền | `features/admin/components/commerce/PlansTab.tsx:52` |
-| E17 | success | Đã lưu ${name} | `features/admin/components/commerce/PlansTab.tsx:96` |
-| E18 | success | Đã tặng cho ${formatNumber(r.recipients)} người | `features/admin/components/commerce/PromotionsTab.tsx:138` |
-| E19 | success | Đã tạo mã ${code} | `features/admin/components/commerce/PromotionsTab.tsx:166` |
-| E20 | success | Đã bật đợt giảm giá | `features/admin/components/commerce/PromotionsTab.tsx:201` |
-| E21 | success | Đã cập nhật | `features/admin/components/commerce/PromotionsTab.tsx:241` |
-| E22 | error | Hãy chọn một CLB | `features/admin/components/commerce/PromotionsTab.tsx:73` |
-| E23 | success | Đã lưu nhiệm vụ | `features/admin/components/commerce/QuestsTab.tsx:32` |
-| E24 | success | Đã lưu giới hạn | `features/admin/components/commerce/QuestsTab.tsx:90` |
-| E25 | success | Đã lưu | `features/admin/components/commerce/ShineAdmin.tsx:25` |
-| E26 | success | Đã lưu cài đặt | `features/admin/components/commerce/ShineAdmin.tsx:26` |
-| E27 | success | Đã hủy thử thách và báo người tham gia | `features/admin/components/console/ChallengesTab.tsx:66` |
-| E28 | error | Hãy ghi lý do (ít nhất 3 ký tự). | `features/admin/components/console/ChallengesTab.tsx:72` |
-| E29 | error | Không tạo được file Excel, thử lại. | `features/admin/components/console/GpsQaTab.tsx:76` |
-| E30 | success | Đã áp dụng chính sách vận hành bản v${v} | `features/admin/components/console/OpsPolicyTab.tsx:104` |
-| E31 | success | Đã khôi phục — đang dùng bản v${v} | `features/admin/components/console/OpsPolicyTab.tsx:242` |
-| E32 | success | Đã chuyển chính sách · ${formatNumber(r.changed)} bài Strava được cập nhật | `features/admin/components/console/StravaTab.tsx:28` |
-| E33 | error | Ghi lý do (ít nhất 3 ký tự) | `features/admin/components/console/StravaTab.tsx:60` |
-| E34 | error | Hãy ghi lý do (ít nhất 3 ký tự). | `features/admin/components/console/UsersTab.tsx:137` |
-| E35 | success | Đã tặng ${qty} lượt tạo cho ${target.name} | `features/admin/components/economy/PassesTab.tsx:38` |
-| E36 | success | Đã thu hồi vé | `features/admin/components/economy/PassesTab.tsx:49` |
-| E37 | success | Đã áp dụng chính sách phiên bản ${v} | `features/admin/components/economy/PolicyTab.tsx:79` |
-| E38 | success | Đã lưu bộ sưu tập | `features/admin/components/items/CollectionsPanel.tsx:69` |
-| E39 | success | Đã tạo bộ ${name.trim()} (${items.length} món) | `features/admin/components/items/KitSheet.tsx:59` |
-| E40 | success | Đã duyệt ${name.trim()} | `features/admin/components/items/UniformReviewPanel.tsx:103` |
-| E41 | success | Đã trả lại mẫu cho CLB | `features/admin/components/items/UniformReviewPanel.tsx:150` |
-| E42 | success | Đã chép ${label.toLowerCase()} | `features/billing/components/OrderSheet.tsx:25` |
-| E43 | success | Đã hủy đơn | `features/billing/components/OrderSheet.tsx:46` |
-| E44 | success | Đã sao chép link mời | `features/challenge/components/detail/ChallengeDetailScreen.tsx:553` |
-| E45 | error | Không sao chép được, hãy chọn và sao chép thủ công. | `features/challenge/components/detail/ChallengeDetailScreen.tsx:553` |
-| E46 | success | Đã đổi hạn đăng ký | `features/challenge/components/detail/ChallengeExtras.tsx:30` |
-| E47 | success | Đã lưu hạng mục của bạn | `features/challenge/components/detail/ConquestPanel.tsx:63` |
-| E48 | success | Đã chia đội và báo cho mọi người | `features/challenge/components/detail/PledgePanel.tsx:175` |
-| E49 | success | Đã lưu mục tiêu của bạn | `features/challenge/components/detail/PledgePanel.tsx:52` |
-| E50 | success | Đã lưu thể lệ | `features/challenge/components/detail/RulesInfo.tsx:100` |
-| E51 | success | Đã lưu thiết kế vinh danh | `features/challenge/components/honor/HonorDesigner.tsx:51` |
-| E52 | success | Đã đổi ảnh vinh danh | `features/challenge/components/honor/HonorPanel.tsx:175` |
-| E53 | success | Đã đổi ảnh | `features/challenge/components/honor/HonorPanel.tsx:227` |
-| E54 | success | Đã lưu hạng mục vinh danh | `features/challenge/components/honor/HonorSetup.tsx:37` |
-| E55 | error | Đã tạo thử thách nhưng chưa bật được mục tiêu tự đăng ký: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:104` |
-| E56 | error | Đã tạo thử thách nhưng chưa lưu được thể lệ (sửa lại ở tab Luật chơi): ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:108` |
-| E57 | error | Đã tạo thử thách nhưng chưa bật được tự lặp lại: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:112` |
-| E58 | success | Đã chép luật từ "${t.title}" — kiểm tra lại rồi tạo | `features/challenge/components/wizard/CreateChallengeScreen.tsx:144` |
-| E59 | error | Kiểm tra lại các ô được đánh dấu. | `features/challenge/components/wizard/CreateChallengeScreen.tsx:75` |
-| E60 | error | Đã tạo thử thách nhưng chưa lưu được hạng mục: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:94` |
-| E61 | error | Đã tạo thử thách nhưng chưa đặt được hạn đăng ký: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:98` |
-| E62 | error | Tối đa 12 lớp in. | `features/character/components/GarmentDesigner.tsx:193` |
-| E63 | error | Tối đa 12 lớp in. | `features/character/components/GarmentDesigner.tsx:198` |
-| E64 | error | Ảnh tối đa 2 MB. | `features/character/components/GarmentDesigner.tsx:199` |
-| E65 | error | Không tải được ảnh. Hãy thử lại. | `features/character/components/GarmentDesigner.tsx:202` |
-| E66 | error | Không tìm được màu trong ảnh này. | `features/character/components/KitStudio.tsx:120` |
-| E67 | success | Đã lấy màu CLB | `features/character/components/KitStudio.tsx:127` |
-| E68 | error | Không đọc được ảnh. Thử ảnh PNG / JPG khác. | `features/character/components/KitStudio.tsx:129` |
-| E69 | success | Đã gắn logo CLB lên ngực áo | `features/character/components/KitStudio.tsx:151` |
-| E70 | error | Không lấy được logo CLB. Hãy tải ảnh logo lên. | `features/character/components/KitStudio.tsx:153` |
-| E71 | error | Ảnh tối đa 2 MB. | `features/character/components/KitStudio.tsx:380` |
-| E72 | error | Không tải được ảnh. Hãy thử lại. | `features/character/components/KitStudio.tsx:383` |
-| E73 | error | Logo tối đa 2 MB. | `features/character/components/PrintFields.tsx:30` |
-| E74 | success | Đã gửi bộ đồng phục | `features/character/components/UniformStudio.tsx:126` |
-| E75 | success | Đã hủy yêu cầu | `features/character/components/UniformStudio.tsx:45` |
-| E76 | success | Đã đủ bộ đồng phục | `features/character/components/Wardrobe.tsx:105` |
-| E77 | success | Đã lưu bộ đồ | `features/character/components/Wardrobe.tsx:64` |
-| E78 | success | Đã mua ${buying.name} | `features/character/components/Wardrobe.tsx:74` |
-| E79 | success | Đang mặc thử ${it.name} tới ${new Date(r.expires_at).toLocaleDateString('vi-VN')} | `features/character/components/Wardrobe.tsx:82` |
-| E80 | success | Đã nhận ${r.items} món trong ${bundle.title} | `features/character/components/Wardrobe.tsx:87` |
-| E81 | success | Đã đăng tổng kết lên bảng tin | `features/club/components/admin/ClubDashboardScreen.tsx:141` |
-| E82 | info | Đã sao chép | `features/club/components/chat/ClubChatScreen.tsx:122` |
-| E83 | success | Đã hủy sự kiện | `features/club/components/events/ClubEventScreen.tsx:220` |
-| E84 | success | Đã sao chép link tham gia | `features/club/components/events/ClubEventScreen.tsx:50` |
-| E85 | error | Không sao chép được link. | `features/club/components/events/ClubEventScreen.tsx:50` |
-| E86 | success | Đã sao chép link tham gia | `features/club/components/events/EventFormSheet.tsx:156` |
-| E87 | error | Không sao chép được, hãy chọn và sao chép thủ công. | `features/club/components/events/EventFormSheet.tsx:156` |
-| E88 | error | Không lấy được vị trí. Hãy bật định vị cho ứng dụng hoặc gõ tên địa điểm. | `features/club/components/events/PlaceField.tsx:63` |
-| E89 | success | Đã đóng bình chọn | `features/club/components/events/Polls.tsx:68` |
-| E90 | success | Đã ghi lựa chọn | `features/club/components/events/Polls.tsx:74` |
-| E91 | success | Đã tạo bình chọn | `features/club/components/events/Polls.tsx:99` |
-| E92 | success | Đã gửi thư mời tới ${to!.name} | `features/club/components/exchange/ExchangeScreen.tsx:184` |
-| E93 | info | Tối đa ${MAX_POST_IMAGES} ảnh mỗi bài. | `features/club/components/feed/Composer.tsx:42` |
-| E94 | success | Đã xóa bài | `features/club/components/feed/PostCard.tsx:223` |
-| E95 | info | Đã hủy yêu cầu tham gia | `features/club/components/hub/ClubShell.tsx:170` |
-| E96 | success | Đã tạo CLB. Mời mọi người vào thôi! | `features/club/components/hub/ClubsInboxScreen.tsx:150` |
-| E97 | success | Đã bỏ ngày vàng | `features/club/components/leaderboard/BoostDays.tsx:23` |
-| E98 | success | Đã gửi lời thách đấu | `features/club/components/leaderboard/ClubBattles.tsx:161` |
-| E99 | success | Đã lưu luật bản ${v} và báo cả CLB | `features/club/components/leaderboard/ClubPoints.tsx:200` |
-| E100 | success | Đã sao chép ${what} | `features/club/components/members/InvitePanel.tsx:44` |
-| E101 | error | Không sao chép được, hãy chọn và sao chép thủ công. | `features/club/components/members/InvitePanel.tsx:44` |
-| E102 | success | Đã xoá album | `features/club/components/photos/ClubPhotosScreen.tsx:103` |
-| E103 | success | Đã cập nhật tường nhà CLB | `features/club/components/settings/BrandingEditor.tsx:31` |
-| E104 | success | Đã đổi logo | `features/club/components/settings/ClubSettingsScreen.tsx:100` |
-| E105 | success | Đã đổi mã mời. Link và QR cũ không còn dùng được. | `features/club/components/settings/ClubSettingsScreen.tsx:157` |
-| E106 | success | Đã lưu | `features/club/components/settings/ClubSettingsScreen.tsx:181` |
-| E107 | success | Đã lưu cài đặt thông báo | `features/club/components/settings/ClubSettingsScreen.tsx:64` |
-| E108 | success | Đã lưu thông tin CLB | `features/club/components/settings/ClubSettingsScreen.tsx:95` |
-| E109 | success | Đã ghi đơn — chuyển khoản để CLB xác nhận | `features/club/components/shop/ClubShopScreen.tsx:120` |
-| E110 | success | Đã sao chép ${what} | `features/club/components/shop/ClubShopScreen.tsx:150` |
-| E111 | success | Đã huỷ đơn | `features/club/components/shop/ClubShopScreen.tsx:91` |
-| E112 | success | Đã báo thủ quỹ. Chờ xác nhận nhé! | `features/club/components/treasury/ClubFinance.tsx:190` |
-| E113 | success | Đã nhắc ${n} người chưa đóng | `features/club/components/treasury/ClubFinance.tsx:203` |
-| E114 | success | Đã sao chép ${what} | `features/club/components/treasury/ClubFinance.tsx:29` |
-| E115 | error | Không sao chép được | `features/club/components/treasury/ClubFinance.tsx:29` |
-| E116 | success | Đã hủy khoản | `features/club/components/treasury/ClubFinance.tsx:322` |
-| E117 | success | Đã tạo kỳ thu phí | `features/club/components/treasury/ClubFinance.tsx:350` |
-| E118 | success | Đã ghi vào sổ | `features/club/components/treasury/ClubFinance.tsx:377` |
-| E119 | error | Ảnh tối đa 5 MB | `features/club/components/treasury/ClubFinance.tsx:393` |
-| E120 | error | Hãy chọn một file ảnh. | `features/club/components/treasury/ClubFinance.tsx:409` |
-| E121 | error | Ảnh tối đa 5 MB | `features/club/components/treasury/ClubFinance.tsx:410` |
-| E122 | success | Đã lưu ảnh QR | `features/club/components/treasury/ClubFinance.tsx:411` |
-| E123 | success | Đã gỡ tài khoản | `features/club/components/treasury/ClubFinance.tsx:422` |
-| E124 | success | Đã lưu tài khoản | `features/club/components/treasury/ClubFinance.tsx:424` |
-| E125 | success | Đã gỡ ảnh QR | `features/club/components/treasury/ClubFinance.tsx:440` |
-| E126 | success | Cảm ơn bạn đã góp ${formatCoin(value)} Xu vào quỹ! | `features/club/components/treasury/ClubTreasuryScreen.tsx:93` |
-| E127 | success | Đã tạo lượt quay | `features/draw/components/DrawPanel.tsx:199` |
-| E128 | success | Đã sao chép kết quả — dán vào Zalo / Facebook | `features/draw/components/DrawPanel.tsx:84` |
-| E129 | error | Không sao chép được | `features/draw/components/DrawPanel.tsx:84` |
-| E130 | info | ${shown.name}: vắng mặt — quay lại ${shown.prize} | `features/draw/components/DrawStage.tsx:103` |
-| E131 | success | Đã công bố kết quả và báo người trúng | `features/draw/components/DrawStage.tsx:113` |
-| E132 | info | Trình duyệt này không hỗ trợ toàn màn hình | `features/draw/components/DrawStage.tsx:133` |
-| E133 | success | Đã tặng ${toName} ${qty > 1 ? | `features/game/components/GiftButton.tsx:97` |
-| E134 | success | ${r.title ?? 'Đã nhận khuyến mãi'}${parts.length ? | `features/game/components/PromoCodeForm.tsx:19` |
-| E135 | success | Đã gửi lời cảm ơn tới ${u.display_name ?? 'runner'} 💛 | `features/game/components/ShineScreen.tsx:112` |
-| E136 | success | Đã đổi ${r.name} | `features/game/components/ShineScreen.tsx:138` |
-| E137 | success | Đã lưu | `features/game/components/ShineScreen.tsx:160` |
-| E138 | success | Đã thêm 1 khiên giữ chuỗi | `features/game/components/StreakSheet.tsx:25` |
-| E139 | success | Đã lưu trang | `features/help/components/HelpAdminTab.tsx:123` |
-| E140 | success | Đã xoá trang (nội dung cũ lưu trong nhật ký quản trị) | `features/help/components/HelpAdminTab.tsx:128` |
-| E141 | success | Đã lưu thông tin pháp nhân | `features/help/components/HelpAdminTab.tsx:82` |
-| E142 | error | Trình duyệt chặn cửa sổ in — hãy cho phép popup. | `features/insights/components/InsightsScreen.tsx:210` |
-| E143 | error | Không lưu được lựa chọn. Thử lại sau. | `features/integrations/strava/components/StravaShareCard.tsx:27` |
-| E144 | success | Đã nhận ${s.imported} bài chạy mới từ Strava | `features/integrations/strava/components/StravaSyncCard.tsx:38` |
-| E145 | warning | Không nhập bài nào: ${skipped.join('; ')}. | `features/integrations/strava/components/StravaSyncCard.tsx:69` |
-| E146 | info | Không có bài chạy mới trên Strava. Bài vừa chạy có thể cần vài phút để Strava xử lý xong. | `features/integrations/strava/components/StravaSyncCard.tsx:70` |
-| E147 | success | Đã nhập ${s.imported} bài chạy | `features/integrations/strava/components/StravaSyncCard.tsx:72` |
-| E148 | success | Cảm ơn góp ý của bạn! | `features/knowledge/components/ArticleScreen.tsx:272` |
-| E149 | success | Huy hiệu mới: Runner ham học 🎓 | `features/knowledge/components/ArticleScreen.tsx:53` |
-| E150 | success | Đã đọc xong bài | `features/knowledge/components/ArticleScreen.tsx:54` |
-| E151 | success | Đã sao chép link bài viết | `features/knowledge/components/ArticleScreen.tsx:99` |
-| E152 | success | Đã tải ảnh | `features/knowledge/components/cms/ArticleEditor.tsx:111` |
-| E153 | success | Đã gửi góp ý | `features/knowledge/components/cms/ArticleEditor.tsx:319` |
-| E154 | success | Đã xoá | `features/knowledge/components/cms/ArticleEditor.tsx:326` |
-| E155 | success | Đã thêm vào ban nội dung | `features/knowledge/components/cms/CmsScreen.tsx:261` |
-| E156 | success | Đã lưu tác giả | `features/knowledge/components/cms/CmsScreen.tsx:283` |
-| E157 | success | Đã cập nhật | `features/market/components/BibMarket.tsx:103` |
-| E158 | success | Đã gửi báo cáo — quản trị viên sẽ xem xét | `features/market/components/BibMarket.tsx:173` |
-| E159 | success | Đã gỡ CLB khỏi Quanh đây | `features/nearby/components/ClubPlaceSection.tsx:34` |
-| E160 | success | Đã lưu khu vực CLB | `features/nearby/components/ClubPlaceSection.tsx:43` |
-| E161 | success | Đã huỷ kết nối | `features/nearby/components/ConnectionsScreen.tsx:119` |
-| E162 | success | Đã rút lời mời | `features/nearby/components/ConnectionsScreen.tsx:130` |
-| E163 | success | Đã bỏ chặn ${name} | `features/nearby/components/ConnectionsScreen.tsx:145` |
-| E164 | success | Đã bật Quanh đây | `features/nearby/components/EnableSheet.tsx:70` |
-| E165 | error | Thiết bị không hỗ trợ định vị — hãy chạm trên bản đồ. | `features/nearby/components/LocationPicker.tsx:58` |
-| E166 | error | Không lấy được vị trí. Bạn có thể chạm trên bản đồ để chọn khu vực. | `features/nearby/components/LocationPicker.tsx:62` |
-| E167 | success | Đã ẩn bạn khỏi Quanh đây | `features/nearby/components/NearbyScreen.tsx:115` |
-| E168 | success | Đã cập nhật khu vực | `features/nearby/components/NearbyScreen.tsx:130` |
-| E169 | success | Đã rủ ${name} | `features/nearby/components/RunnerCard.tsx:118` |
-| E170 | success | Đã gửi báo cáo | `features/nearby/components/RunnerCard.tsx:165` |
-| E171 | success | Đã chặn ${name} | `features/nearby/components/RunnerCard.tsx:197` |
-| E172 | success | Đã gửi. Thông báo sẽ hiện sau vài giây. | `features/notification/components/PushSettings.tsx:56` |
-| E173 | success | Đã tắt thông báo trên thiết bị này | `features/notification/components/PushSettings.tsx:61` |
-| E174 | success | Đã bật thông báo trên thiết bị này | `features/notification/components/PushSettings.tsx:63` |
-| E175 | error | Bạn chưa cho phép thông báo. | `features/notification/components/PushSettings.tsx:64` |
-| E176 | error | Chưa xóa được thông báo. Thử lại sau. | `features/notification/hooks/useNotifications.ts:39` |
-| E177 | success | Đã bật thông báo | `features/onboarding/components/OnboardingScreen.tsx:289` |
-| E178 | error | Bạn chưa cho phép thông báo. Có thể bật lại trong Cài đặt. | `features/onboarding/components/OnboardingScreen.tsx:290` |
-| E179 | error | Không bật được thông báo. Thử lại trong Cài đặt. | `features/onboarding/components/OnboardingScreen.tsx:292` |
-| E180 | error | Có lỗi, thử lại nhé. | `features/onboarding/components/OnboardingScreen.tsx:339` |
-| E181 | success | Đã kết nối Strava! Bài chạy 30 ngày gần nhất đang được đồng bộ. | `features/onboarding/components/OnboardingScreen.tsx:42` |
-| E182 | success | Đã huỷ chiến dịch | `features/org/components/CampaignScreen.tsx:38` |
-| E183 | success | CLB đã rời tổ chức | `features/org/components/ClubOrgCard.tsx:27` |
-| E184 | success | Đã vào tổ chức | `features/org/components/JoinOrgScreen.tsx:25` |
-| E185 | success | Đã gửi yêu cầu — chờ quản trị tổ chức duyệt | `features/org/components/JoinOrgScreen.tsx:26` |
-| E186 | success | Đã xoá tổ chức demo | `features/org/components/admin/EnterpriseAdminTab.tsx:177` |
-| E187 | success | Đã tạo tổ chức · mã mời ${r.invite_code} | `features/org/components/admin/EnterpriseAdminTab.tsx:199` |
-| E188 | success | Đã cập nhật gói | `features/org/components/admin/EnterpriseAdminTab.tsx:247` |
-| E189 | success | Đã lưu | `features/org/components/tabs/MembersTab.tsx:110` |
-| E190 | error | Không tạo được file Excel, thử lại. | `features/org/components/tabs/MembersTab.tsx:177` |
-| E191 | error | Không tạo được file mẫu, thử lại. | `features/org/components/tabs/MembersTab.tsx:205` |
-| E192 | error | Không tạo được file Excel, thử lại. | `features/org/components/tabs/OverviewTab.tsx:56` |
-| E193 | success | Đã lưu | `features/org/components/tabs/SettingsTab.tsx:129` |
-| E194 | success | Đã lưu thông tin xuất hoá đơn | `features/org/components/tabs/SettingsTab.tsx:162` |
-| E195 | success | Đã lưu tên miền | `features/org/components/tabs/SettingsTab.tsx:190` |
-| E196 | success | Đã đổi mã mời — mã cũ hết hiệu lực | `features/org/components/tabs/SettingsTab.tsx:43` |
-| E197 | error | Không sao chép được | `features/org/components/tabs/SettingsTab.tsx:47` |
-| E198 | success | Đã lưu thương hiệu | `features/org/components/tabs/SettingsTab.tsx:79` |
-| E199 | success | Đã gửi lời mời — chờ ban quản trị CLB đồng ý | `features/org/components/tabs/UnitsTab.tsx:160` |
-| E200 | success | Đã đổi đơn vị | `features/org/components/tabs/UnitsTab.tsx:38` |
-| E201 | success | Đã bỏ CLB khỏi tổ chức | `features/org/components/tabs/UnitsTab.tsx:43` |
-| E202 | success | Đã đổi ảnh đại diện | `features/profile/components/AvatarPicker.tsx:50` |
-| E203 | success | Đã gỡ ảnh đại diện | `features/profile/components/AvatarPicker.tsx:55` |
-| E204 | error | Hãy chọn một file ảnh. | `features/profile/components/AvatarPicker.tsx:61` |
-| E205 | error | Không đọc được ảnh này. Thử ảnh JPG hoặc PNG khác. | `features/profile/components/AvatarPicker.tsx:67` |
-| E206 | error | Không tạo được ảnh từ nhân vật. Thử lại sau. | `features/profile/components/AvatarPicker.tsx:78` |
-| E207 | error | Không hủy được kết nối Strava. Thử lại sau. | `features/profile/components/MeScreen.tsx:89` |
-| E208 | success | Đã hủy kết nối Strava | `features/profile/components/MeScreen.tsx:90` |
-| E209 | success | Đã xoá tài khoản. Cảm ơn bạn đã chạy cùng RaceHub. | `features/profile/components/SettingsScreen.tsx:212` |
-| E210 | success | Đã cài RaceHub lên màn hình chính | `features/pwa/components/InstallApp.tsx:37` |
-| E211 | success | Đã có mạng trở lại | `features/pwa/components/OfflineBanner.tsx:25` |
-| E212 | success | Đã kết nối lại máy chủ | `features/pwa/components/OfflineBanner.tsx:27` |
-| E213 | success | Đã lưu thiết kế BIB — VĐV thấy ngay | `features/race/components/BibDesigner.tsx:40` |
-| E214 | success | Đã tạo giải | `features/race/components/CreateRaceScreen.tsx:61` |
-| E215 | success | Đã hủy giải và báo cho VĐV | `features/race/components/RaceDetailScreen.tsx:283` |
-| E216 | success | Đã rút tên | `features/race/components/RaceDetailScreen.tsx:92` |
-| E217 | success | Đã ghi nhận lời mời của ${x.referrer_name} | `features/referral/components/InviteScreen.tsx:118` |
-| E218 | success | Đã sao chép ${what} | `features/referral/components/InviteScreen.tsx:38` |
-| E219 | error | Không sao chép được, hãy chọn và sao chép thủ công. | `features/referral/components/InviteScreen.tsx:38` |
-| E220 | info | Đã bỏ bài chạy | `features/run/components/RunScreen.tsx:352` |
-| E221 | success | Đã gửi bài chạy ${formatKm(item.payload.p_distance_m)} km lên RaceHub | `features/run/hooks/usePendingRuns.ts:55` |
-| E222 | error | Không gửi được một bài chạy lưu trên máy | `features/run/hooks/usePendingRuns.ts:69` |
-| E223 | success | Đã thêm ${r.added} mã${r.issued ? | `features/voucher/components/VoucherForm.tsx:25` |
-| E224 | success | Đã lưu voucher tài trợ | `features/voucher/components/VoucherForm.tsx:29` |
-| E225 | success | Đã sao chép mã | `features/voucher/components/VoucherWallet.tsx:47` |
-| E226 | error | Tối đa ${max} phần tử | `shared/design/studio/Studio.tsx:73` |
-| E227 | success | Đã tải ảnh về máy | `shared/ui/SaveImage.tsx:21` |
-| E228 | success | Đã mở bảng chia sẻ — chọn "Lưu ảnh" để lưu vào máy | `shared/ui/SaveImage.tsx:22` |
+| E10 | success | Đã xóa CLB ${club.name} | `features/admin/components/ClubsProTab.tsx:109` |
+| E11 | success | Đã chép | `features/admin/components/SystemTab.tsx:220` |
+| E12 | success | Đã cập nhật trang Gói (chính sách vận hành bản v${v}) | `features/admin/components/commerce/FreePlansEditor.tsx:51` |
+| E13 | success | Đã lưu quà | `features/admin/components/commerce/GiftsTab.tsx:40` |
+| E14 | success | Đã kết thúc chương trình — giá về giá gốc | `features/admin/components/commerce/ItemPromos.tsx:48` |
+| E15 | success | Đã lưu gói nạp Xu | `features/admin/components/commerce/PlansTab.tsx:149` |
+| E16 | success | Đã cấp ${code} ${MONTH_LABEL[months]} cho ${target?.name} | `features/admin/components/commerce/PlansTab.tsx:191` |
+| E17 | success | Đã lưu tài khoản nhận tiền | `features/admin/components/commerce/PlansTab.tsx:52` |
+| E18 | success | Đã lưu ${name} | `features/admin/components/commerce/PlansTab.tsx:96` |
+| E19 | success | Đã tặng cho ${formatNumber(r.recipients)} người | `features/admin/components/commerce/PromotionsTab.tsx:138` |
+| E20 | success | Đã tạo mã ${code} | `features/admin/components/commerce/PromotionsTab.tsx:166` |
+| E21 | success | Đã bật đợt giảm giá | `features/admin/components/commerce/PromotionsTab.tsx:201` |
+| E22 | success | Đã cập nhật | `features/admin/components/commerce/PromotionsTab.tsx:241` |
+| E23 | error | Hãy chọn một CLB | `features/admin/components/commerce/PromotionsTab.tsx:73` |
+| E24 | success | Đã lưu nhiệm vụ | `features/admin/components/commerce/QuestsTab.tsx:32` |
+| E25 | success | Đã lưu giới hạn | `features/admin/components/commerce/QuestsTab.tsx:90` |
+| E26 | success | Đã lưu | `features/admin/components/commerce/ShineAdmin.tsx:25` |
+| E27 | success | Đã lưu cài đặt | `features/admin/components/commerce/ShineAdmin.tsx:26` |
+| E28 | success | Đã hủy thử thách và báo người tham gia | `features/admin/components/console/ChallengesTab.tsx:66` |
+| E29 | error | Hãy ghi lý do (ít nhất 3 ký tự). | `features/admin/components/console/ChallengesTab.tsx:72` |
+| E30 | error | Không tạo được file Excel, thử lại. | `features/admin/components/console/GpsQaTab.tsx:76` |
+| E31 | success | Đã áp dụng chính sách vận hành bản v${v} | `features/admin/components/console/OpsPolicyTab.tsx:104` |
+| E32 | success | Đã khôi phục — đang dùng bản v${v} | `features/admin/components/console/OpsPolicyTab.tsx:242` |
+| E33 | success | Đã chuyển chính sách · ${formatNumber(r.changed)} bài Strava được cập nhật | `features/admin/components/console/StravaTab.tsx:28` |
+| E34 | error | Ghi lý do (ít nhất 3 ký tự) | `features/admin/components/console/StravaTab.tsx:60` |
+| E35 | error | Hãy ghi lý do (ít nhất 3 ký tự). | `features/admin/components/console/UsersTab.tsx:137` |
+| E36 | success | Đã tặng ${qty} lượt tạo cho ${target.name} | `features/admin/components/economy/PassesTab.tsx:38` |
+| E37 | success | Đã thu hồi vé | `features/admin/components/economy/PassesTab.tsx:49` |
+| E38 | success | Đã áp dụng chính sách phiên bản ${v} | `features/admin/components/economy/PolicyTab.tsx:79` |
+| E39 | success | Đã lưu bộ sưu tập | `features/admin/components/items/CollectionsPanel.tsx:69` |
+| E40 | success | Đã tạo bộ ${name.trim()} (${items.length} món) | `features/admin/components/items/KitSheet.tsx:59` |
+| E41 | success | Đã duyệt ${name.trim()} | `features/admin/components/items/UniformReviewPanel.tsx:103` |
+| E42 | success | Đã trả lại mẫu cho CLB | `features/admin/components/items/UniformReviewPanel.tsx:150` |
+| E43 | success | Đã chép ${label.toLowerCase()} | `features/billing/components/OrderSheet.tsx:25` |
+| E44 | success | Đã hủy đơn | `features/billing/components/OrderSheet.tsx:46` |
+| E45 | success | Đã sao chép link mời | `features/challenge/components/detail/ChallengeDetailScreen.tsx:553` |
+| E46 | error | Không sao chép được, hãy chọn và sao chép thủ công. | `features/challenge/components/detail/ChallengeDetailScreen.tsx:553` |
+| E47 | success | Đã đổi hạn đăng ký | `features/challenge/components/detail/ChallengeExtras.tsx:30` |
+| E48 | success | Đã lưu hạng mục của bạn | `features/challenge/components/detail/ConquestPanel.tsx:63` |
+| E49 | success | Đã chia đội và báo cho mọi người | `features/challenge/components/detail/PledgePanel.tsx:175` |
+| E50 | success | Đã lưu mục tiêu của bạn | `features/challenge/components/detail/PledgePanel.tsx:52` |
+| E51 | success | Đã lưu thể lệ | `features/challenge/components/detail/RulesInfo.tsx:100` |
+| E52 | success | Đã lưu thiết kế vinh danh | `features/challenge/components/honor/HonorDesigner.tsx:51` |
+| E53 | success | Đã đổi ảnh vinh danh | `features/challenge/components/honor/HonorPanel.tsx:176` |
+| E54 | success | Đã đổi ảnh | `features/challenge/components/honor/HonorPanel.tsx:228` |
+| E55 | success | Đã lưu hạng mục vinh danh | `features/challenge/components/honor/HonorSetup.tsx:37` |
+| E56 | error | Đã tạo thử thách nhưng chưa bật được mục tiêu tự đăng ký: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:105` |
+| E57 | error | Đã tạo thử thách nhưng chưa lưu được thể lệ (sửa lại ở tab Luật chơi): ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:109` |
+| E58 | error | Đã tạo thử thách nhưng chưa bật được tự lặp lại: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:113` |
+| E59 | success | Đã chép luật từ "${t.title}" — kiểm tra lại rồi tạo | `features/challenge/components/wizard/CreateChallengeScreen.tsx:145` |
+| E60 | error | Kiểm tra lại các ô được đánh dấu. | `features/challenge/components/wizard/CreateChallengeScreen.tsx:76` |
+| E61 | error | Đã tạo thử thách nhưng chưa lưu được hạng mục: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:95` |
+| E62 | error | Đã tạo thử thách nhưng chưa đặt được hạn đăng ký: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:99` |
+| E63 | error | Tối đa 12 lớp in. | `features/character/components/GarmentDesigner.tsx:193` |
+| E64 | error | Tối đa 12 lớp in. | `features/character/components/GarmentDesigner.tsx:198` |
+| E65 | error | Ảnh tối đa 2 MB. | `features/character/components/GarmentDesigner.tsx:199` |
+| E66 | error | Không tải được ảnh. Hãy thử lại. | `features/character/components/GarmentDesigner.tsx:202` |
+| E67 | error | Không tìm được màu trong ảnh này. | `features/character/components/KitStudio.tsx:120` |
+| E68 | success | Đã lấy màu CLB | `features/character/components/KitStudio.tsx:127` |
+| E69 | error | Không đọc được ảnh. Thử ảnh PNG / JPG khác. | `features/character/components/KitStudio.tsx:129` |
+| E70 | success | Đã gắn logo CLB lên ngực áo | `features/character/components/KitStudio.tsx:151` |
+| E71 | error | Không lấy được logo CLB. Hãy tải ảnh logo lên. | `features/character/components/KitStudio.tsx:153` |
+| E72 | error | Ảnh tối đa 2 MB. | `features/character/components/KitStudio.tsx:380` |
+| E73 | error | Không tải được ảnh. Hãy thử lại. | `features/character/components/KitStudio.tsx:383` |
+| E74 | error | Logo tối đa 2 MB. | `features/character/components/PrintFields.tsx:30` |
+| E75 | success | Đã gửi bộ đồng phục | `features/character/components/UniformStudio.tsx:126` |
+| E76 | success | Đã hủy yêu cầu | `features/character/components/UniformStudio.tsx:45` |
+| E77 | success | Đã đủ bộ đồng phục | `features/character/components/Wardrobe.tsx:105` |
+| E78 | success | Đã lưu bộ đồ | `features/character/components/Wardrobe.tsx:64` |
+| E79 | success | Đã mua ${buying.name} | `features/character/components/Wardrobe.tsx:74` |
+| E80 | success | Đang mặc thử ${it.name} tới ${new Date(r.expires_at).toLocaleDateString('vi-VN')} | `features/character/components/Wardrobe.tsx:82` |
+| E81 | success | Đã nhận ${r.items} món trong ${bundle.title} | `features/character/components/Wardrobe.tsx:87` |
+| E82 | success | Đã đăng tổng kết lên bảng tin | `features/club/components/admin/ClubDashboardScreen.tsx:141` |
+| E83 | info | Đã sao chép | `features/club/components/chat/ClubChatScreen.tsx:122` |
+| E84 | success | Đã hủy sự kiện | `features/club/components/events/ClubEventScreen.tsx:220` |
+| E85 | success | Đã sao chép link tham gia | `features/club/components/events/ClubEventScreen.tsx:50` |
+| E86 | error | Không sao chép được link. | `features/club/components/events/ClubEventScreen.tsx:50` |
+| E87 | success | Đã sao chép link tham gia | `features/club/components/events/EventFormSheet.tsx:156` |
+| E88 | error | Không sao chép được, hãy chọn và sao chép thủ công. | `features/club/components/events/EventFormSheet.tsx:156` |
+| E89 | error | Không lấy được vị trí. Hãy bật định vị cho ứng dụng hoặc gõ tên địa điểm. | `features/club/components/events/PlaceField.tsx:63` |
+| E90 | success | Đã đóng bình chọn | `features/club/components/events/Polls.tsx:68` |
+| E91 | success | Đã ghi lựa chọn | `features/club/components/events/Polls.tsx:74` |
+| E92 | success | Đã tạo bình chọn | `features/club/components/events/Polls.tsx:99` |
+| E93 | success | Đã gửi thư mời tới ${to!.name} | `features/club/components/exchange/ExchangeScreen.tsx:184` |
+| E94 | info | Tối đa ${MAX_POST_IMAGES} ảnh mỗi bài. | `features/club/components/feed/Composer.tsx:42` |
+| E95 | success | Đã xóa bài | `features/club/components/feed/PostCard.tsx:223` |
+| E96 | info | Đã hủy yêu cầu tham gia | `features/club/components/hub/ClubShell.tsx:170` |
+| E97 | success | Đã tạo CLB. Mời mọi người vào thôi! | `features/club/components/hub/ClubsInboxScreen.tsx:150` |
+| E98 | success | Đã bỏ ngày vàng | `features/club/components/leaderboard/BoostDays.tsx:23` |
+| E99 | success | Đã gửi lời thách đấu | `features/club/components/leaderboard/ClubBattles.tsx:161` |
+| E100 | success | Đã lưu luật bản ${v} và báo cả CLB | `features/club/components/leaderboard/ClubPoints.tsx:200` |
+| E101 | success | Đã sao chép ${what} | `features/club/components/members/InvitePanel.tsx:44` |
+| E102 | error | Không sao chép được, hãy chọn và sao chép thủ công. | `features/club/components/members/InvitePanel.tsx:44` |
+| E103 | success | Đã xoá album | `features/club/components/photos/ClubPhotosScreen.tsx:103` |
+| E104 | success | Đã cập nhật tường nhà CLB | `features/club/components/settings/BrandingEditor.tsx:31` |
+| E105 | success | Đã đổi logo | `features/club/components/settings/ClubSettingsScreen.tsx:100` |
+| E106 | success | Đã đổi mã mời. Link và QR cũ không còn dùng được. | `features/club/components/settings/ClubSettingsScreen.tsx:157` |
+| E107 | success | Đã lưu | `features/club/components/settings/ClubSettingsScreen.tsx:181` |
+| E108 | success | Đã lưu cài đặt thông báo | `features/club/components/settings/ClubSettingsScreen.tsx:64` |
+| E109 | success | Đã lưu thông tin CLB | `features/club/components/settings/ClubSettingsScreen.tsx:95` |
+| E110 | success | Đã ghi đơn — chuyển khoản để CLB xác nhận | `features/club/components/shop/ClubShopScreen.tsx:120` |
+| E111 | success | Đã sao chép ${what} | `features/club/components/shop/ClubShopScreen.tsx:150` |
+| E112 | success | Đã huỷ đơn | `features/club/components/shop/ClubShopScreen.tsx:91` |
+| E113 | success | Đã báo thủ quỹ. Chờ xác nhận nhé! | `features/club/components/treasury/ClubFinance.tsx:190` |
+| E114 | success | Đã nhắc ${n} người chưa đóng | `features/club/components/treasury/ClubFinance.tsx:203` |
+| E115 | success | Đã sao chép ${what} | `features/club/components/treasury/ClubFinance.tsx:29` |
+| E116 | error | Không sao chép được | `features/club/components/treasury/ClubFinance.tsx:29` |
+| E117 | success | Đã hủy khoản | `features/club/components/treasury/ClubFinance.tsx:322` |
+| E118 | success | Đã tạo kỳ thu phí | `features/club/components/treasury/ClubFinance.tsx:350` |
+| E119 | success | Đã ghi vào sổ | `features/club/components/treasury/ClubFinance.tsx:377` |
+| E120 | error | Ảnh tối đa 5 MB | `features/club/components/treasury/ClubFinance.tsx:393` |
+| E121 | error | Hãy chọn một file ảnh. | `features/club/components/treasury/ClubFinance.tsx:409` |
+| E122 | error | Ảnh tối đa 5 MB | `features/club/components/treasury/ClubFinance.tsx:410` |
+| E123 | success | Đã lưu ảnh QR | `features/club/components/treasury/ClubFinance.tsx:411` |
+| E124 | success | Đã gỡ tài khoản | `features/club/components/treasury/ClubFinance.tsx:422` |
+| E125 | success | Đã lưu tài khoản | `features/club/components/treasury/ClubFinance.tsx:424` |
+| E126 | success | Đã gỡ ảnh QR | `features/club/components/treasury/ClubFinance.tsx:440` |
+| E127 | success | Cảm ơn bạn đã góp ${formatCoin(value)} Xu vào quỹ! | `features/club/components/treasury/ClubTreasuryScreen.tsx:93` |
+| E128 | success | Đã tạo lượt quay | `features/draw/components/DrawPanel.tsx:199` |
+| E129 | success | Đã sao chép kết quả — dán vào Zalo / Facebook | `features/draw/components/DrawPanel.tsx:84` |
+| E130 | error | Không sao chép được | `features/draw/components/DrawPanel.tsx:84` |
+| E131 | info | ${shown.name}: vắng mặt — quay lại ${shown.prize} | `features/draw/components/DrawStage.tsx:103` |
+| E132 | success | Đã công bố kết quả và báo người trúng | `features/draw/components/DrawStage.tsx:113` |
+| E133 | info | Trình duyệt này không hỗ trợ toàn màn hình | `features/draw/components/DrawStage.tsx:133` |
+| E134 | success | Đã tặng ${toName} ${qty > 1 ? | `features/game/components/GiftButton.tsx:98` |
+| E135 | success | ${r.title ?? 'Đã nhận khuyến mãi'}${parts.length ? | `features/game/components/PromoCodeForm.tsx:19` |
+| E136 | success | Đã gửi lời cảm ơn tới ${u.display_name ?? 'runner'} 💛 | `features/game/components/ShineScreen.tsx:112` |
+| E137 | success | Đã đổi ${r.name} | `features/game/components/ShineScreen.tsx:138` |
+| E138 | success | Đã lưu | `features/game/components/ShineScreen.tsx:160` |
+| E139 | success | Đã thêm 1 khiên giữ chuỗi | `features/game/components/StreakSheet.tsx:25` |
+| E140 | success | Đã lưu trang | `features/help/components/HelpAdminTab.tsx:123` |
+| E141 | success | Đã xoá trang (nội dung cũ lưu trong nhật ký quản trị) | `features/help/components/HelpAdminTab.tsx:128` |
+| E142 | success | Đã lưu thông tin pháp nhân | `features/help/components/HelpAdminTab.tsx:82` |
+| E143 | error | Trình duyệt chặn cửa sổ in — hãy cho phép popup. | `features/insights/components/InsightsScreen.tsx:213` |
+| E144 | error | Không lưu được lựa chọn. Thử lại sau. | `features/integrations/strava/components/StravaShareCard.tsx:27` |
+| E145 | success | Đã nhận ${s.imported} bài chạy mới từ Strava | `features/integrations/strava/components/StravaSyncCard.tsx:38` |
+| E146 | warning | Không nhập bài nào: ${skipped.join('; ')}. | `features/integrations/strava/components/StravaSyncCard.tsx:69` |
+| E147 | info | Không có bài chạy mới trên Strava. Bài vừa chạy có thể cần vài phút để Strava xử lý xong. | `features/integrations/strava/components/StravaSyncCard.tsx:70` |
+| E148 | success | Đã nhập ${s.imported} bài chạy | `features/integrations/strava/components/StravaSyncCard.tsx:72` |
+| E149 | success | Cảm ơn góp ý của bạn! | `features/knowledge/components/ArticleScreen.tsx:272` |
+| E150 | success | Huy hiệu mới: Runner ham học 🎓 | `features/knowledge/components/ArticleScreen.tsx:53` |
+| E151 | success | Đã đọc xong bài | `features/knowledge/components/ArticleScreen.tsx:54` |
+| E152 | success | Đã sao chép link bài viết | `features/knowledge/components/ArticleScreen.tsx:99` |
+| E153 | success | Đã tải ảnh | `features/knowledge/components/cms/ArticleEditor.tsx:111` |
+| E154 | success | Đã gửi góp ý | `features/knowledge/components/cms/ArticleEditor.tsx:319` |
+| E155 | success | Đã xoá | `features/knowledge/components/cms/ArticleEditor.tsx:326` |
+| E156 | success | Đã thêm vào ban nội dung | `features/knowledge/components/cms/CmsScreen.tsx:261` |
+| E157 | success | Đã lưu tác giả | `features/knowledge/components/cms/CmsScreen.tsx:283` |
+| E158 | success | Đã cập nhật | `features/market/components/BibMarket.tsx:103` |
+| E159 | success | Đã gửi báo cáo — quản trị viên sẽ xem xét | `features/market/components/BibMarket.tsx:173` |
+| E160 | success | Đã gỡ CLB khỏi Quanh đây | `features/nearby/components/ClubPlaceSection.tsx:34` |
+| E161 | success | Đã lưu khu vực CLB | `features/nearby/components/ClubPlaceSection.tsx:43` |
+| E162 | success | Đã huỷ kết nối | `features/nearby/components/ConnectionsScreen.tsx:119` |
+| E163 | success | Đã rút lời mời | `features/nearby/components/ConnectionsScreen.tsx:130` |
+| E164 | success | Đã bỏ chặn ${name} | `features/nearby/components/ConnectionsScreen.tsx:145` |
+| E165 | success | Đã bật Quanh đây | `features/nearby/components/EnableSheet.tsx:70` |
+| E166 | error | Thiết bị không hỗ trợ định vị — hãy chạm trên bản đồ. | `features/nearby/components/LocationPicker.tsx:58` |
+| E167 | error | Không lấy được vị trí. Bạn có thể chạm trên bản đồ để chọn khu vực. | `features/nearby/components/LocationPicker.tsx:62` |
+| E168 | success | Đã ẩn bạn khỏi Quanh đây | `features/nearby/components/NearbyScreen.tsx:115` |
+| E169 | success | Đã cập nhật khu vực | `features/nearby/components/NearbyScreen.tsx:130` |
+| E170 | success | Đã rủ ${name} | `features/nearby/components/RunnerCard.tsx:118` |
+| E171 | success | Đã gửi báo cáo | `features/nearby/components/RunnerCard.tsx:165` |
+| E172 | success | Đã chặn ${name} | `features/nearby/components/RunnerCard.tsx:197` |
+| E173 | success | Đã gửi. Thông báo sẽ hiện sau vài giây. | `features/notification/components/PushSettings.tsx:56` |
+| E174 | success | Đã tắt thông báo trên thiết bị này | `features/notification/components/PushSettings.tsx:61` |
+| E175 | success | Đã bật thông báo trên thiết bị này | `features/notification/components/PushSettings.tsx:63` |
+| E176 | error | Bạn chưa cho phép thông báo. | `features/notification/components/PushSettings.tsx:64` |
+| E177 | error | Chưa xóa được thông báo. Thử lại sau. | `features/notification/hooks/useNotifications.ts:39` |
+| E178 | success | Đã bật thông báo | `features/onboarding/components/OnboardingScreen.tsx:289` |
+| E179 | error | Bạn chưa cho phép thông báo. Có thể bật lại trong Cài đặt. | `features/onboarding/components/OnboardingScreen.tsx:290` |
+| E180 | error | Không bật được thông báo. Thử lại trong Cài đặt. | `features/onboarding/components/OnboardingScreen.tsx:292` |
+| E181 | error | Có lỗi, thử lại nhé. | `features/onboarding/components/OnboardingScreen.tsx:339` |
+| E182 | success | Đã kết nối Strava! Bài chạy 30 ngày gần nhất đang được đồng bộ. | `features/onboarding/components/OnboardingScreen.tsx:42` |
+| E183 | success | Đã huỷ chiến dịch | `features/org/components/CampaignScreen.tsx:38` |
+| E184 | success | CLB đã rời tổ chức | `features/org/components/ClubOrgCard.tsx:27` |
+| E185 | success | Đã vào tổ chức | `features/org/components/JoinOrgScreen.tsx:25` |
+| E186 | success | Đã gửi yêu cầu — chờ quản trị tổ chức duyệt | `features/org/components/JoinOrgScreen.tsx:26` |
+| E187 | success | Đã xoá tổ chức demo | `features/org/components/admin/EnterpriseAdminTab.tsx:177` |
+| E188 | success | Đã tạo tổ chức · mã mời ${r.invite_code} | `features/org/components/admin/EnterpriseAdminTab.tsx:199` |
+| E189 | success | Đã cập nhật gói | `features/org/components/admin/EnterpriseAdminTab.tsx:247` |
+| E190 | success | Đã lưu | `features/org/components/tabs/MembersTab.tsx:110` |
+| E191 | error | Không tạo được file Excel, thử lại. | `features/org/components/tabs/MembersTab.tsx:177` |
+| E192 | error | Không tạo được file mẫu, thử lại. | `features/org/components/tabs/MembersTab.tsx:205` |
+| E193 | error | Không tạo được file Excel, thử lại. | `features/org/components/tabs/OverviewTab.tsx:56` |
+| E194 | success | Đã lưu | `features/org/components/tabs/SettingsTab.tsx:129` |
+| E195 | success | Đã lưu thông tin xuất hoá đơn | `features/org/components/tabs/SettingsTab.tsx:162` |
+| E196 | success | Đã lưu tên miền | `features/org/components/tabs/SettingsTab.tsx:190` |
+| E197 | success | Đã đổi mã mời — mã cũ hết hiệu lực | `features/org/components/tabs/SettingsTab.tsx:43` |
+| E198 | error | Không sao chép được | `features/org/components/tabs/SettingsTab.tsx:47` |
+| E199 | success | Đã lưu thương hiệu | `features/org/components/tabs/SettingsTab.tsx:79` |
+| E200 | success | Đã gửi lời mời — chờ ban quản trị CLB đồng ý | `features/org/components/tabs/UnitsTab.tsx:160` |
+| E201 | success | Đã đổi đơn vị | `features/org/components/tabs/UnitsTab.tsx:38` |
+| E202 | success | Đã bỏ CLB khỏi tổ chức | `features/org/components/tabs/UnitsTab.tsx:43` |
+| E203 | success | Đã đổi ảnh đại diện | `features/profile/components/AvatarPicker.tsx:50` |
+| E204 | success | Đã gỡ ảnh đại diện | `features/profile/components/AvatarPicker.tsx:55` |
+| E205 | error | Hãy chọn một file ảnh. | `features/profile/components/AvatarPicker.tsx:61` |
+| E206 | error | Không đọc được ảnh này. Thử ảnh JPG hoặc PNG khác. | `features/profile/components/AvatarPicker.tsx:67` |
+| E207 | error | Không tạo được ảnh từ nhân vật. Thử lại sau. | `features/profile/components/AvatarPicker.tsx:78` |
+| E208 | error | Không hủy được kết nối Strava. Thử lại sau. | `features/profile/components/MeScreen.tsx:89` |
+| E209 | success | Đã hủy kết nối Strava | `features/profile/components/MeScreen.tsx:90` |
+| E210 | success | Đã xoá tài khoản. Cảm ơn bạn đã chạy cùng RaceHub. | `features/profile/components/SettingsScreen.tsx:212` |
+| E211 | success | Đã cài RaceHub lên màn hình chính | `features/pwa/components/InstallApp.tsx:37` |
+| E212 | success | Đã có mạng trở lại | `features/pwa/components/OfflineBanner.tsx:25` |
+| E213 | success | Đã kết nối lại máy chủ | `features/pwa/components/OfflineBanner.tsx:27` |
+| E214 | success | Đã lưu thiết kế BIB — VĐV thấy ngay | `features/race/components/BibDesigner.tsx:40` |
+| E215 | success | Đã tạo giải | `features/race/components/CreateRaceScreen.tsx:62` |
+| E216 | success | Đã hủy giải và báo cho VĐV | `features/race/components/RaceDetailScreen.tsx:283` |
+| E217 | success | Đã rút tên | `features/race/components/RaceDetailScreen.tsx:92` |
+| E218 | success | Đã ghi nhận lời mời của ${x.referrer_name} | `features/referral/components/InviteScreen.tsx:118` |
+| E219 | success | Đã sao chép ${what} | `features/referral/components/InviteScreen.tsx:38` |
+| E220 | error | Không sao chép được, hãy chọn và sao chép thủ công. | `features/referral/components/InviteScreen.tsx:38` |
+| E221 | info | Đã bỏ bài chạy | `features/run/components/RunScreen.tsx:352` |
+| E222 | success | Đã gửi bài chạy ${formatKm(item.payload.p_distance_m)} km lên RaceHub | `features/run/hooks/usePendingRuns.ts:55` |
+| E223 | error | Không gửi được một bài chạy lưu trên máy | `features/run/hooks/usePendingRuns.ts:69` |
+| E224 | success | Đã thêm ${r.added} mã${r.issued ? | `features/voucher/components/VoucherForm.tsx:25` |
+| E225 | success | Đã lưu voucher tài trợ | `features/voucher/components/VoucherForm.tsx:29` |
+| E226 | success | Đã sao chép mã | `features/voucher/components/VoucherWallet.tsx:47` |
+| E227 | error | Tối đa ${max} phần tử | `shared/design/studio/Studio.tsx:73` |
+| E228 | success | Đã tải ảnh về máy | `shared/ui/SaveImage.tsx:21` |
+| E229 | success | Đã mở bảng chia sẻ — chọn "Lưu ảnh" để lưu vào máy | `shared/ui/SaveImage.tsx:22` |

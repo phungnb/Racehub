@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { companyLine, featuredMenu, fillSiteInfo, groupMenu, staticHref } from './help'
+import { companyLine, contactLinks, featuredMenu, fillSiteInfo, groupMenu, staticHref } from './help'
 
 describe('menu Hướng dẫn & Chính sách', () => {
   it('điền thông tin pháp nhân; thiếu thì ghi "đang cập nhật"; khoá lạ giữ nguyên', () => {
@@ -35,5 +35,18 @@ describe('menu Hướng dẫn & Chính sách', () => {
   it('chân menu chỉ hiện thông tin đã nhập', () => {
     expect(companyLine({})).toEqual([])
     expect(companyLine({ company_name: 'Công ty A', tax_code: '0101', support_phone: '0909' })).toEqual(['Công ty A', 'MST 0101', '0909'])
+  })
+})
+
+describe('contactLinks', () => {
+  it('tạo link gọi, Zalo, Telegram, email; bỏ giá trị sai', () => {
+    expect(contactLinks({ support_phone: '0909 123 456', support_zalo: '+84 909123456', support_telegram: 'https://t.me/racehub_vn', support_email: 'hotro@racehub.vn' })
+      .map((c) => [c.kind, c.href])).toEqual([
+      ['phone', 'tel:0909123456'], ['zalo', 'https://zalo.me/0909123456'], ['telegram', 'https://t.me/racehub_vn'], ['email', 'mailto:hotro@racehub.vn'],
+    ])
+    expect(contactLinks({ support_zalo: 'https://zalo.me/g/abc123', support_telegram: '@ab' })).toEqual([
+      { kind: 'zalo', label: 'Zalo', value: 'https://zalo.me/g/abc123', href: 'https://zalo.me/g/abc123' },
+    ])
+    expect(contactLinks({ support_zalo: 'javascript:alert(1)', support_email: 'khong-phai-email' })).toEqual([])
   })
 })

@@ -16,6 +16,7 @@ import { routes } from '@/shared/config/routes'
 import { exportActivities, getPerformance, getTrends, insightsErrorMessage, type Period } from '../api/insightsApi'
 import { bestEfforts, fmtDuration, fmtPace, paceHistogram, summarize, toCsv, type ExportRow } from '../model/insights'
 import { printReport } from './printReport'
+import { PurchaseOnly } from '@/features/system'
 
 type Tab = 'trends' | 'records' | 'report'
 const NEED: Record<Tab, number> = { trends: 1, records: 2, report: 3 }
@@ -41,9 +42,11 @@ function Locked({ need }: { need: number }) {
           : need === 2 ? 'Kỷ lục 1K → Marathon từ dữ liệu từng km, phân bố pace, nhân bản thử thách cũ.'
           : 'Xuất toàn bộ bài chạy ra Excel (CSV) và bản báo cáo in / lưu PDF.'}
       </p>
-      <Link href={routes.plan} className="mx-auto inline-flex h-11 items-center gap-2 rounded-xl bg-coin px-4 font-semibold text-bg">
-        <Crown className="size-4" aria-hidden />Xem gói VIP
-      </Link>
+      <PurchaseOnly>
+        <Link href={routes.plan} className="mx-auto inline-flex h-11 items-center gap-2 rounded-xl bg-coin px-4 font-semibold text-bg">
+          <Crown className="size-4" aria-hidden />Xem gói VIP
+        </Link>
+      </PurchaseOnly>
     </Card>
   )
 }

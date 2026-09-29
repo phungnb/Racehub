@@ -15,6 +15,7 @@ import { routes } from '@/shared/config/routes'
 import { BrandingEditor } from './BrandingEditor'
 import { ProLockedButton } from './ProLock'
 import { downloadXlsx } from '@/shared/lib/excel'
+import { PurchaseOnly } from '@/features/system'
 
 const BENEFITS = [
   { icon: Users, text: 'Không giới hạn Quản trị viên (gói miễn phí: 2)' },
@@ -72,7 +73,7 @@ export function ProSection({ club }: { club: Club }) {
         )}
         <QuotaCard club={club} />
         {p.active && <BrandingEditor club={club} active />}
-        <div id={`club-pro-buy-${club.id}`}><ClubProPurchase clubId={club.id} active={p.active} /></div>
+        <PurchaseOnly><div id={`club-pro-buy-${club.id}`}><ClubProPurchase clubId={club.id} active={p.active} /></div></PurchaseOnly>
       </Card>
       {report && <ReportSheet club={club} onClose={() => setReport(false)} />}
     </section>
@@ -110,7 +111,7 @@ function QuotaCard({ club }: { club: Club }) {
         {d.plan === 'FREE'
           ? `Ngoài hạn mức vẫn tạo được, phí tính theo quy mô và trừ quỹ CLB. CLB Pro: ${d.pro.max_open} thử thách cùng lúc, tới ${formatNumber(d.pro.max_slots)} người, không cần điều kiện thành viên.`
           : 'Ngoài hạn mức: phí theo quy mô, trừ quỹ CLB.'}
-        {' '}<Link href={routes.plans} className="font-semibold text-brand">So sánh Miễn phí và Pro →</Link>
+        <PurchaseOnly>{' '}<Link href={routes.plans} className="font-semibold text-brand">So sánh Miễn phí và Pro →</Link></PurchaseOnly>
       </p>
     </div>
   )

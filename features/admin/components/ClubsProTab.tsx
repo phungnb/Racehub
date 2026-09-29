@@ -2,13 +2,14 @@
 
 import { useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Crown, Search } from 'lucide-react'
+import { Crown, Search, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, EmptyState, ErrorState, Field, Input, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { useDebounced } from '@/shared/lib/search'
 import { formatNumber } from '@/shared/lib/format'
 import { adminErrorMessage, adminListClubs, adminSetClubPlan, type AdminClub } from '../api/adminApi'
+import { clubErrorMessage, deleteClub } from '@/features/club'
 
 const TERMS = [{ months: 1, label: '1 tháng' }, { months: 3, label: '3 tháng' }, { months: 12, label: '12 tháng' }, { months: 0, label: 'Không thời hạn' }]
 
@@ -16,6 +17,7 @@ const TERMS = [{ months: 1, label: '1 tháng' }, { months: 3, label: '3 tháng' 
 export function ClubsProTab() {
   const [q, setQ] = useState('')
   const [editing, setEditing] = useState<AdminClub | null>(null)
+  const [removing, setRemoving] = useState<AdminClub | null>(null)
   const term = useDebounced(q.trim())
   const list = useQuery({ queryKey: ['admin', 'clubs', term], queryFn: () => adminListClubs(term), placeholderData: keepPreviousData })
   return (
@@ -41,11 +43,13 @@ export function ClubsProTab() {
                   </p>
                 </div>
                 <Button size="sm" variant={c.active ? 'secondary' : 'primary'} onClick={() => setEditing(c)}>{c.active ? 'Sửa' : 'Bật Pro'}</Button>
+                <Button size="sm" variant="ghost" aria-label={`Xóa CLB ${c.name}`} onClick={() => setRemoving(c)}><Trash2 className="size-4 text-danger" aria-hidden /></Button>
               </li>
             ))}
           </ul>
         )}
       {editing && <PlanSheet club={editing} onClose={() => setEditing(null)} />}
+      {removing && <DeleteClubSheet club={removing} onClose={() => setRemoving(null)} />}
     </div>
   )
 }
@@ -92,6 +96,27 @@ function PlanSheet({ club, onClose }: { club: AdminClub; onClose: () => void }) 
           <Input id="pro-reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="VD: CK 12 tháng, mã GD 123456" />
         </Field>
       </div>
+    </Sheet>
+  )
+}
+
+/** Admin xóa CLB (kể cả CLB tạo từ trước, admin không phải chủ nhiệm): gõ đúng tên để xác nhận, ghi nhật ký quản trị */
+function DeleteClubSheet({ club, onClose }: { club: AdminClub; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [name, setName] = useState('')
+  const del = useMutation({
+    mutationFn: () => deleteClub(club.id, name),
+    onSuccess: () => { toast.success(`Đã xóa CLB ${club.name}`); void qc.invalidateQueries({ queryKey: ['admin', 'clubs'] }); void qc.invalidateQueries({ queryKey: ['club'] }); onClose() },
+    onError: (e) => toast.error(clubErrorMessage(e)),
+  })
+  const ok = name.trim().toLowerCase() === club.name.trim().toLowerCase()
+  return (
+    <Sheet open onClose={onClose} title={`Xóa CLB ${club.name}?`}
+      description={`Xóa vĩnh viễn CLB, bảng tin, tin nhắn, sự kiện, thử thách nội bộ của ${formatNumber(club.member_count)} thành viên. Không khôi phục được; thao tác được ghi nhật ký quản trị.`}
+      footer={<Button block variant="danger" loading={del.isPending} disabled={!ok} onClick={() => del.mutate()}><Trash2 className="size-4" aria-hidden />Xóa vĩnh viễn</Button>}>
+      <Field label={`Gõ đúng tên CLB "${club.name}" để xác nhận`} htmlFor="del-club-name">
+        <Input id="del-club-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" placeholder={club.name} />
+      </Field>
     </Sheet>
   )
 }

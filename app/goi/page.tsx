@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { PlanCompare } from '@/features/billing'
-import { HelpBody, HelpShell, type HelpPage } from '@/features/help'
+import { ContactCard, HelpBody, HelpShell, type HelpPage } from '@/features/help'
+import { PurchaseOnly } from '@/features/system'
 import { createSupabaseServerClient } from '@/shared/lib/supabase-server'
 import { loadHelpPage } from '@/shared/lib/help-page-server'
 
@@ -22,12 +23,16 @@ export default async function PlansPage() {
         Bắt đầu miễn phí, nâng cấp khi cần. Giá và hạn mức dưới đây luôn là số mới nhất.
       </p>
       <PlanCompare signedIn={signedIn} />
-      {notes?.body?.trim() && (
-        <section className="mt-8 border-t border-border pt-6">
-          <h2 className="mb-3 text-lg font-bold">Thông tin thêm</h2>
-          <HelpBody page={notes} />
-        </section>
-      )}
+      {/* App iOS/Android chưa bật mua trong app: không hiện hướng dẫn thanh toán / liên hệ mua (quy định App Store) */}
+      <PurchaseOnly>
+        {notes?.body?.trim() && (
+          <section className="mt-8 border-t border-border pt-6">
+            <h2 className="mb-3 text-lg font-bold">Thông tin thêm</h2>
+            <HelpBody page={notes} />
+          </section>
+        )}
+        <ContactCard className="mt-8 border-t border-border pt-6" title="Cần tư vấn gói?" note="Nhắn admin để được tư vấn, hỗ trợ thanh toán hoặc xuất hoá đơn." />
+      </PurchaseOnly>
     </HelpShell>
   )
 }

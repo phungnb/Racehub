@@ -49,7 +49,7 @@ const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; la
     { id: 'users', label: 'Người dùng', icon: Users }, { id: 'risk', label: 'Tài khoản bất thường', icon: Fingerprint }, { id: 'review', label: 'Duyệt bài chạy', icon: CheckCircle2, badge: 'reviews' },
     { id: 'reports', label: 'Báo cáo', icon: ShieldAlert, badge: 'reports' }] },
   { id: 'community', label: 'Cộng đồng', icon: Trophy, tabs: [
-    { id: 'challenges', label: 'Thử thách', icon: Trophy }, { id: 'clubs', label: 'CLB Pro', icon: Crown }, { id: 'cups', label: 'Thách đấu CLB', icon: Swords, badge: 'cups' },
+    { id: 'challenges', label: 'Thử thách', icon: Trophy }, { id: 'clubs', label: 'CLB (Pro, xóa)', icon: Crown }, { id: 'cups', label: 'Thách đấu CLB', icon: Swords, badge: 'cups' },
     { id: 'partners', label: 'Đối tác', icon: Store, badge: 'partners' }, { id: 'bib', label: 'Chợ BIB', icon: Ticket }, { id: 'organizers', label: 'Tổ chức giải', icon: Flag },
     { id: 'content', label: 'Nội dung', icon: BookOpen, badge: 'content' }, { id: 'help', label: 'Hướng dẫn & chính sách', icon: LifeBuoy }] },
   { id: 'sales', label: 'Kinh doanh', icon: Receipt, tabs: [

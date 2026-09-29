@@ -18,6 +18,8 @@ export const SITE_KEYS = [
   { key: 'address', label: 'Địa chỉ', placeholder: 'Số nhà, đường, phường, tỉnh / thành' },
   { key: 'support_email', label: 'Email hỗ trợ', placeholder: 'hotro@…' },
   { key: 'support_phone', label: 'Điện thoại hỗ trợ', placeholder: '09…' },
+  { key: 'support_zalo', label: 'Zalo hỗ trợ', placeholder: 'Số điện thoại Zalo hoặc link zalo.me/…' },
+  { key: 'support_telegram', label: 'Telegram hỗ trợ', placeholder: '@tên hoặc link t.me/…' },
   { key: 'report_email', label: 'Email nhận báo cáo vi phạm', placeholder: 'baocao@…' },
   { key: 'dpo_contact', label: 'Người phụ trách dữ liệu cá nhân', placeholder: 'Họ tên — email' },
   { key: 'min_age', label: 'Tuổi tối thiểu dùng app', placeholder: '16' },
@@ -74,4 +76,31 @@ export function companyLine(site: SiteInfo): string[] {
     site.address,
     [site.support_email, site.support_phone].filter(Boolean).join(' · ') || undefined,
   ].filter((x): x is string => !!x && x.trim().length > 0)
+}
+
+export type ContactKind = 'phone' | 'zalo' | 'telegram' | 'email'
+export interface ContactLink { kind: ContactKind; label: string; value: string; href: string }
+
+const digits = (v: string) => v.replace(/[^\d+]/g, '')
+const isUrl = (v: string) => /^https:\/\//i.test(v)
+
+/** Các kênh liên hệ admin đã nhập → link bấm được (gọi, mở Zalo / Telegram, soạn email). Giá trị lạ / sai → bỏ qua. */
+export function contactLinks(site: SiteInfo): ContactLink[] {
+  const out: ContactLink[] = []
+  const phone = site.support_phone?.trim()
+  if (phone && digits(phone).replace('+', '').length >= 8) out.push({ kind: 'phone', label: 'Điện thoại', value: phone, href: `tel:${digits(phone)}` })
+  const zalo = site.support_zalo?.trim()
+  if (zalo) {
+    const d = digits(zalo).replace(/^\+84/, '0')
+    const href = isUrl(zalo) && /^https:\/\/(www\.)?zalo\.me\//i.test(zalo) ? zalo : d.length >= 8 ? `https://zalo.me/${d}` : null
+    if (href) out.push({ kind: 'zalo', label: 'Zalo', value: zalo, href })
+  }
+  const tg = site.support_telegram?.trim()
+  if (tg) {
+    const name = tg.replace(/^https:\/\/(www\.)?t\.me\//i, '').replace(/^@/, '')
+    if (/^[A-Za-z0-9_]{4,32}$/.test(name)) out.push({ kind: 'telegram', label: 'Telegram', value: `@${name}`, href: `https://t.me/${name}` })
+  }
+  const email = site.support_email?.trim()
+  if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) out.push({ kind: 'email', label: 'Email', value: email, href: `mailto:${email}` })
+  return out
 }

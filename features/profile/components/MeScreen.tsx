@@ -1,6 +1,6 @@
 'use client'
 
-import { useOpsPolicy } from '@/features/system'
+import { PurchaseOnly, useOpsPolicy } from '@/features/system'
 import { useState } from 'react'
 import { shineTier } from '@/shared/lib/shine'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -185,16 +185,19 @@ export function MeScreen({ profile }: { profile: Profile }) {
             </Link>}
             <Link href={routes.plan} className="flex items-center gap-3 p-4">
               <span className="grid size-10 place-items-center rounded-xl bg-coin/15 text-coin"><Crown className="size-5" aria-hidden /></span>
-              <span className="min-w-0 flex-1"><span className="block font-semibold">Gói VIP & Nạp Xu</span>
-                <span className="block text-xs text-fg-muted">Lượt tạo thử thách miễn phí mỗi tháng, đơn hàng của tôi</span></span>
+              <PurchaseOnly fallback={<span className="min-w-0 flex-1"><span className="block font-semibold">Gói của bạn</span>
+                <span className="block text-xs text-fg-muted">Gói đang dùng, lượt tạo thử thách còn lại</span></span>}>
+                <span className="min-w-0 flex-1"><span className="block font-semibold">Gói VIP & Nạp Xu</span>
+                  <span className="block text-xs text-fg-muted">Lượt tạo thử thách miễn phí mỗi tháng, đơn hàng của tôi</span></span>
+              </PurchaseOnly>
               <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
             </Link>
-            <Link href={routes.plans} className="flex items-center gap-3 p-4">
+            <PurchaseOnly><Link href={routes.plans} className="flex items-center gap-3 p-4">
               <span className="grid size-10 place-items-center rounded-xl bg-coin/15 text-coin"><Scale className="size-5" aria-hidden /></span>
               <span className="min-w-0 flex-1"><span className="block font-semibold">So sánh các gói</span>
                 <span className="block text-xs text-fg-muted">Miễn phí · VIP · CLB Pro · Doanh nghiệp khác nhau thế nào</span></span>
               <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
-            </Link>
+            </Link></PurchaseOnly>
           </Card>
           <Card><Invite /></Card>
           <Card className="space-y-1">

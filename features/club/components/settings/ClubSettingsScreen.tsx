@@ -24,7 +24,7 @@ import { ProSection } from './ProSection'
 import { proActive } from '../../model/roles'
 
 export function ClubSettingsScreen({ clubId }: { clubId: string }) {
-  const { club, role, isStaff } = useClub(clubId)
+  const { club, role, isStaff, isAdmin, ownRole } = useClub(clubId)
   if (!club) return <Skeleton className="h-64" />
   return (
     <div className="space-y-8 pb-6">
@@ -35,7 +35,7 @@ export function ClubSettingsScreen({ clubId }: { clubId: string }) {
       {isStaff && <ClubPlaceSection clubId={club.id} />}
       {isStaff && <UniformSection clubId={club.id} clubName={club.name} accent={accentOf(club)} logoUrl={club.avatar_url} />}
       {role === 'OWNER' && <PolicySection club={club} />}
-      <DangerSection club={club} isOwner={role === 'OWNER'} />
+      <DangerSection club={club} isOwner={role === 'OWNER'} canLeave={!!ownRole && ownRole !== 'OWNER'} viaAdmin={isAdmin && ownRole !== 'OWNER'} />
     </div>
   )
 }
@@ -203,7 +203,7 @@ function PolicySection({ club }: { club: Club }) {
   )
 }
 
-function DangerSection({ club, isOwner }: { club: Club; isOwner: boolean }) {
+function DangerSection({ club, isOwner, canLeave, viaAdmin }: { club: Club; isOwner: boolean; canLeave: boolean; viaAdmin: boolean }) {
   const router = useRouter()
   const qc = useQueryClient()
   const members = useClubMembers(club.id, isOwner)
@@ -225,14 +225,13 @@ function DangerSection({ club, isOwner }: { club: Club; isOwner: boolean }) {
     <section>
       <SectionTitle>Khác</SectionTitle>
       <div className="space-y-2">
-        {isOwner ? (
+        {isOwner && (
           <>
-            <Row icon={Crown} label="Trao quyền Chủ nhiệm" hint="Bạn sẽ trở thành Quản trị viên" onClick={() => setDialog('transfer')} />
-            <Row icon={Trash2} label="Giải tán CLB" hint="Xóa vĩnh viễn CLB, bảng tin và tin nhắn" danger onClick={() => setDialog('delete')} />
+            <Row icon={Crown} label="Trao quyền Chủ nhiệm" hint={viaAdmin ? 'Quyền admin hệ thống: chọn Chủ nhiệm mới cho CLB' : 'Bạn sẽ trở thành Quản trị viên'} onClick={() => setDialog('transfer')} />
+            <Row icon={Trash2} label="Giải tán CLB" hint={viaAdmin ? 'Quyền admin hệ thống: xóa vĩnh viễn CLB (ghi nhật ký quản trị)' : 'Xóa vĩnh viễn CLB, bảng tin và tin nhắn'} danger onClick={() => setDialog('delete')} />
           </>
-        ) : (
-          <Row icon={LogOut} label="Rời CLB" danger onClick={() => setDialog('leave')} />
         )}
+        {(canLeave || !isOwner) && <Row icon={LogOut} label="Rời CLB" danger onClick={() => setDialog('leave')} />}
       </div>
 
       <ConfirmSheet open={dialog === 'leave'} onClose={() => setDialog(null)} onConfirm={() => leave.mutate()} loading={leave.isPending}

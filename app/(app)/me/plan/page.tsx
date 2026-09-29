@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { PlanScreen } from '@/features/billing'
 import { routes } from '@/shared/config/routes'
+import { useCanPurchase } from '@/features/system'
 
 // Gói VIP & Nạp Xu: mở từ Ví, trang Tôi, thông báo VIP
 export default function PlanPage() {
   const router = useRouter()
+  const canPurchase = useCanPurchase()
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center gap-2">
@@ -16,7 +18,7 @@ export default function PlanPage() {
           className="-ml-2 grid size-11 place-items-center rounded-full text-fg-muted hover:bg-surface-2">
           <ArrowLeft className="size-5" aria-hidden />
         </button>
-        <h1 className="text-xl font-bold">Gói VIP & Nạp Xu</h1>
+        <h1 className="text-xl font-bold">{canPurchase ? 'Gói VIP & Nạp Xu' : 'Gói của bạn'}</h1>
       </div>
       <Suspense><PlanScreen /></Suspense>
     </div>

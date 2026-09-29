@@ -23,3 +23,10 @@ describe('thẻ gói do admin soạn (009200)', () => {
     expect(validatePlanContent({ ...DEFAULT_PLAN_CONTENT, org: { ...DEFAULT_PLAN_CONTENT.org, perks: [] } })).toContain('Doanh nghiệp')
   })
 })
+
+describe('mua trong app iOS/Android (011100)', () => {
+  it('mặc định tắt khi máy chủ chưa đặt; các tính năng khác mặc định bật', () => {
+    expect(toOps({}).features).toMatchObject({ nativePurchases: false, nearby: true, orgs: true })
+    expect(toOps({ features: { nativePurchases: true } }).features.nativePurchases).toBe(true)
+  })
+})

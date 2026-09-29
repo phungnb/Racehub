@@ -126,7 +126,7 @@ Trong Xcode:
 
 | # | Vấn đề | Quy định | Việc cần làm |
 |---|---|---|---|
-| 1 | Mua **VIP, CLB Pro, nạp Xu** qua VietQR trong app. Đây là hàng số, dùng ngay trong app. | Apple 3.1.1; Google Play Payments | Chọn một trong hai: (a) tích hợp In-App Purchase / Google Play Billing; hoặc (b) trong app native **ẩn giá và nút mua**, chỉ bán trên web (không đặt link dẫn ra web trong app iOS). Cửa hàng CLB bán **hàng thật** (áo, BIB in) và phí CLB thì được thanh toán ngoài. |
+| 1 | ~~Mua VIP, CLB Pro, nạp Xu qua VietQR trong app~~ **Đã xử lý (011100)**: trong app iOS/Android mọi chỗ giá, mua gói, nạp Xu, mã khuyến mãi tự ẩn khi công tắc **"Cho phép mua trong app"** (Quản trị → Hệ thống → Chính sách vận hành) đang TẮT. Web vẫn bán bằng VietQR. Menu có "Liên hệ hỗ trợ" (SĐT, Zalo, Telegram, email — nhập ở Thông tin công ty) nhưng không gắn với việc mua. | Apple 3.1.1 / 3.1.3; Google Play Payments | Khi làm xong thanh toán qua Apple / Google thì bật công tắc. **Không bật khi chưa có** — app sẽ hiện lại VietQR và dễ bị từ chối. |
 | 2 | Bình luận, bảng tin, chat CLB **chưa có nút Báo cáo / Chặn người dùng**. | Apple 1.2 (nội dung người dùng tạo); Google UGC | Thêm "Báo cáo" (bài, bình luận, tin nhắn) và "Chặn người này", đưa vào hàng chờ trong Quản trị. Phần Quanh đây đã có. |
 | 3 | Thông báo đẩy trong app native chưa có. Web Push không chạy trong WebView iOS. | Không bắt buộc, nhưng là tính năng cốt lõi | Thêm `@capacitor/push-notifications` (APNs + FCM) và bảng token thiết bị. Máy chủ gửi song song với Web Push. |
 | 4 | App tải giao diện từ web (`server.url`). | Apple 4.2 / 2.5.2 | Được phép, vì có tính năng native thật. Ghi rõ trong Review Notes và gửi kèm tài khoản thử. Rủi ro còn lại ở mức trung bình. |

@@ -18,6 +18,7 @@ import {
 import { drawHonor, HONOR_FORMATS, honorData, honorValue, resolveHonor, type HonorContext, type HonorMode } from '../../model/honor'
 import { HonorDesigner } from './HonorDesigner'
 import { HonorSetup } from './HonorSetup'
+import { PurchaseOnly } from '@/features/system'
 
 export const honorKey = (id: string) => ['challenge', id, 'honor'] as const
 export function useHonor(id: string, enabled = true) {
@@ -121,9 +122,9 @@ function ManageBar({ h, d, participants, ctx }: { h: HonorState; d: ChallengeDet
         <p className="flex items-center gap-2 font-semibold"><Crown className="size-4 text-coin" aria-hidden />Vinh danh là tính năng CLB Pro / VIP</p>
         <p className="text-sm text-fg-muted">
           Thiết kế ảnh vinh danh chuyên nghiệp (khung ảnh runner, 10 nền, 40 font), tự tính Top thành tích / chạy đều / bứt phá / được tiếp sức,
-          công bố và gửi thông báo cho người được vinh danh. Nâng cấp CLB lên Pro hoặc gói VIP của bạn để dùng.
+          công bố và gửi thông báo cho người được vinh danh. Dành cho CLB Pro hoặc thành viên VIP.
         </p>
-        <Link href={routes.plan}><Button size="sm">Xem gói Pro / VIP</Button></Link>
+        <PurchaseOnly><Link href={routes.plan}><Button size="sm">Xem gói Pro / VIP</Button></Link></PurchaseOnly>
       </Card>
     )
   }

@@ -21,8 +21,8 @@ export function useClub(clubId: string) {
   const { profile } = useMyProfile()
   const admin = isSystemAdmin(profile)
   const ownRole = membership.data?.status === 'APPROVED' ? membership.data.role : null
-  // Admin hệ thống toàn quyền ở mọi CLB (migration 007100): coi như Chủ nhiệm khi không phải thành viên
-  const role = ownRole ?? (admin ? 'OWNER' : null)
+  // Admin hệ thống toàn quyền ở mọi CLB (migration 007100): luôn coi như Chủ nhiệm — kể cả CLB mình chỉ là thành viên thường
+  const role = admin ? 'OWNER' : ownRole
   return {
     uid,
     club: club.data,
@@ -30,6 +30,8 @@ export function useClub(clubId: string) {
     role,
     /** Có thật trong danh sách thành viên (admin xem hộ thì false) */
     isRealMember: ownRole !== null,
+    /** Vai trò thật trong CLB (không tính quyền admin hệ thống) */
+    ownRole,
     isAdmin: admin,
     isMember: role !== null,
     isStaff: isStaff(role),
