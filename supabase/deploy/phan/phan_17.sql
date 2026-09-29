@@ -1050,6 +1050,7 @@ update public.club_posts p set deleted_at = now()
 --   giải thưởng thử thách (Xu người tạo treo, không phát hành mới), Xu nạp bằng tiền (VietQR / cửa hàng) và hoàn tiền → NHẬN bình thường.
 --   Vẫn CHẶN nguồn admin có thể tự cấp cho mình: khuyến mãi / mã khuyến mãi, cộng tay (ADMIN_GRANT), thưởng giới thiệu,
 --   thưởng nhiệm vụ (admin tự tạo được nhiệm vụ) → phần đó không phát hành (về tài khoản hệ thống).
+--   Admin KHÔNG tự xác nhận đơn nạp / mua gói của chính mình (cần admin khác xác nhận) — chặn "in Xu" không trả tiền.
 -- Thay luật "admin không nhận Xu" của 010800. Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT. Chạy lại an toàn.
 
 -- Loại giao dịch admin vẫn được cộng Xu vào ví của mình
@@ -1083,8 +1084,10 @@ begin
 
   -- 2. Tài khoản quản trị không nhận Xu TỰ CẤP (khuyến mãi, cộng tay, giới thiệu, nhiệm vụ): phần đó về tài khoản hệ thống.
   --    Xu kiếm theo luật (chạy bộ, điểm danh, chuỗi, lên cấp…), Xu nạp bằng tiền và hoàn tiền vẫn nhận như người thường.
-  if not private.admin_credit_allowed(p_type) then
+  --    Admin không tự nạp Xu cho mình (tự xác nhận đơn của chính mình = in Xu không cần trả tiền).
+  if not private.admin_credit_allowed(p_type) or p_type like 'XU_PURCHASE%' then
     v_entries := (select jsonb_agg(case when (e->>'amount')::numeric > 0 and private.is_admin_account((e->>'account_id')::uuid)
+                                         and (not private.admin_credit_allowed(p_type) or (e->>'account_id')::uuid = p_created_by)
                                         then jsonb_set(e, '{account_id}', to_jsonb(private.system_account()::text)) else e end)
                     from jsonb_array_elements(v_entries) e);
   end if;
@@ -1155,6 +1158,35 @@ begin
   end if;
   perform private.add_xp(p_user, p_xp, p_activity);
   return true;
+end $$;
+
+-- Xác nhận đơn: không tự xác nhận đơn của chính mình
+create or replace function public.admin_confirm_order(p_order_id uuid, p_note text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := private.require_admin(); o public.orders := (select x from public.orders x where x.id = p_order_id for update);
+begin
+  if o.id is null then raise exception 'ORDER_NOT_FOUND'; end if;
+  if o.status = 'PAID' then return private.order_json(o); end if;
+  if o.status <> 'PENDING' then raise exception 'ORDER_NOT_PENDING'; end if;
+  -- Đơn của chính mình (người mua hoặc chủ ví / gói) phải do admin khác xác nhận
+  if o.buyer_id = v_uid or o.owner_id = v_uid then raise exception 'SELF_CONFIRM_FORBIDDEN'; end if;
+  update public.orders set status = 'PAID', paid_at = now(), confirmed_by = v_uid, note = nullif(trim(coalesce(p_note, '')), '') where id = o.id;
+  if o.kind = 'PLAN' then
+    perform private.grant_subscription(o.owner_type, o.owner_id, o.plan_code, o.months, 'ORDER', o.id, 'Đơn ' || o.code, v_uid);
+  else
+    perform private.ledger_post('XU_PURCHASE', 'order:' || o.id, 'Nạp Xu — đơn ' || o.code, v_uid,
+      jsonb_build_array(jsonb_build_object('account_id', o.owner_id, 'coin_kind', 'PAID', 'amount', o.xu),
+                        jsonb_build_object('account_id', private.system_account(), 'coin_kind', 'PAID', 'amount', -o.xu)), o.id);
+    if o.bonus_xu > 0 then
+      perform private.ledger_post('XU_PURCHASE_BONUS', 'order_bonus:' || o.id, 'Tặng thêm khi nạp — đơn ' || o.code, v_uid,
+        jsonb_build_array(jsonb_build_object('account_id', o.owner_id, 'coin_kind', 'BONUS', 'amount', o.bonus_xu),
+                          jsonb_build_object('account_id', private.system_account(), 'coin_kind', 'BONUS', 'amount', -o.bonus_xu)), o.id);
+    end if;
+    perform private.notify(o.owner_id, null, 'ADMIN_XU', 'Đã nạp ' || (o.xu + o.bonus_xu) || ' Xu', 'Đơn ' || o.code || ' đã được xác nhận.', '/wallet', v_uid, true);
+  end if;
+  insert into public.admin_audit_log (actor_id, action, target, new_value)
+  values (v_uid, 'CONFIRM_ORDER', o.code, jsonb_build_object('kind', o.kind, 'amount_vnd', o.amount_vnd, 'plan', o.plan_code, 'xu', o.xu));
+  return private.order_json((select x from public.orders x where x.id = o.id));
 end $$;
 
 commit;
