@@ -3,25 +3,127 @@
 
 export type ChallengePhase = 'UPCOMING' | 'LIVE' | 'SETTLING' | 'ENDED' | 'CANCELLED'
 export type ChallengeFormat = 'SOLO_GOAL' | 'RANKED' | 'DUEL' | 'TEAM' | 'COLLECTIVE'
-export type Objective = 'DISTANCE' | 'RUNS' | 'DURATION' | 'STREAK_DAYS'
+export type Objective = 'DISTANCE' | 'RUNS' | 'DURATION' | 'STREAK_DAYS' | 'BEST_TIME' | 'BEST_PACE'
 export type TeamMode = 'TEAM_SUM' | 'TEAM_AVG' | 'TEAM_GAP' | 'LAST_MEMBER'
 export type Audience = 'PUBLIC' | 'CLUB_ONLY' | 'INVITE_ONLY'
 export type RewardSource = 'NONE' | 'CREATOR' | 'CLUB'
 export type RewardSplit = 'WINNER' | 'TOP3' | 'FINISHERS' | 'TEAM'
 
 export const FORMAT_META: Record<ChallengeFormat, { label: string; short: string; description: string }> = {
-  SOLO_GOAL: { label: 'Mục tiêu cá nhân', short: 'Cá nhân', description: 'Tự đặt mục tiêu (VD: 100 km tháng này) và chinh phục nó' },
-  RANKED: { label: 'Đua xếp hạng', short: 'Xếp hạng', description: 'Mọi người cùng chạy, ai nhiều nhất đứng đầu BXH' },
+  SOLO_GOAL: { label: 'Chinh phục cá nhân', short: 'Cá nhân', description: 'Quãng đường, thời gian (5K, 10K, Half, Full…), pace hoặc chuỗi ngày — cho riêng bạn hoặc rủ nhiều người' },
+  RANKED: { label: 'Cộng đồng', short: 'Cộng đồng', description: 'Mọi người cùng chạy, BXH theo km hoặc số ngày chạy' },
   DUEL: { label: 'Thách đấu 1-1', short: '1-1', description: 'Rủ một người bạn so tài, ai hơn thì thắng' },
   TEAM: { label: 'Đồng đội', short: 'Đồng đội', description: 'Chia đội thi đấu, tính điểm theo cả đội' },
-  COLLECTIVE: { label: 'Cộng đồng', short: 'Cộng đồng', description: 'Tất cả cùng góp km để đạt một mốc chung' },
+  COLLECTIVE: { label: 'Cộng đồng', short: 'Cộng đồng', description: 'Cùng nhau chinh phục: cộng dồn km, có BXH theo km hoặc số ngày chạy' },
 }
+
+/** Nhóm thử thách "Cộng đồng" gồm các kiểu con — thêm kiểu mới ở đây khi phát triển (Cùng nhau chinh phục, …) */
+export const COMMUNITY_KINDS = [
+  { id: 'TOGETHER', label: 'Cùng nhau chinh phục', description: 'Cộng dồn km của mọi người; đặt mốc chung (không bắt buộc). BXH lọc theo km, số ngày chạy, số buổi' },
+] as const
+export const isCommunity = (f: ChallengeFormat | string) => f === 'COLLECTIVE' || f === 'RANKED'
+export const isConquest = (o: Objective | string | null | undefined) => o === 'BEST_TIME' || o === 'BEST_PACE'
 
 export const OBJECTIVE_META: Record<Objective, { label: string; unit: string; hint: string }> = {
   DISTANCE: { label: 'Quãng đường', unit: 'km', hint: 'Cộng dồn số km chạy' },
   RUNS: { label: 'Số buổi chạy', unit: 'buổi', hint: 'Mỗi bài chạy hợp lệ tính 1 buổi' },
   DURATION: { label: 'Thời gian chạy', unit: 'phút', hint: 'Cộng dồn thời gian di chuyển' },
   STREAK_DAYS: { label: 'Chuỗi ngày', unit: 'ngày', hint: 'Số ngày chạy đủ cự ly tối thiểu trong ngày' },
+  BEST_TIME: { label: 'Chinh phục thời gian', unit: 'hạng mục', hint: '5K, 10K, Half, Full… đạt thời gian mục tiêu' },
+  BEST_PACE: { label: 'Chinh phục pace', unit: 'hạng mục', hint: '5K, 10K, Half, Full… chạy đạt pace mục tiêu' },
+}
+
+/* ------------------- Chinh phục thời gian / pace (migration 010700) ------------------- */
+
+export type ConquestMode = 'FIXED' | 'SELF'
+export interface ConquestCategoryDraft { label: string; km: number; target: string }
+export interface ConquestDraft { mode: ConquestMode; categories: ConquestCategoryDraft[] }
+/** Cự ly có sẵn — "Tự đặt" cho phép nhập cự ly bất kỳ */
+export const CONQUEST_PRESETS: { label: string; km: number; time: string; pace: string }[] = [
+  { label: '5K', km: 5, time: '30:00', pace: '6:00' },
+  { label: '10K', km: 10, time: '1:00:00', pace: '6:00' },
+  { label: 'Half', km: 21.0975, time: '2:15:00', pace: '6:24' },
+  { label: 'Full', km: 42.195, time: '4:45:00', pace: '6:45' },
+]
+export const DEFAULT_CONQUEST: ConquestDraft = { mode: 'FIXED', categories: [{ label: '5K', km: 5, target: '30:00' }, { label: '10K', km: 10, target: '1:00:00' }] }
+
+/** "1:05:30" → 3930 · "25:00" → 1500 · "6:15" (pace) → 375; sai → null */
+export function parseClock(t: string): number | null {
+  const parts = t.trim().replace(/[.,']/g, ':').split(':').filter((x) => x !== '')
+  if (!parts.length || parts.length > 3 || parts.some((x) => !/^\d{1,3}$/.test(x))) return null
+  const n = parts.map(Number)
+  if (n.slice(1).some((x) => x >= 60)) return null
+  const s = n.reduce((acc, x) => acc * 60 + x, 0)
+  return s > 0 ? s : null
+}
+/** 3930 → "1:05:30" · 1500 → "25:00" */
+export function formatClock(s: number | null | undefined): string {
+  if (s == null || !Number.isFinite(s)) return '—'
+  const v = Math.round(s), h = Math.floor(v / 3600), m = Math.floor((v % 3600) / 60), sec = v % 60
+  const mm = h ? String(m).padStart(2, '0') : String(m)
+  return `${h ? `${h}:` : ''}${mm}:${String(sec).padStart(2, '0')}`
+}
+export const kmLabel = (km: number) => `${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 }).format(km)} km`
+
+/** Kiểm tra hạng mục (khớp set_challenge_conquest) */
+export function validateConquest(c: ConquestDraft, objective: Objective): string | null {
+  if (!c.categories.length || c.categories.length > 8) return 'Cần 1 đến 8 hạng mục'
+  for (const [i, x] of c.categories.entries()) {
+    const at = `Hạng mục ${i + 1}`
+    if (!x.label.trim() || x.label.trim().length > 40) return `${at}: đặt tên (tối đa 40 ký tự)`
+    if (!(x.km >= 0.4 && x.km <= 250)) return `${at}: cự ly từ 0,4 đến 250 km`
+    if (c.mode === 'FIXED') {
+      const s = parseClock(x.target)
+      if (s === null) return `${at}: nhập mục tiêu dạng ${objective === 'BEST_PACE' ? '6:00 (phút:giây mỗi km)' : '1:05:00 hoặc 25:00'}`
+      if (objective === 'BEST_PACE' && (s < 120 || s > 1500)) return `${at}: pace từ 2:00 đến 25:00 /km`
+      if (objective === 'BEST_TIME' && (s < 60 || s > 172_800)) return `${at}: thời gian không hợp lệ`
+    }
+  }
+  if (new Set(c.categories.map((x) => x.label.trim().toLowerCase())).size !== c.categories.length) return 'Tên hạng mục bị trùng'
+  return null
+}
+export const conquestPayload = (d: Pick<ChallengeDraft, 'objective' | 'conquest'>) => ({
+  objective: d.objective as 'BEST_TIME' | 'BEST_PACE',
+  mode: d.conquest.mode,
+  categories: d.conquest.categories.map((x) => ({ label: x.label.trim(), distance_km: x.km, target_s: d.conquest.mode === 'FIXED' ? parseClock(x.target) : null })),
+})
+
+/**
+ * Cách tính điểm của từng loại thử thách — hiện ở bước tạo và tab Luật chơi để ai cũng hiểu mình được tính thế nào.
+ */
+export function scoringLines(c: {
+  format: ChallengeFormat | string; objective: Objective | string | null; game_mode?: string | null; pledge_enabled?: boolean
+  target_value?: number | null; conquest_mode?: string | null; pledge_cap_pct?: number | null; min_km?: number | null
+}): string[] {
+  const o = (c.objective ?? 'DISTANCE') as Objective
+  const unit = OBJECTIVE_META[o]?.unit ?? 'km'
+  if (isConquest(o)) {
+    return [
+      `Mỗi hạng mục (5K, 10K…) lấy bài chạy tốt nhất có cự ly ≥ hạng mục; ${o === 'BEST_PACE' ? 'pace = pace trung bình của bài' : 'thời gian quy đổi theo pace trung bình của bài'}.`,
+      c.conquest_mode === 'SELF' ? 'Mỗi người tự đăng ký mục tiêu cho hạng mục mình chọn.' : 'Người tạo đặt mục tiêu cho từng hạng mục; người chơi chọn hạng mục để đăng ký.',
+      'Đạt mọi hạng mục đã đăng ký = hoàn thành. BXH từng hạng mục xếp theo kết quả nhanh nhất.',
+    ]
+  }
+  if (c.format === 'TEAM') {
+    const mode = TEAM_MODE_META[(c.game_mode ?? 'TEAM_SUM') as TeamMode]
+    return [
+      c.pledge_enabled ? `Mỗi người đăng ký km cam kết; điểm đội = tổng km được tính${c.pledge_cap_pct != null ? ` (mỗi người tối đa mục tiêu +${c.pledge_cap_pct}%)` : ''}.`
+        : `Điểm đội — ${mode?.label ?? 'Tổng'}: ${mode?.description ?? ''}.`,
+      `Điểm cá nhân = ${OBJECTIVE_META[o]?.label.toLowerCase()} (${unit}); đội điểm cao nhất thắng.`,
+    ]
+  }
+  if (isCommunity(c.format)) {
+    return [
+      'Điểm = tổng km hợp lệ của mỗi người; cả cộng đồng cộng dồn' + (Number(c.target_value) > 0 ? ` để chạm mốc ${formatScore(o, c.target_value)}.` : '.'),
+      'BXH xếp theo km, lọc được theo số ngày chạy và số buổi.',
+    ]
+  }
+  if (c.format === 'DUEL') return [`Hai người so ${OBJECTIVE_META[o]?.label.toLowerCase()} (${unit}); ai hơn khi hết giờ thì thắng.`]
+  // Chinh phục cá nhân theo km / chuỗi ngày
+  if (c.pledge_enabled) return ['Mỗi người tự đăng ký mốc km; đạt mốc của mình = hoàn thành. BXH theo % mục tiêu, lọc theo từng mốc.']
+  return [o === 'STREAK_DAYS'
+    ? `Mỗi ngày chạy đủ ${c.min_km ?? 0} km tính 1 ngày; đủ ${formatScore(o, c.target_value)} = hoàn thành.`
+    : `Cộng dồn ${OBJECTIVE_META[o]?.label.toLowerCase()} hợp lệ; đạt ${formatScore(o, c.target_value)} = hoàn thành.`]
 }
 
 export const TEAM_MODE_META: Record<TeamMode, { label: string; description: string }> = {
@@ -132,6 +234,12 @@ export interface ChallengeDraft {
   rules: RulesInfoDraft
   /** Tự lặp lại (migration 007600): hết kỳ, hệ thống tự tạo kỳ kế tiếp cùng luật */
   recurrence: Recurrence
+  /** Chinh phục cá nhân "Cá nhân tôi": chỉ mình mình, không hiện ở Khám phá */
+  personal: boolean
+  /** Chinh phục thời gian / pace: các hạng mục (migration 010700) */
+  conquest: ConquestDraft
+  /** Hạn đăng ký (ISO); null = đến khi kết thúc (thử thách đội: đến giờ xuất phát) */
+  regDeadline: string | null
 }
 
 export type Recurrence = 'NONE' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
@@ -174,8 +282,8 @@ export const plannedTeams = (members: number, teamSize: number) =>
   teamSize > 0 ? Math.max(2, Math.round(members / teamSize)) : 2
 
 /** Thử thách này có hỗ trợ mục tiêu tự đăng ký không (chỉ tính quãng đường, cá nhân hoặc đồng đội) */
-export const pledgeSupported = (d: Pick<ChallengeDraft, 'format' | 'objective'>) =>
-  d.objective === 'DISTANCE' && (d.format === 'SOLO_GOAL' || d.format === 'TEAM')
+export const pledgeSupported = (d: Pick<ChallengeDraft, 'format' | 'objective'> & { personal?: boolean }) =>
+  d.objective === 'DISTANCE' && ((d.format === 'SOLO_GOAL' && !d.personal) || d.format === 'TEAM')
 
 /** Số tuần ISO của ngày (theo giờ VN) — "Thử thách tuần 39" */
 export function isoWeek(date: Date): number {
@@ -254,7 +362,7 @@ export function defaultDraft(now = new Date(), clubId: string | null = null): Ch
   const start = new Date(now.getTime() + 3_600_000)
   start.setMinutes(0, 0, 0)
   return {
-    format: 'RANKED', title: '', description: '', audience: clubId ? 'CLUB_ONLY' : 'PUBLIC', clubId,
+    format: 'COLLECTIVE', title: '', description: '', audience: clubId ? 'CLUB_ONLY' : 'PUBLIC', clubId,
     objective: 'DISTANCE', gameMode: 'TEAM_AVG', targetValue: 0, minKm: 1, minPace: 3, maxPace: 15, dailyCapKm: 0, requireHr: false,
     teamNames: ['Đội Xanh', 'Đội Đỏ'], teamSize: 0, maxSlots: 5,      // ≤ 5 người: miễn phí tạo
     start: start.toISOString(), end: new Date(start.getTime() + 7 * DAY).toISOString(),
@@ -262,6 +370,9 @@ export function defaultDraft(now = new Date(), clubId: string | null = null): Ch
     pledge: { ...DEFAULT_PLEDGE },
     rules: {},
     recurrence: 'NONE',
+    personal: false,
+    conquest: { ...DEFAULT_CONQUEST, categories: DEFAULT_CONQUEST.categories.map((c) => ({ ...c })) },
+    regDeadline: null,
   }
 }
 
@@ -278,7 +389,8 @@ export function validateDraft(d: ChallengeDraft, step: 1 | 2 | 3, now = new Date
   if (step === 2) {
     const pledge = d.pledge.enabled && pledgeSupported(d)
     if (pledge) { const pe = validatePledge(d.pledge); if (pe) e.pledge = pe }
-    if (!pledge && (d.format === 'SOLO_GOAL' || d.format === 'COLLECTIVE') && !(d.targetValue > 0)) e.targetValue = 'Hãy đặt mục tiêu'
+    if (isConquest(d.objective)) { const ce = validateConquest(d.conquest, d.objective); if (ce) e.conquest = ce }
+    else if (!pledge && d.format === 'SOLO_GOAL' && !(d.targetValue > 0)) e.targetValue = 'Hãy đặt mục tiêu'
     if (d.targetValue < 0) e.targetValue = 'Mục tiêu không hợp lệ'
     if (d.minKm < 0 || d.minKm > 100) e.minKm = 'Từ 0 đến 100 km'
     if (d.objective === 'STREAK_DAYS' && !(d.minKm > 0)) e.minKm = 'Chuỗi ngày cần cự ly tối thiểu mỗi ngày'
@@ -301,15 +413,20 @@ export function validateDraft(d: ChallengeDraft, step: 1 | 2 | 3, now = new Date
     if (d.format === 'TEAM' && s < now.getTime() + 10 * 60_000) e.start = 'Thử thách đội cần bắt đầu sau ít nhất 10 phút để mọi người chọn đội'
     if (d.objective === 'STREAK_DAYS' && d.targetValue > Math.ceil((en - s) / DAY)) e.targetValue = 'Số ngày chuỗi dài hơn thời gian thử thách'
     if (d.rewardXu < 0 || d.rewardXu > 100_000) e.rewardXu = 'Từ 0 đến 100.000 Xu'
+    if (d.regDeadline) {
+      const r = Date.parse(d.regDeadline)
+      if (Number.isNaN(r) || r > en || r < now.getTime()) e.regDeadline = 'Hạn đăng ký phải từ bây giờ đến trước khi kết thúc'
+      else if (d.format === 'TEAM' && r > s) e.regDeadline = 'Thử thách đội: hạn đăng ký trước giờ xuất phát'
+    }
     if (d.format !== 'DUEL' && (d.maxSlots < 2 || d.maxSlots > 10_000) && d.format !== 'SOLO_GOAL') e.maxSlots = 'Từ 2 đến 10.000 người'
   }
   return e
 }
 
 /** Số người tối đa thực tế (máy chủ tính phí theo số này) */
-export function effectiveSlots(d: Pick<ChallengeDraft, 'format' | 'maxSlots' | 'teamSize' | 'teamNames'> & { pledge?: PledgeDraft }): number {
+export function effectiveSlots(d: Pick<ChallengeDraft, 'format' | 'maxSlots' | 'teamSize' | 'teamNames'> & { pledge?: PledgeDraft; personal?: boolean }): number {
   if (d.format === 'DUEL') return 2
-  if (d.format === 'SOLO_GOAL') return d.pledge?.enabled ? d.maxSlots : 1
+  if (d.format === 'SOLO_GOAL') return d.personal ? 1 : d.maxSlots
   if (d.format === 'TEAM' && d.pledge?.enabled) return d.maxSlots
   if (d.format === 'TEAM' && d.teamSize > 0) {
     const teams = d.teamNames.filter((t) => t.trim()).length
@@ -321,14 +438,18 @@ export function effectiveSlots(d: Pick<ChallengeDraft, 'format' | 'maxSlots' | '
 /** Dữ liệu gửi lên RPC create_challenge_v2 */
 export function draftToPayload(d: ChallengeDraft) {
   const pledge = d.pledge?.enabled && pledgeSupported(d)
+  const conquest = isConquest(d.objective)
+  // "Cộng đồng" không đặt mốc chung = đua xếp hạng
+  const format: ChallengeFormat = d.format === 'COLLECTIVE' && !(d.targetValue > 0) ? 'RANKED' : d.format
   return {
     title: d.title.trim(),
     description: d.description.trim(),
-    format: d.format,
-    objective: d.objective,
+    format,
+    // Chinh phục: tạo như thử thách km rồi bật hạng mục ngay sau khi tạo (set_challenge_conquest)
+    objective: conquest ? 'DISTANCE' : d.objective,
     game_mode: d.format === 'TEAM' ? (pledge ? 'TEAM_SUM' : d.gameMode) : null,
     // Mục tiêu tự đăng ký: mục tiêu chung chỉ là mốc thấp nhất (máy chủ yêu cầu > 0 với thử thách cá nhân)
-    target_value: pledge ? (d.format === 'SOLO_GOAL' ? Math.min(...(d.pledge.options.length ? d.pledge.options : [d.pledge.minKm])) : 0) : d.targetValue || 0,
+    target_value: conquest ? 1 : pledge ? (d.format === 'SOLO_GOAL' ? Math.min(...(d.pledge.options.length ? d.pledge.options : [d.pledge.minKm])) : 0) : d.targetValue || 0,
     min_km: d.minKm,
     min_pace: d.minPace,
     max_pace: d.maxPace,
@@ -336,14 +457,15 @@ export function draftToPayload(d: ChallengeDraft) {
     start_date: d.start,
     end_date: d.end,
     max_slots: effectiveSlots(d),
-    audience: d.format === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience,
-    club_id: d.audience === 'CLUB_ONLY' ? d.clubId : null,
+    // "Cá nhân tôi": ẩn khỏi Khám phá, chỉ mình mình
+    audience: d.format === 'SOLO_GOAL' && d.personal ? 'INVITE_ONLY' : d.format === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience,
+    club_id: d.audience === 'CLUB_ONLY' && !(d.format === 'SOLO_GOAL' && d.personal) ? d.clubId : null,
     // Đua đội theo mục tiêu: 2 đội tạm, máy chủ tạo lại đúng số đội khi ban quản trị chia đội
     team_names: d.format === 'TEAM' ? (pledge ? ['Đội 1', 'Đội 2'] : d.teamNames.map((n) => n.trim()).filter(Boolean)) : [],
     team_size: d.format === 'TEAM' && !pledge ? d.teamSize : 0,
     reward_xu: d.rewardXu || 0,
     reward_source: d.rewardXu > 0 ? d.rewardSource : 'NONE',
-    reward_split: d.format === 'RANKED' ? d.rewardSplit : 'WINNER',
+    reward_split: format === 'RANKED' ? d.rewardSplit : 'WINNER',
   }
 }
 
@@ -372,13 +494,13 @@ export function draftFromTemplate(t: {
 }, allowedClubs: string[], now = new Date()): ChallengeDraft {
   const base = defaultDraft(now, null)
   const num = (v: unknown, d: number) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? d : Number(v))
-  const format = (['SOLO_GOAL', 'RANKED', 'TEAM', 'DUEL', 'COLLECTIVE'] as string[]).includes(t.format) ? (t.format as ChallengeFormat) : base.format
+  const format = t.format === 'RANKED' ? 'COLLECTIVE' : (['SOLO_GOAL', 'TEAM', 'DUEL', 'COLLECTIVE'] as string[]).includes(t.format) ? (t.format as ChallengeFormat) : base.format
   const club = t.audience === 'CLUB_ONLY' && t.club_id && allowedClubs.includes(t.club_id) ? t.club_id : null
   const start = new Date(base.start)
   return {
     ...base, format, title: t.title, description: t.description ?? '',
     audience: club ? 'CLUB_ONLY' : t.audience === 'INVITE_ONLY' ? 'INVITE_ONLY' : 'PUBLIC', clubId: club,
-    objective: (t.objective as Objective) ?? base.objective, gameMode: (t.game_mode as TeamMode) ?? base.gameMode,
+    objective: isConquest(t.objective) ? 'DISTANCE' : (t.objective as Objective) ?? base.objective, gameMode: (t.game_mode as TeamMode) ?? base.gameMode,
     targetValue: num(t.target_value, 0), minKm: num(t.min_km, base.minKm), minPace: num(t.min_pace, base.minPace), maxPace: num(t.max_pace, base.maxPace),
     dailyCapKm: num(t.daily_cap_km, 0), requireHr: !!t.require_hr,
     teamNames: t.team_names.length ? t.team_names : base.teamNames, teamSize: num(t.team_size, 0), maxSlots: num(t.max_slots, base.maxSlots),
@@ -391,5 +513,6 @@ export function draftFromTemplate(t: {
       teamSize: num(t.pledge.team_size, DEFAULT_PLEDGE.teamSize),
     } : { ...DEFAULT_PLEDGE },
     rules: t.rules_info ?? {},
+    personal: format === 'SOLO_GOAL' && t.max_slots <= 1,
   }
 }

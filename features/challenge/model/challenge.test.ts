@@ -130,3 +130,37 @@ describe('nhân bản thử thách cũ (VIP2)', () => {
     expect(lost).toMatchObject({ audience: 'PUBLIC', clubId: null, rewardXu: 0, rewardSource: 'NONE' })
   })
 })
+
+describe('chinh phục thời gian / pace (010700)', () => {
+  it('đọc / hiện giờ:phút:giây', () => {
+    expect(m.parseClock('1:05:30')).toBe(3930)
+    expect(m.parseClock('25:00')).toBe(1500)
+    expect(m.parseClock('6.15')).toBe(375)
+    expect(m.parseClock('6:75')).toBeNull()
+    expect(m.parseClock('abc')).toBeNull()
+    expect(m.formatClock(3930)).toBe('1:05:30')
+    expect(m.formatClock(1500)).toBe('25:00')
+  })
+  it('kiểm tra hạng mục: cần mục tiêu khi người tạo đặt, pace trong khoảng hợp lý, không trùng tên', () => {
+    expect(m.validateConquest({ mode: 'FIXED', categories: [{ label: '5K', km: 5, target: '' }] }, 'BEST_TIME')).toContain('mục tiêu')
+    expect(m.validateConquest({ mode: 'SELF', categories: [{ label: '5K', km: 5, target: '' }] }, 'BEST_TIME')).toBeNull()
+    expect(m.validateConquest({ mode: 'FIXED', categories: [{ label: '10K', km: 10, target: '1:00' }] }, 'BEST_PACE')).toContain('pace')
+    expect(m.validateConquest({ mode: 'FIXED', categories: [{ label: '5K', km: 5, target: '25:00' }, { label: '5k', km: 5, target: '26:00' }] }, 'BEST_TIME')).toContain('trùng')
+    expect(m.conquestPayload({ objective: 'BEST_TIME', conquest: { mode: 'FIXED', categories: [{ label: ' 10K ', km: 10, target: '55:00' }] } }))
+      .toEqual({ objective: 'BEST_TIME', mode: 'FIXED', categories: [{ label: '10K', distance_km: 10, target_s: 3300 }] })
+  })
+  it('tạo: chinh phục gửi như thử thách km; "Cá nhân tôi" ẩn khỏi Khám phá, 1 người; Cộng đồng không đặt mốc = xếp hạng', () => {
+    const conq = draftToPayload({ ...defaultDraft(now), format: 'SOLO_GOAL', objective: 'BEST_PACE', personal: true, title: 'Pace 6' })
+    expect(conq).toMatchObject({ objective: 'DISTANCE', target_value: 1, audience: 'INVITE_ONLY', max_slots: 1, club_id: null })
+    const ranked = draftToPayload({ ...defaultDraft(now), format: 'COLLECTIVE', targetValue: 0, title: 'Cùng chạy' })
+    expect(ranked.format).toBe('RANKED')
+    const together = draftToPayload({ ...defaultDraft(now), format: 'COLLECTIVE', targetValue: 1000, title: 'Cùng 1000 km' })
+    expect(together.format).toBe('COLLECTIVE')
+    expect(validateDraft({ ...defaultDraft(now), format: 'COLLECTIVE', targetValue: 0 }, 2, now).targetValue).toBeUndefined()
+  })
+  it('mỗi loại thử thách có mô tả cách tính điểm riêng', () => {
+    expect(m.scoringLines({ format: 'SOLO_GOAL', objective: 'BEST_TIME', conquest_mode: 'SELF' }).join(' ')).toContain('tự đăng ký')
+    expect(m.scoringLines({ format: 'TEAM', objective: 'DISTANCE', game_mode: 'LAST_MEMBER' }).join(' ')).toContain('Chốt đoàn')
+    expect(m.scoringLines({ format: 'RANKED', objective: 'DISTANCE' }).join(' ')).toContain('số ngày chạy')
+  })
+})

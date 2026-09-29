@@ -16,9 +16,12 @@ import { cn } from '@/shared/lib/cn'
 import { formatNumber, formatPace } from '@/shared/lib/format'
 import { challengeErrorMessage, setChallengeRecurrence, type ChallengeDetail, type LeaderboardEntry, type TeamStanding } from '../../api/challengeApi'
 import {
-  AUDIENCE_LABEL, challengePhase, FORMAT_META, formatScore, OBJECTIVE_META, planStatus, RECURRENCE_LABEL, rewardSummary, TEAM_MODE_META, timeLabel,
+  AUDIENCE_LABEL, challengePhase, FORMAT_META, formatScore, isConquest, OBJECTIVE_META, planStatus, RECURRENCE_LABEL, rewardSummary, scoringLines, TEAM_MODE_META, timeLabel,
   type Recurrence, type TeamMode,
 } from '../../model/challenge'
+import { ConquestPanel } from './ConquestPanel'
+import { MemberDaysSheet } from './MemberDaysSheet'
+import { ChallengeBoostDays, RegDeadlineCard } from './ChallengeExtras'
 import { useChallenge, useChallengeActions } from '../../hooks/useChallenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
 import { PledgePanel } from './PledgePanel'
@@ -34,6 +37,8 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
   const { detail, leaderboard, teams } = useChallenge(id, code)
   const [tab, setTab] = useState<'RANK' | 'RULES' | 'HONOR'>(useSearchParams().get('tab') === 'honor' ? 'HONOR' : 'RANK')
   const honor = useHonor(id, !!detail.data)
+  // Bấm một người trên BXH → chi tiết từng ngày, từng bài
+  const [pick, setPick] = useState<string | null>(null)
 
   if (detail.isLoading) return <DetailSkeleton />
   if (detail.isError || !detail.data) {
@@ -101,12 +106,17 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
         { value: 'RULES', label: 'Luật chơi' }]} />
       {tab === 'HONOR' && showHonor ? <HonorPanel d={d} participants={leaderboard.data ?? []} />
         : tab === 'RANK' || tab === 'HONOR'
-        ? c.pledge_enabled
-          ? <PledgePanel d={d} />
-          : <Leaderboard d={d} rows={leaderboard.data} loading={leaderboard.isLoading} error={leaderboard.isError} standings={standings} />
+        ? isConquest(c.objective)
+          ? <ConquestPanel d={d} onPick={setPick} />
+          : c.pledge_enabled
+          ? <PledgePanel d={d} onPick={setPick} />
+          : <Leaderboard d={d} rows={leaderboard.data} loading={leaderboard.isLoading} error={leaderboard.isError} standings={standings} onPick={setPick} />
         : <div className="space-y-3"><Rules d={d} />
+            {c.format !== 'DUEL' && c.max_slots > 1 && <RegDeadlineCard d={d} />}
+            <ChallengeBoostDays d={d} />
             <RulesInfoCard challengeId={c.id} rules={c.rules_info} updatedAt={c.rules_updated_at}
               canEdit={d.can_manage && (phase === 'UPCOMING' || phase === 'LIVE')} /></div>}
+      <MemberDaysSheet challengeId={c.id} userId={pick} onClose={() => setPick(null)} />
       {tab !== 'RULES' && tab !== 'HONOR' && <TopSupported challengeId={c.id} />}
       {tab === 'RANK' && <ChallengeVouchers challengeId={c.id} canManage={d.can_manage} />}
       {tab === 'RANK' && <DrawPanel scope="CHALLENGE" refId={c.id} canManage={d.can_manage} />}
@@ -187,6 +197,7 @@ function ProgressHero({ d, phase, standings }: { d: ChallengeDetail; phase: Retu
   if (!d.me) return null
   const score = d.me.current_progress
   if (c.pledge_enabled && !target) return null        // chưa chọn mục tiêu → thẻ chọn mục tiêu ở dưới
+  if (isConquest(c.objective)) return null            // chinh phục: thẻ "Hạng mục của bạn" ở tab BXH
   const plan = phase === 'LIVE' ? planStatus({ ...c, target_value: target }, score) : null
   return (
     <Card className="flex items-center gap-4">
@@ -256,10 +267,15 @@ function MiniStat({ icon: Icon, label, value, tone }: { icon: typeof Users; labe
   )
 }
 
-function Leaderboard({ d, rows, loading, error, standings }: {
-  d: ChallengeDetail; rows?: LeaderboardEntry[]; loading: boolean; error: boolean; standings: TeamStanding[]
+type SortKey = 'SCORE' | 'DAYS' | 'RUNS'
+const SORT_LABEL: Record<SortKey, string> = { SCORE: 'Điểm', DAYS: 'Số ngày chạy', RUNS: 'Số buổi' }
+
+function Leaderboard({ d, rows, loading, error, standings, onPick }: {
+  d: ChallengeDetail; rows?: LeaderboardEntry[]; loading: boolean; error: boolean; standings: TeamStanding[]; onPick: (userId: string) => void
 }) {
   const [team, setTeam] = useState<string | 'ALL'>('ALL')
+  // Xếp hạng lại theo số ngày chạy / số buổi (vd thử thách cộng đồng: ai chạy đều nhất)
+  const [sort, setSort] = useState<SortKey>('SCORE')
   const [q, setQ] = useState('')
   const [doneMode, setDoneMode] = useDoneFilter()
   const [now] = useState(() => Date.now())
@@ -271,7 +287,10 @@ function Leaderboard({ d, rows, loading, error, standings }: {
   const ended = now >= Date.parse(c.end_date)
   const inTeamAll = (rows ?? []).filter((r) => team === 'ALL' || r.team_id === team)
   const inTeam = !hasGoal || doneMode === 'ALL' ? inTeamAll : inTeamAll.filter((r) => (doneMode === 'DONE') === !!r.completed_at)
-  const list = filterSearch(inTeam, q, (r) => [r.display_name])
+  const sorted = sort === 'SCORE' ? inTeam : [...inTeam].sort((a, b) => sort === 'DAYS'
+    ? b.streak_days - a.streak_days || b.score - a.score : b.run_count - a.run_count || b.score - a.score)
+  const rankOf = new Map(sorted.map((r, i) => [r.participant_id, sort === 'SCORE' ? r.rank : i + 1]))
+  const list = filterSearch(sorted, q, (r) => [r.display_name])
   const meRow = d.me ? (rows ?? []).find((r) => r.participant_id === d.me?.id) : undefined
   const teamOf = new Map(standings.map((t) => [t.team_id, t]))
   return (
@@ -283,6 +302,17 @@ function Leaderboard({ d, rows, loading, error, standings }: {
               className={cn('flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm font-medium',
                 team === t.team_id ? 'border-fg bg-surface-2' : 'border-border text-fg-muted')}>
               <span className="size-2.5 rounded-full" style={{ background: t.color }} aria-hidden />{t.name}
+            </button>
+          ))}
+        </div>
+      )}
+      {(rows?.length ?? 0) > 1 && c.format !== 'DUEL' && (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]" role="radiogroup" aria-label="Xếp hạng theo">
+          <span className="shrink-0 text-xs text-fg-subtle">Xếp theo</span>
+          {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+            <button key={k} type="button" role="radio" aria-checked={sort === k} onClick={() => setSort(k)}
+              className={cn('min-h-9 shrink-0 rounded-full border px-3 text-sm font-medium', sort === k ? 'border-fg bg-surface-2' : 'border-border text-fg-muted')}>
+              {k === 'SCORE' ? (c.objective === 'DISTANCE' ? 'Km' : SORT_LABEL.SCORE) : SORT_LABEL[k]}
             </button>
           ))}
         </div>
@@ -304,10 +334,12 @@ function Leaderboard({ d, rows, loading, error, standings }: {
             const me = r.participant_id === d.me?.id
             const t = r.team_id ? teamOf.get(r.team_id) : undefined
             return (
-              <li key={r.participant_id} id={`lb-${r.participant_id}`} className={cn('flex scroll-mt-20 items-center gap-3 rounded-xl border px-3 py-2.5',
-                me ? 'border-brand/50 bg-brand/10' : 'border-border bg-surface')}>
+              <li key={r.participant_id} id={`lb-${r.participant_id}`} className="scroll-mt-20">
+                <button type="button" onClick={() => onPick(r.user_id)} aria-label={`Chi tiết của ${me ? 'bạn' : r.display_name}`}
+                  className={cn('flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors hover:border-fg-subtle',
+                  me ? 'border-brand/50 bg-brand/10' : 'border-border bg-surface')}>
                 <span className={cn('w-7 text-center font-mono text-sm font-bold',
-                  r.rank === 1 ? 'text-medal-gold' : r.rank === 2 ? 'text-medal-silver' : r.rank === 3 ? 'text-medal-bronze' : 'text-fg-muted')}>{r.rank}</span>
+                  rankOf.get(r.participant_id) === 1 ? 'text-medal-gold' : rankOf.get(r.participant_id) === 2 ? 'text-medal-silver' : rankOf.get(r.participant_id) === 3 ? 'text-medal-bronze' : 'text-fg-muted')}>{rankOf.get(r.participant_id)}</span>
                 <Avatar src={r.avatar_url} name={r.display_name} size="sm" ring={t?.color} />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
@@ -315,10 +347,14 @@ function Leaderboard({ d, rows, loading, error, standings }: {
                     <LevelBadge level={r.level} />
                     {r.completed_at && <Check className="size-4 shrink-0 text-coin" aria-label="Đã hoàn thành" />}
                   </span>
-                  <span className="text-xs text-fg-subtle">{r.run_count} buổi{t ? ` · ${t.name}` : ''}{r.reward_xu > 0 ? ` · +${formatNumber(r.reward_xu)} Xu` : ''}
+                  <span className="text-xs text-fg-subtle">{r.run_count} buổi · {r.streak_days} ngày{t ? ` · ${t.name}` : ''}{r.reward_xu > 0 ? ` · +${formatNumber(r.reward_xu)} Xu` : ''}
                     {hasGoal && !r.completed_at && c.target_value > 0 && <span className="text-danger"> · {ended ? 'thiếu' : 'còn'} {formatScore(c.objective, Math.max(c.target_value - r.score, 0))}</span>}</span>
                 </span>
-                <span className="font-mono tabular font-bold">{formatScore(c.objective, r.score)}</span>
+                <span className="text-right">
+                  <span className="block font-mono tabular font-bold">{sort === 'DAYS' ? `${r.streak_days} ngày` : sort === 'RUNS' ? `${r.run_count} buổi` : formatScore(c.objective, r.score)}</span>
+                  {sort !== 'SCORE' && <span className="block text-[11px] text-fg-subtle">{formatScore(c.objective, r.score)}</span>}
+                </span>
+                </button>
               </li>
             )
           })}
@@ -331,10 +367,11 @@ function Leaderboard({ d, rows, loading, error, standings }: {
 function Rules({ d }: { d: ChallengeDetail }) {
   const c = d.challenge
   const reward = rewardSummary(c)
+  const conquest = isConquest(c.objective)
   const rows: { icon: typeof Route; label: string; value: string }[] = [
     { icon: Trophy, label: 'Tính điểm theo', value: `${OBJECTIVE_META[c.objective]?.label} — ${OBJECTIVE_META[c.objective]?.hint.toLowerCase()}` },
-    ...(c.target_value > 0 ? [{ icon: Crown, label: 'Mục tiêu', value: formatScore(c.objective, c.target_value) }] : []),
-    { icon: Route, label: c.objective === 'STREAK_DAYS' ? 'Tối thiểu mỗi ngày' : 'Tối thiểu mỗi bài', value: `${formatNumber(c.min_km)} km` },
+    ...(c.target_value > 0 && !conquest && !c.pledge_enabled ? [{ icon: Crown, label: 'Mục tiêu', value: formatScore(c.objective, c.target_value) }] : []),
+    ...(conquest ? [] : [{ icon: Route, label: c.objective === 'STREAK_DAYS' ? 'Tối thiểu mỗi ngày' : 'Tối thiểu mỗi bài', value: `${formatNumber(c.min_km)} km` }]),
     { icon: Gauge, label: 'Pace hợp lệ', value: `${formatPace(c.min_pace * 60)} – ${formatPace(c.max_pace * 60)} /km` },
     ...(c.require_hr ? [{ icon: HeartPulse, label: 'Nhịp tim', value: 'Bắt buộc — bài không có dữ liệu nhịp tim không được tính' }] : []),
     ...(c.daily_cap_km ? [{ icon: Timer, label: 'Trần mỗi người mỗi ngày', value: `${formatNumber(c.daily_cap_km)} km` }] : []),
@@ -342,8 +379,13 @@ function Rules({ d }: { d: ChallengeDetail }) {
     ...(c.format === 'TEAM' ? [{ icon: UsersRound, label: 'Cách tính đội', value: TEAM_MODE_META[(c.game_mode ?? 'TEAM_SUM') as TeamMode]?.description ?? '' }] : []),
     ...(reward ? [{ icon: Coins, label: 'Phần thưởng', value: reward }] : []),
   ]
+  const scoring = scoringLines(c)
   return (
     <Card className="space-y-3">
+      <div className="rounded-xl bg-surface-2/60 p-3">
+        <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold"><Info className="size-4 text-brand" aria-hidden />Cách tính điểm</p>
+        <ul className="list-disc space-y-0.5 pl-5 text-xs text-fg-muted">{scoring.map((l) => <li key={l}>{l}</li>)}</ul>
+      </div>
       <ul className="space-y-3">
         {rows.map((r) => (
           <li key={r.label} className="flex gap-3">
@@ -370,7 +412,9 @@ function ActionBar({ d, phase, code }: { d: ChallengeDetail; phase: ReturnType<t
   const open = phase === 'UPCOMING' || phase === 'LIVE'
   const teamLocked = c.format === 'TEAM' && phase !== 'UPCOMING'
   const pickTeam = c.format === 'TEAM' && !c.pledge_enabled       // đua đội theo mục tiêu: ban quản trị chia đội, không tự chọn
-  const canJoin = open && !joined && !teamLocked
+  const [now] = useState(() => Date.now())
+  const regClosed = !!c.reg_deadline && now >= Date.parse(c.reg_deadline) && !d.can_manage
+  const canJoin = open && !joined && !teamLocked && !regClosed
   const canLeave = joined && open && (phase === 'UPCOMING' || (c.format !== 'TEAM' && c.format !== 'DUEL'))
   const canCancel = d.can_manage && open && (phase === 'UPCOMING' || d.stats.participants <= 1)
   const inviteCode = d.invite_code ?? code
@@ -384,13 +428,13 @@ function ActionBar({ d, phase, code }: { d: ChallengeDetail; phase: ReturnType<t
       <div className="fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-md gap-2 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur-md">
         {canJoin ? (
           <Button block size="lg" loading={a.join.isPending}
-            onClick={() => pickTeam ? setSheet('team') : run(a.join.mutateAsync({ code }), c.format === 'DUEL' ? 'Đã nhận lời thách đấu!' : c.pledge_enabled ? 'Đã tham gia. Hãy đăng ký mục tiêu của bạn!' : 'Đã tham gia. Chạy thôi!')}>
+            onClick={() => pickTeam ? setSheet('team') : run(a.join.mutateAsync({ code }), c.format === 'DUEL' ? 'Đã nhận lời thách đấu!' : c.pledge_enabled ? 'Đã tham gia. Hãy đăng ký mục tiêu của bạn!' : isConquest(c.objective) ? 'Đã tham gia. Chọn hạng mục bạn muốn chinh phục!' : 'Đã tham gia. Chạy thôi!')}>
             {pickTeam ? 'Chọn đội và tham gia' : c.format === 'TEAM' ? 'Tham gia và đăng ký mục tiêu' : c.format === 'DUEL' ? 'Nhận lời thách đấu' : 'Tham gia'}
           </Button>
         ) : joined && open ? (
           <Button block size="lg" variant="secondary" onClick={() => setSheet('invite')}><Share2 className="size-4" aria-hidden />Mời bạn cùng tham gia</Button>
         ) : (
-          <p className="flex flex-1 items-center text-sm text-fg-muted">{teamLocked && !joined ? 'Danh sách đội đã khóa.' : ''}</p>
+          <p className="flex flex-1 items-center text-sm text-fg-muted">{teamLocked && !joined ? 'Danh sách đội đã khóa.' : regClosed && !joined && open ? 'Đã hết hạn đăng ký.' : ''}</p>
         )}
         {(canLeave || canCancel || (joined && pickTeam && phase === 'UPCOMING') || (!joined && inviteCode)) && (
           <Button variant="secondary" size="lg" aria-label="Tùy chọn khác" className="w-13 shrink-0 px-0" onClick={() => setSheet('menu')}>

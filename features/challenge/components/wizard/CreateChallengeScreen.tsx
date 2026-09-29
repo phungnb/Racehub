@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { ArrowLeft, CalendarRange, Check, CheckCircle2, ChevronRight, Coins, Flag, Lock, Minus, Plus, Scale, Shield, Swords, Ticket, Users, X } from 'lucide-react'
+import { ArrowLeft, CalendarRange, Check, CheckCircle2, ChevronRight, Coins, Flag, Info, Lock, Minus, Plus, Scale, Shield, Swords, Ticket, User, Users, UsersRound, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useMyProfile } from '@/features/auth'
 import { isStaff, useClubInbox } from '@/features/club'
@@ -13,10 +13,11 @@ import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { capacityTier, creationFee, DEFAULT_POLICY, runPolicyText, xuToVnd } from '@/shared/lib/economy'
 import { routes } from '@/shared/config/routes'
-import { challengeErrorMessage, createChallenge, hasRulesInfo, quoteChallenge, setChallengeOptions, setChallengePledge, setChallengeRecurrence, setChallengeRules, type ChallengeQuote, type ClubChallengeQuota } from '../../api/challengeApi'
+import { challengeErrorMessage, createChallenge, hasRulesInfo, quoteChallenge, setChallengeConquest, setChallengeOptions, setChallengePledge, setChallengeRecurrence, setChallengeRules, setRegDeadline, type ChallengeQuote, type ClubChallengeQuota } from '../../api/challengeApi'
 import { RulesInfoForm } from '../detail/RulesInfo'
 import {
-  AUDIENCE_LABEL, defaultDraft, draftFromTemplate, effectiveSlots, FORMAT_META, formatScore, OBJECTIVE_META, pledgePayload, pledgeSupported, rewardSummary,
+  AUDIENCE_LABEL, COMMUNITY_KINDS, CONQUEST_PRESETS, conquestPayload, defaultDraft, draftFromTemplate, effectiveSlots, FORMAT_META, formatClock, formatScore, isCommunity,
+  isConquest, kmLabel, OBJECTIVE_META, parseClock, pledgePayload, pledgeSupported, rewardSummary, scoringLines,
   isTeamPledge, RECURRENCE_LABEL, recurrenceAllowed, TEAM_MODE_META, validateDraft, weeklyPreset,
   type Audience, type ChallengeDraft, type ChallengeFormat, type DraftErrors, type Objective, type Recurrence, type TeamMode,
 } from '../../model/challenge'
@@ -36,7 +37,7 @@ const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : '')
 /** Ai trả bao nhiêu: phí (sau khi dùng vé) + treo thưởng, tách ví cá nhân / quỹ CLB — khớp create_challenge_v2 */
 function billFor(d: ChallengeDraft, q: ChallengeQuote) {
   const feeDue = q.pass ? 0 : q.fee
-  const reward = d.rewardXu > 0 && d.audience === 'CLUB_ONLY' ? d.rewardXu : 0
+  const reward = d.rewardXu > 0 && d.audience === 'CLUB_ONLY' && !(d.format === 'SOLO_GOAL' && d.personal) ? d.rewardXu : 0
   const fromWallet = q.payer === 'USER' ? feeDue : 0
   const fromClub = (q.payer === 'CLUB' ? feeDue : 0) + reward
   return {
@@ -61,7 +62,7 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
   const set = (patch: Partial<ChallengeDraft>) => setD((prev) => ({ ...prev, ...patch }))
   const balance = Number(profile?.xu ?? 0)
   const quote = useQuery({
-    queryKey: ['challenge-quote', d.format, effectiveSlots(d), d.audience, d.clubId],
+    queryKey: ['challenge-quote', d.format, effectiveSlots(d), d.audience, d.clubId, d.personal],
     queryFn: () => quoteChallenge(d), enabled: step >= 2, placeholderData: keepPreviousData,
   })
   const bill = quote.data ? billFor(d, quote.data) : null
@@ -87,6 +88,15 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
     setBusy(true)
     try {
       const r = await createChallenge(d, key.current)
+      if (isConquest(d.objective)) {
+        // Hạng mục chinh phục bật ngay sau khi tạo (trước khi ai tham gia)
+        await setChallengeConquest(r.challenge_id, conquestPayload(d))
+          .catch((e) => toast.error(`Đã tạo thử thách nhưng chưa lưu được hạng mục: ${challengeErrorMessage(e)}`))
+      }
+      if (d.regDeadline) {
+        await setRegDeadline(r.challenge_id, d.regDeadline)
+          .catch((e) => toast.error(`Đã tạo thử thách nhưng chưa đặt được hạn đăng ký: ${challengeErrorMessage(e)}`))
+      }
       if (d.requireHr) await setChallengeOptions(r.challenge_id, { require_hr: true })
       if (d.pledge.enabled && pledgeSupported(d)) {
         // Bật mục tiêu tự đăng ký ngay sau khi tạo (cùng người tạo, trước khi ai tham gia)
@@ -101,7 +111,7 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
         await setChallengeRecurrence(r.challenge_id, d.recurrence)
           .catch((e) => toast.error(`Đã tạo thử thách nhưng chưa bật được tự lặp lại: ${challengeErrorMessage(e)}`))
       }
-      toast.success(d.audience === 'CLUB_ONLY' ? 'Đã tạo và báo cho cả CLB!' : 'Đã tạo thử thách!')
+      toast.success(d.audience === 'CLUB_ONLY' && !(d.format === 'SOLO_GOAL' && d.personal) ? 'Đã tạo và báo cho cả CLB!' : 'Đã tạo thử thách!')
       router.replace(`/challenges/${r.challenge_id}${r.invite_code ? `?code=${r.invite_code}` : ''}`)
     } catch (e) {
       toast.error(challengeErrorMessage(e))
@@ -153,17 +163,39 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
 
 type StepProps = { d: ChallengeDraft; set: (p: Partial<ChallengeDraft>) => void; errors: DraftErrors }
 
+/** Các hình thức: Chinh phục cá nhân · Cộng đồng · Đồng đội (2 kiểu) · Thách đấu 1-1 · Thách đấu CLB */
+const FORMAT_CHOICES: { format: ChallengeFormat; label: string; description: string }[] = [
+  { format: 'SOLO_GOAL', label: FORMAT_META.SOLO_GOAL.label, description: FORMAT_META.SOLO_GOAL.description },
+  { format: 'COLLECTIVE', label: 'Cộng đồng', description: COMMUNITY_KINDS.map((k) => k.label).join(' · ') + ' — cộng dồn km, BXH theo km hoặc số ngày chạy' },
+  { format: 'TEAM', label: 'Đồng đội', description: 'Chia đội thi đấu, mỗi thử thách có cách tính điểm đội riêng' },
+  { format: 'DUEL', label: FORMAT_META.DUEL.label, description: FORMAT_META.DUEL.description },
+]
+/** Tính điểm theo — mỗi hình thức có lựa chọn riêng */
+export const objectivesFor = (d: Pick<ChallengeDraft, 'format'>): Objective[] =>
+  d.format === 'SOLO_GOAL' ? ['DISTANCE', 'BEST_TIME', 'BEST_PACE', 'STREAK_DAYS']
+    : d.format === 'COLLECTIVE' ? ['DISTANCE']
+    : d.format === 'TEAM' ? ['DISTANCE', 'RUNS', 'DURATION']
+    : ['DISTANCE', 'RUNS', 'DURATION', 'STREAK_DAYS']
+
 function StepType({ d, set, errors, staffClubs }: StepProps & { staffClubs: { club_id: string; name: string; accent_color: string | null }[] }) {
-  const formats = Object.keys(FORMAT_META) as ChallengeFormat[]
   const audiences: Audience[] = staffClubs.length ? ['PUBLIC', 'INVITE_ONLY', 'CLUB_ONLY'] : ['PUBLIC', 'INVITE_ONLY']
   const templateClub = d.clubId ?? staffClubs[0]?.club_id ?? null
+  const solo = d.format === 'SOLO_GOAL'
+  const pick = (fmt: ChallengeFormat, teamPledge = false) => {
+    const allowed = objectivesFor({ format: fmt })
+    set({ format: fmt, objective: teamPledge || !allowed.includes(d.objective) ? 'DISTANCE' : d.objective,
+      audience: fmt === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience,
+      personal: fmt === 'SOLO_GOAL' ? d.personal : false,
+      pledge: { ...d.pledge, enabled: teamPledge || (fmt === 'SOLO_GOAL' && d.pledge.enabled),
+        ...(teamPledge ? { options: [], minKm: 1, maxKm: 1000, capPct: d.pledge.capPct ?? 20 } : {}) } })
+  }
   return (
     <div className="space-y-5">
       {templateClub && (
         <section>
           <p className="mb-2 text-sm font-medium text-fg-muted">Mẫu nhanh cho CLB</p>
           <div className="grid gap-2">
-            <button type="button" onClick={() => set(weeklyPreset(new Date(), templateClub))}
+            <button type="button" onClick={() => set({ ...weeklyPreset(new Date(), templateClub), personal: false })}
               className={cn('rounded-xl border p-3 text-left', d.pledge.enabled && d.format === 'SOLO_GOAL' ? 'border-brand/60 bg-brand/10' : 'border-border bg-surface hover:border-fg-subtle')}>
               <CalendarRange className="mb-1.5 size-5 text-brand" aria-hidden />
               <span className="block text-sm font-semibold">Thử thách tuần</span>
@@ -175,29 +207,38 @@ function StepType({ d, set, errors, staffClubs }: StepProps & { staffClubs: { cl
       <section>
         <p className="mb-2 text-sm font-medium text-fg-muted">Hình thức</p>
         <div role="radiogroup" aria-label="Hình thức" className="grid grid-cols-1 gap-2">
-          {formats.flatMap((f) => (f === 'TEAM' ? [f, 'TEAM_PLEDGE' as const] : [f])).map((f) => {
-            const teamPledge = f === 'TEAM_PLEDGE'
-            const fmt: ChallengeFormat = teamPledge ? 'TEAM' : f
-            const Icon = teamPledge ? Scale : FORMAT_ICON[fmt]
-            // "Đồng đội" (đặt tên đội, tự chọn đội) và "Đua đội theo mục tiêu" (đăng ký km → máy tự chia đội) là 2 lựa chọn riêng
-            const on = d.format === fmt && (fmt !== 'TEAM' || isTeamPledge(d) === teamPledge)
+          {FORMAT_CHOICES.map((f) => {
+            const on = d.format === f.format
+            const Icon = f.format === 'TEAM' ? UsersRound : FORMAT_ICON[f.format]
             return (
-              <button key={f} role="radio" aria-checked={on}
-                onClick={() => set({ format: fmt, objective: fmt === 'TEAM' || fmt === 'COLLECTIVE' ? (teamPledge || d.objective === 'STREAK_DAYS' ? 'DISTANCE' : d.objective) : d.objective,
-                  audience: fmt === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience,
-                  pledge: { ...d.pledge, enabled: teamPledge || (fmt === 'SOLO_GOAL' && d.pledge.enabled),
-                    ...(teamPledge ? { options: [], minKm: 1, maxKm: 1000, capPct: d.pledge.capPct ?? 20 } : {}) } })}
-                className={cn('flex items-center gap-3 rounded-xl border p-3 text-left transition-colors',
-                  on ? 'border-brand/60 bg-brand/10' : 'border-border bg-surface hover:border-fg-subtle')}>
-                <span className={cn('grid size-10 shrink-0 place-items-center rounded-xl', teamPledge ? 'bg-xp/15 text-xp' : FORMAT_TONE[fmt])}><Icon className="size-5" aria-hidden /></span>
-                <span className="flex-1">
-                  <span className="block font-semibold">{teamPledge ? 'Đua đội theo mục tiêu' : FORMAT_META[fmt].label}</span>
-                  <span className="block text-sm text-fg-muted">{teamPledge
-                    ? 'Mỗi người đăng ký km theo sức mình, hệ thống chia đội sao cho tổng mục tiêu các đội bằng nhau'
-                    : FORMAT_META[fmt].description}</span>
-                </span>
-                {on && <Check className="size-5 text-brand" aria-hidden />}
-              </button>
+              <div key={f.format} className={cn('rounded-xl border transition-colors', on ? 'border-brand/60 bg-brand/10' : 'border-border bg-surface hover:border-fg-subtle')}>
+                <button role="radio" aria-checked={on} onClick={() => pick(f.format, f.format === 'TEAM' && on ? isTeamPledge(d) : false)}
+                  className="flex w-full items-center gap-3 p-3 text-left">
+                  <span className={cn('grid size-10 shrink-0 place-items-center rounded-xl', FORMAT_TONE[f.format])}><Icon className="size-5" aria-hidden /></span>
+                  <span className="flex-1">
+                    <span className="block font-semibold">{f.label}</span>
+                    <span className="block text-sm text-fg-muted">{f.description}</span>
+                  </span>
+                  {on && <Check className="size-5 text-brand" aria-hidden />}
+                </button>
+                {/* Đồng đội: 2 kiểu — tự chọn đội / đua đội theo mục tiêu (máy chia đội cân bằng) */}
+                {on && f.format === 'TEAM' && (
+                  <div role="radiogroup" aria-label="Kiểu đồng đội" className="grid gap-2 px-3 pb-3">
+                    {([false, true] as const).map((tp) => {
+                      const sub = isTeamPledge(d) === tp
+                      return (
+                        <button key={String(tp)} role="radio" aria-checked={sub} onClick={() => pick('TEAM', tp)}
+                          className={cn('flex items-start gap-2.5 rounded-lg border p-2.5 text-left', sub ? 'border-xp/60 bg-xp/10' : 'border-border bg-bg/40')}>
+                          {tp ? <Scale className="mt-0.5 size-4 shrink-0 text-xp" aria-hidden /> : <Users className="mt-0.5 size-4 shrink-0 text-xp" aria-hidden />}
+                          <span><span className="block text-sm font-semibold">{tp ? 'Đua đội theo mục tiêu' : 'Chia đội, tự chọn đội'}</span>
+                            <span className="block text-xs text-fg-muted">{tp ? 'Mỗi người đăng ký km theo sức mình, hệ thống chia đội sao cho tổng mục tiêu các đội bằng nhau'
+                              : 'Đặt tên đội, mỗi người tự chọn đội; chọn cách tính điểm đội (tổng, trung bình, gap, chốt đoàn)'}</span></span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             )
           })}
           {/* Nhiều CLB tranh tài: màn riêng (BQT CLB đăng ký cho cả CLB, người thường tạo thì chờ admin duyệt) */}
@@ -214,55 +255,57 @@ function StepType({ d, set, errors, staffClubs }: StepProps & { staffClubs: { cl
 
       <Field label="Tên thử thách" htmlFor="c-title" error={errors.title} hint={`${d.title.trim().length}/120`}>
         <Input id="c-title" value={d.title} onChange={(e) => set({ title: e.target.value })} maxLength={120}
-          placeholder={d.format === 'SOLO_GOAL' ? 'VD: 100 km tháng 10' : d.format === 'DUEL' ? 'VD: Solo 30 km trong tuần' : 'VD: Đại chiến Chim Ưng vs Cá Mập'} />
+          placeholder={solo ? 'VD: Sub 55 phút 10K' : d.format === 'DUEL' ? 'VD: Solo 30 km trong tuần' : d.format === 'COLLECTIVE' ? 'VD: Cùng nhau 1.000 km tháng 10' : 'VD: Đại chiến Chim Ưng vs Cá Mập'} />
       </Field>
       <Field label="Mô tả (không bắt buộc)" htmlFor="c-desc">
         <Textarea id="c-desc" value={d.description} onChange={(e) => set({ description: e.target.value })} maxLength={2000}
           placeholder="Lời nhắn, quà tặng thêm, điểm tập trung…" />
       </Field>
 
-      {(d.format !== 'SOLO_GOAL' || d.pledge.enabled) && (
-        <section>
-          <p className="mb-2 text-sm font-medium text-fg-muted">Ai được tham gia</p>
-          <div role="radiogroup" aria-label="Phạm vi" className="grid gap-2">
-            {audiences.filter((a) => !(d.format === 'DUEL' && a === 'PUBLIC')).map((a) => {
-              const on = d.audience === a
-              const Icon = a === 'PUBLIC' ? Users : a === 'INVITE_ONLY' ? Lock : Shield
-              return (
-                <button key={a} role="radio" aria-checked={on}
-                  onClick={() => set({ audience: a, clubId: a === 'CLUB_ONLY' ? d.clubId ?? staffClubs[0]?.club_id ?? null : null,
-                    rewardSource: a === 'CLUB_ONLY' ? 'CLUB' : 'NONE', rewardXu: a === 'CLUB_ONLY' ? d.rewardXu : 0 })}
-                  className={cn('flex items-center gap-3 rounded-xl border p-3 text-left', on ? 'border-brand/60 bg-brand/10' : 'border-border bg-surface hover:border-fg-subtle')}>
-                  <Icon className={cn('size-5', on ? 'text-brand' : 'text-fg-subtle')} aria-hidden />
-                  <span className="flex-1">
-                    <span className="block text-sm font-semibold">{AUDIENCE_LABEL[a]}</span>
-                    <span className="block text-xs text-fg-muted">
-                      {a === 'PUBLIC' ? 'Hiện ở mục Khám phá, ai cũng vào được' : a === 'INVITE_ONLY' ? 'Ẩn khỏi Khám phá, chỉ vào được bằng link có mã' : 'Chỉ thành viên CLB; ban quản trị tạo, phí và thưởng trích quỹ CLB'}
-                    </span>
-                  </span>
-                  {on && <Check className="size-5 text-brand" aria-hidden />}
-                </button>
-              )
-            })}
-          </div>
-          {d.audience === 'CLUB_ONLY' && (
-            <div className="mt-3 space-y-1.5">
-              <p className="text-sm font-medium text-fg-muted">CLB tổ chức</p>
-              <div className="flex flex-wrap gap-2">
-                {staffClubs.map((c) => (
-                  <button key={c.club_id} onClick={() => set({ clubId: c.club_id })} aria-pressed={d.clubId === c.club_id}
-                    className={cn('flex min-h-10 items-center gap-2 rounded-full border px-3 text-sm font-medium',
-                      d.clubId === c.club_id ? 'border-fg bg-surface-2' : 'border-border text-fg-muted')}>
-                    <Shield className="size-4" style={{ color: c.accent_color ?? undefined }} aria-hidden />{c.name}
-                  </button>
-                ))}
-              </div>
-              {errors.clubId && <p role="alert" className="text-xs text-danger">{errors.clubId}</p>}
-            </div>
+      <section>
+        <p className="mb-2 text-sm font-medium text-fg-muted">Ai được tham gia</p>
+        <div role="radiogroup" aria-label="Phạm vi" className="grid gap-2">
+          {solo && (
+            <AudienceOption on={d.personal} icon={User} label="Cá nhân tôi" text="Mục tiêu của riêng bạn, không ai khác tham gia, không hiện ở Khám phá · luôn miễn phí"
+              onClick={() => set({ personal: true, pledge: { ...d.pledge, enabled: false }, rewardXu: 0, rewardSource: 'NONE' })} />
           )}
-        </section>
-      )}
+          {audiences.filter((a) => !(d.format === 'DUEL' && a === 'PUBLIC')).map((a) => (
+            <AudienceOption key={a} on={(!solo || !d.personal) && d.audience === a} icon={a === 'PUBLIC' ? Users : a === 'INVITE_ONLY' ? Lock : Shield}
+              label={AUDIENCE_LABEL[a]}
+              text={a === 'PUBLIC' ? 'Hiện ở mục Khám phá, ai cũng vào được' : a === 'INVITE_ONLY' ? 'Ẩn khỏi Khám phá, chỉ vào được bằng link có mã' : 'Chỉ thành viên CLB; ban quản trị tạo, phí và thưởng trích quỹ CLB'}
+              onClick={() => set({ audience: a, personal: false, clubId: a === 'CLUB_ONLY' ? d.clubId ?? staffClubs[0]?.club_id ?? null : null,
+                pledge: solo && d.personal && d.objective === 'DISTANCE' ? { ...d.pledge, enabled: true } : d.pledge,
+                rewardSource: a === 'CLUB_ONLY' ? 'CLUB' : 'NONE', rewardXu: a === 'CLUB_ONLY' ? d.rewardXu : 0 })} />
+          ))}
+        </div>
+        {d.audience === 'CLUB_ONLY' && !(solo && d.personal) && (
+          <div className="mt-3 space-y-1.5">
+            <p className="text-sm font-medium text-fg-muted">CLB tổ chức</p>
+            <div className="flex flex-wrap gap-2">
+              {staffClubs.map((c) => (
+                <button key={c.club_id} onClick={() => set({ clubId: c.club_id })} aria-pressed={d.clubId === c.club_id}
+                  className={cn('flex min-h-10 items-center gap-2 rounded-full border px-3 text-sm font-medium',
+                    d.clubId === c.club_id ? 'border-fg bg-surface-2' : 'border-border text-fg-muted')}>
+                  <Shield className="size-4" style={{ color: c.accent_color ?? undefined }} aria-hidden />{c.name}
+                </button>
+              ))}
+            </div>
+            {errors.clubId && <p role="alert" className="text-xs text-danger">{errors.clubId}</p>}
+          </div>
+        )}
+      </section>
     </div>
+  )
+}
+
+function AudienceOption({ on, icon: Icon, label, text, onClick }: { on: boolean; icon: typeof Users; label: string; text: string; onClick: () => void }) {
+  return (
+    <button role="radio" aria-checked={on} onClick={onClick}
+      className={cn('flex items-center gap-3 rounded-xl border p-3 text-left', on ? 'border-brand/60 bg-brand/10' : 'border-border bg-surface hover:border-fg-subtle')}>
+      <Icon className={cn('size-5', on ? 'text-brand' : 'text-fg-subtle')} aria-hidden />
+      <span className="flex-1"><span className="block text-sm font-semibold">{label}</span><span className="block text-xs text-fg-muted">{text}</span></span>
+      {on && <Check className="size-5 text-brand" aria-hidden />}
+    </button>
   )
 }
 
@@ -287,19 +330,21 @@ function NumberField({ label, value, onChange, unit, step = 1, min = 0, max, err
 }
 
 function StepRules({ d, set, errors }: StepProps) {
-  const objectives = (Object.keys(OBJECTIVE_META) as Objective[])
-    .filter((o) => !(o === 'STREAK_DAYS' && (d.format === 'TEAM' || d.format === 'COLLECTIVE')))
+  const objectives = objectivesFor(d)
   const unit = OBJECTIVE_META[d.objective].unit
-  const needTarget = d.format === 'SOLO_GOAL' || d.format === 'COLLECTIVE'
+  const conquest = isConquest(d.objective)
+  const community = isCommunity(d.format)
+  const needTarget = d.format === 'SOLO_GOAL'
   const pledge = d.pledge.enabled && pledgeSupported(d)
   return (
     <div className="space-y-5">
-      {!isTeamPledge(d) && <section>
+      {!isTeamPledge(d) && objectives.length > 1 && <section>
         <p className="mb-2 text-sm font-medium text-fg-muted">Tính điểm theo</p>
         <div role="radiogroup" aria-label="Tính điểm theo" className="grid grid-cols-2 gap-2">
           {objectives.map((o) => (
             <button key={o} role="radio" aria-checked={d.objective === o}
-              onClick={() => set({ objective: o, minKm: o === 'STREAK_DAYS' ? Math.max(d.minKm, 2) : d.minKm })}
+              onClick={() => set({ objective: o, minKm: o === 'STREAK_DAYS' ? Math.max(d.minKm, 2) : d.minKm,
+                pledge: isConquest(o) ? { ...d.pledge, enabled: false } : d.pledge })}
               className={cn('rounded-xl border p-3 text-left', d.objective === o ? 'border-brand/60 bg-brand/10' : 'border-border bg-surface')}>
               <span className="block text-sm font-semibold">{OBJECTIVE_META[o].label}</span>
               <span className="block text-xs text-fg-muted">{OBJECTIVE_META[o].hint}</span>
@@ -308,11 +353,13 @@ function StepRules({ d, set, errors }: StepProps) {
         </div>
       </section>}
 
-      {pledgeSupported(d) && (d.format === 'SOLO_GOAL' || pledge) && <PledgeSection d={d} set={set} error={errors.pledge} />}
+      {conquest && <ConquestSection d={d} set={set} error={errors.conquest} />}
 
-      {!pledge && <NumberField id="c-target" label={needTarget ? 'Mục tiêu' : 'Mục tiêu (không bắt buộc)'} unit={unit} value={d.targetValue}
+      {!conquest && pledgeSupported(d) && (d.format === 'SOLO_GOAL' || pledge) && <PledgeSection d={d} set={set} error={errors.pledge} />}
+
+      {!pledge && !conquest && <NumberField id="c-target" label={needTarget ? 'Mục tiêu' : community ? 'Mốc chung của cộng đồng (không bắt buộc)' : 'Mục tiêu (không bắt buộc)'} unit={unit} value={d.targetValue}
         step={d.objective === 'DISTANCE' ? 5 : 1} onChange={(v) => set({ targetValue: v })} error={errors.targetValue}
-        hint={needTarget ? (d.format === 'COLLECTIVE' ? 'Tổng của cả cộng đồng' : 'Mục tiêu của riêng bạn') : 'Để 0 nếu chỉ xếp hạng ai nhiều hơn'} />}
+        hint={needTarget ? (d.personal ? 'Mục tiêu của riêng bạn' : 'Mục tiêu chung cho mọi người tham gia') : community ? 'Tổng km cả cộng đồng cùng chạm tới. Để 0 nếu chỉ xếp hạng ai nhiều km hơn' : 'Để 0 nếu chỉ xếp hạng ai nhiều hơn'} />}
 
       {d.format === 'TEAM' && pledge && (
         <section className="space-y-2">
@@ -364,6 +411,8 @@ function StepRules({ d, set, errors }: StepProps) {
         </>
       )}
 
+      <ScoringCard d={d} />
+
       <label className="flex items-start gap-3 rounded-xl border border-border bg-surface p-3">
         <input type="checkbox" checked={d.requireHr} onChange={(e) => set({ requireHr: e.target.checked })} className="mt-0.5 size-5 accent-[var(--color-brand)]" />
         <span>
@@ -378,8 +427,8 @@ function StepRules({ d, set, errors }: StepProps) {
       <details className="rounded-[var(--radius-card)] border border-border bg-surface p-4" open={!!(errors.minKm || errors.minPace)}>
         <summary className="cursor-pointer text-sm font-semibold">Luật hợp lệ (chống gian lận)</summary>
         <div className="mt-4 space-y-4">
-          <NumberField id="c-minkm" label={d.objective === 'STREAK_DAYS' ? 'Tối thiểu mỗi ngày' : 'Tối thiểu mỗi bài'} unit="km" step={0.5}
-            value={d.minKm} onChange={(v) => set({ minKm: v })} error={errors.minKm} />
+          {!conquest && <NumberField id="c-minkm" label={d.objective === 'STREAK_DAYS' ? 'Tối thiểu mỗi ngày' : 'Tối thiểu mỗi bài'} unit="km" step={0.5}
+            value={d.minKm} onChange={(v) => set({ minKm: v })} error={errors.minKm} />}
           <div className="space-y-3">
             <NumberField id="c-pmin" label="Pace nhanh nhất" unit="ph/km" step={0.5} min={1} value={d.minPace} onChange={(v) => set({ minPace: v })} error={errors.minPace} />
             <NumberField id="c-pmax" label="Pace chậm nhất" unit="ph/km" step={0.5} min={1} value={d.maxPace} onChange={(v) => set({ maxPace: v })} />
@@ -394,6 +443,97 @@ function StepRules({ d, set, errors }: StepProps) {
         <div className="mt-4"><RulesInfoForm value={d.rules} onChange={(rules) => set({ rules })} /></div>
       </details>
     </div>
+  )
+}
+
+/** Cách tính điểm của loại thử thách đang chọn — nói rõ trước khi tạo */
+function ScoringCard({ d }: { d: ChallengeDraft }) {
+  const lines = scoringLines({
+    format: d.format === 'COLLECTIVE' && !(d.targetValue > 0) ? 'RANKED' : d.format, objective: d.objective,
+    game_mode: isTeamPledge(d) ? 'TEAM_SUM' : d.gameMode, pledge_enabled: d.pledge.enabled && pledgeSupported(d),
+    target_value: d.targetValue, conquest_mode: d.conquest.mode, pledge_cap_pct: d.pledge.capPct, min_km: d.minKm,
+  })
+  return (
+    <section className="rounded-xl border border-border bg-surface-2/50 p-3">
+      <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold"><Info className="size-4 text-brand" aria-hidden />Cách tính điểm</p>
+      <ul className="list-disc space-y-0.5 pl-5 text-xs text-fg-muted">{lines.map((l) => <li key={l}>{l}</li>)}</ul>
+    </section>
+  )
+}
+
+/**
+ * Chinh phục thời gian / pace: nhiều hạng mục (5K, 10K, Half, Full, tự đặt).
+ * Lựa chọn 1: người tạo đặt mục tiêu từng hạng mục, người chơi đăng ký hạng mục.
+ * Lựa chọn 2: người chơi tự đăng ký mục tiêu của mình.
+ */
+function ConquestSection({ d, set, error }: { d: ChallengeDraft; set: (p: Partial<ChallengeDraft>) => void; error?: string }) {
+  const c = d.conquest
+  const pace = d.objective === 'BEST_PACE'
+  const setC = (patch: Partial<ChallengeDraft['conquest']>) => set({ conquest: { ...c, ...patch } })
+  const setCat = (i: number, patch: Partial<ChallengeDraft['conquest']['categories'][number]>) =>
+    setC({ categories: c.categories.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
+  const add = (label: string, km: number, target: string) => {
+    if (c.categories.length >= 8) return
+    const name = c.categories.some((x) => x.label === label) ? `${label} (${c.categories.length + 1})` : label
+    setC({ categories: [...c.categories, { label: name, km, target }] })
+  }
+  return (
+    <section className="space-y-4 rounded-[var(--radius-card)] border border-brand/50 bg-brand/5 p-4">
+      <div>
+        <p className="flex items-center gap-1.5 font-semibold"><Flag className="size-4 text-brand" aria-hidden />{pace ? 'Chinh phục pace' : 'Chinh phục thời gian'} — các hạng mục</p>
+        <p className="text-xs text-fg-muted">Tạo một lần nhiều hạng mục. Người chơi chọn hạng mục muốn chinh phục (một hay nhiều).</p>
+      </div>
+      <div role="radiogroup" aria-label="Ai đặt mục tiêu" className="grid grid-cols-2 gap-2">
+        {(['FIXED', 'SELF'] as const).map((m) => (
+          <button key={m} type="button" role="radio" aria-checked={c.mode === m} onClick={() => setC({ mode: m })}
+            className={cn('rounded-xl border p-2.5 text-left', c.mode === m ? 'border-brand/60 bg-brand/10' : 'border-border bg-surface')}>
+            <span className="block text-sm font-semibold">{m === 'FIXED' ? 'Người tạo đặt mục tiêu' : 'Người chơi tự đăng ký'}</span>
+            <span className="block text-xs text-fg-muted">{m === 'FIXED' ? `Bạn đặt ${pace ? 'pace' : 'thời gian'} cho từng hạng mục; người tham gia đăng ký hạng mục`
+              : `Mỗi người tự nhập ${pace ? 'pace' : 'thời gian'} mục tiêu của mình`}</span>
+          </button>
+        ))}
+      </div>
+      <ul className="space-y-2">
+        {c.categories.map((x, i) => (
+          <li key={i} className="space-y-2 rounded-xl border border-border bg-surface p-2.5">
+            <div className="flex items-center gap-2">
+              <Input aria-label={`Tên hạng mục ${i + 1}`} value={x.label} maxLength={40} className="font-semibold" onChange={(e) => setCat(i, { label: e.target.value })} />
+              <div className="relative w-28 shrink-0">
+                <Input aria-label={`Cự ly hạng mục ${i + 1}`} inputMode="decimal" className="pr-9 font-mono" value={String(x.km).replace('.', ',')}
+                  onChange={(e) => { const v = Number(e.target.value.replace(',', '.')); if (!Number.isNaN(v)) setCat(i, { km: v }) }} />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-fg-subtle">km</span>
+              </div>
+              {c.categories.length > 1 && (
+                <button type="button" aria-label={`Bỏ hạng mục ${x.label}`} onClick={() => setC({ categories: c.categories.filter((_, j) => j !== i) })}
+                  className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-subtle hover:bg-surface-2"><X className="size-4" aria-hidden /></button>
+              )}
+            </div>
+            {c.mode === 'FIXED' && (
+              <label className="flex items-center gap-2 text-sm">
+                <span className="w-28 shrink-0 text-fg-muted">{pace ? 'Pace ≤' : 'Thời gian ≤'}</span>
+                <Input aria-label={`Mục tiêu hạng mục ${x.label}`} inputMode="numeric" className="font-mono" value={x.target}
+                  placeholder={pace ? '6:00' : '1:00:00'} onChange={(e) => setCat(i, { target: e.target.value })} />
+                <span className="shrink-0 text-xs text-fg-subtle">{pace ? '/km' : parseClock(x.target) && x.km > 0 ? `≈ ${formatClock((parseClock(x.target) ?? 0) / x.km)}/km` : ''}</span>
+              </label>
+            )}
+          </li>
+        ))}
+      </ul>
+      {c.categories.length < 8 && (
+        <div className="flex flex-wrap gap-2">
+          {CONQUEST_PRESETS.map((p) => (
+            <Button key={p.label} type="button" size="sm" variant="secondary" onClick={() => add(p.label, p.km, pace ? p.pace : p.time)}>
+              <Plus className="size-4" aria-hidden />{p.label}
+            </Button>
+          ))}
+          <Button type="button" size="sm" variant="secondary" onClick={() => add('Tự đặt', 15, pace ? '6:00' : '1:30:00')}><Plus className="size-4" aria-hidden />Tự đặt</Button>
+        </div>
+      )}
+      <p className="text-xs text-fg-muted">
+        Kết quả = bài chạy tốt nhất có cự ly ≥ hạng mục ({pace ? 'pace trung bình của bài' : 'thời gian quy đổi theo pace trung bình'}). VD bài {kmLabel(10.2)} trong 54:24 tính cho 10K là 53:20.
+      </p>
+      {error && <p role="alert" className="text-xs text-danger">{error}</p>}
+    </section>
   )
 }
 
@@ -485,7 +625,7 @@ function PledgeSection({ d, set, error }: { d: ChallengeDraft; set: (p: Partial<
 
 function StepTime({ d, set, errors, balance, quote }: StepProps & { balance: number; quote?: ChallengeQuote }) {
   const quick = [{ label: '1 tuần', days: 7 }, { label: '2 tuần', days: 14 }, { label: '1 tháng', days: 30 }]
-  const clubPays = d.audience === 'CLUB_ONLY'
+  const clubPays = d.audience === 'CLUB_ONLY' && !(d.format === 'SOLO_GOAL' && d.personal)
   const fund = clubPays ? (quote?.payer === 'CLUB' ? quote.payerBalance : 0) : (quote?.walletBalance ?? balance)
   const policy = quote?.policy ?? DEFAULT_POLICY
   const tiers = policy.capacityTiers
@@ -510,6 +650,17 @@ function StepTime({ d, set, errors, balance, quote }: StepProps & { balance: num
         <Field label="Kết thúc" htmlFor="c-end" error={errors.end}>
           <Input id="c-end" type="datetime-local" value={toLocalInput(d.end)} onChange={(e) => set({ end: fromLocalInput(e.target.value) })} />
         </Field>
+        {!(d.format === 'SOLO_GOAL' && d.personal) && (
+          <Field label="Hạn đăng ký (không bắt buộc)" htmlFor="c-reg" error={errors.regDeadline}
+            hint={d.format === 'TEAM' ? 'Mặc định: đến giờ xuất phát (đội khóa khi bắt đầu)'
+              : 'Mặc định: đến khi kết thúc. Sửa được sau khi tạo. Ai tham gia trễ vẫn được tính mọi bài chạy từ ngày bắt đầu.'}>
+            <div className="flex gap-2">
+              <Input id="c-reg" type="datetime-local" value={d.regDeadline ? toLocalInput(d.regDeadline) : ''}
+                onChange={(e) => set({ regDeadline: e.target.value ? fromLocalInput(e.target.value) : null })} />
+              {d.regDeadline && <Button type="button" variant="ghost" className="shrink-0" onClick={() => set({ regDeadline: null })}>Bỏ</Button>}
+            </div>
+          </Field>
+        )}
         {d.format !== 'DUEL' && (
           <Field label="Tự lặp lại" htmlFor="c-recur"
             hint={d.recurrence === 'NONE' ? 'Hết kỳ, hệ thống tự mở kỳ mới cùng luật — không phải tạo lại mỗi tuần'
@@ -523,7 +674,7 @@ function StepTime({ d, set, errors, balance, quote }: StepProps & { balance: num
         )}
       </section>
 
-      {d.format !== 'DUEL' && (d.format !== 'SOLO_GOAL' || d.pledge.enabled) && (
+      {d.format !== 'DUEL' && (d.format !== 'SOLO_GOAL' || !d.personal) && (
         <section className="space-y-2">
           <p className="text-sm font-medium text-fg-muted">{quote?.bestPassSlots ? `Quy mô · ${planName ?? 'gói của bạn'} miễn phí tới ${formatNumber(quote.bestPassSlots)} người` : 'Quy mô (phí thu một lần, không phụ thuộc thời gian)'}</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Chọn quy mô">
@@ -573,7 +724,7 @@ function StepTime({ d, set, errors, balance, quote }: StepProps & { balance: num
         <NumberField id="c-reward" label="Treo thưởng" unit="Xu" step={50} max={100000} value={d.rewardXu} onChange={(v) => set({ rewardXu: v })}
           error={errors.rewardXu ?? (quote && d.rewardXu > fund ? `${clubPays ? 'Quỹ CLB' : 'Ví của bạn'} chỉ có ${formatCoin(fund)} Xu` : undefined)}
           hint="Trừ quỹ CLB ngay khi tạo, hoàn lại nếu không ai đạt hoặc thử thách bị hủy" />
-        {d.format === 'RANKED' && d.rewardXu > 0 && (
+        {isCommunity(d.format) && !(d.targetValue > 0) && d.rewardXu > 0 && (
           <div role="radiogroup" aria-label="Cách chia thưởng" className="grid grid-cols-2 gap-2">
             {(['WINNER', 'TOP3'] as const).map((s) => (
               <button key={s} role="radio" aria-checked={d.rewardSplit === s} onClick={() => set({ rewardSplit: s })}
@@ -587,7 +738,7 @@ function StepTime({ d, set, errors, balance, quote }: StepProps & { balance: num
         <p className="text-xs text-fg-subtle">RaceHub không có cược giữa người chơi: chỉ quỹ CLB được treo thưởng.</p>
       </section>
       ) : (
-        <p className="text-xs text-fg-subtle">Thử thách cá nhân không treo thưởng Xu. Người hoàn thành vẫn nhận Xu & XP từ km chạy như thường.</p>
+        <p className="text-xs text-fg-subtle">Chỉ thử thách nội bộ CLB mới treo thưởng Xu (trích quỹ CLB). Người hoàn thành vẫn nhận Xu & XP từ km chạy như thường.</p>
       )}
     </div>
   )
@@ -601,17 +752,23 @@ function StepReview({ d, quote, bill, loading, failed, quoteError, onRetry, club
   const Icon = FORMAT_ICON[d.format]
   const days = Math.max(1, Math.round((Date.parse(d.end) - Date.parse(d.start)) / DAY))
   const perDay = d.targetValue > 0 ? d.targetValue / days : 0
-  const summary = useMemo(() => rewardSummary({ reward_xu: d.rewardXu, reward_split: d.format === 'RANKED' ? d.rewardSplit : d.format === 'TEAM' ? 'TEAM' : d.format === 'DUEL' ? 'WINNER' : 'FINISHERS', format: d.format }), [d])
+  const ranked = isCommunity(d.format) && !(d.targetValue > 0)
+  const summary = useMemo(() => rewardSummary({ reward_xu: d.rewardXu, reward_split: ranked ? d.rewardSplit : d.format === 'TEAM' ? 'TEAM' : d.format === 'DUEL' ? 'WINNER' : 'FINISHERS', format: ranked ? 'RANKED' : d.format }), [d, ranked])
+  const conquest = isConquest(d.objective)
   return (
     <div className="space-y-4">
       <Card className="space-y-3">
         <div className="flex items-center gap-3">
           <span className={cn('grid size-11 place-items-center rounded-xl', FORMAT_TONE[d.format])}><Icon className="size-5" aria-hidden /></span>
-          <div className="min-w-0"><p className="text-xs font-semibold text-fg-muted">{isTeamPledge(d) ? 'Đua đội theo mục tiêu' : `${FORMAT_META[d.format].label}${d.format === 'TEAM' ? ` · ${TEAM_MODE_META[d.gameMode].label}` : ''}`}</p>
+          <div className="min-w-0"><p className="text-xs font-semibold text-fg-muted">{isTeamPledge(d) ? 'Đồng đội · Đua đội theo mục tiêu' : `${FORMAT_META[d.format].label}${d.format === 'TEAM' ? ` · ${TEAM_MODE_META[d.gameMode].label}` : ''}${d.format === 'SOLO_GOAL' && d.personal ? ' · Cá nhân tôi' : ''}${ranked ? ' · Xếp hạng' : ''}`}</p>
             <p className="truncate text-lg font-bold">{d.title}</p></div>
         </div>
         <ul className="space-y-1.5 text-sm">
-          {d.pledge.enabled && pledgeSupported(d) ? (
+          {conquest ? (
+            <li><span className="text-fg-subtle">{OBJECTIVE_META[d.objective].label}: </span>
+              {d.conquest.categories.map((x) => `${x.label} (${kmLabel(x.km)})${d.conquest.mode === 'FIXED' ? ` ≤ ${x.target}${d.objective === 'BEST_PACE' ? '/km' : ''}` : ''}`).join(' · ')}
+              {d.conquest.mode === 'SELF' ? ' · người chơi tự đặt mục tiêu' : ''}</li>
+          ) : d.pledge.enabled && pledgeSupported(d) ? (
             <li><span className="text-fg-subtle">Mục tiêu tự đăng ký: </span>
               {d.pledge.options.length ? d.pledge.options.map((o) => `${o}`).join(' · ') + ' km' : `${d.pledge.minKm}–${d.pledge.maxKm} km`}
               {d.pledge.capPct !== null ? ` · tính vượt tối đa ${d.pledge.capPct}%` : ''}</li>
@@ -619,12 +776,13 @@ function StepReview({ d, quote, bill, loading, failed, quoteError, onRetry, club
             <li><span className="text-fg-subtle">Tính theo: </span>{OBJECTIVE_META[d.objective].label}{d.targetValue > 0 ? ` · mục tiêu ${formatScore(d.objective, d.targetValue)}` : ''}</li>
           )}
           <li><span className="text-fg-subtle">Thời gian: </span>{fmtWhen(d.start)} → {fmtWhen(d.end)} ({days} ngày)</li>
+          {d.regDeadline && <li><span className="text-fg-subtle">Hạn đăng ký: </span>{fmtWhen(d.regDeadline)}</li>}
           {d.recurrence !== 'NONE' && <li><span className="text-fg-subtle">Lặp lại: </span>{RECURRENCE_LABEL[d.recurrence].toLowerCase()} · kỳ mới tự mở cùng luật</li>}
-          {perDay > 0 && <li><span className="text-fg-subtle">Trung bình cần: </span>{formatScore(d.objective, perDay)}/ngày</li>}
-          <li><span className="text-fg-subtle">Phạm vi: </span>{d.audience === 'CLUB_ONLY' ? `Nội bộ ${clubName ?? 'CLB'}` : AUDIENCE_LABEL[d.format === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience]}</li>
+          {perDay > 0 && !conquest && <li><span className="text-fg-subtle">Trung bình cần: </span>{formatScore(d.objective, perDay)}/ngày</li>}
+          <li><span className="text-fg-subtle">Phạm vi: </span>{d.format === 'SOLO_GOAL' && d.personal ? 'Cá nhân tôi' : d.audience === 'CLUB_ONLY' ? `Nội bộ ${clubName ?? 'CLB'}` : AUDIENCE_LABEL[d.format === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience]}</li>
           {d.requireHr && <li><span className="text-fg-subtle">Nhịp tim: </span>Bắt buộc — bài không có nhịp tim không được tính</li>}
           {d.format === 'TEAM' && <li><span className="text-fg-subtle">Đội: </span>{isTeamPledge(d) ? `Tự chia theo số người đăng ký · ${d.pledge.teamSize} người/đội` : d.teamNames.filter((n) => n.trim()).join(' · ')}</li>}
-          <li><span className="text-fg-subtle">Luật: </span>≥ {formatNumber(d.minKm)} km/{d.objective === 'STREAK_DAYS' ? 'ngày' : 'bài'} · pace {d.minPace}–{d.maxPace} ph/km{d.dailyCapKm > 0 ? ` · tối đa ${d.dailyCapKm} km/ngày` : ''}</li>
+          <li><span className="text-fg-subtle">Luật: </span>{conquest ? '' : `≥ ${formatNumber(d.minKm)} km/${d.objective === 'STREAK_DAYS' ? 'ngày' : 'bài'} · `}pace {d.minPace}–{d.maxPace} ph/km{d.dailyCapKm > 0 ? ` · tối đa ${d.dailyCapKm} km/ngày` : ''}</li>
           {summary && <li><span className="text-fg-subtle">Thưởng: </span>{summary}</li>}
           {hasRulesInfo(d.rules) && <li><span className="text-fg-subtle">Thể lệ BTC: </span>
             {[d.rules.prizes && 'thưởng', d.rules.penalties && 'phạt', d.rules.fees && 'lệ phí', d.rules.conduct && 'quy định', d.rules.contact && 'liên hệ',
@@ -666,9 +824,9 @@ function StepReview({ d, quote, bill, loading, failed, quoteError, onRetry, club
                 out.push(<Suggestion key="fund" title="Góp thêm vào quỹ CLB" text="Thành viên có thể góp Xu vào quỹ ở tab Quỹ"
                   action="Mở quỹ" onClick={() => router.push(routes.clubTab(d.clubId!, 'treasury'))} />)
               }
-              if (d.format !== 'SOLO_GOAL' && bill.walletShort > 0) {
-                out.push(<Suggestion key="solo" title="Mục tiêu cá nhân luôn miễn phí" text="Tự đặt mục tiêu cho riêng mình, không mất phí"
-                  action="Đổi" onClick={() => onEdit(0, { format: 'SOLO_GOAL', audience: 'PUBLIC', targetValue: d.targetValue || 50 })} />)
+              if (!(d.format === 'SOLO_GOAL' && d.personal) && bill.walletShort > 0) {
+                out.push(<Suggestion key="solo" title="Chinh phục cá nhân (chỉ mình bạn) luôn miễn phí" text="Tự đặt mục tiêu cho riêng mình, không mất phí"
+                  action="Đổi" onClick={() => onEdit(0, { format: 'SOLO_GOAL', personal: true, audience: 'PUBLIC', pledge: { ...d.pledge, enabled: false }, targetValue: d.targetValue || 50 })} />)
               }
               return out
             })()}
@@ -699,7 +857,7 @@ function CostCard({ d, q, bill, clubName }: { d: ChallengeDraft; q: ChallengeQuo
               ? `Trong hạn mức ${cq.plan === 'PRO' ? 'CLB Pro' : 'CLB miễn phí'}${clubName ? ` của ${clubName}` : ''} · thử thách đang diễn ra ${cq.open}/${cq.max_open}`
               : q.pass && q.fee > 0
               ? `Dùng 1 lượt ${q.plan?.name ?? 'miễn phí'}${q.payer === 'CLUB' ? ` của ${clubName ?? 'CLB'}` : ''} · còn ${q.pass.remaining} lượt tháng này`
-              : d.format === 'SOLO_GOAL' ? 'Mục tiêu cá nhân luôn miễn phí.' : `Quy mô ≤ ${formatNumber(q.tier?.max ?? slots)} người không mất phí.`}
+              : d.format === 'SOLO_GOAL' && d.personal ? 'Chinh phục cá nhân (chỉ mình bạn) luôn miễn phí.' : `Quy mô ≤ ${formatNumber(q.tier?.max ?? slots)} người không mất phí.`}
           </p>
         </div>
       </Card>

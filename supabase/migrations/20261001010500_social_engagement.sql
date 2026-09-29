@@ -122,8 +122,9 @@ create or replace function public.toggle_post_reaction(p_post_id uuid) returns j
 language plpgsql security definer set search_path = public as $$
 declare v_uid uuid := private.require_uid(); p public.club_posts; v_on boolean;
 begin
-  select * into p from public.club_posts where id = p_post_id and deleted_at is null for update;
-  if not found then raise exception 'POST_NOT_FOUND'; end if;
+  perform 1 from public.club_posts where id = p_post_id and deleted_at is null for update;
+  p := (select x from public.club_posts x where x.id = p_post_id and x.deleted_at is null);
+  if p.id is null then raise exception 'POST_NOT_FOUND'; end if;
   if not public.club_is_member(p.club_id) then raise exception 'NOT_A_MEMBER'; end if;
 
   delete from public.club_post_reactions where post_id = p_post_id and user_id = v_uid;
@@ -146,9 +147,8 @@ begin
 
   update public.club_posts
      set reaction_count = (select count(*) from public.club_post_reactions where post_id = p_post_id)
-   where id = p_post_id
-  returning * into p;
-  return jsonb_build_object('reacted', v_on, 'count', p.reaction_count);
+   where id = p_post_id;
+  return jsonb_build_object('reacted', v_on, 'count', (select x.reaction_count from public.club_posts x where x.id = p_post_id));
 end $$;
 
 -- ---------------------------------------------------------------------

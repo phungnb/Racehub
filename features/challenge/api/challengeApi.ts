@@ -78,6 +78,10 @@ export interface Challenge {
   series_id?: string | null
   recur_next_id?: string | null
   recur_error?: string | null
+  /** Chinh phục thời gian / pace: người tạo đặt mục tiêu (FIXED) hay người chơi tự đặt (SELF) — migration 010700 */
+  conquest_mode?: 'FIXED' | 'SELF' | null
+  /** Hạn đăng ký (null = tới khi kết thúc) */
+  reg_deadline?: string | null
 }
 
 /** Thể lệ bổ sung: thưởng, phạt, lệ phí / đóng góp, điều kiện, liên hệ BTC, tối đa 5 mục tự đặt */
@@ -238,7 +242,7 @@ export interface ClubChallengeQuota {
 /** Báo giá tạo thử thách: phí, ai trả, vé miễn phí đang có (quote_challenge, migration 000700) */
 export async function quoteChallenge(d: ChallengeDraft): Promise<ChallengeQuote> {
   const { data, error } = await supabase.rpc('quote_challenge', {
-    p_max_slots: effectiveSlots(d), p_format: d.format, p_club_id: d.audience === 'CLUB_ONLY' ? d.clubId : null,
+    p_max_slots: effectiveSlots(d), p_format: d.format, p_club_id: d.audience === 'CLUB_ONLY' && !(d.format === 'SOLO_GOAL' && d.personal) ? d.clubId : null,
   })
   if (error) throw error
   const q = data as {
@@ -356,6 +360,16 @@ export async function setChallengePledge(id: string, p: ReturnType<typeof pledge
 
 const MESSAGES: Record<string, string> = {
   VIP_REQUIRED: 'Nhân bản thử thách cũ dành cho VIP2 trở lên.',
+  INVALID_CONQUEST: 'Hạng mục chưa hợp lệ: mỗi hạng mục cần tên, cự ly 0,4–250 km và mục tiêu hợp lý (pace 2:00–25:00/km).',
+  CONQUEST_LOCKED: 'Đã có người đăng ký hạng mục — không đổi luật chinh phục được nữa.',
+  CONQUEST_TARGET_LOCKED: 'Thử thách đã bắt đầu: bạn chỉ thêm được hạng mục mới, không bỏ hay đổi mục tiêu đã đăng ký.',
+  CONQUEST_NOT_SUPPORTED: 'Thử thách này không có hạng mục chinh phục.',
+  REGISTRATION_CLOSED: 'Đã hết hạn đăng ký thử thách này.',
+  INVALID_DEADLINE: 'Hạn đăng ký phải từ bây giờ đến trước khi kết thúc (thử thách đội: trước giờ xuất phát).',
+  BOOST_DAY_TOO_LATE: 'Ngày vàng phải là ngày sắp tới, nằm trong thời gian thử thách.',
+  BOOST_DAYS_LIMIT: 'Mỗi thử thách tối đa 10 ngày vàng.',
+  BOOST_NOT_SUPPORTED: 'Ngày vàng chỉ áp dụng cho thử thách tính theo km.',
+  INVALID_MULTIPLIER: 'Hệ số chỉ được ×1,5, ×2 hoặc ×3.',
   REWARD_TOO_LARGE: 'Mỗi thử thách chỉ treo thưởng tối đa 50% số dư quỹ CLB.',
   REWARD_NOT_ALLOWED: 'Chỉ thử thách CLB mới treo thưởng được (trích quỹ CLB). Thử thách cá nhân không treo thưởng Xu.',
   PLEDGES_MISSING: 'Còn thành viên chưa đăng ký mục tiêu. Nhắc họ, hoặc chia đội luôn (người chưa đăng ký tính 0 km).',
@@ -472,3 +486,54 @@ export function challengeErrorMessage(e: unknown): string {
   const key = Object.keys(MESSAGES).find((k) => raw.includes(k))
   return key ? MESSAGES[key] : systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')
 }
+
+/* ---------------- Chinh phục thời gian / pace nhiều hạng mục (migration 010700) ---------------- */
+
+export interface ConquestCategory { id: string; label: string; distance_m: number; target_s: number | null; entrants: number; achieved: number }
+export interface ConquestRow {
+  category_id: string; user_id: string; display_name: string | null; avatar_url: string | null; level: number
+  target_s: number | null; best_time_s: number | null; best_pace_s: number | null; best_activity_id: string | null
+  best_at: string | null; achieved: boolean; rank: number | null; me: boolean
+}
+export interface ConquestBoard {
+  objective: 'BEST_TIME' | 'BEST_PACE'
+  mode: 'FIXED' | 'SELF'
+  categories: ConquestCategory[]
+  rows: ConquestRow[]
+  mine: { category_id: string; target_s: number | null; best_time_s: number | null; best_pace_s: number | null; achieved: boolean }[]
+}
+
+const rpcData = async <T,>(fn: string, args: Record<string, unknown>) => {
+  const { data, error } = await supabase.rpc(fn, args)
+  if (error) throw error
+  return data as T
+}
+const toConquest = (b: ConquestBoard): ConquestBoard => ({
+  ...b, categories: b.categories.map((c) => ({ ...c, distance_m: Number(c.distance_m) })),
+})
+
+export const getConquestBoard = async (id: string) => toConquest(await rpcData<ConquestBoard>('challenge_conquest_board', { p_challenge_id: id }))
+export const setChallengeConquest = async (id: string, p: { objective: 'BEST_TIME' | 'BEST_PACE'; mode: 'FIXED' | 'SELF'; categories: { label: string; distance_km: number; target_s: number | null }[] }) =>
+  toConquest(await rpcData<ConquestBoard>('set_challenge_conquest', { p_challenge_id: id, p }))
+export const setMyConquest = async (id: string, items: { category_id: string; target_s: number | null }[]) =>
+  toConquest(await rpcData<ConquestBoard>('set_my_conquest', { p_challenge_id: id, p: items }))
+
+/** Hạn đăng ký (người tạo sửa được); tham gia trễ vẫn tính mọi bài từ ngày bắt đầu */
+export const setRegDeadline = (id: string, deadline: string) =>
+  rpcData<{ reg_deadline: string }>('set_challenge_reg_deadline', { p_challenge_id: id, p_deadline: deadline })
+
+/** Một người trong thử thách: km từng ngày, từng bài (bài chỉ hiện nếu người đó để công khai) */
+export interface MemberDays {
+  user: { id: string; display_name: string | null; avatar_url: string | null; level: number }
+  summary: { km: number; runs: number; moving_s: number; days: number; score: number; completed_at: string | null; joined_at: string | null }
+  show_activities: boolean
+  days: { day: string; km: number; counted_km: number; runs: number; moving_s: number; boost: number
+    activities: { id: string; title: string | null; started_at: string; distance_m: number; moving_s: number }[] }[]
+}
+export const getMemberDays = (id: string, userId: string) => rpcData<MemberDays>('challenge_member_days', { p_challenge_id: id, p_user_id: userId })
+
+/** Ngày vàng riêng của thử thách */
+export interface ChallengeBoostDay { day: string; multiplier: number; title: string }
+export const getChallengeBoostDays = (id: string) => rpcData<ChallengeBoostDay[]>('challenge_boost_days', { p_challenge_id: id })
+export const setChallengeBoostDay = (id: string, day: string, multiplier: number | null, title: string) =>
+  rpcData<ChallengeBoostDay[]>('set_challenge_boost_day', { p_challenge_id: id, p_day: day, p_multiplier: multiplier, p_title: title })
