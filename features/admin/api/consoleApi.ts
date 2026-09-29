@@ -28,6 +28,9 @@ async function call<T>(fn: string, args: Record<string, unknown> = {}): Promise<
 }
 export const adminInbox = () => call<AdminInbox | null>('admin_inbox')
 export const adminUserDetail = (id: string) => call<AdminUserDetail>('admin_user_detail', { p_user: id })
+export interface AdminAccount { id: string; display_name: string | null; avatar_url: string | null; email: string | null; last_sign_in_at: string | null; granted_at: string | null; is_me: boolean }
+/** Quản trị viên hệ thống hiện tại (migration 011400) */
+export const adminListAdmins = async () => (await call<AdminAccount[]>('admin_list_admins')) ?? []
 export const adminSetUserBan = (id: string, ban: boolean, reason?: string) => call<void>('admin_set_user_ban', { p_user: id, p_ban: ban, p_reason: reason ?? null })
 export const adminSetUserRole = (id: string, role: 'SYSTEM_ADMIN' | 'MEMBER', reason?: string) =>
   call<void>('admin_set_user_role', { p_user: id, p_role: role, p_reason: reason ?? null })
@@ -54,7 +57,7 @@ const MESSAGES: Record<string, string> = {
 }
 export function consoleErrorMessage(e: unknown, fallback = 'Không thực hiện được. Hãy thử lại.'): string {
   const raw = (e as { message?: string } | null)?.message ?? ''
-  const k = Object.keys(MESSAGES).find((x) => raw.includes(x))
+  const k = Object.keys(MESSAGES).sort((a, b) => b.length - a.length).find((x) => raw.includes(x))
   return k ? MESSAGES[k] : fallback
 }
 

@@ -10,7 +10,7 @@ import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import type { AccountHit } from '../../api/adminApi'
-import { adminSetUserBan, adminSetUserRole, adminUserDetail, auditLabel, consoleErrorMessage, type AdminUserDetail } from '../../api/consoleApi'
+import { adminListAdmins, adminSetUserBan, adminSetUserRole, adminUserDetail, auditLabel, consoleErrorMessage, type AdminUserDetail } from '../../api/consoleApi'
 import { AccountPicker } from '../economy/AccountPicker'
 import { inboxKey } from './InboxPanel'
 
@@ -21,11 +21,38 @@ export function UsersTab() {
   const [pick, setPick] = useState<AccountHit | null>(null)
   return (
     <div className="space-y-3">
+      <AdminList onPick={(id, name) => setPick({ kind: 'USER', id, name, subtitle: 'Quản trị viên', balance: 0 })} />
       <AccountPicker id="admin-user" value={pick} onChange={setPick} />
       {!pick ? <p className="text-sm text-fg-muted">Tìm người dùng để xem hồ sơ, số dư, CLB, giao dịch gần đây; khóa tài khoản vi phạm hoặc cấp quyền quản trị.</p>
         : pick.kind === 'CLUB' ? <Card className="text-sm">Đây là CLB — xem ở nhóm <b>Cộng đồng → CLB Pro</b> hoặc <Link className="text-brand underline" href={routes.club(pick.id)}>mở trang CLB</Link>.</Card>
         : <UserDetail id={pick.id} />}
     </div>
+  )
+}
+
+/** Ai đang là quản trị viên hệ thống; cấp thêm: tìm người dùng bên dưới → "Cấp quyền admin" */
+function AdminList({ onPick }: { onPick: (id: string, name: string) => void }) {
+  const q = useQuery({ queryKey: ['admin', 'admins'], queryFn: adminListAdmins })
+  return (
+    <Card className="space-y-2">
+      <p className="flex items-center gap-2 font-semibold"><ShieldCheck className="size-4 text-brand" aria-hidden />Quản trị viên hiện tại{q.data ? ` (${q.data.length})` : ''}</p>
+      {q.isPending ? <Skeleton className="h-12" /> : q.isError ? <p className="text-xs text-danger">{consoleErrorMessage(q.error, 'Không tải được danh sách admin.')}</p> : (
+        <ul className="divide-y divide-border">
+          {q.data.map((a) => (
+            <li key={a.id}>
+              <button type="button" onClick={() => onPick(a.id, a.display_name ?? a.email ?? 'Admin')} className="flex w-full items-center gap-3 py-2 text-left">
+                <Avatar src={a.avatar_url} name={a.display_name} size="sm" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{a.display_name ?? 'Chưa đặt tên'}{a.is_me ? ' (bạn)' : ''}</span>
+                  <span className="block truncate text-xs text-fg-muted">{a.email ?? '—'} · đăng nhập {fmt(a.last_sign_in_at)}{a.granted_at ? ` · cấp quyền ${fmt(a.granted_at)}` : ''}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-xs text-fg-subtle">Cấp thêm admin: tìm người đó ở ô dưới → mở hồ sơ → <b>Cấp quyền admin</b>. Đơn nạp / mua gói của một admin phải do admin khác xác nhận.</p>
+    </Card>
   )
 }
 

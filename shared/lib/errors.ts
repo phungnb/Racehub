@@ -87,7 +87,7 @@ const MESSAGES: Record<string, string> = {
 
 export function errorMessage(err: unknown, fallback?: string) {
   const raw = (err as { message?: string } | null)?.message ?? (typeof err === 'string' ? err : '')
-  const code = Object.keys(MESSAGES).find((k) => raw.includes(k))
+  const code = Object.keys(MESSAGES).sort((a, b) => b.length - a.length).find((k) => raw.includes(k))
   return code ? MESSAGES[code] : fallback ?? systemErrorMessage(err)
 }
 

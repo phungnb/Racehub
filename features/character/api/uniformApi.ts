@@ -72,6 +72,6 @@ const MESSAGES: Record<string, string> = {
 
 export function uniformErrorMessage(e: unknown): string {
   const msg = (e as { message?: string } | null)?.message ?? ''
-  const key = Object.keys(MESSAGES).find((k) => msg.includes(k))
+  const key = Object.keys(MESSAGES).sort((a, b) => b.length - a.length).find((k) => msg.includes(k))
   return key ? MESSAGES[key] : systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')
 }

@@ -188,7 +188,7 @@ const STORAGE_MESSAGES: [RegExp, string][] = [
 
 export function raceErrorMessage(e: unknown): string {
   const msg = (e as { message?: string } | null)?.message ?? ''
-  const code = Object.keys(MESSAGES).find((k) => msg.includes(k))
+  const code = Object.keys(MESSAGES).sort((a, b) => b.length - a.length).find((k) => msg.includes(k))
   if (code) return MESSAGES[code]
   const storage = STORAGE_MESSAGES.find(([re]) => re.test(msg))
   if (storage) return storage[1]

@@ -64,6 +64,6 @@ const MESSAGES: Record<string, string> = {
 }
 export function voucherErrorMessage(e: unknown): string {
   const raw = (e as { message?: string } | null)?.message ?? ''
-  const k = Object.keys(MESSAGES).find((x) => raw.includes(x))
+  const k = Object.keys(MESSAGES).sort((a, b) => b.length - a.length).find((x) => raw.includes(x))
   return k ? MESSAGES[k] : systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')
 }

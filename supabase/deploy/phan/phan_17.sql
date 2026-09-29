@@ -1,5 +1,5 @@
 -- RaceHub — PHẦN 17/18 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 010700, 010800, 010900, 011000, 011100, 011200, 011300
+-- Gồm: 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400
 -- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
 -- Xong thì chạy phần tiếp theo.
 begin;
@@ -1188,5 +1188,30 @@ begin
   values (v_uid, 'CONFIRM_ORDER', o.code, jsonb_build_object('kind', o.kind, 'amount_vnd', o.amount_vnd, 'plan', o.plan_code, 'xu', o.xu));
   return private.order_json((select x from public.orders x where x.id = o.id));
 end $$;
+
+-- ===================================================================
+-- 20261001011400_admin_list.sql
+-- ===================================================================
+-- 011400: DANH SÁCH QUẢN TRỊ VIÊN HỆ THỐNG
+--   Quản trị → Người dùng hiện "Quản trị viên hiện tại" (tên, email, lần đăng nhập gần nhất, ngày được cấp quyền) để biết ai đang
+--   có toàn quyền. Cấp thêm / gỡ quyền: mở hồ sơ người dùng → "Cấp quyền admin" / "Gỡ quyền admin" (đã có, ghi nhật ký).
+-- Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT, không RETURNING INTO. Chạy lại an toàn.
+
+create or replace function public.admin_list_admins() returns jsonb
+language plpgsql stable security definer set search_path = public, auth as $$
+begin
+  perform private.require_admin();
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+            'id', p.id, 'display_name', p.display_name, 'avatar_url', p.avatar_url,
+            'email', u.email, 'last_sign_in_at', u.last_sign_in_at, 'is_me', p.id = auth.uid(),
+            'granted_at', (select max(l.created_at) from public.admin_audit_log l
+                            where l.action = 'USER_ROLE' and l.target = 'user:' || p.id and l.new_value->>'role' = 'SYSTEM_ADMIN'))
+          order by p.display_name), '[]'::jsonb)
+    from public.profiles p left join auth.users u on u.id = p.id
+   where p.role = 'SYSTEM_ADMIN' or p.is_admin is true);
+end $$;
+
+revoke all on function public.admin_list_admins() from public, anon;
+grant execute on function public.admin_list_admins() to authenticated;
 
 commit;

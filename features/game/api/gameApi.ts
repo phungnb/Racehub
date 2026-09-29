@@ -172,7 +172,7 @@ export function gameErrorMessage(e: unknown): string {
   const err = e as { message?: string; code?: string } | null
   console.warn('[Game] Lỗi gốc:', err?.code, err?.message)
   const raw = err?.message ?? ''
-  const key = Object.keys(MESSAGES).find((k) => raw.includes(k))
+  const key = Object.keys(MESSAGES).sort((a, b) => b.length - a.length).find((k) => raw.includes(k))
   return key ? MESSAGES[key] : systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')
 }
 

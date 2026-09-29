@@ -1,7 +1,7 @@
--- RaceHub: gộp 78 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 79 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -20337,6 +20337,31 @@ begin
 end $$;
 
 -- ===================================================================
+-- 20261001011400_admin_list.sql
+-- ===================================================================
+-- 011400: DANH SÁCH QUẢN TRỊ VIÊN HỆ THỐNG
+--   Quản trị → Người dùng hiện "Quản trị viên hiện tại" (tên, email, lần đăng nhập gần nhất, ngày được cấp quyền) để biết ai đang
+--   có toàn quyền. Cấp thêm / gỡ quyền: mở hồ sơ người dùng → "Cấp quyền admin" / "Gỡ quyền admin" (đã có, ghi nhật ký).
+-- Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT, không RETURNING INTO. Chạy lại an toàn.
+
+create or replace function public.admin_list_admins() returns jsonb
+language plpgsql stable security definer set search_path = public, auth as $$
+begin
+  perform private.require_admin();
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+            'id', p.id, 'display_name', p.display_name, 'avatar_url', p.avatar_url,
+            'email', u.email, 'last_sign_in_at', u.last_sign_in_at, 'is_me', p.id = auth.uid(),
+            'granted_at', (select max(l.created_at) from public.admin_audit_log l
+                            where l.action = 'USER_ROLE' and l.target = 'user:' || p.id and l.new_value->>'role' = 'SYSTEM_ADMIN'))
+          order by p.display_name), '[]'::jsonb)
+    from public.profiles p left join auth.users u on u.id = p.id
+   where p.role = 'SYSTEM_ADMIN' or p.is_admin is true);
+end $$;
+
+revoke all on function public.admin_list_admins() from public, anon;
+grant execute on function public.admin_list_admins() to authenticated;
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -20542,7 +20567,9 @@ begin
     jsonb_build_object('file', '20261001011200', 'label', 'Thử thách bị hủy tự ẩn khỏi bảng tin CLB và trang chủ',
       'ok', exists (select 1 from pg_trigger where tgname = 'trg_hide_cancelled_challenge_posts')),
     jsonb_build_object('file', '20261001011300', 'label', 'Admin cũng là VĐV: nhận Xu chạy bộ / nạp tiền, chặn Xu tự cấp (khuyến mãi, cộng tay, giới thiệu, nhiệm vụ)',
-      'ok', private.sc_fn('private', 'admin_credit_allowed')));
+      'ok', private.sc_fn('private', 'admin_credit_allowed')),
+    jsonb_build_object('file', '20261001011400', 'label', 'Danh sách quản trị viên hệ thống trong Quản trị → Người dùng',
+      'ok', to_regprocedure('public.admin_list_admins()') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
