@@ -16,7 +16,7 @@ import { cn } from '@/shared/lib/cn'
 import { formatNumber, formatPace } from '@/shared/lib/format'
 import { challengeErrorMessage, setChallengeRecurrence, type ChallengeDetail, type LeaderboardEntry, type TeamStanding } from '../../api/challengeApi'
 import {
-  AUDIENCE_LABEL, challengePhase, FORMAT_META, formatScore, isConquest, OBJECTIVE_META, planStatus, RECURRENCE_LABEL, rewardSummary, scoringLines, TEAM_MODE_META, timeLabel,
+  AUDIENCE_LABEL, challengePhase, FORMAT_META, formatScore, isCommunity, isConquest, OBJECTIVE_META, planStatus, RECURRENCE_LABEL, rewardSummary, scoringLines, TEAM_MODE_META, timeLabel,
   type Recurrence, type TeamMode,
 } from '../../model/challenge'
 import { ConquestPanel } from './ConquestPanel'
@@ -121,7 +121,7 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
       {tab === 'RANK' && <ChallengeVouchers challengeId={c.id} canManage={d.can_manage} />}
       {tab === 'RANK' && <DrawPanel scope="CHALLENGE" refId={c.id} canManage={d.can_manage} />}
 
-      <ActionBar d={d} phase={phase} code={code ?? null} />
+      {tab !== 'HONOR' && <ActionBar d={d} phase={phase} code={code ?? null} />}
     </div>
   )
 }
@@ -267,8 +267,9 @@ function MiniStat({ icon: Icon, label, value, tone }: { icon: typeof Users; labe
   )
 }
 
-type SortKey = 'SCORE' | 'DAYS' | 'RUNS'
-const SORT_LABEL: Record<SortKey, string> = { SCORE: 'Điểm', DAYS: 'Số ngày chạy', RUNS: 'Số buổi' }
+type SortKey = 'SCORE' | 'DAYS' | 'RUNS' | 'PACE'
+const SORT_LABEL: Record<SortKey, string> = { SCORE: 'Điểm', DAYS: 'Số ngày chạy', RUNS: 'Số buổi', PACE: 'Pace TB' }
+const paceOf = (r: LeaderboardEntry) => (r.distance_m > 0 ? (r.moving_s / r.distance_m) * 1000 : Infinity)
 
 function Leaderboard({ d, rows, loading, error, standings, onPick }: {
   d: ChallengeDetail; rows?: LeaderboardEntry[]; loading: boolean; error: boolean; standings: TeamStanding[]; onPick: (userId: string) => void
@@ -288,7 +289,11 @@ function Leaderboard({ d, rows, loading, error, standings, onPick }: {
   const inTeamAll = (rows ?? []).filter((r) => team === 'ALL' || r.team_id === team)
   const inTeam = !hasGoal || doneMode === 'ALL' ? inTeamAll : inTeamAll.filter((r) => (doneMode === 'DONE') === !!r.completed_at)
   const sorted = sort === 'SCORE' ? inTeam : [...inTeam].sort((a, b) => sort === 'DAYS'
-    ? b.streak_days - a.streak_days || b.score - a.score : b.run_count - a.run_count || b.score - a.score)
+    ? b.streak_days - a.streak_days || b.score - a.score
+    : sort === 'PACE' ? paceOf(a) - paceOf(b) || b.score - a.score
+    : b.run_count - a.run_count || b.score - a.score)
+  // Cộng đồng: bảng nhiều cột như BXH giải chạy online
+  const table = isCommunity(c.format)
   const rankOf = new Map(sorted.map((r, i) => [r.participant_id, sort === 'SCORE' ? r.rank : i + 1]))
   const list = filterSearch(sorted, q, (r) => [r.display_name])
   const meRow = d.me ? (rows ?? []).find((r) => r.participant_id === d.me?.id) : undefined
@@ -309,7 +314,7 @@ function Leaderboard({ d, rows, loading, error, standings, onPick }: {
       {(rows?.length ?? 0) > 1 && c.format !== 'DUEL' && (
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]" role="radiogroup" aria-label="Xếp hạng theo">
           <span className="shrink-0 text-xs text-fg-subtle">Xếp theo</span>
-          {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+          {(Object.keys(SORT_LABEL) as SortKey[]).filter((k) => k !== 'PACE' || c.objective === 'DISTANCE').map((k) => (
             <button key={k} type="button" role="radio" aria-checked={sort === k} onClick={() => setSort(k)}
               className={cn('min-h-9 shrink-0 rounded-full border px-3 text-sm font-medium', sort === k ? 'border-fg bg-surface-2' : 'border-border text-fg-muted')}>
               {k === 'SCORE' ? (c.objective === 'DISTANCE' ? 'Km' : SORT_LABEL.SCORE) : SORT_LABEL[k]}
@@ -328,6 +333,44 @@ function Leaderboard({ d, rows, loading, error, standings, onPick }: {
       {list.length === 0 ? (
         q.trim() ? null : doneMode === 'NOT' && hasGoal ? <EmptyState icon={Check} title="Ai cũng đã hoàn thành!" description="Không còn vận động viên nào chưa đạt mục tiêu." />
           : <EmptyState icon={Trophy} title="Chưa có ai trên bảng" description="Hãy tham gia và chạy bài đầu tiên để lên bảng xếp hạng." />
+      ) : table ? (
+        <div className="overflow-x-auto rounded-[var(--radius-card)] border border-border bg-surface">
+          <table className="w-full min-w-[340px] text-sm">
+            <thead className="bg-surface-2/70 text-[11px] uppercase tracking-wide text-fg-subtle">
+              <tr>
+                <th className="px-2 py-2 text-center font-semibold">#</th>
+                <th className="px-2 py-2 text-left font-semibold">Vận động viên</th>
+                <th className="px-2 py-2 text-right font-semibold">Km</th>
+                <th className="px-2 py-2 text-right font-semibold">Ngày</th>
+                <th className="px-2 py-2 text-right font-semibold">Buổi</th>
+                <th className="px-2 py-2 text-right font-semibold">Pace</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {list.map((r) => {
+                const me = r.participant_id === d.me?.id
+                const rk = rankOf.get(r.participant_id)
+                return (
+                  <tr key={r.participant_id} id={`lb-${r.participant_id}`} onClick={() => onPick(r.user_id)}
+                    className={cn('scroll-mt-20 cursor-pointer hover:bg-surface-2', me && 'bg-brand/10')}>
+                    <td className={cn('px-2 py-2.5 text-center font-mono font-bold', rk === 1 ? 'text-medal-gold' : rk === 2 ? 'text-medal-silver' : rk === 3 ? 'text-medal-bronze' : 'text-fg-muted')}>{rk}</td>
+                    <td className="max-w-0 px-2 py-2.5">
+                      <span className="flex items-center gap-2">
+                        <Avatar src={r.avatar_url} name={r.display_name} size="xs" />
+                        <span className="truncate font-semibold">{me ? 'Bạn' : r.display_name}</span>
+                        {r.completed_at && <Check className="size-3.5 shrink-0 text-coin" aria-label="Đã hoàn thành" />}
+                      </span>
+                    </td>
+                    <td className={cn('px-2 py-2.5 text-right font-mono tabular', sort === 'SCORE' && 'font-bold')}>{formatScore(c.objective, r.score, false)}</td>
+                    <td className={cn('px-2 py-2.5 text-right font-mono tabular', sort === 'DAYS' && 'font-bold')}>{r.streak_days}</td>
+                    <td className={cn('px-2 py-2.5 text-right font-mono tabular', sort === 'RUNS' && 'font-bold')}>{r.run_count}</td>
+                    <td className={cn('px-2 py-2.5 text-right font-mono tabular', sort === 'PACE' && 'font-bold')}>{Number.isFinite(paceOf(r)) ? formatPace(paceOf(r)) : '—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <ol className="space-y-1.5">
           {list.map((r) => {

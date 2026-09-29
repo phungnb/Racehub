@@ -40,9 +40,14 @@ export async function buyShield(key: string) {
 // Quà đốt Xu của người tặng (người nhận không nhận Xu) → không có đường chuyển Xu P2P.
 
 export type GiftTier = 'CHEER' | 'BOOST' | 'HYPE' | 'LEGEND'
+/** Quà tĩnh (hình đứng yên) hoặc quà hiệu ứng động (hoạt ảnh khi tặng) — migration 011000 */
+export type GiftKind = 'STATIC' | 'ANIMATED'
+/** Quà theo mốc: chỉ tặng trên bài đạt mốc */
+export type GiftContext = 'KM5' | 'KM10' | 'HALF' | 'FULL' | 'ULTRA' | 'PR'
 export interface Gift {
   code: string; name: string; emoji: string; price_xu: number; tier: GiftTier; description: string | null
   vip_tier: number; seasonal: boolean; locked: boolean
+  kind: GiftKind; art_url: string | null; context: GiftContext | null
   /** Khuyến mãi đang áp (migration 005100): Tỏa sáng người nhận tính theo Xu thực trả */
   offer?: { kind: string; title: string; badge: string; price: number; eligible: boolean; ends_at: string | null
     left: number | null; per_user_limit: number | null; used: number } | null
@@ -66,12 +71,14 @@ export interface GiftWall {
   top_supporters: { user_id: string; display_name: string | null; avatar_url: string | null; shine: number }[]
 }
 
-export async function getGiftCatalog(): Promise<GiftCatalog> {
-  const { data, error } = await supabase.rpc('gift_catalog')
+/** Bảng quà cho một bài đăng / bài chạy (quà theo mốc chỉ có khi bài đạt mốc) */
+export async function getGiftCatalog(postId?: string | null, activityId?: string | null): Promise<GiftCatalog> {
+  const { data, error } = await supabase.rpc('gift_catalog_for', { p_post_id: postId ?? null, p_activity_id: activityId ?? null })
   if (error) throw error
   const c = (data ?? {}) as GiftCatalog
   return {
-    gifts: (c.gifts ?? []).map((g) => ({ ...g, price_xu: n(g.price_xu), vip_tier: n(g.vip_tier) })),
+    gifts: (c.gifts ?? []).map((g) => ({ ...g, price_xu: n(g.price_xu), vip_tier: n(g.vip_tier), kind: g.kind ?? (g.tier === 'HYPE' || g.tier === 'LEGEND' ? 'ANIMATED' : 'STATIC'),
+      art_url: g.art_url ?? null, context: g.context ?? null })),
     daily_cap: n(c.daily_cap), sent_today: n(c.sent_today),
   }
 }
@@ -139,6 +146,7 @@ const MESSAGES: Record<string, string> = {
   CANNOT_GIFT_SELF: 'Không tự tặng quà cho chính mình được.',
   GIFT_DAILY_LIMIT: 'Bạn đã tặng quà tối đa trong hôm nay. Mai tiếp nhé!',
   GIFT_NOT_AVAILABLE: 'Quà này hiện không còn (hết mùa hoặc đã ngừng).',
+  GIFT_CONTEXT_REQUIRED: 'Quà này chỉ tặng được trên bài chạy đạt đúng mốc (5K, 10K, Half, Full, Ultra hoặc kỷ lục cá nhân).',
   VIP_REQUIRED: 'Quà này dành cho thành viên VIP.',
   INVALID_QTY: 'Số lượng quà không hợp lệ.',
   CHEER_REPLACED_BY_GIFTS: 'Tặng Xu trực tiếp đã được thay bằng Quà tặng. Hãy cập nhật ứng dụng.',

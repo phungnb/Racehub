@@ -13,7 +13,7 @@ import { filterSearch } from '@/shared/lib/search'
 import { cn } from '@/shared/lib/cn'
 import { formatNumber } from '@/shared/lib/format'
 import {
-  cancelRace, getRace, getRaceDashboard, getRaceResults, lookupBib, raceErrorMessage, registerRace, withdrawRace,
+  cancelRace, getRace, getRaceDashboard, getRaceBoard, lookupBib, raceErrorMessage, registerRace, withdrawRace,
   type Race,
 } from '../api/raceApi'
 import { CERT_FORMATS, drawCertificate, resolveCert } from '../model/certificate'
@@ -183,46 +183,87 @@ function Rules() {
   )
 }
 
+const DONE_FILTERS = [['ALL', 'Tất cả'], ['DONE', 'Hoàn thành'], ['NOT', 'Chưa hoàn thành']] as const
+type DoneFilter = (typeof DONE_FILTERS)[number][0]
+
 function Results({ r }: { r: Race }) {
   const [km, setKm] = useState<number>(r.me?.distance_km != null ? Number(r.me.distance_km) : Number(r.distances[0]))
-  const q = useQuery({ queryKey: ['race', r.id, 'results', km], queryFn: () => getRaceResults(r.id, km), refetchInterval: 60_000 })
+  const q = useQuery({ queryKey: ['race', r.id, 'board', km], queryFn: () => getRaceBoard(r.id, km), refetchInterval: 60_000 })
   const [find, setFind] = useState('')
-  const all = q.data ?? []
-  const list = filterSearch(all, find, (x) => [x.display_name, x.bib])
+  const [done, setDone] = useState<DoneFilter>('ALL')
+  const [now] = useState(() => Date.now())
+  const ended = now >= Date.parse(r.end_at)
+  const all = q.data?.rows ?? []
+  const shown = done === 'ALL' ? all : all.filter((x) => (x.rank != null) === (done === 'DONE'))
+  const list = filterSearch(shown, find, (x) => [x.display_name, x.bib])
   const mine = all.find((x) => x.is_me)
   return (
     <section>
       <SectionTitle>Kết quả</SectionTitle>
       <div className="mb-3 flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
-        {r.distances.map((d) => (
-          <button key={d} type="button" aria-pressed={km === Number(d)} onClick={() => setKm(Number(d))}
-            className={cn('shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold', km === Number(d) ? 'border-brand bg-brand text-brand-fg' : 'border-border text-fg-muted')}>
-            {distanceLabel(d)}
-            <span className="ml-1 font-normal opacity-70">{r.per_distance?.find((p) => Number(p.distance_km) === Number(d))?.finished ?? ''}</span>
-          </button>
-        ))}
+        {r.distances.map((d) => {
+          const p = r.per_distance?.find((x) => Number(x.distance_km) === Number(d))
+          return (
+            <button key={d} type="button" aria-pressed={km === Number(d)} onClick={() => setKm(Number(d))}
+              className={cn('shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold', km === Number(d) ? 'border-brand bg-brand text-brand-fg' : 'border-border text-fg-muted')}>
+              {distanceLabel(d)}
+              {p && <span className="ml-1 font-normal opacity-70">{p.finished}/{p.registered}</span>}
+            </button>
+          )
+        })}
       </div>
-      {q.isPending ? <Skeleton className="h-40" /> : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : !q.data.length ? (
-        <EmptyState icon={Timer} title="Chưa có ai hoàn thành" description="Kết quả tự cập nhật khi VĐV có bài chạy hợp lệ." />
+      {q.isPending ? <Skeleton className="h-40" /> : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : !all.length ? (
+        <EmptyState icon={Timer} title="Chưa có ai đăng ký cự ly này" description="Kết quả tự cập nhật khi VĐV có bài chạy hợp lệ." />
       ) : (
         <div className="space-y-2">
-        {all.length > 5 && (
-          <RankSearch value={find} onChange={setFind} total={all.length} matched={list.length} placeholder="Tìm tên hoặc số BIB…"
-            onFindMe={mine ? () => requestAnimationFrame(() => scrollToRow(`race-res-${mine.user_id}`)) : undefined} />
-        )}
-        <ol className="space-y-1.5">
-          {list.map((x) => (
-            <li key={x.user_id} id={`race-res-${x.user_id}`} className={cn('flex scroll-mt-20 items-center gap-3 rounded-xl border px-3 py-2.5', x.is_me ? 'border-brand/50 bg-brand/10' : 'border-border bg-surface')}>
-              <span className={cn('w-7 text-center font-mono text-sm font-bold', x.rank <= 3 ? ['text-medal-gold', 'text-medal-silver', 'text-medal-bronze'][x.rank - 1] : 'text-fg-muted')}>{x.rank}</span>
-              <Avatar src={x.avatar_url} name={x.display_name ?? 'VĐV'} size="sm" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{x.is_me ? 'Bạn' : x.display_name}</span>
-                <span className="font-mono text-xs text-fg-subtle">{x.bib} · {racePace(x.pace_s)}</span>
-              </span>
-              <span className="font-mono font-bold tabular">{raceTime(x.finish_time_s)}</span>
-            </li>
-          ))}
-        </ol>
+          <div className="flex items-center gap-2">
+            <p className="flex-1 text-sm text-fg-muted">
+              <span className="font-mono font-bold text-fg">{formatNumber(q.data.finished)}</span>/{formatNumber(q.data.registered)} VĐV đã hoàn thành {distanceLabel(km)}
+            </p>
+          </div>
+          <div role="radiogroup" aria-label="Lọc kết quả" className="flex gap-1.5">
+            {DONE_FILTERS.map(([k, label]) => (
+              <button key={k} type="button" role="radio" aria-checked={done === k} onClick={() => setDone(k)}
+                className={cn('rounded-full border px-3 py-1 text-xs font-semibold', done === k ? 'border-brand bg-brand/15 text-brand' : 'border-border text-fg-muted')}>
+                {k === 'NOT' && ended ? 'Không hoàn thành' : label}
+              </button>
+            ))}
+          </div>
+          {all.length > 5 && (
+            <RankSearch value={find} onChange={setFind} total={shown.length} matched={list.length} placeholder="Tìm tên hoặc số BIB…"
+              onFindMe={mine ? () => { setDone('ALL'); setFind(''); requestAnimationFrame(() => scrollToRow(`race-res-${mine.user_id}`)) } : undefined} />
+          )}
+          {!list.length ? (
+            <p className="py-6 text-center text-sm text-fg-subtle">{done === 'DONE' ? 'Chưa có ai hoàn thành cự ly này.' : 'Không có VĐV phù hợp.'}</p>
+          ) : (
+            <ol className="space-y-1.5">
+              {list.map((x) => {
+                const finished = x.rank != null
+                return (
+                  <li key={x.user_id} id={`race-res-${x.user_id}`} className="scroll-mt-20">
+                    <Link href={finished && x.activity_id ? routes.activity(x.activity_id) : routes.athlete(x.user_id)}
+                      className={cn('flex items-center gap-3 rounded-xl border px-3 py-2.5 active:scale-[0.99]', x.is_me ? 'border-brand/50 bg-brand/10' : 'border-border bg-surface', !finished && 'opacity-80')}>
+                      <span className={cn('w-7 text-center font-mono text-sm font-bold', finished && x.rank! <= 3 ? ['text-medal-gold', 'text-medal-silver', 'text-medal-bronze'][x.rank! - 1] : 'text-fg-muted')}>
+                        {finished ? x.rank : '–'}
+                      </span>
+                      <Avatar src={x.avatar_url} name={x.display_name ?? 'VĐV'} size="sm" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold">{x.is_me ? 'Bạn' : x.display_name}</span>
+                        <span className="font-mono text-xs text-fg-subtle">{x.bib}{finished && x.pace_s ? ` · ${racePace(x.pace_s)}` : ''}</span>
+                      </span>
+                      {finished ? (
+                        <span className="font-mono font-bold tabular">{raceTime(x.finish_time_s)}</span>
+                      ) : (
+                        <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', ended ? 'bg-danger/10 text-danger' : 'bg-surface-2 text-fg-muted')}>
+                          {ended ? 'Không hoàn thành' : 'Chưa hoàn thành'}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                )
+              })}
+            </ol>
+          )}
         </div>
       )}
     </section>

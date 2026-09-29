@@ -337,9 +337,15 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
           </Card>
         )}
         {t.error && <p role="alert" className="rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">{t.error}</p>}
-        <Button block size="lg" loading={t.phase === 'SAVING'} onClick={async () => { if (await t.save()) onSaved?.() }}>
-          Lưu bài chạy
-        </Button>
+        <div className="flex gap-2">
+          {/* Lỡ bấm Kết thúc: chạy tiếp đúng bài này (như Strava "Tiếp tục"), thời gian nghỉ ở giữa không tính */}
+          <Button size="lg" variant="secondary" className="shrink-0" disabled={t.phase === 'SAVING'} onClick={t.continueRun}>
+            <Play className="size-4 fill-current" aria-hidden />Chạy tiếp
+          </Button>
+          <Button block size="lg" loading={t.phase === 'SAVING'} onClick={async () => { if (await t.save()) onSaved?.() }}>
+            Lưu bài chạy
+          </Button>
+        </div>
         {confirmDiscard ? (
           <div className="flex gap-2">
             <Button block variant="secondary" onClick={() => setConfirmDiscard(false)}>Giữ lại</Button>
@@ -366,7 +372,7 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
           <div><p className="text-xs text-fg-subtle">Thời gian chạy</p><p className="font-mono tabular text-2xl font-bold">{formatDuration(t.movingS)}</p></div>
         </Card>
         <div className="flex gap-2">
-          <Button block variant="secondary" className="flex-1" onClick={t.discard}>Chạy tiếp</Button>
+          <Button block variant="secondary" className="flex-1" onClick={t.discard}>Chạy bài mới</Button>
           <Link href="/feed" className="flex-1"><Button block>Về trang chủ</Button></Link>
         </div>
       </div>
@@ -400,7 +406,7 @@ function RunResult({ t }: { t: ReturnType<typeof useRunTracker> }) {
       </Card>
       {r?.activity_id && status === 'APPROVED' && <RunRewards activityId={r.activity_id} />}
       <div className="flex gap-2">
-        <Button block variant="secondary" className="flex-1" onClick={t.discard}>Chạy tiếp</Button>
+        <Button block variant="secondary" className="flex-1" onClick={t.discard}>Chạy bài mới</Button>
         <Link href="/feed" className="flex-1"><Button block>Về trang chủ</Button></Link>
       </div>
     </div>

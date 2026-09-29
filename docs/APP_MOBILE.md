@@ -111,3 +111,25 @@ Trong Xcode:
 - **Apple 4.2 (app chỉ là trang web):** RaceHub có tính năng native thật (ghi GPS nền, chặn GPS giả), nên cần ghi rõ điều đó trong phần *Review Notes*. Nên gửi kèm tài khoản thử để Apple đăng nhập được.
 - **Lần đầu bấm Bắt đầu,** app hiện màn giải thích vì sao cần vị trí khi tắt màn hình, sau đó mới để máy hỏi quyền. Cả Google lẫn Apple đều yêu cầu bước này.
 - **Chỉ ghi vị trí từ lúc Bắt đầu đến lúc Kết thúc.** App không theo dõi ngoài buổi chạy.
+
+## Đánh giá sẵn sàng nộp App Store / Google Play (29/09/2026)
+
+**Đã đạt**
+
+- Vỏ Capacitor 7 cho cả iOS và Android, mã app `vn.racehub.app`, trang dự phòng khi mất mạng.
+- Ghi GPS khi tắt màn hình: iOS có `UIBackgroundModes: location` và câu giải thích quyền bằng tiếng Việt; Android dùng dịch vụ nền có thông báo.
+- Có màn giải thích trước khi hỏi quyền. Chỉ ghi vị trí trong lúc chạy.
+- Đăng nhập Apple có cùng lúc với Google (Apple 4.8). Người dùng tự xoá tài khoản trong app (Apple 5.1.1(v), Google Play).
+- Không cần khoá API cho bản đồ và tìm địa điểm. Mọi khoá bí mật chỉ nằm ở máy chủ.
+
+**Phải xử lý trước khi nộp (có thể bị từ chối)**
+
+| # | Vấn đề | Quy định | Việc cần làm |
+|---|---|---|---|
+| 1 | Mua **VIP, CLB Pro, nạp Xu** qua VietQR trong app. Đây là hàng số, dùng ngay trong app. | Apple 3.1.1; Google Play Payments | Chọn một trong hai: (a) tích hợp In-App Purchase / Google Play Billing; hoặc (b) trong app native **ẩn giá và nút mua**, chỉ bán trên web (không đặt link dẫn ra web trong app iOS). Cửa hàng CLB bán **hàng thật** (áo, BIB in) và phí CLB thì được thanh toán ngoài. |
+| 2 | Bình luận, bảng tin, chat CLB **chưa có nút Báo cáo / Chặn người dùng**. | Apple 1.2 (nội dung người dùng tạo); Google UGC | Thêm "Báo cáo" (bài, bình luận, tin nhắn) và "Chặn người này", đưa vào hàng chờ trong Quản trị. Phần Quanh đây đã có. |
+| 3 | Thông báo đẩy trong app native chưa có. Web Push không chạy trong WebView iOS. | Không bắt buộc, nhưng là tính năng cốt lõi | Thêm `@capacitor/push-notifications` (APNs + FCM) và bảng token thiết bị. Máy chủ gửi song song với Web Push. |
+| 4 | App tải giao diện từ web (`server.url`). | Apple 4.2 / 2.5.2 | Được phép, vì có tính năng native thật. Ghi rõ trong Review Notes và gửi kèm tài khoản thử. Rủi ro còn lại ở mức trung bình. |
+| 5 | Chưa có `PrivacyInfo.xcprivacy` cấp app. | Apple (từ 05/2024) | Thêm file khai báo lý do dùng API (UserDefaults, thời gian khởi động…). |
+| 6 | Android đang để `targetSdkVersion = 35`. | Google Play nâng mức tối thiểu hằng năm (tháng 8) | Kiểm tra mức yêu cầu hiện tại trên Play Console. Nếu đã là 36 thì nâng lên và thử lại GPS nền. |
+| 7 | Logo nguồn đang là 512 px phóng to. | App Store cần 1024×1024 | Thay bằng logo gốc 1024×1024. |

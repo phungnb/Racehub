@@ -81,7 +81,7 @@ function MyPledge({ d, locked }: { d: ChallengeDetail; locked: boolean }) {
       <p className="flex items-center gap-2 font-semibold"><Flag className="size-4 text-brand" aria-hidden />{current === null ? 'Đăng ký mục tiêu của bạn' : 'Đổi mục tiêu'}</p>
       <p className="text-xs text-fg-muted">
         {c.format === 'TEAM' ? 'Chọn theo năng lực của bạn — đội được chia để tổng mục tiêu các đội bằng nhau. Mục tiêu khóa khi chia đội' + (cap !== null ? `; chạy vượt chỉ được tính thêm tối đa ${cap}%.` : '.')
-          : 'Hoàn thành mốc bạn chọn là chiến thắng. Chọn trước giờ bắt đầu thì đổi được.'}
+          : 'Hoàn thành mục tiêu bạn chọn là chiến thắng. Chọn trước giờ bắt đầu thì đổi được.'}
       </p>
       {options.length ? (
         <div className="grid grid-cols-4 gap-2">
@@ -267,7 +267,7 @@ function PledgeRanking({ board, team, teamsById, onPick, options }: {
           {[null, ...levels].map((v) => (
             <button key={String(v)} type="button" role="radio" aria-checked={target === v} onClick={() => setTarget(v)}
               className={cn('min-h-9 shrink-0 rounded-full border px-3 text-sm font-medium', target === v ? 'border-fg bg-surface-2' : 'border-border text-fg-muted')}>
-              {v === null ? 'Tất cả mốc' : `${formatNumber(v)} km · ${board.members.filter((m) => m.pledge_km === v).length}`}
+              {v === null ? 'Tất cả mục tiêu' : `${formatNumber(v)} km · ${board.members.filter((m) => m.pledge_km === v).length}`}
             </button>
           ))}
         </div>

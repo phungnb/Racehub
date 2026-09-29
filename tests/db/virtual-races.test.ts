@@ -73,6 +73,14 @@ describe('giải chạy ảo (002700)', () => {
     const res = await rpc<{ bib: string; finish_time_s: number; pace_s: number }[]>(db, R3, `select public.race_results($1, 10) as r`, [race])
     expect(res.map((x) => [x.bib, x.finish_time_s, x.pace_s])).toEqual([['NBNR-0002', 3000, 300], ['NBNR-0001', 3300, 330]])
     expect((await rpc<Detail>(db, R3, `select public.race_detail($1) as r`, [race])).me?.status).toBe('REGISTERED')
+    // BXH v2 theo cự ly: người chưa hoàn thành vẫn có mặt, xếp sau, không có hạng
+    type Board = { registered: number; finished: number; rows: { bib: string; rank: number | null; status: string; is_me: boolean }[] }
+    const b10 = await rpc<Board>(db, R3, `select public.race_results_v2($1, 10) as r`, [race])
+    expect([b10.registered, b10.finished]).toEqual([2, 2])
+    expect(b10.rows.map((x) => [x.bib, x.rank])).toEqual([['NBNR-0002', 1], ['NBNR-0001', 2]])
+    const b5 = await rpc<Board>(db, R3, `select public.race_results_v2($1, 5) as r`, [race])
+    expect(b5).toMatchObject({ registered: 1, finished: 0 })
+    expect(b5.rows[0]).toMatchObject({ bib: 'NBNR-0003', rank: null, status: 'REGISTERED', is_me: true })
 
     await db.query(`update public.activities set validation_status = 'REJECTED', status = 'REJECTED' where id = $1`, [fast])
     expect((await rpc<Detail>(db, R2, `select public.race_detail($1) as r`, [race])).me?.status).toBe('REGISTERED')

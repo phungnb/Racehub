@@ -8,6 +8,7 @@ import { Avatar } from './Avatar'
 import { Button } from './Button'
 import { Input } from './Field'
 import { ConfirmSheet } from './Sheet'
+import { ExpressionPanel, ExpressionToggle, ExpressiveBody, QuickCheers } from './Expressions'
 
 /** Một bình luận (dùng chung bảng tin CLB, Doanh nghiệp…) */
 export interface ThreadComment {
@@ -66,13 +67,14 @@ export function CommentList({ comments, onLike, onReply, onDelete, compact = fal
 function CommentItem({ c, reply, compact, onLike, onReply, onMore }: {
   c: ThreadComment; reply: boolean; compact: boolean; onLike: (c: ThreadComment) => void; onReply: () => void; onMore: (c: ThreadComment) => void
 }) {
+  const expressive = ExpressiveBody({ body: c.body })
   return (
     <div className="flex gap-2.5">
       <Avatar src={c.authorAvatar} name={c.authorName} size={reply || compact ? 'xs' : 'sm'} />
       <div className="min-w-0 flex-1">
-        <div className="relative inline-block max-w-full rounded-2xl rounded-tl-md bg-surface-2 px-3 py-2">
+        <div className={cn('relative inline-block max-w-full rounded-2xl rounded-tl-md px-3 py-2', expressive ? 'pb-3' : 'bg-surface-2')}>
           <p className="text-sm font-semibold">{c.authorName ?? 'Thành viên cũ'}</p>
-          <p className="whitespace-pre-line break-words text-[15px]">{c.body}</p>
+          {expressive ?? <p className="whitespace-pre-line break-words text-[15px]">{c.body}</p>}
           {c.likeCount > 0 && (
             <span className="absolute -bottom-2.5 right-2 inline-flex items-center gap-1 rounded-full border border-border bg-surface px-1.5 py-0.5 text-[11px] font-semibold shadow-sm">
               <ThumbsUp className="size-3 fill-brand text-brand" aria-hidden />{c.likeCount}
@@ -94,12 +96,17 @@ function CommentItem({ c, reply, compact, onLike, onReply, onMore }: {
   )
 }
 
-/** Ô viết bình luận; đang trả lời ai thì hiện dòng "Đang trả lời …" có nút hủy */
+/**
+ * Ô viết bình luận; đang trả lời ai thì hiện dòng "Đang trả lời …" có nút hủy.
+ * Ô trống: hiện hàng câu cổ vũ nhanh (chạm là gửi). Nút mặt cười: emoji + sticker động.
+ */
 export const CommentComposer = forwardRef<HTMLInputElement, {
-  value: string; onChange: (v: string) => void; onSubmit: () => void; pending?: boolean
+  value: string; onChange: (v: string) => void; onSubmit: (text?: string) => void; pending?: boolean
   replyTo: ReplyTarget | null; onCancelReply: () => void; compact?: boolean
 }>(function CommentComposer({ value, onChange, onSubmit, pending, replyTo, onCancelReply, compact }, ref) {
+  const [panel, setPanel] = useState(false)
   const submit = (e: FormEvent) => { e.preventDefault(); if (value.trim()) onSubmit() }
+  const sendNow = (text: string) => { setPanel(false); if (!pending) onSubmit(text) }
   return (
     <div className="space-y-1.5">
       {replyTo && (
@@ -108,7 +115,13 @@ export const CommentComposer = forwardRef<HTMLInputElement, {
           <button type="button" onClick={onCancelReply} aria-label="Hủy trả lời" className="grid size-6 place-items-center rounded-full hover:bg-surface-2"><X className="size-3.5" aria-hidden /></button>
         </p>
       )}
-      <form className="flex gap-2" onSubmit={submit}>
+      {panel ? (
+        <ExpressionPanel showCheers={false} onEmoji={(e) => onChange(value + e)} onSend={sendNow} />
+      ) : !value.trim() && (
+        <QuickCheers onPick={sendNow} disabled={pending} />
+      )}
+      <form className="flex gap-1.5" onSubmit={submit}>
+        <ExpressionToggle open={panel} onToggle={() => setPanel((o) => !o)} className={compact ? 'size-11' : undefined} />
         <Input ref={ref} value={value} onChange={(e) => onChange(e.target.value)} maxLength={1000}
           placeholder={replyTo ? `Trả lời ${replyTo.name}…` : 'Viết bình luận…'} aria-label="Bình luận" />
         <Button type="submit" aria-label="Gửi" loading={pending} disabled={!value.trim()} className={cn('shrink-0 px-0', compact ? 'h-11 w-11' : 'w-11')}>

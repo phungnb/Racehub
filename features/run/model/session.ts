@@ -44,7 +44,7 @@ export type SessionEvent =
   | { type: 'AUTO_STOPPED'; minutes: number }
 
 type Reject = 'INACCURATE' | 'STILL' | 'JITTER' | 'TELEPORT' | 'NO_TIME'
-type LogCode = 'start' | 'pause' | 'resume' | 'auto_pause' | 'auto_resume' | 'gap' | 'long_stop' | 'auto_stop' | 'hidden' | 'visible' | 'finish' | 'restore'
+type LogCode = 'start' | 'pause' | 'resume' | 'auto_pause' | 'auto_resume' | 'gap' | 'long_stop' | 'auto_stop' | 'hidden' | 'visible' | 'finish' | 'restore' | 'reopen'
 
 /** Bộ đếm chất lượng GPS của buổi chạy (gọn, không lưu từng điểm bị loại) */
 export interface QualityCounters {
@@ -264,6 +264,17 @@ export class RunSession {
     this.shownS = this.movingS
     this.autoPaused = false; this.longStop = false
     this.log(now, 'finish')
+  }
+
+  /** "Chạy tiếp" ở màn tổng kết (lỡ bấm Kết thúc): mở lại bài như đang tạm dừng — thời gian từ lúc kết thúc đến giờ không tính */
+  reopen(now: number) {
+    if (this.phase !== 'FINISHED') return
+    this.phase = 'PAUSED'
+    this.endedAt = null
+    this.lastTick = null
+    this.currentPace = 0
+    this.q.pauses++
+    this.log(now, 'reopen')
   }
 
   /** App bị ẩn / hiện lại (tắt màn hình, chuyển app) — chỉ để thống kê chất lượng */

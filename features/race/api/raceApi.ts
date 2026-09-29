@@ -49,16 +49,22 @@ export interface Race {
 }
 
 export interface RaceResult {
-  rank: number
+  /** null = chưa hoàn thành */
+  rank: number | null
   user_id: string
   display_name: string | null
   avatar_url: string | null
   bib: string
-  finish_time_s: number
-  pace_s: number
-  finished_at: string
+  status: MyRegistration['status']
+  finish_time_s: number | null
+  pace_s: number | null
+  finished_at: string | null
+  activity_id: string | null
   is_me: boolean
 }
+
+/** BXH một cự ly: mọi VĐV đã đăng ký (người hoàn thành trước, người chưa hoàn thành sau) */
+export interface RaceBoard { registered: number; finished: number; rows: RaceResult[] }
 
 export interface DashboardRow {
   bib: string
@@ -94,7 +100,8 @@ async function call<T>(fn: string, args: Record<string, unknown> = {}): Promise<
 
 export const listRaces = (scope: RaceScope) => call<Race[]>('list_races', { p_scope: scope }).then((x) => x ?? [])
 export const getRace = (id: string) => call<Race>('race_detail', { p_race_id: id }).then(must<Race>('RACE_NOT_FOUND'))
-export const getRaceResults = (id: string, km: number) => call<RaceResult[]>('race_results', { p_race_id: id, p_distance_km: km }).then((x) => x ?? [])
+export const getRaceBoard = (id: string, km: number) => call<RaceBoard>('race_results_v2', { p_race_id: id, p_distance_km: km })
+  .then((x) => x ?? { registered: 0, finished: 0, rows: [] })
 export const getRaceDashboard = (id: string) => call<DashboardRow[]>('race_dashboard', { p_race_id: id }).then((x) => x ?? [])
 export const createRace = (p: NewRace) => call<string>('create_virtual_race', { p })
 export interface OrganizerRights { admin: boolean; personal: boolean; clubs: string[] }

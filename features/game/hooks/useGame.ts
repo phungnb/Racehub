@@ -63,8 +63,8 @@ export function useBuyShield() {
   return useMutation({ mutationFn: buyShield, onSuccess: refresh })
 }
 
-export function useGiftCatalog(enabled = true) {
-  return useQuery({ queryKey: ['game', 'gifts'], queryFn: getGiftCatalog, enabled, staleTime: 60_000 })
+export function useGiftCatalog(enabled = true, postId?: string | null, activityId?: string | null) {
+  return useQuery({ queryKey: ['game', 'gifts', postId ?? null, activityId ?? null], queryFn: () => getGiftCatalog(postId, activityId), enabled, staleTime: 60_000 })
 }
 
 export const useMyShine = () => useQuery({ queryKey: ['game', 'shine'], queryFn: getMyShine })

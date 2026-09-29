@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Copy, CornerUpLeft, Loader2, MessagesSquare, RotateCcw, SendHorizontal, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, EmptyState, ErrorState, Sheet, Skeleton } from '@/shared/ui'
+import { Avatar, Button, EmptyState, ErrorState, ExpressionPanel, ExpressionToggle, ExpressiveBody, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { matchesSearch } from '@/shared/lib/search'
 import { clubErrorMessage } from '../../api/clubApi'
@@ -144,6 +144,8 @@ function Bubble({ m, mine, start, end, author, accent, reply, people, onAction, 
   const hold = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pressStart = () => { hold.current = setTimeout(onAction, 450) }
   const pressEnd = () => { if (hold.current) clearTimeout(hold.current) }
+  // Sticker / chỉ emoji: vẽ to, không khung (tin trả lời vẫn hiện khung để thấy trích dẫn)
+  const expressive = !m.deleted_at && !m.reply_to ? ExpressiveBody({ body: m.body, align: mine ? 'end' : 'start' }) : null
 
   return (
     <div className={cn('flex items-end gap-2', mine ? 'justify-end' : 'justify-start', start && 'mt-2')}>
@@ -154,10 +156,10 @@ function Bubble({ m, mine, start, end, author, accent, reply, people, onAction, 
           onContextMenu={(e) => { e.preventDefault(); onAction() }}
           aria-label={`Tin nhắn${author ? ` của ${author.name}` : ''}, ${time(m.created_at)}. Chạm để xem tùy chọn`}
           className={cn('select-text rounded-2xl px-3.5 py-2 text-left text-[15px] leading-snug transition-opacity',
-            mine ? 'bg-brand text-brand-fg' : 'bg-surface-2 text-fg',
+            expressive ? 'bg-transparent px-0 py-0' : mine ? 'bg-brand text-brand-fg' : 'bg-surface-2 text-fg',
             mine ? (start ? 'rounded-br-md' : 'rounded-r-md') : (start ? 'rounded-bl-md' : 'rounded-l-md'),
             m.pending === 'sending' && 'opacity-60', m.deleted_at && 'bg-transparent border border-dashed border-border text-fg-subtle italic')}>
-          {m.deleted_at ? 'Tin nhắn đã được thu hồi' : (
+          {m.deleted_at ? 'Tin nhắn đã được thu hồi' : expressive ?? (
             <>
               {m.reply_to && (
                 <span className={cn('mb-1.5 block border-l-2 pl-2 text-sm', mine ? 'border-brand-fg/40 text-brand-fg/80' : 'border-fg-subtle text-fg-muted')}>
@@ -202,6 +204,7 @@ function ChatComposer({ members, replyTo, replyName, onCancelReply, onSend }: {
 }) {
   const [text, setText] = useState('')
   const [caret, setCaret] = useState(0)
+  const [panel, setPanel] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => { if (replyTo) ref.current?.focus() }, [replyTo])
@@ -224,6 +227,14 @@ function ChatComposer({ members, replyTo, replyName, onCancelReply, onSend }: {
     setText('')
     setCaret(0)
   }
+
+  // Chèn emoji vào đúng chỗ con trỏ; sticker / câu cổ vũ gửi ngay (không đụng chữ đang gõ dở)
+  const insertEmoji = (e: string) => {
+    const next = text.slice(0, caret) + e + text.slice(caret)
+    setText(next)
+    setCaret(caret + e.length)
+  }
+  const sendQuick = (body: string) => { setPanel(false); onSend(body, []) }
 
   const pick = (name: string) => {
     if (!mq) return
@@ -259,7 +270,9 @@ function ChatComposer({ members, replyTo, replyName, onCancelReply, onSend }: {
           </button>
         </div>
       )}
-      <form className="flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); submit() }}>
+      {panel && <ExpressionPanel className="mb-2" onEmoji={insertEmoji} onSend={sendQuick} />}
+      <form className="flex items-end gap-1.5" onSubmit={(e) => { e.preventDefault(); submit() }}>
+        <ExpressionToggle open={panel} onToggle={() => setPanel((o) => !o)} />
         <textarea ref={ref} value={text} rows={1} maxLength={2000} aria-label="Soạn tin nhắn" placeholder="Nhắn cho cả CLB… (@ để nhắc tên)"
           onChange={(e) => { setText(e.target.value); setCaret(e.target.selectionStart) }}
           onSelect={(e) => setCaret(e.currentTarget.selectionStart)}

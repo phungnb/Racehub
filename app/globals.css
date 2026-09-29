@@ -49,6 +49,7 @@
   --animate-gift-burst: gift-burst 2.2s ease-out both;
   --animate-reel: reel-in 0.09s linear both;
   --animate-winner: winner-in 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  --animate-sticker: sticker 1.6s ease-in-out infinite;
 
   @keyframes fade-in {
     from { opacity: 0; transform: translateY(4px); }
@@ -88,6 +89,13 @@
     0%   { opacity: 0; transform: scale(0.6); }
     100% { opacity: 1; transform: scale(1); }
   }
+  /* Sticker (khi máy không tải được ảnh động): nhún nhảy nhẹ */
+  @keyframes sticker {
+    0%, 100% { transform: translateY(0) rotate(0) scale(1); }
+    25%      { transform: translateY(-6%) rotate(-6deg) scale(1.06); }
+    50%      { transform: translateY(0) rotate(0) scale(1); }
+    75%      { transform: translateY(-3%) rotate(6deg) scale(1.03); }
+  }
   @keyframes breath {
     0%, 100% { box-shadow: 0 0 0 0 rgb(182 255 59 / 0.45); }
     50%      { box-shadow: 0 0 0 10px rgb(182 255 59 / 0); }
@@ -98,6 +106,7 @@
 .animate-fadeIn { animation: fade-in 0.25s ease-out both; }
 @media (prefers-reduced-motion: reduce) {
   .animate-gift-rise, .animate-gift-burst, .animate-reel, .animate-winner { animation-duration: 0.01s; }
+  .animate-sticker { animation: none; }
 }
 
 html { color-scheme: dark; }

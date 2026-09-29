@@ -90,7 +90,7 @@ describe('mục tiêu tự đăng ký', () => {
   })
   it('kiểm tra + dữ liệu gửi lên; thử thách cá nhân lấy mốc thấp nhất làm mục tiêu chung', () => {
     const d = { ...m.defaultDraft(new Date('2026-09-24T03:00:00Z')), ...m.weeklyPreset(new Date('2026-09-24T03:00:00Z'), 'c') } as m.ChallengeDraft
-    expect(m.validatePledge({ ...d.pledge, options: [0] })).toBe('Mốc từ 1 đến 5.000 km')
+    expect(m.validatePledge({ ...d.pledge, options: [0] })).toBe('Mục tiêu từ 1 đến 5.000 km')
     expect(m.validatePledge({ ...d.pledge, options: [], minKm: 50, maxKm: 10 })).toBe('Khoảng mục tiêu không hợp lệ')
     expect(m.pledgePayload({ ...d.pledge, options: [60, 21, 42, 21] })).toEqual({ options: [21, 42, 60], min_km: null, max_km: null, cap_pct: null, team_size: null })
     expect(m.draftToPayload(d)).toMatchObject({ target_value: 21, max_slots: 50 })
@@ -156,7 +156,9 @@ describe('chinh phục thời gian / pace (010700)', () => {
     expect(ranked.format).toBe('RANKED')
     const together = draftToPayload({ ...defaultDraft(now), format: 'COLLECTIVE', targetValue: 1000, title: 'Cùng 1000 km' })
     expect(together.format).toBe('COLLECTIVE')
-    expect(validateDraft({ ...defaultDraft(now), format: 'COLLECTIVE', targetValue: 0 }, 2, now).targetValue).toBeUndefined()
+    expect(validateDraft({ ...defaultDraft(now), format: 'COLLECTIVE', targetValue: 0 }, 2, now).targetValue).toBeDefined()
+    expect(validateDraft({ ...defaultDraft(now), format: 'RANKED', targetValue: 0 }, 2, now).targetValue).toBeUndefined()
+    expect(draftToPayload({ ...defaultDraft(now), format: 'RANKED', title: 'Đua tháng 10' }).format).toBe('RANKED')
   })
   it('mỗi loại thử thách có mô tả cách tính điểm riêng', () => {
     expect(m.scoringLines({ format: 'SOLO_GOAL', objective: 'BEST_TIME', conquest_mode: 'SELF' }).join(' ')).toContain('tự đăng ký')

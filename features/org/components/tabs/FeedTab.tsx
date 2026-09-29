@@ -153,7 +153,7 @@ function Comments({ postId, onChange }: { postId: string; onChange: () => void }
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null)
   const input = useRef<HTMLInputElement>(null)
   const after = () => { void qc.invalidateQueries({ queryKey: key }); onChange() }
-  const add = useMutation({ mutationFn: () => addOrgComment(postId, text.trim(), replyTo?.id ?? null), onSuccess: () => { setText(''); setReplyTo(null); after() }, onError: (e) => toast.error(orgErrorMessage(e)) })
+  const add = useMutation({ mutationFn: (t?: string) => addOrgComment(postId, (t ?? text).trim(), replyTo?.id ?? null), onSuccess: (_r, t) => { if (t === undefined) setText(''); setReplyTo(null); after() }, onError: (e) => toast.error(orgErrorMessage(e)) })
   const del = useMutation({ mutationFn: (id: string) => deleteOrgComment(id), onSuccess: after, onError: (e) => toast.error(orgErrorMessage(e)) })
   const like = useMutation({ mutationFn: (id: string) => toggleOrgCommentLike(id), onSuccess: () => void qc.invalidateQueries({ queryKey: key }), onError: (e) => toast.error(orgErrorMessage(e)) })
   const comments: ThreadComment[] = (q.data ?? []).map((c) => ({
@@ -164,7 +164,7 @@ function Comments({ postId, onChange }: { postId: string; onChange: () => void }
     <div className="space-y-3">
       <CommentList compact comments={comments} onLike={(c) => like.mutate(c.id)} onDelete={(c) => del.mutate(c.id)}
         onReply={(t) => { setReplyTo(t); requestAnimationFrame(() => input.current?.focus()) }} />
-      <CommentComposer compact ref={input} value={text} onChange={setText} onSubmit={() => add.mutate()} pending={add.isPending}
+      <CommentComposer compact ref={input} value={text} onChange={setText} onSubmit={(t) => add.mutate(t)} pending={add.isPending}
         replyTo={replyTo} onCancelReply={() => setReplyTo(null)} />
     </div>
   )
