@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Card } from '@/shared/ui'
+import { Button } from '@/shared/ui'
 import { formatCoin } from '@/shared/lib/format'
 import { useInvalidateProfile } from '@/features/auth'
 import { SKIP_REASON_LABEL, type SyncSummary } from '../mapping'
@@ -20,11 +20,16 @@ async function syncNow(): Promise<SyncSummary> {
 const AUTO_SYNC_MS = 3 * 60_000
 const LAST_KEY = 'rh:strava:auto-sync'
 
-export function StravaSyncCard() {
+function useStravaRefresh() {
   const qc = useQueryClient()
   const invalidateProfile = useInvalidateProfile()
-  const refresh = () => { qc.invalidateQueries({ queryKey: ['activities'] }); invalidateProfile() }
-  // Đồng bộ ngầm: chỉ báo khi có bài mới, lỗi thì im lặng (người dùng vẫn bấm Đồng bộ được)
+  return () => { void qc.invalidateQueries({ queryKey: ['activities'] }); invalidateProfile() }
+}
+
+/** Đồng bộ ngầm khi mở / quay lại app (không hiện gì) — đặt ở Trang chủ khi đã kết nối Strava */
+export function StravaAutoSync() {
+  const refresh = useStravaRefresh()
+  // Chỉ báo khi có bài mới, lỗi thì im lặng (người dùng vẫn bấm Đồng bộ ở trang Tôi được)
   const auto = useMutation({
     mutationFn: syncNow,
     onSuccess: (s) => {
@@ -49,7 +54,12 @@ export function StravaSyncCard() {
     document.addEventListener('visibilitychange', maybeSync)
     return () => document.removeEventListener('visibilitychange', maybeSync)
   }, [])
+  return null
+}
 
+/** Nút "Đồng bộ" Strava (trang Tôi → Thiết bị & nguồn dữ liệu, cạnh nút Ngắt) */
+export function StravaSyncButton() {
+  const refresh = useStravaRefresh()
   const m = useMutation({
     mutationFn: syncNow,
     onSuccess: (s) => {
@@ -69,17 +79,9 @@ export function StravaSyncCard() {
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Không đồng bộ được Strava.'),
   })
-
   return (
-    <Card className="flex items-center gap-3">
-      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#fc4c02]/15 text-sm font-black text-[#fc4c02]" aria-hidden>S</span>
-      <div className="min-w-0 flex-1">
-        <p className="font-semibold">Strava đã kết nối</p>
-        <p className="text-sm text-fg-muted">{auto.isPending ? 'Đang lấy bài mới…' : 'Bài mới tự về sau khi lưu trên Strava'}</p>
-      </div>
-      <Button size="sm" variant="secondary" loading={m.isPending || auto.isPending} onClick={() => m.mutate()}>
-        {!(m.isPending || auto.isPending) && <RefreshCw className="size-4" aria-hidden />} Đồng bộ
-      </Button>
-    </Card>
+    <Button size="sm" variant="secondary" loading={m.isPending} onClick={() => m.mutate()}>
+      {!m.isPending && <RefreshCw className="size-4" aria-hidden />} Đồng bộ
+    </Button>
   )
 }

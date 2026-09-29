@@ -9,6 +9,8 @@ export const clubKeys = {
   news: (id: string) => ['club', id, 'news'] as const,
   albums: (id: string, f: object) => ['club', id, 'albums', f] as const,
   comments: (postId: string) => ['club-post', postId, 'comments'] as const,
+  engagement: (postId: string) => ['club-post', postId, 'engagement'] as const,
+  community: ['community-feed'] as const,
   chat: (id: string) => ['club', id, 'chat'] as const,
   leaderboard: (id: string, period: string) => ['club', id, 'leaderboard', period] as const,
   treasury: (id: string) => ['club', id, 'treasury'] as const,

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { BookOpen, Bookmark, PenSquare, Search, X } from 'lucide-react'
-import { Button, EmptyState, ErrorState, Input, SegmentedControl, Skeleton } from '@/shared/ui'
+import { Button, EmptyState, ErrorState, Input, PageHeader, SegmentedControl, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import { knowledgeErrorMessage, type ContentType } from '../api/knowledgeApi'
@@ -36,17 +36,11 @@ export function KnowledgeScreen() {
 
   return (
     <div className="space-y-4">
-      <header className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-bold">Kiến thức Runner</h1>
-          <p className="text-sm text-fg-muted">Học để chạy tốt hơn · tin tức chạy bộ</p>
-        </div>
-        {role.data && (
-          <Link href={routes.learnStudio} className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-border px-3 text-sm font-semibold hover:border-fg-subtle">
-            <PenSquare className="size-4" aria-hidden />Soạn bài
-          </Link>
-        )}
-      </header>
+      <PageHeader title="Kiến thức Runner" subtitle="Học để chạy tốt hơn · tin tức chạy bộ" action={role.data ? (
+        <Link href={routes.learnStudio} className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-border px-3 text-sm font-semibold hover:border-fg-subtle">
+          <PenSquare className="size-4" aria-hidden />Soạn bài
+        </Link>
+      ) : undefined} />
 
       <form role="search" onSubmit={(e) => { e.preventDefault(); go({ q: q.trim() }) }} className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" aria-hidden />

@@ -36,6 +36,8 @@ export const routes = {
   terms: '/terms',
   help: '/help',
   helpPage: (slug: string) => `/help/${encodeURIComponent(slug)}`,
+  activities: '/activities',
+  athlete: (id: string) => `/athletes/${encodeURIComponent(id)}`,
   activity: (id: string) => `/activities/${encodeURIComponent(id)}`,
   learn: '/learn',
   learnArticle: (slug: string) => `/learn/${encodeURIComponent(slug)}`,

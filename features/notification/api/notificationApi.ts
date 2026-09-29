@@ -37,6 +37,13 @@ export async function markNotificationsRead(ids?: string[]) {
   if (error) throw error
 }
 
+/** Xóa thông báo (migration 010500): theo danh sách, hoặc tất cả thông báo đã đọc */
+export async function deleteNotifications(ids: string[] | null, readOnly = false): Promise<number> {
+  const { data, error } = await supabase.rpc('delete_notifications', { p_ids: ids, p_read_only: readOnly })
+  if (error) throw error
+  return Number(data ?? 0)
+}
+
 export async function getClubNotificationLevel(clubId: string): Promise<NotificationLevel> {
   const { data, error } = await supabase.from('notification_settings').select('level').eq('club_id', clubId).maybeSingle()
   if (error) throw error

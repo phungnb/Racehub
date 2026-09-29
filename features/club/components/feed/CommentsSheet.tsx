@@ -19,6 +19,7 @@ export function CommentsSheet({ post, meId, isStaff, onClose }: { post: ClubPost
   const q = useQuery({ queryKey: key, queryFn: () => listComments(postId, meId, isStaff), enabled: !!post })
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: key })
+    void qc.invalidateQueries({ queryKey: clubKeys.community })
     if (post) {
       void qc.invalidateQueries({ queryKey: clubKeys.posts(post.club_id) })
       void qc.invalidateQueries({ queryKey: clubKeys.pinned(post.club_id) })

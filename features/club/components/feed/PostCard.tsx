@@ -2,7 +2,10 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { ChevronRight, Crown, ExternalLink, Flame, Heart, Megaphone, MessageCircle, MoreHorizontal, Newspaper, Pencil, Pin, PinOff, Trash2, Trophy, UserPlus } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '@/shared/lib/supabase'
+import { routes } from '@/shared/config/routes'
+import { Check, ChevronRight, Crown, ExternalLink, Megaphone, MessageCircle, MoreHorizontal, Newspaper, Pencil, Pin, PinOff, Shield, ThumbsUp, Trash2, Trophy, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Card, ConfirmSheet, LevelBadge, Sheet } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -13,13 +16,14 @@ import { postImageUrl, type ClubPost } from '../../api/postsApi'
 import { usePostActions } from '../../hooks/useClubFeed'
 import { NEWS_CATEGORIES } from '../../model/media'
 import { NewsSheet } from './NewsSheet'
+import { EngagementSheet, EngagementSummary, type EngagementTab } from './Engagement'
 
 export function PostCard({ post, meId, isStaff, onComments, highlight }: {
   post: ClubPost; meId: string; isStaff: boolean; onComments: (p: ClubPost) => void; highlight?: boolean
 }) {
   if (post.kind === 'AUTO_JOIN') return <JoinRow post={post} meId={meId} />
   if (post.kind === 'RECAP') return <RecapCard post={post} />
-  if (post.kind === 'CHALLENGE') return <ChallengePost post={post} onComments={onComments} />
+  if (post.kind === 'CHALLENGE') return <ChallengePost post={post} meId={meId} onComments={onComments} />
 
   const isRun = post.kind === 'AUTO_RUN'
   const isAnnouncement = post.kind === 'ANNOUNCEMENT'
@@ -32,15 +36,22 @@ export function PostCard({ post, meId, isStaff, onComments, highlight }: {
       isNews && !post.is_pinned && 'border-brand/25',
       highlight && 'ring-2 ring-brand')}>
       <header className="flex items-center gap-3">
-        <Avatar src={post.author?.avatar_url} name={post.author?.display_name} size="md" />
+        {post.author_id ? (
+          <Link href={routes.athlete(post.author_id)} aria-label={`Hồ sơ ${post.author?.display_name ?? 'thành viên'}`}>
+            <Avatar src={post.author?.avatar_url} name={post.author?.display_name} size="md" />
+          </Link>
+        ) : <Avatar src={post.author?.avatar_url} name={post.author?.display_name} size="md" />}
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2">
-            <span className="truncate font-semibold">{post.author?.display_name ?? 'Thành viên cũ'}</span>
+            {post.author_id
+              ? <Link href={routes.athlete(post.author_id)} className="truncate font-semibold hover:underline">{post.author?.display_name ?? 'Thành viên cũ'}</Link>
+              : <span className="truncate font-semibold">{post.author?.display_name ?? 'Thành viên cũ'}</span>}
             {post.author && <LevelBadge level={post.author.level} />}
           </p>
           <p className="text-xs text-fg-subtle">
             {isRun ? 'đã hoàn thành một buổi chạy · ' : milestone ? 'chạm cột mốc mới · ' : ''}{formatRelative(post.created_at)}
           </p>
+          {post.club && <ClubTag club={post.club} />}
         </div>
         {post.is_pinned && <Pin className="size-4 text-coin" aria-label="Đã ghim" />}
         <PostMenu post={post} meId={meId} isStaff={isStaff} />
@@ -66,7 +77,9 @@ export function PostCard({ post, meId, isStaff, onComments, highlight }: {
           </div>
         </div>
       ) : post.title && <h3 className="text-lg font-bold leading-snug">{post.title}</h3>}
-      {isRun ? <RunStats post={post} /> : null}
+      {isRun ? (post.activity_id
+        ? <Link href={routes.activity(post.activity_id)} aria-label="Xem chi tiết bài chạy" className="block rounded-xl hover:opacity-90"><RunStats post={post} /></Link>
+        : <RunStats post={post} />) : null}
       {post.body && !isRun && <p className="whitespace-pre-line break-words text-[15px] leading-relaxed">{post.body}</p>}
       {post.image_paths.length > 0 && <Images paths={post.image_paths} />}
       {isNews && post.meta.link && (
@@ -140,29 +153,40 @@ function Images({ paths }: { paths: string[] }) {
   )
 }
 
+/** Thanh tương tác: tóm tắt (👍 · 🎁 · bình luận) + Thích · Bình luận · Tặng quà */
 function PostActions({ post, onComments }: { post: ClubPost; onComments: (p: ClubPost) => void }) {
   const { react } = usePostActions(post.club_id)
-  const isRun = post.kind === 'AUTO_RUN'
-  const Icon = isRun ? Flame : Heart
+  const [sheet, setSheet] = useState<EngagementTab | null>(null)
+  const giftable = !!post.author_id && (post.kind === 'AUTO_RUN' || post.kind === 'POST' || post.kind === 'MILESTONE')
   return (
-    <footer className="-mx-2 flex items-center gap-1 border-t border-border pt-2">
-      <button onClick={() => react.mutate(post)} aria-pressed={post.reacted}
-        className={cn('flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold transition-colors hover:bg-surface-2',
-          post.reacted ? (isRun ? 'text-coin' : 'text-live') : 'text-fg-muted')}>
-        <Icon className={cn('size-5', post.reacted && 'fill-current animate-pop')} aria-hidden />
-        {isRun ? 'Cổ vũ' : 'Thích'}
-        {post.reaction_count > 0 && <span className="font-mono tabular">{formatNumber(post.reaction_count)}</span>}
-      </button>
-      <button onClick={() => onComments(post)}
-        className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-fg-muted transition-colors hover:bg-surface-2">
-        <MessageCircle className="size-5" aria-hidden />Bình luận
-        {post.comment_count > 0 && <span className="font-mono tabular">{formatNumber(post.comment_count)}</span>}
-      </button>
-      {post.author_id && (post.kind === 'AUTO_RUN' || post.kind === 'POST') && (
-        <GiftButton className="ml-auto" toUser={post.author_id} toName={post.author?.display_name ?? 'Thành viên'}
-          toAvatar={post.author?.avatar_url} postId={post.id} activityId={post.activity_id} total={Number(post.cheer_xu ?? 0)} />
-      )}
-    </footer>
+    <div className="space-y-1">
+      <EngagementSummary post={post} onOpen={setSheet} onComments={() => onComments(post)} />
+      <footer className="-mx-2 flex items-center border-t border-border pt-1.5">
+        <button onClick={() => react.mutate(post)} aria-pressed={post.reacted}
+          className={cn('flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-2 text-sm font-semibold transition-colors hover:bg-surface-2',
+            post.reacted ? 'text-brand' : 'text-fg-muted')}>
+          <ThumbsUp className={cn('size-5', post.reacted && 'fill-current animate-pop')} aria-hidden />Thích
+        </button>
+        <button onClick={() => onComments(post)}
+          className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-2 text-sm font-semibold text-fg-muted transition-colors hover:bg-surface-2">
+          <MessageCircle className="size-5" aria-hidden />Bình luận
+        </button>
+        {giftable && (
+          <GiftButton className="flex-1 justify-center" toUser={post.author_id!} toName={post.author?.display_name ?? 'Thành viên'}
+            toAvatar={post.author?.avatar_url} postId={post.id} activityId={post.activity_id} />
+        )}
+      </footer>
+      <EngagementSheet post={sheet ? post : null} tab={sheet ?? 'LIKES'} onTab={setSheet} onClose={() => setSheet(null)} />
+    </div>
+  )
+}
+
+/** Bài trên bảng tin cộng đồng: thuộc CLB nào (bấm để vào CLB) */
+function ClubTag({ club }: { club: NonNullable<ClubPost['club']> }) {
+  return (
+    <Link href={routes.club(club.id)} className="mt-0.5 inline-flex max-w-full items-center gap-1 text-xs font-medium text-fg-muted hover:text-fg">
+      <Shield className="size-3 shrink-0" style={{ color: club.accent_color ?? undefined }} aria-hidden /><span className="truncate">{club.name}</span>
+    </Link>
   )
 }
 
@@ -275,9 +299,24 @@ function RecapCard({ post }: { post: ClubPost }) {
   )
 }
 
-function ChallengePost({ post, onComments }: { post: ClubPost; onComments: (p: ClubPost) => void }) {
+/** Mình đã tham gia thử thách này chưa (để nút đổi thành "Bạn đã tham gia") */
+function useJoinedChallenge(challengeId: string | undefined, meId: string) {
+  const q = useQuery({
+    queryKey: ['challenge', challengeId, 'joined', meId],
+    queryFn: async () => {
+      const { data } = await supabase.from('challenge_participants').select('status')
+        .eq('challenge_id', challengeId!).eq('profile_id', meId).maybeSingle()
+      return !!data && data.status !== 'LEFT'
+    },
+    enabled: !!challengeId && !!meId, staleTime: 60_000,
+  })
+  return q.data === true
+}
+
+function ChallengePost({ post, meId, onComments }: { post: ClubPost; meId: string; onComments: (p: ClubPost) => void }) {
   const m = post.meta
   const result = !!m.result
+  const joined = useJoinedChallenge(result ? undefined : m.challenge_id, meId)
   return (
     <Card id={`post-${post.id}`} className={cn('space-y-3', result ? 'border-coin/40 bg-gradient-to-br from-coin/10 to-transparent' : 'border-brand/30 bg-gradient-to-br from-brand/10 to-transparent')}>
       <header className="flex items-center gap-2">
@@ -296,8 +335,8 @@ function ChallengePost({ post, onComments }: { post: ClubPost; onComments: (p: C
       {m.challenge_id && (
         <Link href={`/challenges/${m.challenge_id}`}
           className={cn('flex min-h-11 items-center justify-center gap-1 rounded-xl text-sm font-semibold',
-            result ? 'bg-surface-2 text-fg hover:bg-border' : 'bg-brand text-brand-fg hover:bg-brand-strong')}>
-          {result ? 'Xem bảng xếp hạng' : 'Xem và tham gia'}<ChevronRight className="size-4" aria-hidden />
+            result || joined ? 'bg-surface-2 text-fg hover:bg-border' : 'bg-brand text-brand-fg hover:bg-brand-strong')}>
+          {result ? 'Xem bảng xếp hạng' : joined ? <><Check className="size-4 text-brand" aria-hidden />Bạn đã tham gia</> : 'Xem và tham gia'}<ChevronRight className="size-4" aria-hidden />
         </Link>
       )}
       <PostActions post={post} onComments={onComments} />

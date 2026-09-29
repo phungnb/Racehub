@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { CalendarDays, ChevronRight, EyeOff, MapPin, Radar, Settings2, ShieldAlert, Users, UsersRound } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, EmptyState, ErrorState, SegmentedControl, Sheet, Skeleton } from '@/shared/ui'
+import { Avatar, Button, Card, EmptyState, ErrorState, PageHeader, SegmentedControl, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import {
@@ -24,16 +24,11 @@ export function NearbyScreen() {
   const me = useDiscovery()
   return (
     <div className="space-y-4">
-      <header className="flex items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-bold">Quanh đây</h1>
-          <p className="text-sm text-fg-muted">Bạn chạy cùng pace, buổi chạy nhóm, CLB gần bạn</p>
-        </div>
+      <PageHeader title="Quanh đây" subtitle="Bạn chạy cùng pace, buổi chạy nhóm, CLB gần bạn" action={
         <Link href={routes.nearbyConnections} className="relative inline-flex h-11 items-center gap-1.5 rounded-xl border border-border px-3 text-sm font-semibold hover:border-fg-subtle">
           <UsersRound className="size-4" aria-hidden />Kết nối
           {!!me.data?.incoming && <span className="absolute -right-1.5 -top-1.5 grid min-w-5 place-items-center rounded-full bg-live px-1 text-[11px] font-bold text-white">{me.data.incoming}</span>}
-        </Link>
-      </header>
+        </Link>} />
       {me.isPending ? <div className="space-y-3"><Skeleton className="h-28" /><Skeleton className="h-40" /><Skeleton className="h-40" /></div>
         : me.isError ? <ErrorState message={nearbyErrorMessage(me.error)} error={me.error} onRetry={() => void me.refetch()} />
         : <Body d={me.data} />}

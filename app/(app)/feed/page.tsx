@@ -1,14 +1,13 @@
 'use client'
 
-import { Users } from 'lucide-react'
 import { useMyProfile } from '@/features/auth'
 import { ConnectDeviceCard, ExploreShortcuts } from '@/features/home'
 import { GameHub } from '@/features/game'
-import { ActivityList } from '@/features/activity'
-import { StravaSyncCard } from '@/features/integrations'
+import { StravaAutoSync } from '@/features/integrations'
 import { InstallCard } from '@/features/pwa'
 import { KnowledgeHomeSection } from '@/features/knowledge'
-import { EmptyState, SectionTitle, Skeleton } from '@/shared/ui'
+import { Skeleton } from '@/shared/ui'
+import { CommunityFeed } from '@/features/club'
 
 export default function FeedPage() {
   const { profile, isPending } = useMyProfile()
@@ -28,18 +27,9 @@ export default function FeedPage() {
       <GameHub profile={profile} />
       <ExploreShortcuts />
       <KnowledgeHomeSection />
-      {profile.strava_connected ? <StravaSyncCard /> : <ConnectDeviceCard />}
+      {profile.strava_connected ? <StravaAutoSync /> : <ConnectDeviceCard />}
 
-      <section>
-        <SectionTitle>Hoạt động của bạn</SectionTitle>
-        <ActivityList userId={profile.id} />
-      </section>
-
-      <section>
-        <SectionTitle>Bảng tin cộng đồng</SectionTitle>
-        <EmptyState icon={Users} title="Sắp ra mắt"
-          description="Bạn sẽ thấy bài chạy của bạn bè, kỷ lục mới và có thể gửi Cheer tại đây." />
-      </section>
+      <CommunityFeed meId={profile.id} />
     </div>
   )
 }

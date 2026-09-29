@@ -37,9 +37,25 @@ export interface ClubPost {
   reaction_count: number
   comment_count: number
   cheer_xu?: number
+  /** Số lượt quà được tặng trên bài (migration 010500) */
+  gift_count?: number
   created_at: string
   author: MemberProfile | null
   reacted: boolean
+  /** Bảng tin cộng đồng (Trang chủ): bài thuộc CLB nào */
+  club?: { id: string; name: string; avatar_url: string | null; accent_color: string | null }
+}
+
+/** Ai đã thích, ai đã tặng quà trên một bài (migration 010500) */
+export interface EngagementPerson { user_id: string; display_name: string | null; avatar_url: string | null; level: number; at: string; me: boolean }
+export interface EngagementGift extends EngagementPerson { id: string; emoji: string; name: string; tier: string; qty: number; message: string | null }
+export interface PostEngagement {
+  like_count: number
+  gift_count: number
+  gift_senders: number
+  likes: EngagementPerson[]
+  gifts: EngagementGift[]
+  gift_summary: { emoji: string; name: string; qty: number }[]
 }
 
 export interface PostComment {
@@ -120,6 +136,19 @@ export async function deletePost(postId: string) {
 export async function pinPost(postId: string, pinned: boolean) {
   const { error } = await supabase.rpc('pin_club_post', { p_post_id: postId, p_pinned: pinned })
   if (error) throw error
+}
+
+export async function getPostEngagement(postId: string): Promise<PostEngagement> {
+  const { data, error } = await supabase.rpc('post_engagement', { p_post_id: postId })
+  if (error) throw error
+  return data as PostEngagement
+}
+
+/** Bảng tin cộng đồng: bài chạy, cột mốc, bài viết từ mọi CLB mình tham gia (một bài chạy nhiều CLB chỉ hiện một lần) */
+export async function listCommunityFeed(before?: string, limit = 15): Promise<ClubPost[]> {
+  const { data, error } = await supabase.rpc('community_feed', { p_before: before ?? null, p_limit: limit })
+  if (error) throw error
+  return ((data ?? []) as ClubPost[]).map((p) => ({ ...p, image_paths: p.image_paths ?? [], meta: p.meta ?? {} }))
 }
 
 export async function toggleReaction(postId: string): Promise<{ reacted: boolean; count: number }> {
