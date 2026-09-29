@@ -5,6 +5,12 @@ import { systemErrorMessage } from '@/shared/lib/errors'
 
 export type RsvpStatus = 'GOING' | 'MAYBE' | 'NOT_GOING'
 
+export interface EventRoute { km: number | null; pace: string | null }
+
+/** Cự ly của sự kiện: ưu tiên danh sách mới, không có thì dựng từ cột cũ */
+export const eventRoutes = (e: Pick<ClubEvent, 'routes' | 'distance_km' | 'pace_text'>): EventRoute[] =>
+  e.routes?.length ? e.routes : e.distance_km || e.pace_text ? [{ km: e.distance_km, pace: e.pace_text }] : []
+
 export interface ClubEvent {
   id: string
   club_id: string
@@ -18,6 +24,8 @@ export interface ClubEvent {
   lng: number | null
   distance_km: number | null
   pace_text: string | null
+  /** Các cự ly của buổi chạy (migration 010600); bản cũ chỉ có distance_km / pace_text */
+  routes?: EventRoute[]
   capacity: number | null
   status: 'SCHEDULED' | 'CANCELLED'
   cancel_reason: string | null
@@ -56,6 +64,7 @@ export interface EventInput {
   lng?: number | null
   distance_km?: number | null
   pace_text?: string | null
+  routes?: EventRoute[]
   capacity?: number | null
 }
 

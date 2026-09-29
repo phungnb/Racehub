@@ -23,13 +23,13 @@ export function ClubPoints({ clubId }: { clubId: string }) {
   const [period, setPeriod] = useState<LeaderboardPeriod>('WEEK')
   const rules = useQuery({ queryKey: ['club', clubId, 'point-rules'], queryFn: () => getPointRules(clubId) })
   const board = useQuery({ queryKey: ['club', clubId, 'points', period], queryFn: () => getPointsBoard(clubId, period), staleTime: 60_000 })
-  const [editing, setEditing] = useState(false)
+  const [editing, setEditing] = useState<false | { template: number | null }>(false)
   if (rules.isPending) return <Skeleton className="h-64" />
   if (rules.isError) return <ErrorState message={pointsErrorMessage(rules.error)} error={rules.error} onRetry={() => void rules.refetch()} />
   const cur = rules.data.current
   return (
     <div className="space-y-4">
-      <RulesCard set={cur} history={rules.data.history} canEdit={rules.data.can_edit} onEdit={() => setEditing(true)} />
+      <RulesCard set={cur} history={rules.data.history} canEdit={rules.data.can_edit} onEdit={(template = null) => setEditing({ template })} />
       {cur && (
         <>
           <SegmentedControl value={period} onChange={(v) => setPeriod(v as LeaderboardPeriod)} options={PERIODS} />
@@ -50,21 +50,24 @@ export function ClubPoints({ clubId }: { clubId: string }) {
           <MyPoints clubId={clubId} period={period} />
         </>
       )}
-      {editing && <RulesEditor clubId={clubId} current={cur} onClose={() => setEditing(false)} />}
+      {editing && <RulesEditor clubId={clubId} current={editing.template === null ? cur : null} template={editing.template ?? 0} onClose={() => setEditing(false)} />}
     </div>
   )
 }
 
-function RulesCard({ set, history, canEdit, onEdit }: { set: PointRuleSet | null; history: PointRuleSet[]; canEdit: boolean; onEdit: () => void }) {
+function RulesCard({ set, history, canEdit, onEdit }: { set: PointRuleSet | null; history: PointRuleSet[]; canEdit: boolean; onEdit: (template?: number | null) => void }) {
   const [showHistory, setShowHistory] = useState(false)
   if (!set) {
     return (
-      <Card className="space-y-3 text-center">
-        <Sparkles className="mx-auto size-8 text-coin" aria-hidden />
-        <p className="font-semibold">CLB chưa có luật tính điểm</p>
-        <p className="text-sm text-fg-muted">Điểm CLB thưởng cho sự đều đặn, chạy sáng sớm, đi chạy nhóm… chứ không chỉ ai chạy nhiều km nhất. Ban quản trị đặt luật một lần, hệ thống tự chấm cho mọi bài chạy.</p>
-        {canEdit && <Button block onClick={onEdit}><Plus className="size-4" aria-hidden />Đặt luật tính điểm</Button>}
-      </Card>
+      <div className="space-y-3">
+        <Card className="space-y-3 text-center">
+          <Sparkles className="mx-auto size-8 text-coin" aria-hidden />
+          <p className="font-semibold">CLB chưa có luật tính điểm</p>
+          <p className="text-sm text-fg-muted">Điểm CLB thưởng cho sự đều đặn, chạy sáng sớm, đi chạy nhóm… chứ không chỉ ai chạy nhiều km nhất. Ban quản trị đặt luật một lần, hệ thống tự chấm cho mọi bài chạy.</p>
+          {canEdit && <Button block onClick={() => onEdit(0)}><Plus className="size-4" aria-hidden />Đặt luật tính điểm</Button>}
+        </Card>
+        <TemplateGallery canEdit={canEdit} onUse={(i) => onEdit(i)} />
+      </div>
     )
   }
   return (
@@ -74,7 +77,7 @@ function RulesCard({ set, history, canEdit, onEdit }: { set: PointRuleSet | null
           <p className="font-semibold">Luật tính điểm {set.enabled ? '' : '(đang tạm tắt)'}</p>
           <p className="text-xs text-fg-muted">Bản {set.version} · áp dụng cho bài chạy từ {fmtDate(set.valid_from)}{set.by ? ` · ${set.by}` : ''}</p>
         </div>
-        {canEdit && <Button size="sm" variant="secondary" onClick={onEdit}><Pencil className="size-4" aria-hidden />Sửa luật</Button>}
+        {canEdit && <Button size="sm" variant="secondary" onClick={() => onEdit(null)}><Pencil className="size-4" aria-hidden />Sửa luật</Button>}
       </div>
       <ul className="space-y-1.5">
         {set.rules.map((r, i) => (
@@ -104,6 +107,41 @@ function RulesCard({ set, history, canEdit, onEdit }: { set: PointRuleSet | null
         </>
       )}
     </Card>
+  )
+}
+
+/** Mẫu bảng chấm điểm: xem trước từng luật + ví dụ một bài chạy được bao nhiêu điểm; ban quản trị bấm dùng luôn */
+function TemplateGallery({ canEdit, onUse }: { canEdit: boolean; onUse: (i: number) => void }) {
+  const [open, setOpen] = useState<number | null>(0)
+  return (
+    <section className="space-y-2">
+      <p className="text-sm font-semibold">Mẫu bảng chấm điểm</p>
+      {RULE_TEMPLATES.map((t, i) => (
+        <Card key={t.label} className="space-y-2 p-3">
+          <button type="button" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i} className="flex w-full items-center gap-2 text-left">
+            <span className="min-w-0 flex-1"><b>{t.label}</b><span className="block text-xs text-fg-muted">{t.hint}</span></span>
+            <ChevronRight className={cn('size-4 text-fg-subtle transition-transform', open === i && 'rotate-90')} aria-hidden />
+          </button>
+          {open === i && (
+            <>
+              <table className="w-full text-left text-sm">
+                <thead><tr className="text-xs text-fg-subtle"><th className="py-1 font-medium">Luật</th><th className="py-1 text-right font-medium">Điểm</th></tr></thead>
+                <tbody className="divide-y divide-border">
+                  {t.rules.map((r) => (
+                    <tr key={r.name}>
+                      <td className="py-1.5 pr-2"><span className="font-medium">{r.name}</span><span className="block text-xs text-fg-muted">{describeRule(r)}</span></td>
+                      <td className="py-1.5 text-right font-mono font-bold text-coin">+{formatNumber(r.points)}{r.per === 'KM' ? '/km' : ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-xs text-fg-muted">{t.daily_cap ? `Tối đa ${formatNumber(t.daily_cap)} điểm mỗi ngày · ` : ''}Một bài chạy được cộng điểm của mọi luật khớp.</p>
+              {canEdit && <Button size="sm" variant="secondary" onClick={() => onUse(i)}>Dùng mẫu này</Button>}
+            </>
+          )}
+        </Card>
+      ))}
+    </section>
   )
 }
 
@@ -144,10 +182,10 @@ const numOrNull = (v: string) => (v.trim() === '' ? null : Number(v.replace(',',
 const APPLY: { value: ApplyFrom; label: string }[] = [{ value: 'NOW', label: 'Từ bây giờ' }, { value: 'WEEK', label: 'Đầu tuần' }, { value: 'MONTH', label: 'Đầu tháng' }, { value: 'ALL', label: 'Mọi bài' }]
 
 /** Ban quản trị (chủ nhiệm + quản trị viên) soạn luật; lưu = phiên bản mới, báo lên bảng tin CLB */
-function RulesEditor({ clubId, current, onClose }: { clubId: string; current: PointRuleSet | null; onClose: () => void }) {
+function RulesEditor({ clubId, current, template = 0, onClose }: { clubId: string; current: PointRuleSet | null; template?: number; onClose: () => void }) {
   const qc = useQueryClient()
-  const [rules, setRules] = useState<Draft[]>(() => (current?.rules ?? RULE_TEMPLATES[0].rules).map(toDraft))
-  const [cap, setCap] = useState(current ? (current.daily_cap?.toString() ?? '') : String(RULE_TEMPLATES[0].daily_cap ?? ''))
+  const [rules, setRules] = useState<Draft[]>(() => (current?.rules ?? RULE_TEMPLATES[template].rules).map(toDraft))
+  const [cap, setCap] = useState(current ? (current.daily_cap?.toString() ?? '') : String(RULE_TEMPLATES[template].daily_cap ?? ''))
   const [boost, setBoost] = useState(current?.use_boost ?? true)
   const [enabled, setEnabled] = useState(current?.enabled ?? true)
   const [apply, setApply] = useState<ApplyFrom>(current ? 'NOW' : 'MONTH')

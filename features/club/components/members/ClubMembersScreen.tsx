@@ -1,8 +1,10 @@
 'use client'
 
+import Link from 'next/link'
+import { routes } from '@/shared/config/routes'
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Ban, Check, Crown, Search, Share2, ShieldCheck, UserMinus, UserX } from 'lucide-react'
+import { Ban, Check, Crown, Search, Share2, ShieldCheck, UserMinus, UserX, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Input, LevelBadge, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
 import { matchesSearch } from '@/shared/lib/search'
@@ -126,7 +128,7 @@ export function ClubMembersScreen({ clubId }: { clubId: string }) {
                     <li key={m.id}>
                       {manageable
                         ? <button onClick={() => setMenu(m)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-surface-2">{row}</button>
-                        : <div className="flex items-center gap-3 px-4 py-3">{row}</div>}
+                        : <Link href={routes.athlete(m.user_id)} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2">{row}</Link>}
                     </li>
                   )
                 })}
@@ -156,6 +158,9 @@ export function ClubMembersScreen({ clubId }: { clubId: string }) {
       <Sheet open={!!menu} onClose={() => setMenu(null)} title={menu?.profile?.display_name ?? 'Thành viên'} description={menu ? ROLE_LABEL[menu.role] : undefined}>
         {menu && (
           <div className="space-y-1">
+            <Link href={routes.athlete(menu.user_id)} className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] font-medium hover:bg-surface-2">
+              <UserRound className="size-5" aria-hidden />Xem hồ sơ & bài chạy
+            </Link>
             {role === 'OWNER' && menu.role === 'MEMBER' && (
               <MenuItem icon={ShieldCheck} label="Cho làm Quản trị viên" onClick={() => act.mutate({ type: 'promote', m: menu })} />
             )}

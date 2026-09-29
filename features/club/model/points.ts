@@ -41,6 +41,15 @@ export const RULE_TEMPLATES: { label: string; hint: string; rules: PointRule[]; 
     { name: 'Đi chạy nhóm CLB', per: 'RUN', points: 20, group_only: true },
     { name: 'Chạy cuối tuần', per: 'RUN', points: 5, min_km: 5, days: [6, 7] },
   ] },
+  { label: 'Tốc độ', hint: 'Thưởng buổi chạy nhanh — hợp CLB luyện thi', daily_cap: 40, rules: [
+    { name: 'Mỗi buổi từ 5 km', per: 'RUN', points: 5, min_km: 5 },
+    { name: 'Pace từ 6:00 trở xuống', per: 'RUN', points: 10, min_km: 5, max_pace_s: 360 },
+    { name: 'Pace từ 5:00 trở xuống', per: 'RUN', points: 10, min_km: 5, max_pace_s: 300 },
+  ] },
+  { label: 'Người mới', hint: 'Dễ đạt, thưởng việc ra đường chạy', daily_cap: 20, rules: [
+    { name: 'Mỗi buổi từ 2 km', per: 'RUN', points: 10, min_km: 2 },
+    { name: 'Thưởng buổi 5 km', per: 'RUN', points: 5, min_km: 5 },
+  ] },
 ]
 
 /** Kiểm tra giống máy chủ để báo lỗi ngay trên form */
