@@ -205,3 +205,31 @@ describe('quy tắc ghi bài chạy do admin đặt (Chính sách vận hành)',
     expect(s.phase).toBe('PAUSED')
   })
 })
+
+describe('Chạy tiếp sau khi lỡ bấm Kết thúc', () => {
+  it('mở lại đúng bài: giữ quãng đường cũ, thời gian chờ ở màn tổng kết không tính, chạy tiếp cộng thêm km', () => {
+    const { s, step, now } = sim()
+    step(3, 400)
+    s.finish(now())
+    const km1 = s.distanceM, moving1 = s.movingS
+    expect(s.phase).toBe('FINISHED')
+    // Đứng ở màn tổng kết 5 phút rồi bấm Chạy tiếp
+    const later = now() + 300_000
+    s.reopen(later)
+    s.resume(later)
+    expect(s.phase).toBe('RUNNING')
+    expect(s.endedAt).toBeNull()
+    expect(s.distanceM).toBe(km1)
+    step(0, 0)
+    // tiếp tục chạy thêm ~600 m (bước giả lập bắt đầu sau khoảng chờ)
+    for (let i = 0; i < 200; i++) s.tick(later + i * 1000)
+    s.finish(later + 200_000)
+    expect(s.movingS).toBeLessThan(moving1 + 250)   // 5 phút chờ không bị cộng vào thời gian chạy
+  })
+  it('chỉ mở lại được bài đã kết thúc', () => {
+    const { s, step, now } = sim()
+    step(3, 50)
+    s.reopen(now())
+    expect(s.phase).toBe('RUNNING')
+  })
+})

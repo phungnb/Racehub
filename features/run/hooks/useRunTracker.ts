@@ -204,6 +204,21 @@ export function useRunTracker() {
     sync()
   }, [stopAll, say, persist, sync, setPhase])
 
+  /** Màn tổng kết → "Chạy tiếp": mở lại đúng bài này, bật GPS và chạy tiếp (không tạo bài mới) */
+  const continueRun = useCallback(() => {
+    if (phaseRef.current !== 'FINISHED') return
+    session.current.reopen(Date.now())
+    session.current.resume(Date.now())
+    setSummary(null)
+    setPhase('RUNNING')
+    say('Chạy tiếp')
+    acquireWakeLock()
+    setGps('SEARCHING')
+    if (canTrackLocation()) startWatch()
+    persist(true)
+    sync()
+  }, [setPhase, say, acquireWakeLock, startWatch, persist, sync])
+
   const discard = useCallback(() => {
     stopAll()
     clearSnapshot()
@@ -285,6 +300,6 @@ export function useRunTracker() {
     background: tracksInBackground(),
     phase, gps, ...view, autoPauseOn, voiceOn, result, error, recovery, qaOn, qa, summary,
     stopRules: { askMin: tracking.longStopAskMin, autoStopMin: tracking.longStopAutoStopMin },
-    setVoiceOn, setAutoPauseOn, setQaOn, setQa, start, startAnyway, pause, resume, finish, discard, save, restore, dismissRecovery, dismissLongStop,
+    setVoiceOn, setAutoPauseOn, setQaOn, setQa, start, startAnyway, pause, resume, finish, continueRun, discard, save, restore, dismissRecovery, dismissLongStop,
   }
 }

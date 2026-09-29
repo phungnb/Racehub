@@ -121,7 +121,7 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
       {tab === 'RANK' && <ChallengeVouchers challengeId={c.id} canManage={d.can_manage} />}
       {tab === 'RANK' && <DrawPanel scope="CHALLENGE" refId={c.id} canManage={d.can_manage} />}
 
-      <ActionBar d={d} phase={phase} code={code ?? null} />
+      {tab !== 'HONOR' && <ActionBar d={d} phase={phase} code={code ?? null} />}
     </div>
   )
 }

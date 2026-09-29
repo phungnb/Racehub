@@ -199,7 +199,7 @@ function StepType({ d, set, errors, staffClubs }: StepProps & { staffClubs: { cl
               className={cn('rounded-xl border p-3 text-left', d.pledge.enabled && d.format === 'SOLO_GOAL' ? 'border-brand/60 bg-brand/10' : 'border-border bg-surface hover:border-fg-subtle')}>
               <CalendarRange className="mb-1.5 size-5 text-brand" aria-hidden />
               <span className="block text-sm font-semibold">Thử thách tuần</span>
-              <span className="block text-xs text-fg-muted">Mỗi người tự chọn mốc 21 · 42 · 60 · 100 km</span>
+              <span className="block text-xs text-fg-muted">Mỗi người tự chọn mục tiêu 21 · 42 · 60 · 100 km</span>
             </button>
           </div>
         </section>
@@ -555,7 +555,7 @@ function PledgeSection({ d, set, error }: { d: ChallengeDraft; set: (p: Partial<
           <span className="flex items-center gap-1.5 font-semibold"><Flag className="size-4 text-brand" aria-hidden />Mỗi người tự đăng ký mục tiêu</span>
           <span className="block text-xs text-fg-muted">
             {d.format === 'TEAM' ? 'Thành viên tự nhập km cam kết trước giờ xuất phát'
-              : 'Hoàn thành = đạt mốc của chính mình; bảng xếp hạng theo % mục tiêu'}
+              : 'Hoàn thành = đạt mục tiêu của chính mình; bảng xếp hạng theo % mục tiêu'}
           </span>
         </span>
       </label>
@@ -574,7 +574,7 @@ function PledgeSection({ d, set, error }: { d: ChallengeDraft; set: (p: Partial<
                 <button key={m} type="button" aria-pressed={on}
                   onClick={() => setP({ options: m === 'OPTIONS' ? (p.options.length ? p.options : [21, 42, 60, 100]) : [] })}
                   className={cn('rounded-xl border p-2.5 text-left text-sm', on ? 'border-brand/60 bg-brand/10 font-semibold' : 'border-border')}>
-                  {m === 'OPTIONS' ? 'Chọn theo mốc' : 'Tự nhập số km'}
+                  {m === 'OPTIONS' ? 'Chọn mục tiêu có sẵn' : 'Tự nhập số km'}
                 </button>
               )
             })}
@@ -585,7 +585,7 @@ function PledgeSection({ d, set, error }: { d: ChallengeDraft; set: (p: Partial<
                 {p.options.map((o) => (
                   <span key={o} className="inline-flex items-center gap-1 rounded-full bg-surface-2 py-1 pl-3 pr-1 font-mono text-sm font-semibold">
                     {o} km
-                    <button type="button" aria-label={`Bỏ mốc ${o} km`} disabled={p.options.length <= 1}
+                    <button type="button" aria-label={`Bỏ mục tiêu ${o} km`} disabled={p.options.length <= 1}
                       onClick={() => setP({ options: p.options.filter((x) => x !== o) })}
                       className="grid size-7 place-items-center rounded-full text-fg-subtle hover:bg-surface disabled:opacity-30"><X className="size-3.5" aria-hidden /></button>
                   </span>
@@ -593,7 +593,7 @@ function PledgeSection({ d, set, error }: { d: ChallengeDraft; set: (p: Partial<
               </div>
               {p.options.length < 8 && (
                 <div className="flex gap-2">
-                  <Input inputMode="decimal" value={newOpt} onChange={(e) => setNewOpt(e.target.value)} placeholder="Thêm mốc, vd 150" aria-label="Thêm mốc km"
+                  <Input inputMode="decimal" value={newOpt} onChange={(e) => setNewOpt(e.target.value)} placeholder="Thêm mục tiêu, vd 150" aria-label="Thêm mục tiêu km"
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addOpt() } }} />
                   <Button type="button" variant="secondary" className="shrink-0" onClick={addOpt}><Plus className="size-4" aria-hidden />Thêm</Button>
                 </div>
