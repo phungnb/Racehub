@@ -163,6 +163,10 @@ function Drawer({ profile, onSignOut, onClose }: { profile: Profile | null; onSi
                   <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-base" aria-hidden>💬</span>
                   <span className="min-w-0 flex-1 text-sm font-medium">Tin nhắn</span><ChevronRight className="size-4 text-fg-subtle" aria-hidden />
                 </Link></li>
+                <li><Link href={routes.victory} onClick={onClose} className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 hover:bg-surface-2">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-base" aria-hidden>🏆</span>
+                  <span className="min-w-0 flex-1 text-sm font-medium">Ảnh vinh danh (Victory Studio)</span><ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+                </Link></li>
               </ul>
             </section>
           )}

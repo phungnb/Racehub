@@ -30,6 +30,7 @@ import { RulesInfoCard } from './RulesInfo'
 import { TopSupported } from '@/features/game'
 import { HonorPanel, useHonor } from '../honor/HonorPanel'
 import { ChallengeVouchers } from '@/features/voucher'
+import { VictoryButton } from '@/features/victory'
 
 const fmtDateTime = (iso: string) => new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
 
@@ -93,6 +94,17 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
       <RecurrenceBar d={d} />
       <StatusBanner d={d} phase={phase} />
       <ProgressHero d={d} phase={phase} standings={standings} />
+      {/* Victory Studio: runner tạo ảnh vinh danh ngay tại đây; BTC vinh danh bất kỳ ai với danh hiệu tự đặt */}
+      {((!!d.me && d.me.status !== 'LEFT' && (d.me.current_progress > 0 || !!d.me.completed_at)) || (d.can_manage && phase !== 'UPCOMING')) && (
+        <div className="flex flex-wrap gap-2">
+          {!!d.me && d.me.status !== 'LEFT' && (d.me.current_progress > 0 || !!d.me.completed_at) && (
+            <VictoryButton kind="CHALLENGE" refId={c.id} className="flex-1" label={d.me.completed_at ? 'Tạo ảnh vinh danh' : 'Tạo ảnh hành trình'} />
+          )}
+          {d.can_manage && phase !== 'UPCOMING' && (
+            <VictoryButton kind="CHALLENGE" refId={c.id} pick label="Vinh danh thành viên" className="flex-1 from-surface-2 to-surface-2 text-fg" />
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-2">
         <MiniStat icon={Users} label="Tham gia" value={`${formatNumber(d.stats.participants)}${c.format !== 'COLLECTIVE' && c.format !== 'SOLO_GOAL' ? `/${formatNumber(c.max_slots)}` : ''}`} />
