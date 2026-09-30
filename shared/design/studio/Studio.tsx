@@ -159,12 +159,14 @@ export function Studio(p: StudioProps) {
 
   const pct = (v: number, of: number) => `${(v / of) * 100}%`
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start">
+    // Chia cột theo bề rộng khung chứa (container query), không theo cửa sổ: trong trang app hẹp (điện thoại / cột giữa) luôn 1 cột
+    <div className="@container">
+    <div className="grid grid-cols-1 gap-4 @3xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] @3xl:items-start">
       {/* Xem trước + thao tác trực tiếp */}
-      <div className="sticky top-0 z-10 -mx-1 space-y-2 bg-surface px-1 pb-2 lg:top-2">
+      <div className="sticky top-[var(--studio-top,0px)] z-10 -mx-1 space-y-2 bg-surface px-1 pb-2 @3xl:top-2">
         <div ref={box} tabIndex={0} onKeyDown={onKey} aria-label="Khung thiết kế — chạm chọn, kéo để di chuyển, phím mũi tên để dịch"
           style={{ '--ar': size.w / size.h } as CSSProperties}
-          className="relative mx-auto max-w-[calc(46dvh*var(--ar))] touch-none select-none rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-brand lg:max-w-[calc(72dvh*var(--ar))]"
+          className="relative mx-auto max-w-[calc(46dvh*var(--ar))] touch-none select-none rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-brand @3xl:max-w-[calc(72dvh*var(--ar))]"
           onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
           {p.preview(setLayout)}
           {guides.x && <span aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-fuchsia-500" />}
@@ -285,6 +287,7 @@ export function Studio(p: StudioProps) {
 
         {tab === 'style' && p.stylePanel}
       </div>
+    </div>
     </div>
   )
 }

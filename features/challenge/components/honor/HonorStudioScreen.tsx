@@ -194,15 +194,18 @@ function Editor({ d, h, board }: { d: ChallengeDetail; h: HonorState | null; boa
       ) : (
         <>
           <p className="text-xs text-fg-muted">Chạm một cụm trên ảnh (QR, tiêu đề, tên, ảnh runner, logo) để <b>kéo, phóng to, xoay</b>; chạm logo để đổi ảnh và hình khung (tròn, chữ nhật…).</p>
-          <Studio size={size} binds={HONOR_BINDS} palette={palette} colorLabels={HONOR_COLOR_LABEL} photoBinds={HONOR_PHOTO_BINDS} maxLayers={MAX_HONOR_LAYERS}
-            layers={design.layers} update={setLayers} snapshot={hist.snapshot} history={hist}
-            preview={(onLayout) => (
-              <DesignCanvas size={size} label="Xem trước ảnh vinh danh" onLayout={onLayout}
-                drawKey={JSON.stringify([design, data, n])} draw={(c) => drawHonor(c, design, 'poster', data, { editing: true }, n)} />
-            )}
-            upload={upload}
-            qrSuggestions={[{ key: 'race', title: 'QR thử thách', hint: 'Mở trang thử thách để xem bảng xếp hạng', ready: true, layer: { source: 'race', label: 'Xem thử thách' } }]}
-            onAuto={() => auto()} stylePanel={stylePanel} />
+          {/* Khung xem trước dính dưới thanh trên cùng khi cuộn bảng chỉnh */}
+          <div className="rounded-2xl bg-surface p-2" style={{ '--studio-top': 'var(--topbar-h)' } as React.CSSProperties}>
+            <Studio size={size} binds={HONOR_BINDS} palette={palette} colorLabels={HONOR_COLOR_LABEL} photoBinds={HONOR_PHOTO_BINDS} maxLayers={MAX_HONOR_LAYERS}
+              layers={design.layers} update={setLayers} snapshot={hist.snapshot} history={hist}
+              preview={(onLayout) => (
+                <DesignCanvas size={size} label="Xem trước ảnh vinh danh" onLayout={onLayout}
+                  drawKey={JSON.stringify([design, data, n])} draw={(c) => drawHonor(c, design, 'poster', data, { editing: true }, n)} />
+              )}
+              upload={upload}
+              qrSuggestions={[{ key: 'race', title: 'QR thử thách', hint: 'Mở trang thử thách để xem bảng xếp hạng', ready: true, layer: { source: 'race', label: 'Xem thử thách' } }]}
+              onAuto={() => auto()} stylePanel={stylePanel} />
+          </div>
         </>
       )}
 
