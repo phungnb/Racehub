@@ -32,7 +32,7 @@ export function VictoryHome() {
       {!access.unlocked && <VictoryUpsell />}
       <SegmentedControl value={tab} onChange={setTab} options={[
         { value: 'MINE', label: 'Thành tích' },
-        ...(managed.length ? [{ value: 'HONOR' as const, label: 'Vinh danh', count: managed.length }] : []),
+        ...(managed.length ? [{ value: 'HONOR' as const, label: 'Vinh danh thử thách' }] : []),
         { value: 'HISTORY', label: 'Đã tạo' },
       ]} />
       {tab === 'HISTORY' ? <History /> : q.isPending ? (

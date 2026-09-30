@@ -137,7 +137,7 @@ export type QrSource = keyof typeof QR_SOURCES
 export const SHAPES = { rect: 'Chữ nhật', round: 'Bo góc', pill: 'Viên thuốc', circle: 'Tròn', line: 'Đường kẻ', slash: 'Băng chéo', laurel: 'Nguyệt quế', seal: 'Con dấu' } as const
 export type ShapeKind = keyof typeof SHAPES
 
-export const PHOTO_SHAPES = { circle: 'Tròn', round: 'Bo góc', square: 'Vuông', hex: 'Lục giác', arch: 'Vòm', shield: 'Khiên' } as const
+export const PHOTO_SHAPES = { circle: 'Tròn', round: 'Bo góc', square: 'Chữ nhật', hex: 'Lục giác', arch: 'Vòm', shield: 'Khiên' } as const
 export type PhotoShape = keyof typeof PHOTO_SHAPES
 
 export const IMAGE_ROLES = { logo: 'Logo', sponsor: 'Nhà tài trợ', image: 'Ảnh', signature: 'Chữ ký' } as const
