@@ -13,7 +13,7 @@ async function seed(db: PGlite) {
 }
 describe('danh sách admin (011400)', () => {
   let db: PGlite
-  beforeAll(async () => { db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed }) }, 300_000)
+  beforeAll(async () => { db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed, until: '20261001011700' }) }, 300_000)  // trước Quản trị chính (011800)
   it('admin xem được, người thường bị chặn; cấp quyền xong có trong danh sách', async () => {
     const list = async () => (await asUser<{ r: { id: string; email: string; is_me: boolean }[] }>(db, ADM, '/rpc', `select public.admin_list_admins() as r`)).rows[0].r
     expect((await list()).map((a) => a.email)).toEqual(['a114@x.vn'])

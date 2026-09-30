@@ -20,6 +20,8 @@ import {
   VIC_TEMPLATES, type PhotoMode, type VicFacts, type VicFormat, type VicKind, type VicOptions, type VicStyle, type VicTemplate,
 } from '../model/victory'
 import { victoryKeys } from '../hooks/keys'
+import { useVictoryAccess } from '../hooks/useVictoryAccess'
+import { VictoryUpsell } from './VictoryUpsell'
 
 const AWARDS = ['Runner bền bỉ nhất', 'Runner của tháng', 'Pacer tiêu biểu', 'Người truyền cảm hứng', 'Chiến binh km', 'Tân binh xuất sắc']
 
@@ -58,6 +60,7 @@ function Designer({ facts: f, user, onChangePerson }: { facts: VicFacts; user: s
   const [character, setCharacter] = useState<string | null>(null)
   const [origin] = useState(() => (typeof window === 'undefined' ? '' : window.location.origin))
   const [code, setCode] = useState<string | null>(null)
+  const access = useVictoryAccess(f.kind === 'CHALLENGE' ? f.ref : null)
   // Đổi danh hiệu → mã cũ không còn khớp
   const setAward = (v: string) => { setAwardText(v); setCode(null) }
   const [post, setPost] = useState(false)
@@ -259,6 +262,14 @@ function Designer({ facts: f, user, onChangePerson }: { facts: VicFacts; user: s
       </Card>
 
       {/* Thanh xuất ảnh */}
+      {!access.unlocked && <VictoryUpsell compact />}
+      {!access.unlocked ? (
+        <div className="fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-md border-t border-border bg-bg/95 px-3 py-2 backdrop-blur-md">
+          <Link href={routes.plans} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-coin text-sm font-bold text-black">
+            <Lock className="size-4" aria-hidden />Nâng cấp để lưu và chia sẻ ảnh
+          </Link>
+        </div>
+      ) : (
       <div className="fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-md border-t border-border bg-bg/95 px-3 py-2 backdrop-blur-md">
         <div className="grid grid-cols-3 gap-2">
           <Button variant="secondary" onClick={() => save('image/png')} loading={render.isPending || saver.busy}><Download className="size-4" aria-hidden />Lưu PNG</Button>
@@ -269,6 +280,7 @@ function Designer({ facts: f, user, onChangePerson }: { facts: VicFacts; user: s
           <Megaphone className="size-4" aria-hidden />Đăng lên bảng tin CLB trên RaceHub
         </button>
       </div>
+      )}
       {saver.sheet}
       {post && <PostSheet facts={f} message={o.message} render={() => render.mutateAsync('image/jpeg')} onClose={() => setPost(false)} />}
     </div>

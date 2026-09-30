@@ -4,7 +4,7 @@ import { createSupabaseAdminClient, createSupabaseServerClient } from '@/shared/
 // Quản trị → Người dùng → "Thêm admin bằng email":
 //  • email đã có tài khoản → cấp quyền admin ngay (qua RPC của chính admin đang thao tác: ghi nhật ký, áp quy tắc quản trị);
 //  • chưa có → gửi thư mời đăng ký (Supabase Auth), tài khoản mới được cấp quyền admin luôn.
-// Chỉ admin hệ thống gọi được. Khóa service role chỉ dùng ở máy chủ để gửi thư mời, không trả gì ra ngoài.
+// Chỉ Quản trị chính gọi được (011800) — kiểm tra trước khi gửi thư mời để admin thường không gửi thư hàng loạt. Khóa service role chỉ dùng ở máy chủ để gửi thư mời, không trả gì ra ngoài.
 export const dynamic = 'force-dynamic'
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
@@ -15,6 +15,12 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'AUTH_REQUIRED' }, { status: 401 })
   const { data: isAdmin } = await supabase.rpc('is_system_admin')
   if (!isAdmin) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 })
+  const team = await supabase.rpc('admin_team')
+  if (!team.error) {
+    const t = team.data as { owner_exists: boolean; me: { is_owner: boolean } }
+    if (!t.owner_exists) return NextResponse.json({ error: 'OWNER_REQUIRED' }, { status: 403 })
+    if (!t.me.is_owner) return NextResponse.json({ error: 'OWNER_ONLY' }, { status: 403 })
+  }
 
   const body = (await req.json().catch(() => ({}))) as { email?: string }
   const email = String(body.email ?? '').trim().toLowerCase()
@@ -35,5 +41,5 @@ export async function POST(req: NextRequest) {
     const r = await supabase.rpc('admin_set_user_role', { p_user: target.id, p_role: 'SYSTEM_ADMIN', p_reason: `Thêm admin bằng email ${email}` })
     if (r.error) return NextResponse.json({ error: r.error.message }, { status: 400 })
   }
-  return NextResponse.json({ ok: true, invited, already: target.role === 'SYSTEM_ADMIN', name: target.display_name })
+  return NextResponse.json({ ok: true, invited, already: target.role === 'SYSTEM_ADMIN', id: target.id, name: target.display_name })
 }

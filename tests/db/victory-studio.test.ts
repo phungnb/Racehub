@@ -24,7 +24,8 @@ const run = (db: PGlite, uid: string, km: number, paceS: number) => db.query<{ i
 describe('Victory Studio (011600)', () => {
   let db: PGlite
   beforeAll(async () => {
-    db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed })
+    // Hành vi trước 011800 (011800 khóa Victory Studio theo gói — xem feedback-round4.test.ts)
+    db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed, until: '20261001011700' })
     await db.query(`insert into public.challenges (id, title, start_date, end_date, target_value, objective, format, status, created_by)
       values ($1, 'Thử thách 100 KM tháng 9', now() - interval '30 days', now() - interval '1 day', 100, 'DISTANCE', 'RANKED', 'ACTIVE', $2)`, [CH, M])
     await db.query(`insert into public.challenge_participants (challenge_id, profile_id, status, current_progress, distance_m, moving_s, run_count, streak_days, completed_at)

@@ -34,6 +34,32 @@ export const adminListAdmins = async () => (await call<AdminAccount[]>('admin_li
 export const adminSetUserBan = (id: string, ban: boolean, reason?: string) => call<void>('admin_set_user_ban', { p_user: id, p_ban: ban, p_reason: reason ?? null })
 export const adminSetUserRole = (id: string, role: 'SYSTEM_ADMIN' | 'MEMBER', reason?: string) =>
   call<void>('admin_set_user_role', { p_user: id, p_role: role, p_reason: reason ?? null })
+/** Đội quản trị (migration 011800): Quản trị chính + admin theo nhóm quyền */
+export type AdminScope = 'USERS' | 'ECONOMY' | 'ORDERS' | 'CLUBS' | 'CHALLENGES' | 'SHOP' | 'CONTENT' | 'MODERATION' | 'SYSTEM' | 'AUDIT'
+export const ADMIN_SCOPES: Record<AdminScope, { label: string; hint: string }> = {
+  USERS: { label: 'Người dùng', hint: 'Tìm tài khoản, xem hồ sơ, khóa / mở khóa, tài khoản bất thường' },
+  ECONOMY: { label: 'Kinh tế Xu', hint: 'Cộng / trừ Xu, chính sách kinh tế, gói nạp, quỹ CLB, chỉ số' },
+  ORDERS: { label: 'Đơn hàng & gói', hint: 'Xác nhận thanh toán, tặng gói VIP / Pro, bảng giá' },
+  CLUBS: { label: 'CLB & doanh nghiệp', hint: 'Gói CLB Pro, xóa CLB, doanh nghiệp; toàn quyền trong mọi CLB' },
+  CHALLENGES: { label: 'Thử thách & giải', hint: 'Hủy thử thách, lượt tạo, chợ BIB, đơn vị tổ chức giải' },
+  SHOP: { label: 'Cửa hàng & khuyến mãi', hint: 'Vật phẩm, quà, khuyến mãi, nhiệm vụ, voucher, đối tác, quay thưởng' },
+  CONTENT: { label: 'Nội dung', hint: 'Knowledge, trang hướng dẫn & chính sách, thông báo hệ thống' },
+  MODERATION: { label: 'Kiểm duyệt', hint: 'Báo cáo vi phạm, duyệt bài chạy, kiểm thử GPS' },
+  SYSTEM: { label: 'Hệ thống', hint: 'Kiểm tra hệ thống, lỗi, chính sách vận hành, Strava' },
+  AUDIT: { label: 'Nhật ký', hint: 'Xem nhật ký quản trị (chỉ đọc)' },
+}
+export interface TeamMember {
+  id: string; display_name: string | null; avatar_url: string | null; email: string | null; last_sign_in_at: string | null; is_me: boolean
+  is_owner: boolean; legacy: boolean; scopes: AdminScope[]; expires_at: string | null; expired: boolean; note: string | null; granted_at: string | null
+}
+export interface AdminTeam {
+  owner_exists: boolean
+  me: { id: string; is_owner: boolean; legacy: boolean; scopes: AdminScope[]; expires_at: string | null }
+  admins: TeamMember[]
+}
+export const adminTeam = () => call<AdminTeam>('admin_team')
+export const adminSetPermissions = (id: string, scopes: AdminScope[], expiresAt: string | null, note: string | null) =>
+  call<void>('admin_set_permissions', { p_user: id, p_scopes: scopes, p_expires_at: expiresAt, p_note: note })
 export const adminListChallenges = (query: string, status: string) =>
   call<AdminChallenge[]>('admin_list_challenges', { p_query: query, p_status: status }).then((x) => x ?? [])
 export const adminCancelChallenge = (id: string, reason: string) => call<void>('admin_cancel_challenge', { p_challenge_id: id, p_reason: reason })
@@ -54,6 +80,14 @@ const MESSAGES: Record<string, string> = {
   REASON_REQUIRED: 'Hãy ghi lý do (ít nhất 3 ký tự) để lưu nhật ký.',
   CHALLENGE_CLOSED: 'Thử thách đã kết thúc hoặc đã hủy.',
   USER_NOT_FOUND: 'Không tìm thấy người dùng.',
+  OWNER_REQUIRED: 'Chưa có Quản trị chính. Người giữ key hệ thống chạy lệnh đặt Quản trị chính trong Supabase SQL Editor trước.',
+  OWNER_ONLY: 'Chỉ Quản trị chính mới cấp / gỡ quyền và phân quyền admin.',
+  CANNOT_TARGET_OWNER: 'Không tác động được Quản trị chính (chỉ đổi được bằng key hệ thống).',
+  EMAIL_REQUIRED: 'Tài khoản này chưa có email đăng nhập — không cấp quyền admin được.',
+  INVALID_SCOPE: 'Nhóm quyền không hợp lệ.',
+  INVALID_EXPIRY: 'Ngày hết hạn phải ở tương lai.',
+  NOT_ADMIN: 'Người này chưa là admin.',
+  FORBIDDEN: 'Bạn chưa được giao quyền cho việc này.',
 }
 export function consoleErrorMessage(e: unknown, fallback = 'Không thực hiện được. Hãy thử lại.'): string {
   const raw = (e as { message?: string } | null)?.message ?? ''
@@ -63,7 +97,7 @@ export function consoleErrorMessage(e: unknown, fallback = 'Không thực hiện
 
 /** Nhãn tiếng Việt cho mã hành động trong nhật ký quản trị */
 export const AUDIT_LABEL: Record<string, string> = {
-  USER_BAN: 'Khóa tài khoản', USER_REPORT_DISMISS: 'Bỏ qua báo cáo', USER_REPORT_SUSPEND: 'Khóa Quanh đây', CONTENT_PUBLISHED: 'Đăng bài Knowledge', CONTENT_SCHEDULED: 'Hẹn giờ bài', CONTENT_ARCHIVED: 'Lưu trữ bài', CONTENT_DRAFT: 'Trả bài về nháp', CONTENT_REVIEW: 'Gửi duyệt bài', CONTENT_EXPERT_APPROVE: 'Duyệt chuyên môn', CONTENT_EXPERT_REJECT: 'Góp ý chuyên môn', CONTENT_STAFF: 'Đổi ban nội dung', BIB_HIDE: 'Ẩn tin BIB', BIB_UNHIDE: 'Hiện lại tin BIB', USER_UNBAN: 'Mở khóa tài khoản', USER_ROLE: 'Đổi quyền admin', CHALLENGE_CANCEL: 'Hủy thử thách',
+  USER_BAN: 'Khóa tài khoản', USER_REPORT_DISMISS: 'Bỏ qua báo cáo', USER_REPORT_SUSPEND: 'Khóa Quanh đây', CONTENT_PUBLISHED: 'Đăng bài Knowledge', CONTENT_SCHEDULED: 'Hẹn giờ bài', CONTENT_ARCHIVED: 'Lưu trữ bài', CONTENT_DRAFT: 'Trả bài về nháp', CONTENT_REVIEW: 'Gửi duyệt bài', CONTENT_EXPERT_APPROVE: 'Duyệt chuyên môn', CONTENT_EXPERT_REJECT: 'Góp ý chuyên môn', CONTENT_STAFF: 'Đổi ban nội dung', BIB_HIDE: 'Ẩn tin BIB', BIB_UNHIDE: 'Hiện lại tin BIB', USER_UNBAN: 'Mở khóa tài khoản', USER_ROLE: 'Đổi quyền admin', ADMIN_SCOPES: 'Phân quyền admin', ADMIN_OWNER_SET: 'Đặt Quản trị chính', ADMIN_OWNER_UNSET: 'Bỏ Quản trị chính', CHALLENGE_CANCEL: 'Hủy thử thách',
   ADMIN_GRANT_XU: 'Cộng / trừ Xu', ADJUST_USER_XU: 'Điều chỉnh Xu', TOPUP_USER_XU: 'Nạp Xu cho người dùng', TOPUP_CLUB_FUND: 'Nạp quỹ CLB',
   PARTNER_APPROVE: 'Xác minh đối tác', PARTNER_REJECT: 'Từ chối đối tác', PARTNER_HIDE: 'Ẩn đối tác',
   CLUB_TRANSFER_OWNER: 'Trao quyền chủ nhiệm', CLUB_SET_BANK: 'Đổi tài khoản quỹ CLB', CLUB_SET_BANK_QR: 'Đổi QR quỹ CLB', SET_CLUB_PLAN: 'Đổi gói CLB',

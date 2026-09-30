@@ -2,7 +2,7 @@
 
 import { useSearchParams } from 'next/navigation'
 import { useState } from 'react'
-import { Activity, Fingerprint, BookOpen, Link2, LifeBuoy, ShieldAlert, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, Building2, FlaskConical, SlidersHorizontal, type LucideIcon } from 'lucide-react'
+import { Activity, Fingerprint, BookOpen, Link2, LifeBuoy, ShieldAlert, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, Building2, FlaskConical, SlidersHorizontal, ShieldCheck, Lock, type LucideIcon } from 'lucide-react'
 import { ErrorState, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { adminErrorMessage } from '../api/adminApi'
@@ -27,6 +27,8 @@ import type { AdminInbox } from '../api/consoleApi'
 import { InboxPanel, useAdminInbox } from './console/InboxPanel'
 import { UsersTab } from './console/UsersTab'
 import { RiskTab } from './console/RiskTab'
+import { TeamTab, useAdminTeam } from './console/TeamTab'
+import type { AdminScope } from '../api/consoleApi'
 import { ChallengesTab } from './console/ChallengesTab'
 import { AuditTab } from './console/AuditTab'
 import { ReportsTab } from './console/ReportsTab'
@@ -39,7 +41,7 @@ import { HelpAdminTab } from '@/features/help'
 import { EnterpriseAdminTab } from '@/features/org'
 import { DrawPanel } from '@/features/draw'
 
-type Tab = 'overview' | 'metrics' | 'users' | 'risk' | 'review' | 'reports' | 'challenges' | 'clubs' | 'cups' | 'partners' | 'organizers' | 'content' | 'help' | 'bib'
+type Tab = 'overview' | 'metrics' | 'users' | 'team' | 'risk' | 'review' | 'reports' | 'challenges' | 'clubs' | 'cups' | 'partners' | 'organizers' | 'content' | 'help' | 'bib'
   | 'enterprise' | 'draws' | 'orders' | 'plans' | 'promos' | 'quests' | 'gifts' | 'items' | 'grant' | 'passes' | 'policy' | 'system' | 'audit' | 'strava' | 'gps' | 'ops'
 type Badge = keyof AdminInbox
 const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; label: string; icon: LucideIcon; badge?: Badge }[] }[] = [
@@ -47,7 +49,7 @@ const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; la
     { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard }, { id: 'metrics', label: 'Chỉ số', icon: BarChart3 }] },
   { id: 'people', label: 'Người dùng', icon: Users, tabs: [
     { id: 'users', label: 'Người dùng', icon: Users }, { id: 'risk', label: 'Tài khoản bất thường', icon: Fingerprint }, { id: 'review', label: 'Duyệt bài chạy', icon: CheckCircle2, badge: 'reviews' },
-    { id: 'reports', label: 'Báo cáo', icon: ShieldAlert, badge: 'reports' }] },
+    { id: 'reports', label: 'Báo cáo', icon: ShieldAlert, badge: 'reports' }, { id: 'team', label: 'Đội quản trị', icon: ShieldCheck }] },
   { id: 'community', label: 'Cộng đồng', icon: Trophy, tabs: [
     { id: 'challenges', label: 'Thử thách', icon: Trophy }, { id: 'clubs', label: 'CLB (Pro, xóa)', icon: Crown }, { id: 'cups', label: 'Thách đấu CLB', icon: Swords, badge: 'cups' },
     { id: 'partners', label: 'Đối tác', icon: Store, badge: 'partners' }, { id: 'bib', label: 'Chợ BIB', icon: Ticket }, { id: 'organizers', label: 'Tổ chức giải', icon: Flag },
@@ -60,6 +62,14 @@ const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; la
   { id: 'system', label: 'Hệ thống', icon: Activity, tabs: [
     { id: 'system', label: 'Kiểm tra hệ thống', icon: Activity, badge: 'errors' }, { id: 'ops', label: 'Chính sách vận hành', icon: SlidersHorizontal }, { id: 'audit', label: 'Nhật ký quản trị', icon: History }, { id: 'strava', label: 'Strava', icon: Link2 }, { id: 'gps', label: 'Kiểm thử GPS', icon: FlaskConical }] },
 ]
+/** Nhóm quyền cần cho từng tab (máy chủ vẫn tự kiểm tra — đây chỉ để ẩn tab không được giao) */
+const TAB_SCOPE: Partial<Record<Tab, AdminScope>> = {
+  metrics: 'ECONOMY', users: 'USERS', risk: 'USERS', review: 'MODERATION', reports: 'MODERATION', gps: 'MODERATION',
+  challenges: 'CHALLENGES', cups: 'CHALLENGES', bib: 'CHALLENGES', organizers: 'CHALLENGES', passes: 'CHALLENGES',
+  clubs: 'CLUBS', enterprise: 'CLUBS', partners: 'SHOP', promos: 'SHOP', draws: 'SHOP', quests: 'SHOP', gifts: 'SHOP', items: 'SHOP',
+  content: 'CONTENT', help: 'CONTENT', orders: 'ORDERS', plans: 'ORDERS', grant: 'ECONOMY', policy: 'ECONOMY',
+  system: 'SYSTEM', ops: 'SYSTEM', strava: 'SYSTEM', audit: 'AUDIT',
+}
 const ALL_TABS = GROUPS.flatMap((g) => g.tabs.map((t) => t.id))
 const groupOf = (t: Tab) => GROUPS.find((g) => g.tabs.some((x) => x.id === t)) ?? GROUPS[0]
 
@@ -81,7 +91,10 @@ export function AdminConsole() {
   const o = useEconomyOverview()
   const inbox = useAdminInbox().data
   const count = (b?: Badge) => (b && inbox ? Number(inbox[b] ?? 0) : 0)
-  const group = groupOf(tab)
+  const team = useAdminTeam().data
+  const can = (t: Tab) => !team || !TAB_SCOPE[t] || team.me.scopes.includes(TAB_SCOPE[t]!)
+  const groups = GROUPS.map((g) => ({ ...g, tabs: g.tabs.filter((t) => can(t.id)) })).filter((g) => g.tabs.length)
+  const group = groups.find((g) => g.tabs.some((x) => x.id === tab)) ?? groupOf(tab)
 
   return (
     <div className="space-y-4">
@@ -91,7 +104,7 @@ export function AdminConsole() {
       </div>
       <nav className="space-y-2" aria-label="Khu vực quản trị">
         <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]" role="tablist" aria-label="Nhóm">
-          {GROUPS.map((g) => {
+          {groups.map((g) => {
             const n = g.tabs.reduce((a, t) => a + count(t.badge), 0)
             return (
               <button key={g.id} role="tab" aria-selected={group.id === g.id} onClick={() => setTab(g.tabs[0].id)}
@@ -118,7 +131,11 @@ export function AdminConsole() {
       </nav>
 
       {tab === 'overview' && <InboxPanel onGo={setTab} />}
-      {tab === 'system' ? <SystemTab />
+      {!can(tab) ? (
+        <p className="flex items-center gap-2 rounded-xl border border-border p-4 text-sm text-fg-muted"><Lock className="size-4" aria-hidden />Bạn chưa được giao nhóm quyền này. Liên hệ Quản trị chính.</p>
+      ) : tab === 'overview' && team && !team.me.scopes.includes('ECONOMY') ? null
+        : tab === 'team' ? <TeamTab />
+        : tab === 'system' ? <SystemTab />
         : tab === 'users' ? <UsersTab />
         : tab === 'risk' ? <RiskTab />
         : tab === 'challenges' ? <ChallengesTab />

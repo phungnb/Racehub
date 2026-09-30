@@ -1,11 +1,3 @@
--- RaceHub — PHẦN 19/20 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 011800
--- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
--- Xong thì chạy phần tiếp theo.
-begin;
--- ===================================================================
--- 20261001011800_feedback_round4.sql
--- ===================================================================
 -- 011800: Chỉnh sửa lần 4.
 -- 1. Victory Studio lấy đúng "Mục tiêu đăng ký" (km runner tự đăng ký) ở thử thách tự đăng ký mục tiêu.
 -- 2. Quản trị hệ thống 2 tầng:
@@ -467,5 +459,3 @@ revoke all on function public.admin_set_permissions(uuid, text[], timestamptz, t
   public.victory_access(text), public.admin_set_user_role(uuid, text, text) from public, anon;
 grant execute on function public.admin_set_permissions(uuid, text[], timestamptz, text), public.admin_team(),
   public.victory_access(text), public.admin_set_user_role(uuid, text, text) to authenticated;
-
-commit;
