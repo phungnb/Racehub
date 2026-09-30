@@ -175,7 +175,7 @@ export interface OrgPost {
   meta: { campaign_id?: string; draw_id?: string }; is_pinned: boolean; created_at: string
   author_name: string | null; author_avatar: string | null; likes: number; liked: boolean; comments: number; can_delete: boolean
 }
-export interface OrgComment { id: string; parent_id?: string | null; body: string; created_at: string; author_id: string | null; author_name: string | null; author_avatar: string | null; can_delete: boolean; like_count?: number; liked?: boolean }
+export interface OrgComment { id: string; parent_id?: string | null; body: string; created_at: string; author_id: string | null; author_name: string | null; author_avatar: string | null; can_delete: boolean; like_count?: number; liked?: boolean; can_edit?: boolean; edited_at?: string | null }
 export const getOrgFeed = (orgId: string, before?: string | null) => call<OrgPost[]>('org_feed', { p_org: orgId, p_before: before ?? null })
 export const createOrgPost = (orgId: string, body: string, imageUrl: string | null, announce: boolean) =>
   call<OrgPost>('create_org_post', { p_org: orgId, p_body: body, p_image_url: imageUrl, p_announce: announce })
@@ -187,6 +187,7 @@ export const addOrgComment = (postId: string, body: string, parentId: string | n
   parentId ? call<void>('add_org_post_comment', { p_id: postId, p_body: body, p_parent_id: parentId }) : call<void>('add_org_post_comment', { p_id: postId, p_body: body })
 export const toggleOrgCommentLike = (id: string) => call<{ liked: boolean; count: number }>('toggle_org_comment_like', { p_id: id })
 export const deleteOrgComment = (id: string) => call<void>('delete_org_post_comment', { p_id: id })
+export const editOrgComment = (id: string, body: string) => call<void>('edit_org_post_comment', { p_id: id, p_body: body })
 
 export const getOrgReport = (orgId: string, from: string, to: string) => call<ReportRow[]>('org_report', { p_org: orgId, p_from: from, p_to: to })
 
@@ -287,12 +288,14 @@ const MESSAGES: Record<string, string> = {
   POSTS_ADMIN_ONLY: 'Chỉ quản trị tổ chức được đăng bài.',
   EMPTY_POST: 'Hãy viết nội dung.',
   EMPTY_COMMENT: 'Hãy viết bình luận.',
+  NOT_AUTHOR: 'Chỉ người viết mới sửa được bình luận này.',
+  COMMENT_NOT_FOUND: 'Bình luận không còn nữa.',
   POST_NOT_FOUND: 'Bài đăng không còn.',
   INVALID_IMAGE_PATH: 'Ảnh không hợp lệ, hãy tải lại.',
 }
 
 export function orgErrorMessage(e: unknown): string {
   const raw = (e as { message?: string } | null)?.message ?? ''
-  const key = Object.keys(MESSAGES).find((k) => raw.includes(k))
+  const key = Object.keys(MESSAGES).sort((a, b) => b.length - a.length).find((k) => raw.includes(k))
   return key ? MESSAGES[key] : systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')
 }

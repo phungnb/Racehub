@@ -47,6 +47,6 @@ const MESSAGES: Record<string, string> = {
 export function profileErrorMessage(e: unknown): string {
   const err = e as { message?: string; code?: string } | null
   console.warn('[Hồ sơ] Lỗi gốc:', err?.code, err?.message)
-  const key = Object.keys(MESSAGES).find((k) => (err?.message ?? '').includes(k))
+  const key = Object.keys(MESSAGES).sort((a, b) => b.length - a.length).find((k) => (err?.message ?? '').includes(k))
   return key ? MESSAGES[key] : systemErrorMessage(e, 'Không lưu được. Hãy thử lại.')
 }

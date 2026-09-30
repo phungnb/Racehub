@@ -12,6 +12,8 @@ export const routes = {
   club: (id: string) => `/clubs/${encodeURIComponent(id)}`,
   clubTab: (id: string, tab: 'chat' | 'challenges' | 'leaderboard' | 'members' | 'treasury' | 'settings' | 'photos' | 'hall' | 'shop' | 'exchange' | 'settings' | 'admin') => `/clubs/${encodeURIComponent(id)}/${tab}`,
   notifications: '/notifications',
+  messages: '/messages',
+  message: (userId: string) => `/messages/${encodeURIComponent(userId)}`,
   orgs: '/orgs',
   org: (id: string) => `/orgs/${encodeURIComponent(id)}`,
   orgCampaign: (orgId: string, id: string) => `/orgs/${encodeURIComponent(orgId)}/campaigns/${encodeURIComponent(id)}`,

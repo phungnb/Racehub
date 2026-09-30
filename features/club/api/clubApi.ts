@@ -382,6 +382,8 @@ const MESSAGES: Record<string, string> = {
   IMAGE_SIZE: 'Mỗi ảnh tối đa 5 MB.',
   EMPTY_POST: 'Hãy viết gì đó hoặc thêm ảnh.',
   EMPTY_COMMENT: 'Hãy viết bình luận.',
+  NOT_AUTHOR: 'Chỉ người viết mới sửa được bình luận này.',
+  COMMENT_NOT_FOUND: 'Bình luận không còn nữa.',
   EMPTY_MESSAGE: 'Tin nhắn đang trống.',
   POST_TOO_LONG: 'Nội dung quá dài.',
   POST_NOT_FOUND: 'Bài đăng không còn tồn tại.',
@@ -413,7 +415,7 @@ export function clubErrorMessage(e: unknown): string {
   // Ghi lỗi gốc ra Console (F12) để chẩn đoán; người dùng chỉ thấy câu tiếng Việt
   console.warn('[CLB] Lỗi gốc:', err?.code, err?.message, err?.details ?? '', err?.hint ?? '')
   const raw = err?.message ?? ''
-  const key = Object.keys(MESSAGES).find((k) => raw.includes(k))
+  const key = Object.keys(MESSAGES).sort((a, b) => b.length - a.length).find((k) => raw.includes(k))
   if (key) return MESSAGES[key]
   if (err?.code === '42501') return MESSAGES.FORBIDDEN
   return systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')

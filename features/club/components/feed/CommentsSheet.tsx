@@ -5,10 +5,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { CommentComposer, CommentList, ErrorState, Sheet, Skeleton, type ReplyTarget, type ThreadComment } from '@/shared/ui'
 import { clubErrorMessage } from '../../api/clubApi'
-import { addComment, deleteComment, listComments, toggleCommentLike, type ClubPost } from '../../api/postsApi'
+import { addComment, deleteComment, editComment, listComments, toggleCommentLike, type ClubPost } from '../../api/postsApi'
 import { clubKeys } from '../../hooks/keys'
 
-/** Bình luận một bài trên bảng tin CLB: thích, trả lời; xóa trong nút ⋯ (người viết / ban quản trị), luôn hỏi lại */
+/** Bình luận một bài trên bảng tin CLB: thích, trả lời; nút ⋯: sửa (người viết), xóa (người viết / ban quản trị, luôn hỏi lại) */
 export function CommentsSheet({ post, meId, isStaff, onClose }: { post: ClubPost | null; meId: string; isStaff: boolean; onClose: () => void }) {
   const qc = useQueryClient()
   const [text, setText] = useState('')
@@ -32,6 +32,11 @@ export function CommentsSheet({ post, meId, isStaff, onClose }: { post: ClubPost
     onError: (e) => toast.error(clubErrorMessage(e)),
   })
   const del = useMutation({ mutationFn: deleteComment, onSuccess: refresh, onError: (e) => toast.error(clubErrorMessage(e)) })
+  const edit = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: string }) => editComment(id, body),
+    onSuccess: () => { toast.success('Đã sửa bình luận'); void qc.invalidateQueries({ queryKey: key }) },
+    onError: (e) => toast.error(clubErrorMessage(e)),
+  })
   // Thích: đổi ngay trên màn hình, máy chủ trả số chính xác sau
   const like = useMutation({
     mutationFn: (c: ThreadComment) => toggleCommentLike(c.id),
@@ -54,7 +59,8 @@ export function CommentsSheet({ post, meId, isStaff, onClose }: { post: ClubPost
       ) : !q.data?.length ? (
         <p className="py-8 text-center text-sm text-fg-muted">Chưa có bình luận. Hãy là người đầu tiên!</p>
       ) : (
-        <CommentList comments={q.data} onLike={(c) => like.mutate(c)} onReply={reply} onDelete={(c) => del.mutate(c.id)} />
+        <CommentList comments={q.data} onLike={(c) => like.mutate(c)} onReply={reply} onDelete={(c) => del.mutate(c.id)}
+          onEdit={(c, body) => edit.mutateAsync({ id: c.id, body })} />
       )}
     </Sheet>
   )

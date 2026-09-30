@@ -11,7 +11,7 @@ import { formatRelative } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import { useSession } from '@/features/auth'
 import {
-  addOrgComment, toggleOrgCommentLike, createOrgPost, deleteOrgComment, deleteOrgPost, getOrgFeed, listOrgComments, orgErrorMessage, pinOrgPost, toggleOrgPostLike,
+  addOrgComment, toggleOrgCommentLike, createOrgPost, deleteOrgComment, editOrgComment, deleteOrgPost, getOrgFeed, listOrgComments, orgErrorMessage, pinOrgPost, toggleOrgPostLike,
   uploadOrgImage, type OrgDetail, type OrgPost,
 } from '../../api/orgApi'
 
@@ -155,14 +155,17 @@ function Comments({ postId, onChange }: { postId: string; onChange: () => void }
   const after = () => { void qc.invalidateQueries({ queryKey: key }); onChange() }
   const add = useMutation({ mutationFn: (t?: string) => addOrgComment(postId, (t ?? text).trim(), replyTo?.id ?? null), onSuccess: (_r, t) => { if (t === undefined) setText(''); setReplyTo(null); after() }, onError: (e) => toast.error(orgErrorMessage(e)) })
   const del = useMutation({ mutationFn: (id: string) => deleteOrgComment(id), onSuccess: after, onError: (e) => toast.error(orgErrorMessage(e)) })
+  const edit = useMutation({ mutationFn: ({ id, body }: { id: string; body: string }) => editOrgComment(id, body), onSuccess: () => { toast.success('Đã sửa bình luận'); void qc.invalidateQueries({ queryKey: key }) }, onError: (e) => toast.error(orgErrorMessage(e)) })
   const like = useMutation({ mutationFn: (id: string) => toggleOrgCommentLike(id), onSuccess: () => void qc.invalidateQueries({ queryKey: key }), onError: (e) => toast.error(orgErrorMessage(e)) })
   const comments: ThreadComment[] = (q.data ?? []).map((c) => ({
     id: c.id, parentId: c.parent_id ?? null, authorName: c.author_name, authorAvatar: c.author_avatar, body: c.body, createdAt: c.created_at,
     likeCount: c.like_count ?? 0, liked: !!c.liked, canDelete: c.can_delete, mine: c.author_id === uid,
+    canEdit: c.can_edit ?? false, editedAt: c.edited_at ?? null,
   }))
   return (
     <div className="space-y-3">
       <CommentList compact comments={comments} onLike={(c) => like.mutate(c.id)} onDelete={(c) => del.mutate(c.id)}
+        onEdit={(c, body) => edit.mutateAsync({ id: c.id, body })}
         onReply={(t) => { setReplyTo(t); requestAnimationFrame(() => input.current?.focus()) }} />
       <CommentComposer compact ref={input} value={text} onChange={setText} onSubmit={(t) => add.mutate(t)} pending={add.isPending}
         replyTo={replyTo} onCancelReply={() => setReplyTo(null)} />

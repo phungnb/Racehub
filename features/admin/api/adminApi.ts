@@ -334,7 +334,7 @@ export function adminErrorMessage(e: unknown): string {
   const err = e as { message?: string; code?: string } | null
   console.warn('[Admin] Lỗi gốc:', err?.code, err?.message)
   const raw = err?.message ?? ''
-  const key = Object.keys(MESSAGES).find((k) => raw.includes(k))
+  const key = Object.keys(MESSAGES).sort((a, b) => b.length - a.length).find((k) => raw.includes(k))
   if (key) return MESSAGES[key]
   // Lỗi quyền của chính cơ sở dữ liệu (không phải luật "chỉ admin"): hiện nguyên văn để biết bảng / hàm nào bị chặn
   if (err?.code === '42501') return `Lỗi quyền trong cơ sở dữ liệu: ${raw || 'permission denied'}. Gửi nguyên văn dòng này cho đội kỹ thuật.`

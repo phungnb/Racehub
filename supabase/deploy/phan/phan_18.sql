@@ -1,260 +1,414 @@
--- RaceHub — PHẦN 18/18 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 003500
+-- RaceHub — PHẦN 18/19 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- Gồm: 011500
 -- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
--- PHẦN CUỐI: luôn chạy phần này sau cùng (cập nhật trang Quản trị → Kiểm tra hệ thống).
+-- Xong thì chạy phần tiếp theo.
 begin;
 -- ===================================================================
--- 20261001003500_system_check.sql
+-- 20261001011500_social_follow_dm.sql
 -- ===================================================================
--- 003500: Trang "Kiểm tra hệ thống" cho admin.
--- admin_system_check() dò từng migration đã chạy chưa (qua một đối tượng đặc trưng của file đó),
--- kho ảnh, pg_net / cấu hình push, và dữ liệu bất thường (thử thách / trận CLB quá hạn chưa tất toán,
--- hàng đợi push bị kẹt, bài chờ duyệt). Chỉ đọc, không đổi gì. Chạy lại nhiều lần vẫn an toàn.
+-- 011500: MẠNG XÃ HỘI RUNNER — THÔNG BÁO HOẠT ĐỘNG MỚI, SỬA BÌNH LUẬN, THEO DÕI RUNNER, TIN NHẮN 1-1
+--   1. Thông báo khi bài chạy từ Strava / đồng hồ về: câu chúc mừng thay cho "Bài chạy … đã về RaceHub".
+--   2. Người viết bình luận được SỬA bình luận của mình (hiện "đã sửa"); xóa như cũ (người viết hoặc ban quản trị).
+--   3. Theo dõi runner (một chiều như Strava): bảng tin "Đang theo dõi" hiện hoạt động của người mình theo dõi (và của mình),
+--      tôn trọng quyền riêng tư sẵn có (Công khai / Chỉ CLB / Riêng tư, bài Strava chưa đồng ý chia sẻ thì không hiện).
+--      Người được theo dõi nhận thông báo. Chặn nhau → tự bỏ theo dõi hai chiều.
+--   4. Tin nhắn 1-1 giữa hai runner: nhắn được khi người nhận theo dõi mình, hoặc hai người là bạn kết nối, hoặc cùng CLB,
+--      hoặc người nhận đã từng nhắn cho mình. Có chặn, báo cáo (ngữ cảnh DM), thu hồi tin; giới hạn 60 tin / giờ.
+-- Chạy được trong SQL Editor: không DO $$, không SELECT INTO, không LIMIT, không RETURNING INTO. Chạy lại an toàn.
 
-create or replace function private.sc_fn(p_schema text, p_name text) returns boolean
-language sql stable as $$
-  select exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = p_schema and p.proname = p_name)
-$$;
-
-create or replace function private.sc_col(p_table text, p_col text) returns boolean
-language sql stable as $$
-  select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = p_table and column_name = p_col)
-$$;
-
-create or replace function public.admin_system_check() returns jsonb
-language plpgsql stable security definer set search_path = public as $$
+-- ---------------------------------------------------------------------
+-- 1. Thông báo hoạt động mới
+-- ---------------------------------------------------------------------
+create or replace function private.run_synced_notify() returns trigger
+language plpgsql security definer set search_path = public as $$
 declare
-  v_mig jsonb;
-  v_buckets jsonb;
-  v_stats jsonb := '{}'::jsonb;
+  v_km numeric;
+  v_xu numeric;
+  v_xp numeric;
+  v_more integer;
+  v_pace text;
+  v_body text;
+  v_km_text text;
+  v_title text;
 begin
-  if not public.is_system_admin() then raise exception 'FORBIDDEN'; end if;
-
-  v_mig := jsonb_build_array(
-    jsonb_build_object('file', '20261001000100', 'label', 'Khóa khẩn cấp quyền ghi', 'ok', not has_table_privilege('authenticated', 'public.clubs', 'INSERT')),
-    jsonb_build_object('file', '20261001000200', 'label', 'Sổ cái Xu', 'ok', private.sc_fn('private', 'ledger_post')),
-    jsonb_build_object('file', '20261001000300', 'label', 'RPC an toàn', 'ok', private.sc_fn('private', 'require_admin')),
-    jsonb_build_object('file', '20261001000400', 'label', 'Nhận bài chạy từ Strava', 'ok', private.sc_fn('public', 'ingest_provider_activity')),
-    jsonb_build_object('file', '20261001000500', 'label', 'CLB: bảng tin, chat, thông báo', 'ok', private.sc_fn('private', 'notify')),
-    jsonb_build_object('file', '20261001000600', 'label', 'Thử thách', 'ok', private.sc_fn('private', 'challenge_apply_activity')),
-    jsonb_build_object('file', '20261001000700', 'label', 'Kinh tế Xu + admin', 'ok', private.sc_fn('public', 'economy_policy')),
-    jsonb_build_object('file', '20261001000800', 'label', 'Lớp game', 'ok', private.sc_fn('private', 'game_config')),
-    jsonb_build_object('file', '20261001000900', 'label', 'Cửa hàng nhân vật', 'ok', private.sc_fn('private', 'character_look')),
-    jsonb_build_object('file', '20261001001000', 'label', 'Nhân vật 2D', 'ok', private.sc_col('avatar_items', 'render_kind')),
-    jsonb_build_object('file', '20261001001100', 'label', 'Bỏ cột 3D', 'ok', not private.sc_col('avatar_items', 'model_key')),
-    jsonb_build_object('file', '20261001001200', 'label', 'Admin vật phẩm', 'ok', private.sc_fn('public', 'admin_save_avatar_item')),
-    jsonb_build_object('file', '20261001001300', 'label', 'Bộ mũ / băng đô', 'ok', exists (select 1 from public.avatar_items where code = 'hat_cap_tempo_black')),
-    jsonb_build_object('file', '20261001001400', 'label', 'Hồ sơ chi tiết', 'ok', to_regclass('public.profile_details') is not null),
-    jsonb_build_object('file', '20261001001500', 'label', 'Sự kiện + quỹ CLB', 'ok', private.sc_fn('private', 'event_json')),
-    jsonb_build_object('file', '20261001001600', 'label', 'QR ngân hàng CLB', 'ok', private.sc_col('clubs', 'bank_qr_url')),
-    jsonb_build_object('file', '20261001001700', 'label', 'Thông báo đẩy', 'ok', private.sc_fn('private', 'push_kick')),
-    jsonb_build_object('file', '20261001001800', 'label', 'Onboarding', 'ok', private.sc_col('profiles', 'onboarded_at')),
-    jsonb_build_object('file', '20261001001900', 'label', 'Chi tiết bài chạy', 'ok', to_regclass('public.activity_details') is not null),
-    jsonb_build_object('file', '20261001002000', 'label', 'Mục tiêu tự đăng ký', 'ok', private.sc_fn('public', 'set_my_pledge')),
-    jsonb_build_object('file', '20261001002100', 'label', 'CLB không giới hạn thành viên', 'ok',
-      (select column_default from information_schema.columns where table_schema = 'public' and table_name = 'clubs' and column_name = 'member_limit') = '1000000'),
-    jsonb_build_object('file', '20261001002200', 'label', 'Tự chia đội', 'ok', private.sc_col('challenges', 'pledge_team_size')),
-    jsonb_build_object('file', '20261001002300', 'label', 'Chống gian lận', 'ok', private.sc_col('activities', 'risk_score')),
-    jsonb_build_object('file', '20261001002400', 'label', 'Duyệt bài nghi vấn', 'ok', private.sc_fn('private', 'can_review_activity')),
-    jsonb_build_object('file', '20261001002500', 'label', 'Bộ đồ NBNR', 'ok', exists (select 1 from public.avatar_items where code = 'bottom_nbnr_club')),
-    jsonb_build_object('file', '20261001002600', 'label', 'CLB đấu CLB', 'ok', private.sc_fn('public', 'create_club_battle')),
-    jsonb_build_object('file', '20261001002700', 'label', 'Giải chạy ảo', 'ok', to_regclass('public.virtual_races') is not null),
-    jsonb_build_object('file', '20261001002800', 'label', 'CLB Pro', 'ok', private.sc_col('clubs', 'plan')),
-    jsonb_build_object('file', '20261001002900', 'label', 'e-BIB + kho ảnh race-media', 'ok', private.sc_col('virtual_races', 'bib_design')),
-    jsonb_build_object('file', '20261001003000', 'label', 'BIB: ảnh có sẵn', 'ok', private.sc_fn('private', 'bib_num')),
-    jsonb_build_object('file', '20261001003100', 'label', 'Tìm kiếm không dấu', 'ok', private.sc_fn('private', 'search_key')),
-    jsonb_build_object('file', '20261001003200', 'label', 'BIB: 3 khung chữ', 'ok', private.sc_fn('private', 'bib_box')),
-    jsonb_build_object('file', '20261001003300', 'label', 'Gợi ý tìm kiếm + sửa kho ảnh', 'ok', private.sc_fn('public', 'can_upload_race_media')),
-    jsonb_build_object('file', '20261001003400', 'label', 'Chặn lộ mã mời CLB', 'ok', not has_column_privilege('authenticated', 'public.clubs', 'invite_code', 'SELECT')),
-    jsonb_build_object('file', '20261001003500', 'label', 'Kiểm tra hệ thống', 'ok', true),
-    jsonb_build_object('file', '20261001003600', 'label', 'Thách đấu nhiều CLB', 'ok', to_regclass('public.club_cups') is not null),
-    jsonb_build_object('file', '20261001003700', 'label', 'Kinh tế v2 (1 Xu = 100đ)', 'ok', private.sc_fn('private', 'run_xu_for_km')),
-    jsonb_build_object('file', '20261001003800', 'label', 'Gói VIP / Pro, đơn hàng', 'ok', to_regclass('public.orders') is not null),
-    jsonb_build_object('file', '20261001003900', 'label', 'Quà tặng', 'ok', to_regclass('public.gift_catalog') is not null),
-    jsonb_build_object('file', '20261001004000', 'label', 'Phân tích VIP + chỉ số kinh tế', 'ok', to_regprocedure('public.admin_economy_metrics(integer)') is not null),
-    jsonb_build_object('file', '20261001004100', 'label', 'Bảo mật + nhật ký không xóa được', 'ok', private.sc_fn('private', 'append_only')),
-    jsonb_build_object('file', '20261001004200', 'label', 'Phong độ + chào mừng trở lại', 'ok', to_regprocedure('public.runner_form(uuid)') is not null),
-    jsonb_build_object('file', '20261001004300', 'label', 'Nhiệm vụ do admin tạo + khuyến mãi', 'ok', to_regclass('public.promotions') is not null),
-    jsonb_build_object('file', '20261001004400', 'label', 'Thông báo hệ thống + nhật ký lỗi', 'ok', to_regprocedure('public.system_notice()') is not null),
-    jsonb_build_object('file', '20261001004500', 'label', 'Báo "Bài chạy đã về"', 'ok', private.sc_fn('private', 'run_synced_notify')),
-    jsonb_build_object('file', '20261001004600', 'label', 'Nhiệm vụ v2 (bậc, cộng đồng, gợi ý)', 'ok', private.sc_fn('private', 'quest_finish')),
-    jsonb_build_object('file', '20261001004700', 'label', 'Ví Tỏa sáng (đổi quà, bậc tỏa sáng)', 'ok', to_regclass('public.shine_shop') is not null),
-    jsonb_build_object('file', '20261001004800', 'label', 'Thiết kế BIB theo lớp + giấy chứng nhận', 'ok', private.sc_col('virtual_races', 'cert_design')),
-    jsonb_build_object('file', '20261001004900', 'label', 'Vinh danh thử thách (CLB Pro / VIP)', 'ok', to_regclass('public.challenge_honors') is not null),
-    jsonb_build_object('file', '20261001005000', 'label', 'Sửa trao quyền Chủ nhiệm CLB', 'ok',
-      exists (select 1 from pg_proc where proname = 'transfer_club_ownership' and prosrc like '%CAPTAIN%')),
-    jsonb_build_object('file', '20261001005100', 'label', 'Khuyến mãi vật phẩm (Xu)', 'ok', to_regclass('public.item_promotions') is not null),
-    jsonb_build_object('file', '20261001005200', 'label', 'Voucher tài trợ (thử thách / nhiệm vụ)', 'ok', to_regclass('public.voucher_campaigns') is not null),
-    jsonb_build_object('file', '20261001005300', 'label', 'Chợ Runner (hồ sơ HLV / Shop / Dịch vụ đã xác minh)', 'ok', to_regclass('public.partners') is not null),
-    jsonb_build_object('file', '20261001005400', 'label', 'Thể lệ thử thách + danh sách bỏ thử thách đã hủy', 'ok', to_regprocedure('public.set_challenge_rules(uuid, jsonb)') is not null),
-    jsonb_build_object('file', '20261001005500', 'label', 'Đăng nhập Google / Apple + mã giới thiệu + xem trước lời mời', 'ok', to_regprocedure('public.my_referral()') is not null),
-    jsonb_build_object('file', '20261001005600', 'label', 'Quản trị: việc cần xử lý, người dùng, thử thách, nhật ký', 'ok', to_regprocedure('public.admin_inbox()') is not null),
-    jsonb_build_object('file', '20261001005700', 'label', 'Gỡ ràng buộc vai trò CLB cũ (sửa lỗi trao quyền Chủ nhiệm)',
-      'ok', not exists (select 1 from pg_constraint where conname = 'club_members_role_check' and conrelid = 'public.club_members'::regclass)),
-    jsonb_build_object('file', '20261001005800', 'label', 'Trang phục: bộ sưu tập, vòng đời, điều kiện mở khóa, vùng in, đồng phục CLB',
-      'ok', to_regprocedure('public.request_club_uniform(uuid, jsonb)') is not null),
-    jsonb_build_object('file', '20261001005900', 'label', 'Bộ đồng phục: áo + quần + tất + giày, họa tiết, mặc cả bộ',
-      'ok', to_regprocedure('private.clean_design(jsonb, text)') is not null),
-    jsonb_build_object('file', '20261001006000', 'label', 'Bộ sưu tập nhân vật (dáng) + thiết kế in kéo thả, độ đậm màu, ảnh vải',
-      'ok', to_regprocedure('private.character_bodies()') is not null))
-  -- PostgreSQL giới hạn 100 tham số mỗi hàm → danh sách chia thành nhiều mảng rồi nối lại
-  || jsonb_build_array(
-    jsonb_build_object('file', '20261001006100', 'label', 'Quanh đây: runner gần bạn (ô ~1 km), kết nối, rủ chạy, buổi chạy công khai, chặn / báo cáo',
-      'ok', to_regprocedure('public.nearby_runners(jsonb)') is not null),
-    jsonb_build_object('file', '20261001006200', 'label', 'RaceHub Knowledge: kiến thức & tin tức, CMS có duyệt chuyên môn, tiến độ đọc, chuỗi bài → huy hiệu',
-      'ok', to_regprocedure('public.knowledge_home()') is not null),
-    jsonb_build_object('file', '20261001006300', 'label', 'Quản lý CLB: Tin CLB của ban chủ nhiệm + kho link ảnh CLB (album sự kiện, giải chạy)',
-      'ok', to_regprocedure('public.club_albums(uuid, jsonb)') is not null),
-    jsonb_build_object('file', '20261001006400', 'label', 'Chợ BIB: nhượng / tìm mua BIB (không cao hơn giá gốc, liên hệ ẩn, báo cáo, admin ẩn tin)',
-      'ok', to_regprocedure('public.bib_listings(jsonb)') is not null),
-    jsonb_build_object('file', '20261001006500', 'label', 'Chấm bài GPS: phát hiện mất tín hiệu (tắt màn hình) — tuyến nối thẳng phải xác minh',
-      'ok', exists (select 1 from pg_proc where proname = 'submit_and_process_activity' and prosrc like '%GPS_GAP%')),
-    jsonb_build_object('file', '20261001006600', 'label', 'Quãng đường bài GPS = số app đo (kẹp theo tuyến) + từng km trên máy chủ',
-      'ok', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'activity_track_points' and column_name = 'distance_m')),
-    jsonb_build_object('file', '20261001006700', 'label', 'Quy định API Strava: bài Strava của người khác chỉ hiện số tổng (ẩn bản đồ, từng km, nhịp tim)',
-      'ok', exists (select 1 from pg_proc where proname = 'activity_detail' and prosrc like '%strava_limited%')),
-    jsonb_build_object('file', '20261001006800', 'label', 'Xoá tài khoản trong app (Apple 5.1.1(v), Luật BVDLCN 2025): xoá dữ liệu cá nhân + ẩn danh',
-      'ok', to_regprocedure('public.delete_my_account(text)') is not null),
-    jsonb_build_object('file', '20261001006900', 'label', 'Thông báo / push lỗi không làm hỏng thao tác chính (gán Pro, nhập bài Strava…) + nhật ký lỗi',
-      'ok', to_regprocedure('public.admin_notify_errors()') is not null),
-    jsonb_build_object('file', '20261001007000', 'label', 'Bài Strava chỉ hiện cho người khác khi runner đồng ý (hướng B+) + công tắc chính sách của admin',
-      'ok', to_regprocedure('public.set_strava_sharing(boolean)') is not null),
-    jsonb_build_object('file', '20261001007100', 'label', 'Admin hệ thống toàn quyền trong mọi CLB (duyệt, sửa, đăng tin, trao quyền, giải tán)',
-      'ok', exists (select 1 from pg_proc where proname = 'club_is_staff' and prosrc like '%is_system_admin%')),
-    jsonb_build_object('file', '20261001007200', 'label', 'Hàm gán gói CLB Pro đúng bản chuẩn (sửa lỗi "chỉ quản trị viên…" khi gán Pro)',
-      'ok', exists (select 1 from pg_proc where proname = 'admin_set_club_plan' and prosrc like '%log_notify_error(''club_plan''%')),
-    jsonb_build_object('file', '20261001007300', 'label', 'Menu Hướng dẫn & Chính sách (trang admin soạn được, đọc khi chưa đăng nhập) + thông tin pháp nhân',
-      'ok', to_regprocedure('public.help_menu()') is not null),
-    jsonb_build_object('file', '20261001007400', 'label', 'Kết nối Strava = đồng ý hiện bài cho CLB & BXH (bỏ bước hỏi; runner tắt được trong Cài đặt)',
-      'ok', exists (select 1 from pg_proc where proname = 'activity_shared' and prosrc like '%strava_share from public.profile_settings s where s.user_id = p_user), true)%')),
-    jsonb_build_object('file', '20261001007500', 'label', 'Sửa lỗi "Không tính được phí" khi tạo thử thách / giải cho CLB Pro + báo giá biết gói VIP / Pro',
-      'ok', exists (select 1 from pg_proc where proname = 'issue_credits' and prosrc like '%r_credit%')),
-    jsonb_build_object('file', '20261001007600', 'label', 'Thử thách tự lặp lại hằng tuần / tháng / quý / năm (tạo kỳ mới như tạo tay: quyền, phí, lượt)',
-      'ok', to_regprocedure('public.spawn_recurring_challenges()') is not null),
-    jsonb_build_object('file', '20261001007700', 'label', 'Ngày vàng ×1,5 / ×2 / ×3 của CLB (nhân km thử thách CLB + BXH CLB, không nhân XP / Xu)',
-      'ok', to_regprocedure('public.club_leaderboard_v2(uuid, text)') is not null),
-    jsonb_build_object('file', '20261001007800', 'label', 'Đại sảnh danh vọng CLB + cột mốc km / Half / Full Marathon tự đăng bảng tin',
-      'ok', to_regprocedure('public.club_hall_of_fame(uuid)') is not null),
-    jsonb_build_object('file', '20261001007900', 'label', 'Cửa hàng CLB: đặt áo / BIB, VietQR vào tài khoản CLB (RaceHub không giữ tiền)',
-      'ok', to_regprocedure('public.place_club_order(uuid, jsonb, text)') is not null),
-    jsonb_build_object('file', '20261001008000', 'label', 'Trang công khai của CLB Pro (/c/<link-riêng>)',
-      'ok', to_regprocedure('public.club_public_page(text)') is not null),
-    jsonb_build_object('file', '20261001008100', 'label', 'Tường nhà CLB Pro (ảnh bìa, khẩu hiệu, chủ đề) + thư mời giao lưu CLB',
-      'ok', to_regprocedure('public.send_club_exchange(uuid, uuid, jsonb)') is not null and private.sc_col('clubs', 'cover_url')),
-    jsonb_build_object('file', '20261001008200', 'label', 'Hạn mức thử thách CLB theo gói (Free / Pro), chặn CLB một người',
-      'ok', to_regprocedure('public.club_challenge_quota(uuid, integer)') is not null),
-    jsonb_build_object('file', '20261001008300', 'label', 'RaceHub Doanh nghiệp / Liên CLB (tổ chức, chiến dịch, báo cáo, báo giá)',
-      'ok', to_regprocedure('public.org_campaign_board(uuid)') is not null),
-    jsonb_build_object('file', '20261001008400', 'label', 'Quản lý doanh nghiệp (email công ty, nhập danh sách, đơn vị nhiều cấp, chốt kết quả, chứng nhận, bảng tin) + quay thưởng',
-      'ok', to_regprocedure('public.run_lucky_draw(uuid)') is not null and to_regprocedure('public.org_import_members(uuid, jsonb, jsonb)') is not null),
-    jsonb_build_object('file', '20261001008500', 'label', 'Chống gian lận chỉ khi thi đấu, CLB miễn phí tối đa 50 thành viên, bảng so sánh gói, Điều khoản / Quyền riêng tư sửa được',
-      'ok', to_regprocedure('public.plan_compare()') is not null and private.sc_col('activities', 'review_skipped')),
-    jsonb_build_object('file', '20261001008600', 'label', 'Tổ chức demo cho admin / khách dùng thử gói Doanh nghiệp',
-      'ok', to_regprocedure('public.admin_create_demo_org(jsonb)') is not null),
-    jsonb_build_object('file', '20261001008700', 'label', 'Tổng quan tổ chức: chỉ số, BXH phòng ban / CLB / cá nhân, km theo ngày',
-      'ok', to_regprocedure('public.org_overview(uuid, timestamp with time zone, timestamp with time zone)') is not null),
-    jsonb_build_object('file', '20261001008800', 'label', 'Chất lượng GPS của bài chạy ghi bằng app + kiểm thử GPS thực địa',
-      'ok', to_regprocedure('public.admin_gps_qa_list(integer)') is not null and to_regclass('public.activity_gps_quality') is not null),
-    jsonb_build_object('file', '20261001008900', 'label', 'VÁ BẢO MẬT: chặn người ngoài CLB / khách sửa CLB, đổi mã mời, chuyển quyền chủ',
-      'ok', not has_function_privilege('anon', 'public.update_club(uuid, text, text, text, text)', 'execute')
-            and position('coalesce' in (select p.prosrc from pg_proc p where p.oid = 'public.transfer_ownership(uuid, uuid)'::regprocedure)) > 0),
-    jsonb_build_object('file', '20261001009000', 'label', 'Lỗi người dùng gặp: admin đánh dấu đã xử lý',
-      'ok', to_regprocedure('public.admin_resolve_client_error(text)') is not null),
-    jsonb_build_object('file', '20261001009100', 'label', 'Chính sách vận hành: bật / tắt tính năng, ghi bài chạy, ngưỡng chống gian lận, trang Doanh nghiệp + lịch sử / khôi phục',
-      'ok', to_regprocedure('public.admin_publish_ops_policy(jsonb, text)') is not null and to_regprocedure('public.admin_rollback_config(text, integer)') is not null),
-    jsonb_build_object('file', '20261001009200', 'label', 'Thẻ gói Miễn phí / CLB Miễn phí / Doanh nghiệp do admin soạn + số quản trị viên CLB miễn phí do admin đặt',
-      'ok', to_regprocedure('private.valid_plan_content(jsonb)') is not null and to_regprocedure('private.club_free_captains()') is not null),
-    jsonb_build_object('file', '20261001009300', 'label', 'Quay thưởng trên sân khấu: BTC chọn danh sách / loại trừ, quay từng giải, vắng mặt quay lại, mã cam kết',
-      'ok', to_regprocedure('public.draw_next(uuid, integer)') is not null and private.sc_col('lucky_draws', 'seed_hash')),
-    jsonb_build_object('file', '20261001009400', 'label', 'Điểm CLB: ban quản trị tự đặt luật tính điểm (phiên bản, lịch sử), BXH điểm, điểm từng bài',
-      'ok', to_regprocedure('public.save_club_point_rules(uuid, jsonb, text)') is not null and to_regclass('public.club_point_rules') is not null),
-    jsonb_build_object('file', '20261001009500', 'label', 'Quay thưởng: người điểm danh tại buổi, danh sách dán, nhà tài trợ',
-      'ok', to_regprocedure('public.draw_absent_key(uuid, text)') is not null and private.sc_col('lucky_draws', 'manual_names')),
-    jsonb_build_object('file', '20261001009600', 'label', 'Bảng điều khiển ban quản trị CLB + tổng kết tuần / tháng tự động',
-      'ok', to_regprocedure('public.club_admin_dashboard(uuid)') is not null and to_regprocedure('public.post_monthly_club_recaps()') is not null),
-    jsonb_build_object('file', '20261001009700', 'label', 'VÁ CHỐNG GIAN LẬN: không tự duyệt bài nghi vấn từ mức Trung bình, "chỉ tính phần có GPS", lời báo thân thiện',
-      'ok', to_regprocedure('public.accept_verified_distance(uuid)') is not null and private.sc_col('activities', 'review_detail')),
-    jsonb_build_object('file', '20261001009800', 'label', 'Chống gian lận cho MỌI bài chạy (không còn tự duyệt khi không thi đấu), lời báo ngắn',
-      'ok', coalesce((private.ops_defaults()->'antiCheat'->>'autoApproveMaxScore')::int, -1) = 0),
-    jsonb_build_object('file', '20261001009900', 'label', 'Bài chạy trùng giờ (nhiều thiết bị): mỗi thời điểm chỉ tính một bài, bài dài nhất; thu hồi thưởng bài bị thay',
-      'ok', to_regprocedure('private.activity_overlap_guard()') is not null
-            and exists (select 1 from pg_trigger t where t.tgname = 'trg_ac_activity_overlap' and t.tgrelid = 'public.activities'::regclass)),
-    jsonb_build_object('file', '20261001010000', 'label', 'Chống gian lận GPS V1: mất GPS một đoạn vẫn tính đủ km, điểm nhảy không cộng km, chỉ giữ bài có dấu hiệu rõ',
-      'ok', (private.ops_defaults()->'antiCheat') ? 'gapReviewPct'),
-    jsonb_build_object('file', '20261001010100', 'label', 'Vá sau nghiệm thu: thu hồi quyền ghi thừa trên 9 bảng, chống spam yêu cầu báo giá',
-      'ok', not has_table_privilege('anon', 'public.partners', 'insert') and to_regclass('public.org_leads_user_idx') is not null),
-    jsonb_build_object('file', '20261001010200', 'label', 'Đổi tên "Giải chạy ảo" thành "Giải chạy" (trang hướng dẫn, bài Kiến thức, thông báo, thẻ gói)',
-      'ok', not exists (select 1 from public.help_pages h where h.body ilike '%giải chạy ảo%')),
-    jsonb_build_object('file', '20261001010300', 'label', 'Tài khoản bất thường cho admin: hai nơi cùng lúc, chung thiết bị, bài trùng giờ, nuôi lời mời',
-      'ok', to_regprocedure('public.admin_account_risks(integer)') is not null and to_regclass('private.device_links') is not null),
-    jsonb_build_object('file', '20261001010400', 'label', 'Bình luận có Thích và Trả lời (bảng tin CLB + Doanh nghiệp), thông báo khi được trả lời / thích',
-      'ok', to_regprocedure('public.toggle_post_comment_like(uuid)') is not null and to_regprocedure('public.toggle_org_comment_like(uuid)') is not null),
-    jsonb_build_object('file', '20261001010500', 'label', 'Thích + quà tặng minh bạch (ai thích, ai tặng), bảng tin cộng đồng, xóa thông báo',
-      'ok', to_regprocedure('public.post_engagement(uuid)') is not null and to_regprocedure('public.community_feed(timestamp with time zone,integer)') is not null
-            and private.sc_col('club_posts', 'gift_count')),
-    jsonb_build_object('file', '20261001010600', 'label', 'Sự kiện chạy nhóm nhiều cự ly, báo cả CLB khi đổi lịch',
-      'ok', private.sc_col('club_events', 'routes') and private.sc_fn('private', 'event_routes')),
-    jsonb_build_object('file', '20261001010700', 'label', 'Thử thách chinh phục thời gian / pace nhiều hạng mục, hạn đăng ký, BXH theo ngày, ngày vàng riêng',
-      'ok', to_regclass('public.challenge_categories') is not null and to_regprocedure('public.challenge_member_days(uuid,uuid)') is not null
-            and to_regclass('public.challenge_boost_days') is not null),
-    jsonb_build_object('file', '20261001010800', 'label', 'Khóa chống trừ Xu hai lần, ví không bao giờ âm, quản trị viên không nhận Xu, sửa BXH đấu CLB',
-      'ok', to_regclass('public.ledger_transactions_idempotency_uidx') is not null and private.sc_fn('private', 'is_admin_account')
-            and exists (select 1 from pg_trigger where tgname = 'trg_ledger_no_negative')),
-    jsonb_build_object('file', '20261001010900', 'label', 'BXH giải chạy theo cự ly (ai hoàn thành, ai chưa), đổi "mốc" thành "mục tiêu"',
-      'ok', to_regprocedure('public.race_results_v2(uuid,numeric)') is not null),
-    jsonb_build_object('file', '20261001011000', 'label', 'Kho quà v2: quà tĩnh / quà hiệu ứng động, quà theo mốc (5K…Ultra, PR), 45 quà mới, ảnh riêng',
-      'ok', private.sc_col('gift_catalog', 'kind') and to_regprocedure('public.gift_catalog_for(uuid,uuid)') is not null),
-    jsonb_build_object('file', '20261001011100', 'label', 'App cửa hàng: ẩn mua bán trong app iOS/Android (công tắc "Cho phép mua trong app"), Zalo / Telegram hỗ trợ',
-      'ok', private.ops_defaults()->'features' ? 'nativePurchases' and 'support_zalo' = any (private.site_info_keys())),
-    jsonb_build_object('file', '20261001011200', 'label', 'Thử thách bị hủy tự ẩn khỏi bảng tin CLB và trang chủ',
-      'ok', exists (select 1 from pg_trigger where tgname = 'trg_hide_cancelled_challenge_posts')),
-    jsonb_build_object('file', '20261001011300', 'label', 'Admin cũng là VĐV: nhận Xu chạy bộ / nạp tiền, chặn Xu tự cấp (khuyến mãi, cộng tay, giới thiệu, nhiệm vụ)',
-      'ok', private.sc_fn('private', 'admin_credit_allowed')));
-
-  v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
-                   'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
-                  from unnest(array['avatars', 'character-layers', 'club-media', 'race-media', 'uniform-media', 'content-media']) b(id)
-                  left join storage.buckets s on s.id = b.id);
-
-  v_stats := jsonb_build_object(
-    'pg_net', exists (select 1 from pg_extension where extname = 'pg_net'),
-    'push_url', case when to_regclass('private.app_settings') is not null
-                     then (select value from private.app_settings where key = 'push_dispatch_url') end,
-    'admins', (select count(*) from public.profiles where role = 'SYSTEM_ADMIN'),
-    'users', (select count(*) from public.profiles),
-    'clubs', (select count(*) from public.clubs));
-  if to_regclass('private.push_queue') is not null then
-    v_stats := v_stats || jsonb_build_object('push_stuck', (select count(*) from private.push_queue where claimed_at is null and created_at < now() - interval '15 minutes'));
-  end if;
-  if private.sc_col('challenges', 'end_date') then
-    v_stats := v_stats || jsonb_build_object('challenges_overdue', (select count(*) from public.challenges where status = 'ACTIVE' and end_date < now() - interval '1 day'));
-  end if;
-  if to_regclass('public.club_battles') is not null then
-    v_stats := v_stats || jsonb_build_object('battles_overdue', (select count(*) from public.club_battles where status = 'ACCEPTED' and end_at < now() - interval '1 day'));
-  end if;
-  if to_regclass('public.orders') is not null then
-    v_stats := v_stats || jsonb_build_object('orders_pending', (select count(*) from public.orders where status = 'PENDING' and expires_at > now()),
-                                             'payment_account', exists (select 1 from private.app_settings where key = 'pay_account_no'));
-  end if;
-  if to_regclass('public.club_cups') is not null then
-    v_stats := v_stats || jsonb_build_object('cups_overdue', (select count(*) from public.club_cups where status = 'OPEN' and end_at < now() - interval '1 day'),
-                                             'cups_pending', (select count(*) from public.club_cups where status = 'PENDING_REVIEW'));
-  end if;
-  if to_regclass('private.client_errors') is not null then
-    v_stats := v_stats || jsonb_build_object('client_errors_24h', (select coalesce(sum(hits), 0) from private.client_errors where last_at > now() - interval '24 hours'),
-                                             'not_deployed_24h', (select coalesce(sum(hits), 0) from private.client_errors where kind = 'NOT_DEPLOYED' and last_at > now() - interval '24 hours'));
-  end if;
-  if private.sc_col('activities', 'validation_status') then
-    v_stats := v_stats || jsonb_build_object('pending_reviews', (select count(*) from public.activities where validation_status = 'PENDING'));
-  end if;
-
-  return jsonb_build_object('migrations', v_mig, 'buckets', v_buckets, 'stats', v_stats, 'checked_at', now());
+  if new.user_id is null or new.source_activity_id is null or new.source = 'DIRECT_GPS' then return new; end if;
+  if coalesce(new.started_at, now()) < now() - interval '2 days' then return new; end if;
+  begin
+    v_km := private.run_km(new);
+    v_km_text := replace(to_char(round(v_km, 2), 'FM999990.00'), '.', ',') || ' km';
+    -- Trigger này tên "zz" nên chạy sau các trigger cộng thưởng khác (thẻ bài chạy, nhiệm vụ, chuỗi, huy hiệu…)
+    v_xu := (select coalesce(sum(e.xu), 0) from public.game_events e where e.activity_id = new.id and e.kind <> 'CHEER_IN');
+    v_xp := (select coalesce(sum(e.xp), 0) from public.game_events e where e.activity_id = new.id);
+    v_more := (select count(*) from public.game_events e where e.activity_id = new.id and e.kind <> 'RUN');
+    v_pace := private.pace_text(case when v_km > 0 then coalesce(nullif(new.moving_time_s, 0), new.elapsed_time_s) / v_km end);
+    v_body := concat_ws(' · ', v_km_text,
+      case when v_pace is not null then 'Pace ' || v_pace || '/km' end,
+      case when v_xu > 0 then '+' || replace(trim_scale(round(v_xu, 1))::text, '.', ',') || ' Xu' end,
+      case when v_xp > 0 then '+' || round(v_xp)::text || ' XP' end,
+      case when v_more > 0 then v_more || ' phần thưởng khác' end);
+    v_title := (array['Chúc mừng! Bạn có hoạt động mới 🎉',
+                      'Bạn đã hoàn thành thêm 1 hoạt động nữa rồi — chúc mừng bạn! 💪',
+                      'Chúc mừng bạn có thêm hoạt động mới 🏃'])[1 + floor(random() * 3)::int];
+    perform private.notify(new.user_id, null, 'RUN_SYNCED', v_title, v_body, '/feed?rewards=1', null, true);
+  exception when others then
+    raise warning 'run_synced_notify % lỗi: % %', new.id, sqlstate, sqlerrm;
+  end;
+  return new;
 end $$;
 
-revoke all on function private.sc_fn(text, text), private.sc_col(text, text) from public, anon, authenticated;
-revoke all on function public.admin_system_check() from public, anon;
-grant execute on function public.admin_system_check() to authenticated;
+-- ---------------------------------------------------------------------
+-- 2. Sửa bình luận (chỉ người viết)
+-- ---------------------------------------------------------------------
+alter table public.club_post_comments add column if not exists edited_at timestamptz;
+alter table public.org_post_comments add column if not exists edited_at timestamptz;
 
-notify pgrst, 'reload schema';
+create or replace function public.edit_post_comment(p_comment_id uuid, p_body text) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  c public.club_post_comments := (select x from public.club_post_comments x where x.id = p_comment_id and x.deleted_at is null);
+  v_body text := trim(coalesce(p_body, ''));
+begin
+  if c.id is null then raise exception 'COMMENT_NOT_FOUND'; end if;
+  if c.author_id is distinct from v_uid then raise exception 'NOT_AUTHOR'; end if;
+  if char_length(v_body) not between 1 and 1000 then raise exception 'EMPTY_COMMENT'; end if;
+  if v_body = c.body then return; end if;
+  update public.club_post_comments set body = v_body, edited_at = now() where id = c.id;
+end $$;
+
+create or replace function public.edit_org_post_comment(p_id uuid, p_body text) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  c public.org_post_comments := (select x from public.org_post_comments x where x.id = p_id);
+  v_body text := trim(coalesce(p_body, ''));
+begin
+  if c.id is null then raise exception 'COMMENT_NOT_FOUND'; end if;
+  if c.author_id is distinct from v_uid then raise exception 'NOT_AUTHOR'; end if;
+  if char_length(v_body) not between 1 and 1000 then raise exception 'EMPTY_COMMENT'; end if;
+  if v_body = c.body then return; end if;
+  update public.org_post_comments set body = v_body, edited_at = now() where id = c.id;
+end $$;
+
+-- Danh sách bình luận kèm "đã sửa" và quyền sửa
+create or replace function public.club_post_comment_thread(p_post_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_uid uuid := private.require_uid(); p public.club_posts := (select x from public.club_posts x where x.id = p_post_id and x.deleted_at is null);
+begin
+  if p.id is null then raise exception 'POST_NOT_FOUND'; end if;
+  if not public.club_is_member(p.club_id) and not public.is_system_admin() then raise exception 'NOT_A_MEMBER'; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object(
+      'id', c.id, 'parent_id', c.parent_id, 'author_id', c.author_id, 'body', c.body, 'created_at', c.created_at, 'edited_at', c.edited_at,
+      'author_name', pr.display_name, 'author_avatar', pr.avatar_url, 'author_level', pr.level,
+      'like_count', c.like_count,
+      'liked', exists (select 1 from public.club_comment_likes l where l.comment_id = c.id and l.user_id = v_uid),
+      'can_edit', c.author_id = v_uid,
+      'can_delete', c.author_id = v_uid or public.club_is_staff(p.club_id)) order by c.created_at)
+    from public.club_post_comments c left join public.profiles pr on pr.id = c.author_id
+   where c.post_id = p_post_id and c.deleted_at is null), '[]'::jsonb);
+end $$;
+
+create or replace function public.org_post_comments(p_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_org uuid := (select p.org_id from public.org_posts p where p.id = p_id);
+begin
+  if v_org is null or not public.org_is_member(v_org) then raise exception 'NOT_A_MEMBER'; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object('id', cm.id, 'parent_id', cm.parent_id, 'body', cm.body, 'created_at', cm.created_at,
+             'edited_at', cm.edited_at, 'author_id', cm.author_id, 'author_name', private.display_name(cm.author_id), 'author_avatar', pr.avatar_url,
+             'like_count', (select count(*)::int from public.org_comment_likes l where l.comment_id = cm.id),
+             'liked', exists (select 1 from public.org_comment_likes l where l.comment_id = cm.id and l.user_id = auth.uid()),
+             'can_edit', cm.author_id = auth.uid(),
+             'can_delete', cm.author_id = auth.uid() or public.org_is_admin(v_org)) order by cm.created_at)
+           from public.org_post_comments cm left join public.profiles pr on pr.id = cm.author_id where cm.post_id = p_id), '[]'::jsonb);
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 3. Theo dõi runner
+-- ---------------------------------------------------------------------
+create table if not exists public.runner_follows (
+  follower_id uuid not null references public.profiles(id) on delete cascade,
+  followee_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (follower_id, followee_id),
+  check (follower_id <> followee_id)
+);
+create index if not exists runner_follows_followee_idx on public.runner_follows (followee_id, created_at desc);
+alter table public.runner_follows enable row level security;
+revoke all on public.runner_follows from anon, authenticated;
+
+create or replace function private.is_following(p_a uuid, p_b uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.runner_follows f where f.follower_id = p_a and f.followee_id = p_b)
+$$;
+
+-- Bảng tin nhắn 1-1 (tạo trước vì private.can_dm đọc tới)
+create table if not exists public.direct_threads (
+  id uuid primary key default gen_random_uuid(),
+  user_a uuid not null references public.profiles(id) on delete cascade,
+  user_b uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  last_message_at timestamptz,
+  a_read_at timestamptz,
+  b_read_at timestamptz,
+  unique (user_a, user_b),
+  check (user_a < user_b)
+);
+create table if not exists public.direct_messages (
+  id uuid primary key default gen_random_uuid(),
+  thread_id uuid not null references public.direct_threads(id) on delete cascade,
+  sender_id uuid references public.profiles(id) on delete set null,
+  body text not null check (char_length(body) between 1 and 2000),
+  created_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+create index if not exists direct_messages_thread_idx on public.direct_messages (thread_id, created_at desc);
+create index if not exists direct_threads_b_idx on public.direct_threads (user_b, last_message_at desc);
+alter table public.direct_threads enable row level security;
+alter table public.direct_messages enable row level security;
+revoke all on public.direct_threads, public.direct_messages from anon, authenticated;
+
+-- Hai người được nhắn tin cho nhau không (A gửi cho B)
+create or replace function private.can_dm(p_from uuid, p_to uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select p_from is not null and p_to is not null and p_from <> p_to
+     and not private.is_blocked(p_from, p_to)
+     and (private.is_following(p_to, p_from)
+          or private.are_connected(p_from, p_to)
+          or public.shares_club(p_from, p_to)
+          or exists (select 1 from public.direct_messages m join public.direct_threads t on t.id = m.thread_id
+                      where t.user_a = least(p_from, p_to) and t.user_b = greatest(p_from, p_to) and m.sender_id = p_to))
+$$;
+
+create or replace function public.follow_runner(p_user uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := private.require_uid(); v_new boolean;
+begin
+  if p_user is null or p_user = v_uid then raise exception 'INVALID_TARGET'; end if;
+  if not exists (select 1 from public.profiles p where p.id = p_user) then raise exception 'USER_NOT_FOUND'; end if;
+  if private.is_blocked(v_uid, p_user) then raise exception 'BLOCKED'; end if;
+  v_new := not private.is_following(v_uid, p_user);
+  if v_new then
+    if (select count(*) from public.runner_follows f where f.follower_id = v_uid and f.created_at > now() - interval '1 day') >= 200 then
+      raise exception 'RATE_LIMITED';
+    end if;
+    insert into public.runner_follows (follower_id, followee_id) values (v_uid, p_user) on conflict do nothing;
+    perform private.notify(p_user, null, 'FOLLOW', private.display_name(v_uid) || ' đã theo dõi bạn',
+      case when private.is_following(p_user, v_uid) then 'Hai bạn đã theo dõi nhau — giờ có thể nhắn tin cho nhau.'
+           else 'Theo dõi lại để xem hoạt động của nhau.' end, '/athletes/' || v_uid, v_uid, false);
+  end if;
+  return public.follow_status(p_user);
+end $$;
+
+create or replace function public.unfollow_runner(p_user uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+begin
+  delete from public.runner_follows where follower_id = private.require_uid() and followee_id = p_user;
+  return public.follow_status(p_user);
+end $$;
+
+create or replace function public.follow_status(p_user uuid) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'following', private.is_following(auth.uid(), p_user),
+    'followed_by', private.is_following(p_user, auth.uid()),
+    'followers', (select count(*) from public.runner_follows f where f.followee_id = p_user),
+    'following_count', (select count(*) from public.runner_follows f where f.follower_id = p_user),
+    'blocked', private.is_blocked(auth.uid(), p_user),
+    'blocked_by_me', exists (select 1 from public.user_blocks b where b.blocker = auth.uid() and b.blocked = p_user),
+    'can_message', private.can_dm(auth.uid(), p_user))
+$$;
+
+-- Danh sách người theo dõi / đang theo dõi của một runner (ai cũng xem được nếu xem được hồ sơ)
+create or replace function public.follow_list(p_user uuid, p_kind text default 'FOLLOWERS') returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform private.require_uid();
+  if not public.can_view_profile(p_user) then return '[]'::jsonb; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object('id', p.id, 'display_name', p.display_name, 'avatar_url', p.avatar_url,
+            'level', coalesce(p.level, 1), 'following', private.is_following(auth.uid(), p.id), 'is_me', p.id = auth.uid())
+            order by f.created_at desc)
+    from public.runner_follows f
+    join public.profiles p on p.id = case when upper(p_kind) = 'FOLLOWING' then f.followee_id else f.follower_id end
+   where (upper(p_kind) = 'FOLLOWING' and f.follower_id = p_user) or (upper(p_kind) <> 'FOLLOWING' and f.followee_id = p_user)), '[]'::jsonb);
+end $$;
+
+-- Bảng tin "Đang theo dõi": hoạt động của người mình theo dõi + của chính mình, mới nhất trước
+create or replace function public.following_feed(p_before timestamptz default null, p_limit integer default 20) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_limit integer := least(greatest(coalesce(p_limit, 20), 1), 40);
+begin
+  return (select coalesce(jsonb_agg(jsonb_build_object(
+            'id', t.id, 'title', t.title, 'source', t.source, 'started_at', t.started_at,
+            'distance_m', t.dist, 'moving_time_s', t.mt, 'avg_pace_s', t.avg_pace_s, 'elevation_gain_m', t.elevation_gain_m,
+            'is_me', t.user_id = v_uid,
+            'user', jsonb_build_object('id', pr.id, 'display_name', pr.display_name, 'avatar_url', pr.avatar_url, 'level', coalesce(pr.level, 1)))
+          order by t.started_at desc), '[]'::jsonb)
+    from (select a.id, a.user_id, a.title, a.source, a.started_at, a.avg_pace_s, a.elevation_gain_m,
+                 coalesce(nullif(a.moving_distance_m, 0), a.distance_m, 0) as dist, coalesce(a.moving_time_s, a.elapsed_time_s, 0) as mt,
+                 row_number() over (order by a.started_at desc, a.id) as rn
+            from public.activities a
+           where (a.user_id = v_uid or a.user_id in (select f.followee_id from public.runner_follows f where f.follower_id = v_uid))
+             and a.started_at is not null and a.started_at < coalesce(p_before, now() + interval '1 day')
+             and a.started_at > now() - interval '90 days'
+             and public.activity_is_countable(a.status, a.validation_status)
+             and (a.user_id = v_uid or (a.shared and public.can_view_activities(a.user_id) and not private.is_blocked(v_uid, a.user_id)))) t
+    join public.profiles pr on pr.id = t.user_id
+   where t.rn <= v_limit);
+end $$;
+
+-- Gợi ý người để theo dõi: cùng CLB, bạn kết nối, người theo dõi mình mà mình chưa theo dõi lại
+create or replace function public.follow_suggestions() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_uid uuid := private.require_uid();
+begin
+  return coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'display_name', s.display_name, 'avatar_url', s.avatar_url,
+            'level', s.level, 'reason', s.reason) order by s.score desc, s.display_name)
+    from (select p.id, p.display_name, p.avatar_url, coalesce(p.level, 1) as level,
+                 case when private.is_following(p.id, v_uid) then 'Đang theo dõi bạn'
+                      when private.are_connected(p.id, v_uid) then 'Bạn kết nối' else 'Cùng CLB' end as reason,
+                 (case when private.is_following(p.id, v_uid) then 3 else 0 end) + (case when private.are_connected(p.id, v_uid) then 2 else 0 end) as score,
+                 row_number() over (order by p.id) as rn
+            from public.profiles p
+           where p.id <> v_uid and not private.is_following(v_uid, p.id) and not private.is_blocked(v_uid, p.id)
+             and (private.is_following(p.id, v_uid) or private.are_connected(p.id, v_uid) or public.shares_club(v_uid, p.id))) s
+   where s.rn <= 30), '[]'::jsonb);
+end $$;
+
+-- Chặn → bỏ theo dõi hai chiều (giữ nguyên phần cũ: xóa kết nối, hủy lời mời)
+create or replace function public.block_user(p_user uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := private.require_uid();
+begin
+  if p_user = v_uid then raise exception 'INVALID_TARGET'; end if;
+  insert into public.user_blocks (blocker, blocked) values (v_uid, p_user) on conflict do nothing;
+  delete from public.runner_connections where user_a = least(v_uid, p_user) and user_b = greatest(v_uid, p_user);
+  update public.runner_connection_requests set status = 'CANCELLED', responded_at = now()
+   where status = 'PENDING' and ((from_id = v_uid and to_id = p_user) or (from_id = p_user and to_id = v_uid));
+  delete from public.runner_follows where (follower_id = v_uid and followee_id = p_user) or (follower_id = p_user and followee_id = v_uid);
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 4. Tin nhắn 1-1
+-- ---------------------------------------------------------------------
+-- Báo cáo từ tin nhắn / bình luận
+alter table public.user_reports drop constraint if exists user_reports_context_check;
+alter table public.user_reports add constraint user_reports_context_check
+  check (context in ('NEARBY', 'CONNECTION', 'CLUB', 'BIB', 'MARKET', 'OTHER', 'DM', 'COMMENT', 'PROFILE'));
+
+create or replace function private.dm_json(m public.direct_messages, p_uid uuid) returns jsonb
+language sql stable as $$
+  select jsonb_build_object('id', m.id, 'sender_id', m.sender_id, 'mine', m.sender_id = p_uid, 'created_at', m.created_at,
+    'deleted', m.deleted_at is not null, 'body', case when m.deleted_at is null then m.body else null end)
+$$;
+
+create or replace function public.send_direct_message(p_to uuid, p_body text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_body text := trim(coalesce(p_body, ''));
+  v_thread uuid;
+  v_prev timestamptz;
+  v_read timestamptz;
+  m public.direct_messages;
+begin
+  if p_to is null or p_to = v_uid then raise exception 'INVALID_TARGET'; end if;
+  if char_length(v_body) not between 1 and 2000 then raise exception 'EMPTY_MESSAGE'; end if;
+  if private.is_blocked(v_uid, p_to) then raise exception 'BLOCKED'; end if;
+  if not private.can_dm(v_uid, p_to) then raise exception 'DM_NOT_ALLOWED'; end if;
+  if (select count(*) from public.direct_messages x where x.sender_id = v_uid and x.created_at > now() - interval '1 hour') >= 60 then
+    raise exception 'RATE_LIMITED';
+  end if;
+  insert into public.direct_threads (user_a, user_b) values (least(v_uid, p_to), greatest(v_uid, p_to)) on conflict (user_a, user_b) do nothing;
+  v_thread := (select t.id from public.direct_threads t where t.user_a = least(v_uid, p_to) and t.user_b = greatest(v_uid, p_to));
+  v_prev := (select t.last_message_at from public.direct_threads t where t.id = v_thread);
+  v_read := (select case when t.user_a = p_to then t.a_read_at else t.b_read_at end from public.direct_threads t where t.id = v_thread);
+  m.id := gen_random_uuid();
+  insert into public.direct_messages (id, thread_id, sender_id, body) values (m.id, v_thread, v_uid, v_body);
+  update public.direct_threads set last_message_at = now(),
+         a_read_at = case when user_a = v_uid then now() else a_read_at end,
+         b_read_at = case when user_b = v_uid then now() else b_read_at end
+   where id = v_thread;
+  -- Báo người nhận: một thông báo cho mỗi lượt tin chưa đọc (không dồn dập từng tin)
+  if v_prev is null or v_read >= v_prev or v_prev < now() - interval '10 minutes' then
+    perform private.notify(p_to, null, 'DM', private.display_name(v_uid) || ' nhắn tin cho bạn', left(v_body, 140),
+      '/messages/' || v_uid, v_uid, true);
+  end if;
+  return private.dm_json((select x from public.direct_messages x where x.id = m.id), v_uid);
+end $$;
+
+-- Mở cuộc trò chuyện với một runner: tin nhắn (cũ → mới), đánh dấu đã đọc
+create or replace function public.direct_thread(p_user uuid, p_before timestamptz default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  t public.direct_threads := (select x from public.direct_threads x where x.user_a = least(v_uid, p_user) and x.user_b = greatest(v_uid, p_user));
+  pr public.profiles := (select x from public.profiles x where x.id = p_user);
+begin
+  if pr.id is null or p_user = v_uid then raise exception 'USER_NOT_FOUND'; end if;
+  if t.id is not null then
+    update public.direct_threads set a_read_at = case when user_a = v_uid then now() else a_read_at end,
+                                     b_read_at = case when user_b = v_uid then now() else b_read_at end where id = t.id;
+  end if;
+  return jsonb_build_object(
+    'user', jsonb_build_object('id', pr.id, 'display_name', pr.display_name, 'avatar_url', pr.avatar_url, 'level', coalesce(pr.level, 1)),
+    'can_message', private.can_dm(v_uid, p_user),
+    'blocked', private.is_blocked(v_uid, p_user),
+    'blocked_by_me', exists (select 1 from public.user_blocks b where b.blocker = v_uid and b.blocked = p_user),
+    'messages', coalesce((select jsonb_agg(private.dm_json(m, v_uid) order by m.created_at)
+                  from (select x.id, row_number() over (order by x.created_at desc) as rn from public.direct_messages x
+                         where x.thread_id = t.id and x.created_at < coalesce(p_before, now() + interval '1 day')) r
+                  join public.direct_messages m on m.id = r.id
+                 where r.rn <= 60), '[]'::jsonb));
+end $$;
+
+-- Hộp thư: các cuộc trò chuyện, tin cuối, số tin chưa đọc
+create or replace function public.direct_inbox() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_uid uuid := private.require_uid();
+begin
+  return coalesce((select jsonb_agg(jsonb_build_object(
+            'user', jsonb_build_object('id', pr.id, 'display_name', pr.display_name, 'avatar_url', pr.avatar_url),
+            'last_message_at', t.last_message_at,
+            'last', (select private.dm_json(m, v_uid) from (select x.id, row_number() over (order by x.created_at desc) as rn
+                                                             from public.direct_messages x where x.thread_id = t.id) r
+                       join public.direct_messages m on m.id = r.id where r.rn = 1),
+            'unread', (select count(*) from public.direct_messages m where m.thread_id = t.id and m.sender_id <> v_uid and m.deleted_at is null
+                         and m.created_at > coalesce(case when t.user_a = v_uid then t.a_read_at else t.b_read_at end, '-infinity'::timestamptz)))
+          order by t.last_message_at desc nulls last)
+    from public.direct_threads t
+    join public.profiles pr on pr.id = case when t.user_a = v_uid then t.user_b else t.user_a end
+   where (t.user_a = v_uid or t.user_b = v_uid) and t.last_message_at is not null
+     and not exists (select 1 from public.user_blocks b where b.blocker = v_uid and b.blocked = pr.id)), '[]'::jsonb);
+end $$;
+
+create or replace function public.direct_unread_count() returns integer
+language sql stable security definer set search_path = public as $$
+  select count(*)::int from public.direct_messages m join public.direct_threads t on t.id = m.thread_id
+   where (t.user_a = auth.uid() or t.user_b = auth.uid()) and m.sender_id <> auth.uid() and m.deleted_at is null
+     and m.created_at > coalesce(case when t.user_a = auth.uid() then t.a_read_at else t.b_read_at end, '-infinity'::timestamptz)
+     and not exists (select 1 from public.user_blocks b where b.blocker = auth.uid() and b.blocked = m.sender_id)
+$$;
+
+-- Thu hồi tin nhắn của mình
+create or replace function public.delete_direct_message(p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare m public.direct_messages := (select x from public.direct_messages x where x.id = p_id);
+begin
+  if m.id is null then raise exception 'NOT_FOUND'; end if;
+  if m.sender_id is distinct from private.require_uid() then raise exception 'NOT_AUTHOR'; end if;
+  update public.direct_messages set deleted_at = coalesce(deleted_at, now()) where id = p_id;
+end $$;
+
+revoke all on function private.is_following(uuid, uuid), private.can_dm(uuid, uuid), private.dm_json(public.direct_messages, uuid) from public, anon, authenticated;
+revoke all on function public.edit_post_comment(uuid, text), public.edit_org_post_comment(uuid, text), public.follow_runner(uuid),
+  public.unfollow_runner(uuid), public.follow_status(uuid), public.follow_list(uuid, text), public.following_feed(timestamptz, integer),
+  public.follow_suggestions(), public.send_direct_message(uuid, text), public.direct_thread(uuid, timestamptz), public.direct_inbox(),
+  public.direct_unread_count(), public.delete_direct_message(uuid) from public, anon;
+grant execute on function public.edit_post_comment(uuid, text), public.edit_org_post_comment(uuid, text), public.follow_runner(uuid),
+  public.unfollow_runner(uuid), public.follow_status(uuid), public.follow_list(uuid, text), public.following_feed(timestamptz, integer),
+  public.follow_suggestions(), public.send_direct_message(uuid, text), public.direct_thread(uuid, timestamptz), public.direct_inbox(),
+  public.direct_unread_count(), public.delete_direct_message(uuid) to authenticated;
 
 commit;

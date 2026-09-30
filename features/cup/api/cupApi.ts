@@ -82,6 +82,6 @@ const MESSAGES: Record<string, string> = {
 
 export function cupErrorMessage(e: unknown): string {
   const msg = (e as { message?: string } | null)?.message ?? ''
-  const code = Object.keys(MESSAGES).find((k) => msg.includes(k))
+  const code = Object.keys(MESSAGES).sort((a, b) => b.length - a.length).find((k) => msg.includes(k))
   return code ? MESSAGES[code] : systemErrorMessage(e, 'Có lỗi xảy ra, thử lại sau.')
 }

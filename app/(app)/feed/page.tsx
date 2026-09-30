@@ -8,6 +8,7 @@ import { InstallCard } from '@/features/pwa'
 import { KnowledgeHomeSection } from '@/features/knowledge'
 import { Skeleton } from '@/shared/ui'
 import { CommunityFeed } from '@/features/club'
+import { HomeFeeds } from '@/features/social'
 
 export default function FeedPage() {
   const { profile, isPending } = useMyProfile()
@@ -29,7 +30,7 @@ export default function FeedPage() {
       <KnowledgeHomeSection />
       {profile.strava_connected ? <StravaAutoSync /> : <ConnectDeviceCard />}
 
-      <CommunityFeed meId={profile.id} />
+      <HomeFeeds community={<CommunityFeed meId={profile.id} />} />
     </div>
   )
 }

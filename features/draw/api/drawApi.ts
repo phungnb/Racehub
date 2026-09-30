@@ -81,6 +81,6 @@ const MESSAGES: Record<string, string> = {
 }
 export function drawErrorMessage(e: unknown): string {
   const raw = (e as { message?: string } | null)?.message ?? ''
-  const key = Object.keys(MESSAGES).find((k) => raw.includes(k))
+  const key = Object.keys(MESSAGES).sort((a, b) => b.length - a.length).find((k) => raw.includes(k))
   return key ? MESSAGES[key] : systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')
 }

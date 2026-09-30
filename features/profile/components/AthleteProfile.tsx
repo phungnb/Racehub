@@ -12,6 +12,7 @@ import {
 } from '../api/athleteApi'
 import { FormChip, GiftWall, useGiftWall } from '@/features/game'
 import { ShineBadge } from '@/shared/ui'
+import { FollowPanel } from '@/features/social'
 import ActivityHistory from './ActivityHistory'
 
 /* ────────────────────────────────────────────────────────────
@@ -128,6 +129,7 @@ export default function AthleteProfile({ userId, onClose }: Props) {
                 {shine > 0 && <div className="flex justify-center"><ShineBadge tier={shine} /></div>}
                 <h3 className="text-lg font-black text-white">{name}</h3>
                 <FormChip userId={userId} className="mt-1" />
+                {!data.is_self && <div className="pt-2"><FollowPanel userId={userId} name={name} /></div>}
                 {data.can_view_profile && (
                   <>
                     {data.region && <p className="text-fg-muted">📍 {data.region}</p>}
