@@ -4,7 +4,7 @@ Tạo tự động bằng `python3 scripts/list-messages.py` — **không sửa 
 
 `{…}` là phần tự điền (tên người, số km, số Xu…). Một số câu ghép theo điều kiện nên hiện dạng `{case when …}`.
 
-Tổng: 114 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 566 câu báo lỗi · 239 thông báo nhanh (toast).
+Tổng: 116 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 575 câu báo lỗi · 240 thông báo nhanh (toast).
 
 ## A. Thông báo (chuông + thông báo đẩy)
 
@@ -45,7 +45,7 @@ Tổng: 114 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 56
 | A33 | CLUB_CUP | Thách đấu "{u.title}" đã hủy | — | `cancel_club_cup` |
 | A34 | CLUB_CUP | Thách đấu CLB chờ duyệt: {v_title} | {v_name} vừa tạo. Vào Quản trị → Thách đấu để duyệt. | `create_club_cup` |
 | A35 | CLUB_CUP | {case when p_approve then 'Thách đấu "'}{u.title}{'" đã được duyệt' else 'Thách đấu "'}{u.title}{'" chưa được duyệt' end} | {case when p_approve then 'Ban quản trị c} | `review_club_cup` |
-| A36 | CLUB_CUP | {v_club} tham gia thách đấu "{u.title}" | Mọi km hợp lệ từ {to_char(u.start_at at time zone 'Asia/Ho} đều tính cho CLB. Chạy thôi! | `join_club_cup` |
+| A36 | CLUB_CUP | {v_club} tham gia thách đấu "{u.title}" | {case when coalesce(u.require_signup, fal}{to_char(u.start_at at time zone 'Asia/Ho}{').' else 'Mọi km hợp lệ từ '}{to_char(u.start_at at time zone 'Asia/Ho}{' đều tính cho CLB. Chạy thôi!' end} | `join_club_cup` |
 | A37 | CLUB_CUP | {v_club} đã đăng ký "{u.title}" | — | `join_club_cup` |
 | A38 | CLUB_CUP | {v_msg} | {case when u.metric = 'TOTAL_KM' then 'Tổ}{(r->>'km')}{' km' else (r->>'avg_km')}{' km trung bình / thành viên' end} · {(r->>'runners')} người chạy | `settle_due_club_cups` |
 | A39 | CLUB_DUE | Nhắc đóng phí: {d.title} | {to_char(d.amount_vnd, 'FM999G999G999')}đ{coalesce(' · hạn '}{to_char(d.due_date, 'DD/MM'), '')} | `remind_due` |
@@ -79,51 +79,53 @@ Tổng: 114 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 56
 | A67 | COMMENT_REPLY | {display_name(v_uid)} đã trả lời bình luận của bạn | {left(v_body, 140)} | `add_post_comment` |
 | A68 | COMMENT_REPLY | {display_name(v_uid)} đã trả lời bình luận của bạn | {left(trim(p_body), 120)} | `add_org_post_comment` |
 | A69 | CONTENT | Bài viết cần chỉnh sửa | "{a.title}": {coalesce(p_note, 'Xem ghi chú biên tập')} | `cms_set_status` |
-| A70 | CONTENT | Bài viết đã được đăng | {a.title} | `cms_set_status` |
-| A71 | CONTENT | Chuyên gia góp ý bài viết | "{a.title}": {left(trim(p_note), 200)} | `cms_expert_review` |
-| A72 | DM | {display_name(v_uid)} nhắn tin cho bạn | {left(v_body, 140)} | `send_direct_message` |
-| A73 | ENTERPRISE_LEAD | Yêu cầu báo giá Doanh nghiệp: {left(trim(p->>'org_name'), 80)} | {left(trim(p->>'contact_name'), 80)} · {v_phone} | `request_enterprise_quote` |
-| A74 | FOLLOW | {display_name(v_uid)} đã theo dõi bạn | {case when private.is_following(p_user, v} | `follow_runner` |
-| A75 | GIFT | {v_name} tặng bạn {case when v_qty > 1 then v_qty}{' × ' else '' end}{g.emoji} {g.name} | {coalesce(v_msg, g.description)} | `send_gift` |
-| A76 | HONOR | BTC đã chọn ảnh vinh danh cho bạn | Thử thách "{c.title}". Bạn có thể đổi ảnh khác hoặc ẩn mình khỏi ảnh công khai. | `set_honor_pref` |
-| A77 | HONOR | Bạn được vinh danh 🏆 | Bạn có tên trong bảng vinh danh "{c.title}". Tải ảnh vinh danh để chia sẻ! | `publish_challenge_honor` |
-| A78 | LEAGUE | {case v_outcome when 'PROMOTED' then 'Bạn}{league_name(v_new_tier)}{'!' when 'DEMOTED' then 'Bạn xuống hạng }{league_name(v_new_tier) else 'Bạn giữ hạ}{league_name(v_new_tier) end} | Tuần trước bạn xếp thứ {m.final_rank}/{n} | `settle_league_week` |
-| A79 | LEVEL_UP | Chúc mừng! Bạn lên cấp {p_level} | {level_name(p_level)}{case when v_xu > 0 then ' · +'}{trim_scale(v_xu)}{' Xu' else '' end} | `level_up_event` |
-| A80 | LUCKY_DRAW_WIN | Chúc mừng! Bạn trúng {w.prize} | {d.title} | `draw_absent` |
-| A81 | MARKET | {case v_act when 'APPROVE' then 'Hồ sơ "'}{r.name}{'" đã được xác minh ✓' when 'REJECT' the}{r.name}{'" cần bổ sung' else 'Hồ sơ "'}{r.name}{'" đã bị ẩn' end} | {coalesce(p_note, 'Hồ sơ của bạn đã hiện } | `admin_review_partner` |
-| A82 | MARKET | {case when p_hide then 'Tin BIB đã bị ẩn'} | {b.race_name}{coalesce(': '}{nullif(trim(p_reason), ''), '')} | `admin_hide_bib` |
-| A83 | ORG_APPROVED | Bạn đã vào {coalesce(v_org, 'tổ chức')} | Xem chiến dịch đang diễn ra. | `set_org_member` |
-| A84 | ORG_APPROVED | Bạn đã được thêm vào {(select o.name from public.organizations} | Xem chiến dịch đang diễn ra. | `org_import_members` |
-| A85 | ORG_CAMPAIGN | {coalesce(v_org, 'Tổ chức')}: {v_title} | Chiến dịch mới — bài chạy hợp lệ của bạn được tính tự động. | `save_org_campaign` |
-| A86 | ORG_CAMPAIGN_DQ | Kết quả chiến dịch “{c.title}” không được công nhận | {left(trim(p_note), 300)} | `review_campaign_result` |
-| A87 | ORG_CLUB_INVITE | {o.name} mời CLB tham gia tổ chức | {case when o.include_club_pro then 'Tham } | `org_invite_club` |
-| A88 | ORG_CLUB_JOINED | {(select c.name from public.clubs c where} đã vào tổ chức | Thành viên CLB được tính vào chiến dịch của tổ chức. | `respond_org_invite` |
-| A89 | ORG_CREATED | Mời bạn dùng thử RaceHub Doanh nghiệp | Bạn là quản trị viên của tổ chức dùng thử "{v_name}" trong {v_days} ngày. | `admin_create_demo_org` |
-| A90 | ORG_CREATED | Tổ chức {left(v_name, 80)} đã sẵn sàng | Bạn là quản trị viên. Mời thành viên bằng mã {v_code} và tạo chiến dịch đầu tiên. | `admin_create_org` |
-| A91 | ORG_JOIN_REQUEST | {display_name(v_uid)} xin vào {o.name} | Duyệt ở mục Thành viên của tổ chức. | `join_org` |
-| A92 | ORG_POST_COMMENT | {display_name(v_uid)} bình luận bài của bạn | {left(trim(p_body), 120)} | `add_org_post_comment` |
-| A93 | POST_CHEER | {display_name(v_uid)}{case when p.kind = 'AUTO_RUN' then ' đã } | — | `toggle_post_reaction` |
-| A94 | POST_COMMENT | {display_name(v_uid)} đã bình luận bài của bạn | {left(v_body, 140)} | `add_post_comment` |
-| A95 | PROMO | {pr.title} | {coalesce(nullif(trim(coalesce(pr.message}{array_to_string(v_parts, ', '))} | `give_promo_reward` |
-| A96 | RACE_CANCELLED | Giải {r.title} đã hủy | {coalesce(nullif(trim(p_reason), ''), 'Ba} | `cancel_virtual_race` |
-| A97 | RACE_FINISHED | Hoàn thành {r.title} | Cự ly {g.distance_km} km · BIB {g.bib}. Xem thứ hạng và nhận giấy chứng nhận. | `race_evaluate` |
-| A98 | REFERRAL | Bạn nhận {trim_scale((cfg->>'inviterXu')::numeric)} Xu giới thiệu | {display_name(p_user)} đã hoàn thành bài chạy đầu tiên. | `referral_on_run` |
-| A99 | RUNNER_CONNECT | {first_name(v_uid)} muốn kết nối chạy cùng bạn | {coalesce(v_msg, 'Xem lời mời trong Quanh} | `send_connection` |
-| A100 | RUNNER_CONNECTED | {first_name(v_uid)} đã chấp nhận kết nối | Rủ nhau một buổi chạy nhé! | `respond_connection` |
-| A101 | RUNNER_INVITE | {first_name(v_uid)} rủ bạn chạy: {e.title} | {coalesce(v_note, to_char(e.starts_at at }{coalesce(' · '}{e.location_name, ''))} | `invite_to_run` |
-| A102 | RUNNER_INVITE | {first_name(v_uid)} rủ bạn vào CLB {(select name from public.clubs where id } | {v_note} | `invite_to_run` |
-| A103 | RUN_REVIEW | Bài chạy đang chờ xác minh | {coalesce(new.validation_reason, 'Bài chạ} | `activity_pending_notify` |
-| A104 | RUN_REVIEW | {case when p_status = 'APPROVED' then 'Bà} | {round(coalesce(a.distance_m, 0) / 1000.0} km — {case when p_status = 'APPROVED' then 'đã} | `review_activity` |
-| A105 | RUN_SYNCED | {v_title} | {v_body} | `run_synced_notify` |
-| A106 | SHINE | Bạn đã đạt Tỏa sáng {v_names[private.shine_tier(v_new) + 1]} ✨ | Ảnh đại diện của bạn có khung mới. Cảm ơn cộng đồng đã tiếp sức! | `shine_on_gift` |
-| A107 | SYSTEM | {case when v_role = 'SYSTEM_ADMIN' then '} | {coalesce(p_reason, '')} | `admin_set_user_role` |
-| A108 | THANKS | {display_name(v_uid)} cảm ơn bạn đã tiếp sức 💛 | Món quà của bạn đã tiếp thêm năng lượng cho buổi chạy. | `send_thanks` |
-| A109 | VICTORY | {coalesce(v_award, v_facts->>'headline')} 🏅 | {display_name(v_uid)} vinh danh bạn trong thử thách {coalesce(v_facts->>'title', '')} | `issue_victory` |
-| A110 | VIP | Bạn đã là {v_name} | Hiệu lực tới {to_char(v_row.ends_at at time zone 'Asia}. Lượt tạo thử thách tháng này đã được cấp. | `grant_subscription` |
-| A111 | VIP | Bạn được cấp quyền tổ chức giải chạy | — | `admin_set_race_organizer` |
-| A112 | VOUCHER | Bạn nhận voucher từ {c.sponsor_name} 🎟️ | {c.title} | `issue_voucher` |
-| A113 | p_kind | {p_title} | {p_body} | `notify_club` |
-| A114 | p_kind text | {p_title text} | {p_body text} | `notify` |
+| A70 | CONTENT | Bài viết cộng đồng chờ duyệt | "{v_title}" — {display_name(v_uid)} | `knowledge_submit` |
+| A71 | CONTENT | Bài viết của bạn đã được đăng · +{v_xu} Xu 🎉 | {new.title} | `content_reward_on_publish` |
+| A72 | CONTENT | Bài viết đã được đăng | {a.title} | `cms_set_status` |
+| A73 | CONTENT | Chuyên gia góp ý bài viết | "{a.title}": {left(trim(p_note), 200)} | `cms_expert_review` |
+| A74 | DM | {display_name(v_uid)} nhắn tin cho bạn | {left(v_body, 140)} | `send_direct_message` |
+| A75 | ENTERPRISE_LEAD | Yêu cầu báo giá Doanh nghiệp: {left(trim(p->>'org_name'), 80)} | {left(trim(p->>'contact_name'), 80)} · {v_phone} | `request_enterprise_quote` |
+| A76 | FOLLOW | {display_name(v_uid)} đã theo dõi bạn | {case when private.is_following(p_user, v} | `follow_runner` |
+| A77 | GIFT | {v_name} tặng bạn {case when v_qty > 1 then v_qty}{' × ' else '' end}{g.emoji} {g.name} | {coalesce(v_msg, g.description)} | `send_gift` |
+| A78 | HONOR | BTC đã chọn ảnh vinh danh cho bạn | Thử thách "{c.title}". Bạn có thể đổi ảnh khác hoặc ẩn mình khỏi ảnh công khai. | `set_honor_pref` |
+| A79 | HONOR | Bạn được vinh danh 🏆 | Bạn có tên trong bảng vinh danh "{c.title}". Tải ảnh vinh danh để chia sẻ! | `publish_challenge_honor` |
+| A80 | LEAGUE | {case v_outcome when 'PROMOTED' then 'Bạn}{league_name(v_new_tier)}{'!' when 'DEMOTED' then 'Bạn xuống hạng }{league_name(v_new_tier) else 'Bạn giữ hạ}{league_name(v_new_tier) end} | Tuần trước bạn xếp thứ {m.final_rank}/{n} | `settle_league_week` |
+| A81 | LEVEL_UP | Chúc mừng! Bạn lên cấp {p_level} | {level_name(p_level)}{case when v_xu > 0 then ' · +'}{trim_scale(v_xu)}{' Xu' else '' end} | `level_up_event` |
+| A82 | LUCKY_DRAW_WIN | Chúc mừng! Bạn trúng {w.prize} | {d.title} | `draw_absent` |
+| A83 | MARKET | {case v_act when 'APPROVE' then 'Hồ sơ "'}{r.name}{'" đã được xác minh ✓' when 'REJECT' the}{r.name}{'" cần bổ sung' else 'Hồ sơ "'}{r.name}{'" đã bị ẩn' end} | {coalesce(p_note, 'Hồ sơ của bạn đã hiện } | `admin_review_partner` |
+| A84 | MARKET | {case when p_hide then 'Tin BIB đã bị ẩn'} | {b.race_name}{coalesce(': '}{nullif(trim(p_reason), ''), '')} | `admin_hide_bib` |
+| A85 | ORG_APPROVED | Bạn đã vào {coalesce(v_org, 'tổ chức')} | Xem chiến dịch đang diễn ra. | `set_org_member` |
+| A86 | ORG_APPROVED | Bạn đã được thêm vào {(select o.name from public.organizations} | Xem chiến dịch đang diễn ra. | `org_import_members` |
+| A87 | ORG_CAMPAIGN | {coalesce(v_org, 'Tổ chức')}: {v_title} | Chiến dịch mới — bài chạy hợp lệ của bạn được tính tự động. | `save_org_campaign` |
+| A88 | ORG_CAMPAIGN_DQ | Kết quả chiến dịch “{c.title}” không được công nhận | {left(trim(p_note), 300)} | `review_campaign_result` |
+| A89 | ORG_CLUB_INVITE | {o.name} mời CLB tham gia tổ chức | {case when o.include_club_pro then 'Tham } | `org_invite_club` |
+| A90 | ORG_CLUB_JOINED | {(select c.name from public.clubs c where} đã vào tổ chức | Thành viên CLB được tính vào chiến dịch của tổ chức. | `respond_org_invite` |
+| A91 | ORG_CREATED | Mời bạn dùng thử RaceHub Doanh nghiệp | Bạn là quản trị viên của tổ chức dùng thử "{v_name}" trong {v_days} ngày. | `admin_create_demo_org` |
+| A92 | ORG_CREATED | Tổ chức {left(v_name, 80)} đã sẵn sàng | Bạn là quản trị viên. Mời thành viên bằng mã {v_code} và tạo chiến dịch đầu tiên. | `admin_create_org` |
+| A93 | ORG_JOIN_REQUEST | {display_name(v_uid)} xin vào {o.name} | Duyệt ở mục Thành viên của tổ chức. | `join_org` |
+| A94 | ORG_POST_COMMENT | {display_name(v_uid)} bình luận bài của bạn | {left(trim(p_body), 120)} | `add_org_post_comment` |
+| A95 | POST_CHEER | {display_name(v_uid)}{case when p.kind = 'AUTO_RUN' then ' đã } | — | `toggle_post_reaction` |
+| A96 | POST_COMMENT | {display_name(v_uid)} đã bình luận bài của bạn | {left(v_body, 140)} | `add_post_comment` |
+| A97 | PROMO | {pr.title} | {coalesce(nullif(trim(coalesce(pr.message}{array_to_string(v_parts, ', '))} | `give_promo_reward` |
+| A98 | RACE_CANCELLED | Giải {r.title} đã hủy | {coalesce(nullif(trim(p_reason), ''), 'Ba} | `cancel_virtual_race` |
+| A99 | RACE_FINISHED | Hoàn thành {r.title} | Cự ly {g.distance_km} km · BIB {g.bib}. Xem thứ hạng và nhận giấy chứng nhận. | `race_evaluate` |
+| A100 | REFERRAL | Bạn nhận {trim_scale((cfg->>'inviterXu')::numeric)} Xu giới thiệu | {display_name(p_user)} đã hoàn thành bài chạy đầu tiên. | `referral_on_run` |
+| A101 | RUNNER_CONNECT | {first_name(v_uid)} muốn kết nối chạy cùng bạn | {coalesce(v_msg, 'Xem lời mời trong Quanh} | `send_connection` |
+| A102 | RUNNER_CONNECTED | {first_name(v_uid)} đã chấp nhận kết nối | Rủ nhau một buổi chạy nhé! | `respond_connection` |
+| A103 | RUNNER_INVITE | {first_name(v_uid)} rủ bạn chạy: {e.title} | {coalesce(v_note, to_char(e.starts_at at }{coalesce(' · '}{e.location_name, ''))} | `invite_to_run` |
+| A104 | RUNNER_INVITE | {first_name(v_uid)} rủ bạn vào CLB {(select name from public.clubs where id } | {v_note} | `invite_to_run` |
+| A105 | RUN_REVIEW | Bài chạy đang chờ xác minh | {coalesce(new.validation_reason, 'Bài chạ} | `activity_pending_notify` |
+| A106 | RUN_REVIEW | {case when p_status = 'APPROVED' then 'Bà} | {round(coalesce(a.distance_m, 0) / 1000.0} km — {case when p_status = 'APPROVED' then 'đã} | `review_activity` |
+| A107 | RUN_SYNCED | {v_title} | {v_body} | `run_synced_notify` |
+| A108 | SHINE | Bạn đã đạt Tỏa sáng {v_names[private.shine_tier(v_new) + 1]} ✨ | Ảnh đại diện của bạn có khung mới. Cảm ơn cộng đồng đã tiếp sức! | `shine_on_gift` |
+| A109 | SYSTEM | {case when v_role = 'SYSTEM_ADMIN' then '} | {coalesce(p_reason, '')} | `admin_set_user_role` |
+| A110 | THANKS | {display_name(v_uid)} cảm ơn bạn đã tiếp sức 💛 | Món quà của bạn đã tiếp thêm năng lượng cho buổi chạy. | `send_thanks` |
+| A111 | VICTORY | {coalesce(v_award, v_facts->>'headline')} 🏅 | {display_name(v_uid)} vinh danh bạn trong thử thách {coalesce(v_facts->>'title', '')} | `issue_victory` |
+| A112 | VIP | Bạn đã là {v_name} | Hiệu lực tới {to_char(v_row.ends_at at time zone 'Asia}. Lượt tạo thử thách tháng này đã được cấp. | `grant_subscription` |
+| A113 | VIP | Bạn được cấp quyền tổ chức giải chạy | — | `admin_set_race_organizer` |
+| A114 | VOUCHER | Bạn nhận voucher từ {c.sponsor_name} 🎟️ | {c.title} | `issue_voucher` |
+| A115 | p_kind | {p_title} | {p_body} | `notify_club` |
+| A116 | p_kind text | {p_title text} | {p_body text} | `notify` |
 
 ## B. Lời báo trạng thái bài chạy
 
@@ -503,363 +505,372 @@ Tổng: 114 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 56
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D300 | `FORBIDDEN` | Bạn không có quyền làm việc này. |
-| D301 | `CUP_NOT_FOUND` | Không tìm thấy thách đấu (hoặc đang chờ duyệt). |
-| D302 | `CLUB_STAFF_REQUIRED` | Chỉ Chủ nhiệm / Quản trị viên của CLB mới đăng ký CLB vào thách đấu. |
-| D303 | `CUP_NOT_OPEN` | Thách đấu chưa mở hoặc đã đóng. |
-| D304 | `CUP_NOT_PENDING` | Thách đấu này đã được xử lý. |
-| D305 | `REGISTRATION_CLOSED` | Đã hết hạn đăng ký. |
-| D306 | `ALREADY_JOINED` | CLB đã có trong thách đấu. |
-| D307 | `CUP_FULL` | Thách đấu đã đủ số CLB. |
-| D308 | `CUP_STARTED` | Thách đấu đã bắt đầu. |
-| D309 | `INVALID_TITLE` | Tên thách đấu cần từ 3 đến 120 ký tự. |
-| D310 | `INVALID_METRIC` | Cách tính điểm không hợp lệ. |
-| D311 | `INVALID_TIME_RANGE` | Thời gian kết thúc phải sau thời gian bắt đầu. |
-| D312 | `START_IN_PAST` | Thời gian bắt đầu phải ở tương lai. |
-| D313 | `INVALID_DURATION` | Thách đấu kéo dài từ 1 ngày đến 3 tháng. |
-| D314 | `INVALID_REG_CLOSE` | Hạn đăng ký phải sau hiện tại và trước khi kết thúc. |
-| D315 | `INVALID_MAX` | Số CLB tối đa từ 2 đến 200. |
-| D316 | `REASON_REQUIRED` | Nhập lý do từ chối (ít nhất 3 ký tự). |
-| D317 | `RATE_LIMITED` | Bạn tạo quá nhiều thách đấu trong hôm nay. |
+| D300 | `ALREADY_SIGNED_UP` | Bạn đã đăng ký thi đấu cho một CLB khác trong giải này. |
+| D301 | `CLUB_NOT_IN_CUP` | CLB chưa được ban quản trị đăng ký vào thách đấu. |
+| D302 | `NOT_A_MEMBER` | Bạn chưa là thành viên CLB này. |
+| D303 | `FORBIDDEN` | Bạn không có quyền làm việc này. |
+| D304 | `CUP_NOT_FOUND` | Không tìm thấy thách đấu (hoặc đang chờ duyệt). |
+| D305 | `CLUB_STAFF_REQUIRED` | Chỉ Chủ nhiệm / Quản trị viên của CLB mới đăng ký CLB vào thách đấu. |
+| D306 | `CUP_NOT_OPEN` | Thách đấu chưa mở hoặc đã đóng. |
+| D307 | `CUP_NOT_PENDING` | Thách đấu này đã được xử lý. |
+| D308 | `REGISTRATION_CLOSED` | Đã hết hạn đăng ký. |
+| D309 | `ALREADY_JOINED` | CLB đã có trong thách đấu. |
+| D310 | `CUP_FULL` | Thách đấu đã đủ số CLB. |
+| D311 | `CUP_STARTED` | Thách đấu đã bắt đầu. |
+| D312 | `INVALID_TITLE` | Tên thách đấu cần từ 3 đến 120 ký tự. |
+| D313 | `INVALID_METRIC` | Cách tính điểm không hợp lệ. |
+| D314 | `INVALID_TIME_RANGE` | Thời gian kết thúc phải sau thời gian bắt đầu. |
+| D315 | `START_IN_PAST` | Thời gian bắt đầu phải ở tương lai. |
+| D316 | `INVALID_DURATION` | Thách đấu kéo dài từ 1 ngày đến 3 tháng. |
+| D317 | `INVALID_REG_CLOSE` | Hạn đăng ký phải sau hiện tại và trước khi kết thúc. |
+| D318 | `INVALID_MAX` | Số CLB tối đa từ 2 đến 200. |
+| D319 | `REASON_REQUIRED` | Nhập lý do từ chối (ít nhất 3 ký tự). |
+| D320 | `RATE_LIMITED` | Bạn tạo quá nhiều thách đấu trong hôm nay. |
 
 **features/draw/api/drawApi.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D318 | `NO_ENTRANTS` | Chưa có ai đủ điều kiện quay (hoặc tất cả đã trúng ở lượt trước). |
-| D319 | `DRAW_CLOSED` | Lượt quay này đã quay hoặc đã huỷ. |
-| D320 | `INVALID_PRIZES` | Nhập 1–10 giải, tổng tối đa 200 suất. |
-| D321 | `TITLE_REQUIRED` | Tên lượt quay cần 3–120 ký tự. |
-| D322 | `TOO_MANY_DRAWS` | Đang có 5 lượt quay chờ. Quay hoặc huỷ bớt trước. |
-| D323 | `PICK_REQUIRED` | Hãy chọn ít nhất một người thuộc chương trình. |
-| D324 | `TOO_MANY_PEOPLE` | Chọn tối đa 2.000 người. |
-| D325 | `DRAW_NOT_LIVE` | Lượt quay chưa bắt đầu hoặc đã kết thúc. |
-| D326 | `PRIZE_FULL` | Giải này đã đủ người trúng. Chọn giải khác. |
-| D327 | `POOL_EXHAUSTED` | Đã hết người trong danh sách để quay. |
-| D328 | `NOT_A_WINNER` | Người này không còn trong danh sách trúng. |
-| D329 | `NO_WINNERS` | Chưa có ai trúng — quay ít nhất một giải trước khi công bố. |
-| D330 | `DRAW_STARTED` | Đã quay ra người trúng nên không huỷ được. Hãy quay tiếp hoặc công bố. |
-| D331 | `NAMES_REQUIRED` | Dán ít nhất một tên (mỗi dòng một người). |
-| D332 | `EVENT_REQUIRED` | Chọn một buổi của CLB. |
-| D333 | `INVALID_SPONSOR` | Tên nhà tài trợ tối đa 80 ký tự; logo phải là ảnh https. |
-| D334 | `FORBIDDEN` | Bạn không có quyền làm việc này. |
+| D321 | `NO_ENTRANTS` | Chưa có ai đủ điều kiện quay (hoặc tất cả đã trúng ở lượt trước). |
+| D322 | `DRAW_CLOSED` | Lượt quay này đã quay hoặc đã huỷ. |
+| D323 | `INVALID_PRIZES` | Nhập 1–10 giải, tổng tối đa 200 suất. |
+| D324 | `TITLE_REQUIRED` | Tên lượt quay cần 3–120 ký tự. |
+| D325 | `TOO_MANY_DRAWS` | Đang có 5 lượt quay chờ. Quay hoặc huỷ bớt trước. |
+| D326 | `PICK_REQUIRED` | Hãy chọn ít nhất một người thuộc chương trình. |
+| D327 | `TOO_MANY_PEOPLE` | Chọn tối đa 2.000 người. |
+| D328 | `DRAW_NOT_LIVE` | Lượt quay chưa bắt đầu hoặc đã kết thúc. |
+| D329 | `PRIZE_FULL` | Giải này đã đủ người trúng. Chọn giải khác. |
+| D330 | `POOL_EXHAUSTED` | Đã hết người trong danh sách để quay. |
+| D331 | `NOT_A_WINNER` | Người này không còn trong danh sách trúng. |
+| D332 | `NO_WINNERS` | Chưa có ai trúng — quay ít nhất một giải trước khi công bố. |
+| D333 | `DRAW_STARTED` | Đã quay ra người trúng nên không huỷ được. Hãy quay tiếp hoặc công bố. |
+| D334 | `NAMES_REQUIRED` | Dán ít nhất một tên (mỗi dòng một người). |
+| D335 | `EVENT_REQUIRED` | Chọn một buổi của CLB. |
+| D336 | `INVALID_SPONSOR` | Tên nhà tài trợ tối đa 80 ký tự; logo phải là ảnh https. |
+| D337 | `FORBIDDEN` | Bạn không có quyền làm việc này. |
 
 **features/game/api/gameApi.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D335 | `PROMO_INVALID` | Mã không đúng hoặc đã hết hạn. |
-| D336 | `PROMO_USED_UP` | Mã đã hết lượt sử dụng. |
-| D337 | `PROMO_ALREADY_USED` | Bạn đã dùng mã này rồi. |
-| D338 | `PROMO_NOT_ELIGIBLE` | Mã này không dành cho tài khoản của bạn. |
-| D339 | `TOO_MANY_ATTEMPTS` | Bạn nhập sai quá nhiều lần. Thử lại sau 1 giờ. |
-| D340 | `CANNOT_GIFT_SELF` | Không tự tặng quà cho chính mình được. |
-| D341 | `GIFT_DAILY_LIMIT` | Bạn đã tặng quà tối đa trong hôm nay. Mai tiếp nhé! |
-| D342 | `GIFT_NOT_AVAILABLE` | Quà này hiện không còn (hết mùa hoặc đã ngừng). |
-| D343 | `GIFT_CONTEXT_REQUIRED` | Quà này chỉ tặng được trên bài chạy đạt đúng mốc (5K, 10K, Half, Full, Ultra hoặc kỷ lục cá nhân). |
-| D344 | `VIP_REQUIRED` | Quà này dành cho thành viên VIP. |
-| D345 | `INVALID_QTY` | Số lượng quà không hợp lệ. |
-| D346 | `CHEER_REPLACED_BY_GIFTS` | Tặng Xu trực tiếp đã được thay bằng Quà tặng. Hãy cập nhật ứng dụng. |
-| D347 | `INSUFFICIENT_BALANCE` | Số Xu trong ví không đủ. |
-| D348 | `SHIELD_LIMIT` | Bạn đã có số khiên tối đa. |
-| D349 | `INSUFFICIENT_SHINE` | Tỏa sáng khả dụng chưa đủ. |
-| D350 | `SHINE_LIMIT` | Bạn đã đổi món này đủ số lần trong kỳ. |
-| D351 | `SHINE_NEED_SENDERS` | Cần Tỏa sáng từ đủ số người tặng khác nhau trong 30 ngày. |
-| D352 | `SHINE_ONLY` | Vật phẩm này chỉ đổi bằng Tỏa sáng. |
-| D353 | `SHINE_ITEM_NOT_FOUND` | Món này không còn trong cửa hàng Tỏa sáng. |
-| D354 | `ALREADY_OWNED` | Bạn đã có vật phẩm này. |
-| D355 | `ALREADY_THANKED` | Hôm nay bạn đã cảm ơn người này rồi. |
-| D356 | `NOT_A_SUPPORTER` | Chỉ cảm ơn được người đã tặng quà cho bạn trong 30 ngày. |
-| D357 | `THANKS_LIMIT` | Hôm nay bạn đã gửi đủ lời cảm ơn. |
-| D358 | `INVALID_AMOUNT` | Số Xu không hợp lệ (1–10). |
-| D359 | `INVALID_GOAL` | Mục tiêu tuần từ 1 đến 7 ngày. |
-| D360 | `MESSAGE_TOO_LONG` | Lời nhắn tối đa 140 ký tự. |
-| D361 | `USER_NOT_FOUND` | Không tìm thấy người nhận. |
-| D362 | `FORBIDDEN` | Bạn không có quyền làm việc này. |
+| D338 | `PROMO_INVALID` | Mã không đúng hoặc đã hết hạn. |
+| D339 | `PROMO_USED_UP` | Mã đã hết lượt sử dụng. |
+| D340 | `PROMO_ALREADY_USED` | Bạn đã dùng mã này rồi. |
+| D341 | `PROMO_NOT_ELIGIBLE` | Mã này không dành cho tài khoản của bạn. |
+| D342 | `TOO_MANY_ATTEMPTS` | Bạn nhập sai quá nhiều lần. Thử lại sau 1 giờ. |
+| D343 | `CANNOT_GIFT_SELF` | Không tự tặng quà cho chính mình được. |
+| D344 | `GIFT_DAILY_LIMIT` | Bạn đã tặng quà tối đa trong hôm nay. Mai tiếp nhé! |
+| D345 | `GIFT_NOT_AVAILABLE` | Quà này hiện không còn (hết mùa hoặc đã ngừng). |
+| D346 | `GIFT_CONTEXT_REQUIRED` | Quà này chỉ tặng được trên bài chạy đạt đúng mốc (5K, 10K, Half, Full, Ultra hoặc kỷ lục cá nhân). |
+| D347 | `VIP_REQUIRED` | Quà này dành cho thành viên VIP. |
+| D348 | `INVALID_QTY` | Số lượng quà không hợp lệ. |
+| D349 | `CHEER_REPLACED_BY_GIFTS` | Tặng Xu trực tiếp đã được thay bằng Quà tặng. Hãy cập nhật ứng dụng. |
+| D350 | `INSUFFICIENT_BALANCE` | Số Xu trong ví không đủ. |
+| D351 | `SHIELD_LIMIT` | Bạn đã có số khiên tối đa. |
+| D352 | `INSUFFICIENT_SHINE` | Tỏa sáng khả dụng chưa đủ. |
+| D353 | `SHINE_LIMIT` | Bạn đã đổi món này đủ số lần trong kỳ. |
+| D354 | `SHINE_NEED_SENDERS` | Cần Tỏa sáng từ đủ số người tặng khác nhau trong 30 ngày. |
+| D355 | `SHINE_ONLY` | Vật phẩm này chỉ đổi bằng Tỏa sáng. |
+| D356 | `SHINE_ITEM_NOT_FOUND` | Món này không còn trong cửa hàng Tỏa sáng. |
+| D357 | `ALREADY_OWNED` | Bạn đã có vật phẩm này. |
+| D358 | `ALREADY_THANKED` | Hôm nay bạn đã cảm ơn người này rồi. |
+| D359 | `NOT_A_SUPPORTER` | Chỉ cảm ơn được người đã tặng quà cho bạn trong 30 ngày. |
+| D360 | `THANKS_LIMIT` | Hôm nay bạn đã gửi đủ lời cảm ơn. |
+| D361 | `INVALID_AMOUNT` | Số Xu không hợp lệ (1–10). |
+| D362 | `INVALID_GOAL` | Mục tiêu tuần từ 1 đến 7 ngày. |
+| D363 | `MESSAGE_TOO_LONG` | Lời nhắn tối đa 140 ký tự. |
+| D364 | `USER_NOT_FOUND` | Không tìm thấy người nhận. |
+| D365 | `FORBIDDEN` | Bạn không có quyền làm việc này. |
 
 **features/help/api/helpApi.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D363 | `PAGE_NOT_FOUND` | Không tìm thấy trang. |
-| D364 | `INVALID_SLUG` | Đường dẫn chỉ gồm chữ thường không dấu, số và dấu gạch ngang (2–60 ký tự). |
-| D365 | `INVALID_SECTION` | Chọn nhóm cho trang. |
-| D366 | `INVALID_TITLE` | Tiêu đề cần 2–120 ký tự. |
-| D367 | `FORBIDDEN` | Chỉ quản trị viên hệ thống mới sửa được. |
+| D366 | `PAGE_NOT_FOUND` | Không tìm thấy trang. |
+| D367 | `INVALID_SLUG` | Đường dẫn chỉ gồm chữ thường không dấu, số và dấu gạch ngang (2–60 ký tự). |
+| D368 | `INVALID_SECTION` | Chọn nhóm cho trang. |
+| D369 | `INVALID_TITLE` | Tiêu đề cần 2–120 ký tự. |
+| D370 | `FORBIDDEN` | Chỉ quản trị viên hệ thống mới sửa được. |
 
 **features/knowledge/api/knowledgeApi.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D368 | `ARTICLE_NOT_FOUND` | Không tìm thấy bài viết (có thể đã gỡ hoặc chưa đăng). |
-| D369 | `EXPERT_REVIEW_REQUIRED` | Bài thuộc chủ đề sức khoẻ / giáo án — cần chuyên gia duyệt chuyên môn trước khi đăng. |
-| D370 | `TITLE_TOO_SHORT` | Tiêu đề cần ít nhất 5 ký tự. |
-| D371 | `INVALID_SLUG` | Đường dẫn bài không hợp lệ. |
-| D372 | `SLUG_TAKEN` | Đường dẫn này đã có bài khác dùng — đổi tiêu đề hoặc đường dẫn. |
-| D373 | `INVALID_CATEGORY` | Chọn chuyên mục. |
-| D374 | `INVALID_URL` | Link ảnh / nguồn phải bắt đầu bằng https:// |
-| D375 | `BODY_TOO_SHORT` | Nội dung quá ngắn để đăng. |
-| D376 | `INVALID_SCHEDULE` | Giờ hẹn đăng phải ở tương lai. |
-| D377 | `CANNOT_REVIEW_OWN` | Không tự duyệt chuyên môn bài của mình. |
-| D378 | `NOTE_REQUIRED` | Ghi rõ góp ý để người viết sửa. |
-| D379 | `ARCHIVE_INSTEAD` | Bài đã từng đăng — hãy Lưu trữ thay vì xoá (giữ link và thống kê). |
-| D380 | `IMAGE_TYPE` | Chỉ nhận ảnh JPG, PNG, WEBP. |
-| D381 | `IMAGE_SIZE` | Ảnh tối đa 5 MB. |
-| D382 | `FORBIDDEN` | Bạn không có quyền làm việc này. |
+| D371 | `ALREADY_PUBLISHED` | Bài đã đăng thì không sửa được nữa — liên hệ ban biên tập nếu cần chỉnh. |
+| D372 | `BODY_TOO_LONG` | Nội dung quá dài (tối đa 60.000 ký tự). |
+| D373 | `RATE_LIMITED` | Bạn đã tạo nhiều bài hôm nay. Mai viết tiếp nhé! |
+| D374 | `PDF_TYPE` | Ebook phải là tệp PDF. |
+| D375 | `PDF_SIZE` | Tệp PDF tối đa 10 MB. |
+| D376 | `ARTICLE_NOT_FOUND` | Không tìm thấy bài viết (có thể đã gỡ hoặc chưa đăng). |
+| D377 | `EXPERT_REVIEW_REQUIRED` | Bài thuộc chủ đề sức khoẻ / giáo án — cần chuyên gia duyệt chuyên môn trước khi đăng. |
+| D378 | `TITLE_TOO_SHORT` | Tiêu đề cần ít nhất 5 ký tự. |
+| D379 | `INVALID_SLUG` | Đường dẫn bài không hợp lệ. |
+| D380 | `SLUG_TAKEN` | Đường dẫn này đã có bài khác dùng — đổi tiêu đề hoặc đường dẫn. |
+| D381 | `INVALID_CATEGORY` | Chọn chuyên mục. |
+| D382 | `INVALID_URL` | Link ảnh / nguồn phải bắt đầu bằng https:// |
+| D383 | `BODY_TOO_SHORT` | Nội dung quá ngắn: bài viết cần ít nhất 300 ký tự; ebook cần tệp PDF + vài dòng giới thiệu. |
+| D384 | `INVALID_SCHEDULE` | Giờ hẹn đăng phải ở tương lai. |
+| D385 | `CANNOT_REVIEW_OWN` | Không tự duyệt chuyên môn bài của mình. |
+| D386 | `NOTE_REQUIRED` | Ghi rõ góp ý để người viết sửa. |
+| D387 | `ARCHIVE_INSTEAD` | Bài đã từng đăng — hãy Lưu trữ thay vì xoá (giữ link và thống kê). |
+| D388 | `IMAGE_TYPE` | Chỉ nhận ảnh JPG, PNG, WEBP. |
+| D389 | `IMAGE_SIZE` | Ảnh tối đa 5 MB. |
+| D390 | `FORBIDDEN` | Bạn không có quyền làm việc này. |
 
 **features/market/api/bibApi.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D383 | `NOT_ELIGIBLE` | Cần ít nhất 3 bài chạy hợp lệ để đăng tin BIB (chống tài khoản ảo, lừa đảo). |
-| D384 | `PRICE_ABOVE_ORIGINAL` | Chợ BIB không cho bán cao hơn giá gốc — giúp runner mua đúng giá. |
-| D385 | `PRICE_REQUIRED` | Nhập giá gốc và giá nhượng. |
-| D386 | `CONTACT_REQUIRED` | Nhập ít nhất một cách liên hệ hợp lệ (số điện thoại, Zalo hoặc link Facebook). |
-| D387 | `RACE_DATE_PAST` | Ngày giải đã qua. |
-| D388 | `RACE_REQUIRED` | Nhập tên giải. |
-| D389 | `INVALID_DISTANCE` | Chọn cự ly. |
-| D390 | `NO_LINKS` | Ghi chú không được chứa link (trừ Facebook). |
-| D391 | `TOO_MANY_LISTINGS` | Mỗi runner tối đa 5 tin đang mở. Đóng bớt tin cũ nhé. |
-| D392 | `TOO_MANY_REVEALS` | Bạn đã xem liên hệ của nhiều tin trong 24 giờ. Thử lại sau. |
-| D393 | `LISTING_NOT_FOUND` | Tin không còn tồn tại. |
-| D394 | `LISTING_HIDDEN` | Tin đang bị ẩn — chờ quản trị viên xem xét. |
-| D395 | `RATE_LIMITED` | Bạn đăng hơi nhiều trong hôm nay. Thử lại sau. |
-| D396 | `FORBIDDEN` | Bạn không có quyền làm việc này. |
+| D391 | `NOT_ELIGIBLE` | Cần ít nhất 3 bài chạy hợp lệ để đăng tin BIB (chống tài khoản ảo, lừa đảo). |
+| D392 | `PRICE_ABOVE_ORIGINAL` | Chợ BIB không cho bán cao hơn giá gốc — giúp runner mua đúng giá. |
+| D393 | `PRICE_REQUIRED` | Nhập giá gốc và giá nhượng. |
+| D394 | `CONTACT_REQUIRED` | Nhập ít nhất một cách liên hệ hợp lệ (số điện thoại, Zalo hoặc link Facebook). |
+| D395 | `RACE_DATE_PAST` | Ngày giải đã qua. |
+| D396 | `RACE_REQUIRED` | Nhập tên giải. |
+| D397 | `INVALID_DISTANCE` | Chọn cự ly. |
+| D398 | `NO_LINKS` | Ghi chú không được chứa link (trừ Facebook). |
+| D399 | `TOO_MANY_LISTINGS` | Mỗi runner tối đa 5 tin đang mở. Đóng bớt tin cũ nhé. |
+| D400 | `TOO_MANY_REVEALS` | Bạn đã xem liên hệ của nhiều tin trong 24 giờ. Thử lại sau. |
+| D401 | `LISTING_NOT_FOUND` | Tin không còn tồn tại. |
+| D402 | `LISTING_HIDDEN` | Tin đang bị ẩn — chờ quản trị viên xem xét. |
+| D403 | `RATE_LIMITED` | Bạn đăng hơi nhiều trong hôm nay. Thử lại sau. |
+| D404 | `FORBIDDEN` | Bạn không có quyền làm việc này. |
 
 **features/market/api/marketApi.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D397 | `PARTNER_EXISTS` | Bạn đã có hồ sơ loại này — hãy sửa hồ sơ hiện có. |
-| D398 | `PARTNER_NOT_FOUND` | Không tìm thấy hồ sơ (có thể chưa được xác minh hoặc đã bị ẩn). |
-| D399 | `INVALID_PARTNER_IMAGE` | Ảnh phải tải lên từ RaceHub. |
-| D400 | `INVALID_PARTNER` | Nhập tên hồ sơ (ít nhất 2 ký tự) và chọn loại. |
-| D401 | `INVALID_CONTACT` | Liên hệ chưa đúng: điện thoại 8–16 số; Facebook / website bắt đầu bằng https://; email hợp lệ. |
-| D402 | `TOO_MANY_SERVICES` | Tối đa 12 dịch vụ. |
-| D403 | `REASON_REQUIRED` | Nhập lý do (ít nhất 3 ký tự) để chủ hồ sơ biết cần sửa gì. |
-| D404 | `FORBIDDEN` | Bạn không có quyền sửa hồ sơ này. |
+| D405 | `PARTNER_EXISTS` | Bạn đã có hồ sơ loại này — hãy sửa hồ sơ hiện có. |
+| D406 | `PARTNER_NOT_FOUND` | Không tìm thấy hồ sơ (có thể chưa được xác minh hoặc đã bị ẩn). |
+| D407 | `INVALID_PARTNER_IMAGE` | Ảnh phải tải lên từ RaceHub. |
+| D408 | `INVALID_PARTNER` | Nhập tên hồ sơ (ít nhất 2 ký tự) và chọn loại. |
+| D409 | `INVALID_CONTACT` | Liên hệ chưa đúng: điện thoại 8–16 số; Facebook / website bắt đầu bằng https://; email hợp lệ. |
+| D410 | `TOO_MANY_SERVICES` | Tối đa 12 dịch vụ. |
+| D411 | `REASON_REQUIRED` | Nhập lý do (ít nhất 3 ký tự) để chủ hồ sơ biết cần sửa gì. |
+| D412 | `FORBIDDEN` | Bạn không có quyền sửa hồ sơ này. |
 
 **features/nearby/api/nearbyApi.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D405 | `CONSENT_REQUIRED` | Cần đồng ý điều khoản chia sẻ vị trí gần đúng trước khi bật. |
-| D406 | `NOT_ELIGIBLE` | Cần ít nhất 3 bài chạy hợp lệ để bật Quanh đây (chống tài khoản ảo). |
-| D407 | `NEARBY_SUSPENDED` | Quanh đây của bạn đang tạm khoá do có báo cáo, chờ quản trị viên xem xét. |
-| D408 | `NEARBY_DISABLED` | Bạn chưa bật Quanh đây. |
-| D409 | `NO_PRESENCE` | Hãy chọn vị trí gần đúng của bạn để tìm runner quanh đây. |
-| D410 | `TOO_MANY_MOVES` | Bạn đã đổi vị trí 3 lần trong 24 giờ. Thử lại sau (bảo vệ quyền riêng tư của mọi người). |
-| D411 | `TOO_MANY_SEARCHES` | Bạn tìm quá nhiều lần trong 1 giờ. Nghỉ chút rồi thử lại. |
-| D412 | `INVALID_LOCATION` | Vị trí không hợp lệ. |
-| D413 | `TARGET_UNAVAILABLE` | Runner này hiện không nhận kết nối. |
-| D414 | `ALREADY_CONNECTED` | Hai bạn đã kết nối. |
-| D415 | `ALREADY_REQUESTED` | Bạn đã gửi lời mời, chờ người kia trả lời. |
-| D416 | `REQUEST_COOLDOWN` | Lời mời trước bị từ chối — 30 ngày sau mới gửi lại được. |
-| D417 | `TOO_MANY_REQUESTS` | Bạn đã gửi đủ số lời mời hôm nay. Mai gửi tiếp nhé. |
-| D418 | `NO_LINKS` | Lời nhắn không được chứa link, số Zalo / Telegram. Kết nối xong hãy rủ nhau vào buổi chạy. |
-| D419 | `NOT_CONNECTED` | Chỉ rủ được người đã kết nối. |
-| D420 | `REQUEST_CLOSED` | Lời mời đã được xử lý. |
-| D421 | `EVENT_FULL` | Buổi chạy đã đủ người. |
-| D422 | `EVENT_ENDED` | Buổi chạy đã kết thúc. |
-| D423 | `EVENT_CANCELLED` | Buổi chạy đã bị huỷ. |
-| D424 | `EVENT_NOT_FOUND` | Không tìm thấy buổi chạy (có thể đã chuyển về chỉ thành viên CLB). |
-| D425 | `EVENT_NEEDS_LOCATION` | Buổi chạy công khai cần toạ độ điểm hẹn (nơi công cộng). |
-| D426 | `EVENT_NOT_PUBLIC` | Người này không thuộc CLB đó — chỉ rủ được vào buổi chạy công khai. |
-| D427 | `FORBIDDEN` | Bạn không có quyền làm việc này. |
+| D413 | `CONSENT_REQUIRED` | Cần đồng ý điều khoản chia sẻ vị trí gần đúng trước khi bật. |
+| D414 | `NOT_ELIGIBLE` | Cần ít nhất 3 bài chạy hợp lệ để bật Quanh đây (chống tài khoản ảo). |
+| D415 | `NEARBY_SUSPENDED` | Quanh đây của bạn đang tạm khoá do có báo cáo, chờ quản trị viên xem xét. |
+| D416 | `NEARBY_DISABLED` | Bạn chưa bật Quanh đây. |
+| D417 | `NO_PRESENCE` | Hãy chọn vị trí gần đúng của bạn để tìm runner quanh đây. |
+| D418 | `TOO_MANY_MOVES` | Bạn đã đổi vị trí 3 lần trong 24 giờ. Thử lại sau (bảo vệ quyền riêng tư của mọi người). |
+| D419 | `TOO_MANY_SEARCHES` | Bạn tìm quá nhiều lần trong 1 giờ. Nghỉ chút rồi thử lại. |
+| D420 | `INVALID_LOCATION` | Vị trí không hợp lệ. |
+| D421 | `TARGET_UNAVAILABLE` | Runner này hiện không nhận kết nối. |
+| D422 | `ALREADY_CONNECTED` | Hai bạn đã kết nối. |
+| D423 | `ALREADY_REQUESTED` | Bạn đã gửi lời mời, chờ người kia trả lời. |
+| D424 | `REQUEST_COOLDOWN` | Lời mời trước bị từ chối — 30 ngày sau mới gửi lại được. |
+| D425 | `TOO_MANY_REQUESTS` | Bạn đã gửi đủ số lời mời hôm nay. Mai gửi tiếp nhé. |
+| D426 | `NO_LINKS` | Lời nhắn không được chứa link, số Zalo / Telegram. Kết nối xong hãy rủ nhau vào buổi chạy. |
+| D427 | `NOT_CONNECTED` | Chỉ rủ được người đã kết nối. |
+| D428 | `REQUEST_CLOSED` | Lời mời đã được xử lý. |
+| D429 | `EVENT_FULL` | Buổi chạy đã đủ người. |
+| D430 | `EVENT_ENDED` | Buổi chạy đã kết thúc. |
+| D431 | `EVENT_CANCELLED` | Buổi chạy đã bị huỷ. |
+| D432 | `EVENT_NOT_FOUND` | Không tìm thấy buổi chạy (có thể đã chuyển về chỉ thành viên CLB). |
+| D433 | `EVENT_NEEDS_LOCATION` | Buổi chạy công khai cần toạ độ điểm hẹn (nơi công cộng). |
+| D434 | `EVENT_NOT_PUBLIC` | Người này không thuộc CLB đó — chỉ rủ được vào buổi chạy công khai. |
+| D435 | `FORBIDDEN` | Bạn không có quyền làm việc này. |
 
 **features/org/api/orgApi.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D428 | `NAME_REQUIRED` | Hãy nhập tên người liên hệ. |
-| D429 | `ORG_NAME_REQUIRED` | Hãy nhập tên tổ chức (ít nhất 2 ký tự). |
-| D430 | `INVALID_PHONE` | Số điện thoại chưa đúng. |
-| D431 | `RATE_LIMITED` | Bạn đã gửi nhiều yêu cầu hôm nay. Chúng tôi sẽ liên hệ sớm. |
-| D432 | `OWNER_NOT_FOUND` | Không tìm thấy tài khoản với email này. Người quản trị cần đăng ký RaceHub trước. |
-| D433 | `ORG_NOT_FOUND` | Không tìm thấy tổ chức. |
-| D434 | `NOT_DEMO` | Chỉ xoá được tổ chức demo. |
-| D435 | `NOT_A_MEMBER` | Bạn chưa là thành viên tổ chức này. |
-| D436 | `INVALID_CODE` | Mã mời không đúng hoặc đã được đổi. |
-| D437 | `ORG_INACTIVE` | Gói của tổ chức đã hết hạn hoặc tạm dừng. Liên hệ quản trị tổ chức. |
-| D438 | `ORG_FULL` | Tổ chức đã đủ số chỗ theo hợp đồng. Quản trị tổ chức cần nâng số chỗ. |
-| D439 | `OWNER_CANNOT_LEAVE` | Người sở hữu tổ chức không thể rời. Liên hệ RaceHub để chuyển quyền. |
-| D440 | `UNIT_EXISTS` | Tên đơn vị đã có. |
-| D441 | `UNIT_LIMIT` | Tối đa 500 đơn vị. |
-| D442 | `INVALID_NAME` | Tên không hợp lệ. |
-| D443 | `INVALID_UNIT_LABEL` | Tên gọi đơn vị dài 2–30 ký tự. |
-| D444 | `TAGLINE_TOO_LONG` | Khẩu hiệu tối đa 80 ký tự. |
-| D445 | `INVALID_URL` | Link ảnh phải bắt đầu bằng https:// |
-| D446 | `CLUB_NOT_FOUND` | Không tìm thấy CLB. |
-| D447 | `CLUB_IN_ORG` | CLB này đang thuộc một tổ chức khác. |
-| D448 | `ALREADY_INVITED` | Đã mời CLB này rồi. |
-| D449 | `ORG_CLUB_LIMIT` | Đã đủ số CLB theo hợp đồng. |
-| D450 | `INVITE_NOT_FOUND` | Lời mời không còn hiệu lực. |
-| D451 | `TITLE_REQUIRED` | Tên chiến dịch cần 3–120 ký tự. |
-| D452 | `INVALID_METRIC` | Cách tính không hợp lệ. |
-| D453 | `INVALID_TIME_RANGE` | Thời gian không hợp lệ (tối đa 1 năm). |
-| D454 | `REASON_REQUIRED` | Hãy ghi lý do (ít nhất 3 ký tự). |
-| D455 | `MEMBER_NOT_FOUND` | Không tìm thấy thành viên. |
-| D456 | `IMAGE_TYPE` | Chỉ nhận ảnh JPG, PNG hoặc WebP. |
-| D457 | `IMAGE_SIZE` | Ảnh quá lớn, hãy chọn ảnh khác. |
-| D458 | `FORBIDDEN` | Bạn không có quyền làm việc này. |
-| D459 | `DOMAIN_REQUIRED_LIST` | Bật "chỉ nhận email công ty" cần khai báo ít nhất một tên miền. |
-| D460 | `DOMAIN_REQUIRED` | Tổ chức chỉ nhận tài khoản dùng email công ty. Hãy đăng nhập bằng email công ty. |
-| D461 | `INVALID_DOMAIN` | Tên miền không hợp lệ (vd: congty.vn), tối đa 10 tên miền. |
-| D462 | `PUBLIC_DOMAIN` | Không dùng tên miền email công cộng (gmail, yahoo…). |
-| D463 | `UNIT_CYCLE` | Không thể đặt đơn vị làm con của chính nó. |
-| D464 | `UNIT_DEPTH` | Tối đa 4 cấp đơn vị. |
-| D465 | `UNIT_REQUIRED` | Gán đơn vị trước khi chọn làm trưởng đơn vị. |
-| D466 | `INVALID_ROWS` | Danh sách không hợp lệ (tối đa 5.000 dòng). |
-| D467 | `CAMPAIGN_LOCKED` | Chiến dịch đã chốt kết quả, không sửa được. |
-| D468 | `CAMPAIGN_NOT_ENDED` | Chiến dịch chưa kết thúc. |
-| D469 | `CAMPAIGN_NOT_LOCKED` | Hãy chốt kết quả trước khi duyệt. |
-| D470 | `TOO_MANY_BOOST_DAYS` | Tối đa 20 ngày hội. |
-| D471 | `NOT_ELIGIBLE` | Bạn chưa đủ điều kiện nhận chứng nhận. |
-| D472 | `CERT_DISABLED` | Chiến dịch không cấp chứng nhận. |
-| D473 | `INVALID_CERT_IMAGE` | Ảnh chứng nhận phải tải lên từ kho ảnh của tổ chức. |
-| D474 | `INVALID_CERT_DESIGN` | Mẫu chứng nhận không hợp lệ. |
-| D475 | `POSTS_ADMIN_ONLY` | Chỉ quản trị tổ chức được đăng bài. |
-| D476 | `EMPTY_POST` | Hãy viết nội dung. |
-| D477 | `EMPTY_COMMENT` | Hãy viết bình luận. |
-| D478 | `NOT_AUTHOR` | Chỉ người viết mới sửa được bình luận này. |
-| D479 | `COMMENT_NOT_FOUND` | Bình luận không còn nữa. |
-| D480 | `POST_NOT_FOUND` | Bài đăng không còn. |
-| D481 | `INVALID_IMAGE_PATH` | Ảnh không hợp lệ, hãy tải lại. |
+| D436 | `NAME_REQUIRED` | Hãy nhập tên người liên hệ. |
+| D437 | `ORG_NAME_REQUIRED` | Hãy nhập tên tổ chức (ít nhất 2 ký tự). |
+| D438 | `INVALID_PHONE` | Số điện thoại chưa đúng. |
+| D439 | `RATE_LIMITED` | Bạn đã gửi nhiều yêu cầu hôm nay. Chúng tôi sẽ liên hệ sớm. |
+| D440 | `OWNER_NOT_FOUND` | Không tìm thấy tài khoản với email này. Người quản trị cần đăng ký RaceHub trước. |
+| D441 | `ORG_NOT_FOUND` | Không tìm thấy tổ chức. |
+| D442 | `NOT_DEMO` | Chỉ xoá được tổ chức demo. |
+| D443 | `NOT_A_MEMBER` | Bạn chưa là thành viên tổ chức này. |
+| D444 | `INVALID_CODE` | Mã mời không đúng hoặc đã được đổi. |
+| D445 | `ORG_INACTIVE` | Gói của tổ chức đã hết hạn hoặc tạm dừng. Liên hệ quản trị tổ chức. |
+| D446 | `ORG_FULL` | Tổ chức đã đủ số chỗ theo hợp đồng. Quản trị tổ chức cần nâng số chỗ. |
+| D447 | `OWNER_CANNOT_LEAVE` | Người sở hữu tổ chức không thể rời. Liên hệ RaceHub để chuyển quyền. |
+| D448 | `UNIT_EXISTS` | Tên đơn vị đã có. |
+| D449 | `UNIT_LIMIT` | Tối đa 500 đơn vị. |
+| D450 | `INVALID_NAME` | Tên không hợp lệ. |
+| D451 | `INVALID_UNIT_LABEL` | Tên gọi đơn vị dài 2–30 ký tự. |
+| D452 | `TAGLINE_TOO_LONG` | Khẩu hiệu tối đa 80 ký tự. |
+| D453 | `INVALID_URL` | Link ảnh phải bắt đầu bằng https:// |
+| D454 | `CLUB_NOT_FOUND` | Không tìm thấy CLB. |
+| D455 | `CLUB_IN_ORG` | CLB này đang thuộc một tổ chức khác. |
+| D456 | `ALREADY_INVITED` | Đã mời CLB này rồi. |
+| D457 | `ORG_CLUB_LIMIT` | Đã đủ số CLB theo hợp đồng. |
+| D458 | `INVITE_NOT_FOUND` | Lời mời không còn hiệu lực. |
+| D459 | `TITLE_REQUIRED` | Tên chiến dịch cần 3–120 ký tự. |
+| D460 | `INVALID_METRIC` | Cách tính không hợp lệ. |
+| D461 | `INVALID_TIME_RANGE` | Thời gian không hợp lệ (tối đa 1 năm). |
+| D462 | `REASON_REQUIRED` | Hãy ghi lý do (ít nhất 3 ký tự). |
+| D463 | `MEMBER_NOT_FOUND` | Không tìm thấy thành viên. |
+| D464 | `IMAGE_TYPE` | Chỉ nhận ảnh JPG, PNG hoặc WebP. |
+| D465 | `IMAGE_SIZE` | Ảnh quá lớn, hãy chọn ảnh khác. |
+| D466 | `FORBIDDEN` | Bạn không có quyền làm việc này. |
+| D467 | `DOMAIN_REQUIRED_LIST` | Bật "chỉ nhận email công ty" cần khai báo ít nhất một tên miền. |
+| D468 | `DOMAIN_REQUIRED` | Tổ chức chỉ nhận tài khoản dùng email công ty. Hãy đăng nhập bằng email công ty. |
+| D469 | `INVALID_DOMAIN` | Tên miền không hợp lệ (vd: congty.vn), tối đa 10 tên miền. |
+| D470 | `PUBLIC_DOMAIN` | Không dùng tên miền email công cộng (gmail, yahoo…). |
+| D471 | `UNIT_CYCLE` | Không thể đặt đơn vị làm con của chính nó. |
+| D472 | `UNIT_DEPTH` | Tối đa 4 cấp đơn vị. |
+| D473 | `UNIT_REQUIRED` | Gán đơn vị trước khi chọn làm trưởng đơn vị. |
+| D474 | `INVALID_ROWS` | Danh sách không hợp lệ (tối đa 5.000 dòng). |
+| D475 | `CAMPAIGN_LOCKED` | Chiến dịch đã chốt kết quả, không sửa được. |
+| D476 | `CAMPAIGN_NOT_ENDED` | Chiến dịch chưa kết thúc. |
+| D477 | `CAMPAIGN_NOT_LOCKED` | Hãy chốt kết quả trước khi duyệt. |
+| D478 | `TOO_MANY_BOOST_DAYS` | Tối đa 20 ngày hội. |
+| D479 | `NOT_ELIGIBLE` | Bạn chưa đủ điều kiện nhận chứng nhận. |
+| D480 | `CERT_DISABLED` | Chiến dịch không cấp chứng nhận. |
+| D481 | `INVALID_CERT_IMAGE` | Ảnh chứng nhận phải tải lên từ kho ảnh của tổ chức. |
+| D482 | `INVALID_CERT_DESIGN` | Mẫu chứng nhận không hợp lệ. |
+| D483 | `POSTS_ADMIN_ONLY` | Chỉ quản trị tổ chức được đăng bài. |
+| D484 | `EMPTY_POST` | Hãy viết nội dung. |
+| D485 | `EMPTY_COMMENT` | Hãy viết bình luận. |
+| D486 | `NOT_AUTHOR` | Chỉ người viết mới sửa được bình luận này. |
+| D487 | `COMMENT_NOT_FOUND` | Bình luận không còn nữa. |
+| D488 | `POST_NOT_FOUND` | Bài đăng không còn. |
+| D489 | `INVALID_IMAGE_PATH` | Ảnh không hợp lệ, hãy tải lại. |
 
 **features/profile/api/profileApi.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D482 | `INVALID_NAME` | Tên hiển thị cần từ 2 đến 40 ký tự. |
-| D483 | `INVALID_BIO` | Giới thiệu tối đa 160 ký tự. |
-| D484 | `INVALID_GENDER` | Giới tính không hợp lệ. |
-| D485 | `INVALID_BIRTH_DATE` | Ngày sinh không hợp lệ (bạn cần từ 10 tuổi trở lên). |
-| D486 | `INVALID_HEIGHT` | Chiều cao cần từ 100 đến 250 cm. |
-| D487 | `INVALID_WEIGHT` | Cân nặng cần từ 25 đến 250 kg. |
-| D488 | `INVALID_PROFILE` | Thông tin hồ sơ không hợp lệ. |
+| D490 | `INVALID_NAME` | Tên hiển thị cần từ 2 đến 40 ký tự. |
+| D491 | `INVALID_BIO` | Giới thiệu tối đa 160 ký tự. |
+| D492 | `INVALID_GENDER` | Giới tính không hợp lệ. |
+| D493 | `INVALID_BIRTH_DATE` | Ngày sinh không hợp lệ (bạn cần từ 10 tuổi trở lên). |
+| D494 | `INVALID_HEIGHT` | Chiều cao cần từ 100 đến 250 cm. |
+| D495 | `INVALID_WEIGHT` | Cân nặng cần từ 25 đến 250 kg. |
+| D496 | `INVALID_PROFILE` | Thông tin hồ sơ không hợp lệ. |
 
 **features/profile/components/SettingsScreen.tsx**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D489 | `CONFIRM_REQUIRED` | Gõ đúng chữ XOÁ để xác nhận. |
-| D490 | `ADMIN_CANNOT_DELETE` | Tài khoản quản trị viên cần được gỡ quyền quản trị trước khi xoá. |
-| D491 | `TRANSFER_CLUB_FIRST` | Bạn đang là chủ nhiệm CLB còn thành viên — hãy chuyển quyền chủ nhiệm cho người khác trước. |
+| D497 | `CONFIRM_REQUIRED` | Gõ đúng chữ XOÁ để xác nhận. |
+| D498 | `ADMIN_CANNOT_DELETE` | Tài khoản quản trị viên cần được gỡ quyền quản trị trước khi xoá. |
+| D499 | `TRANSFER_CLUB_FIRST` | Bạn đang là chủ nhiệm CLB còn thành viên — hãy chuyển quyền chủ nhiệm cho người khác trước. |
 
 **features/race/api/raceApi.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D492 | `FORBIDDEN` | Bạn không có quyền làm việc này. |
-| D493 | `APP_OUTDATED` | Ứng dụng vừa được cập nhật — tải lại trang rồi lưu lại thiết kế. |
-| D494 | `RACE_ORGANIZER_REQUIRED` | Chỉ CLB hoặc cá nhân được RaceHub cấp quyền mới tạo được giải chạy. Liên hệ admin để đăng ký. |
-| D495 | `CAPACITY_REQUIRED` | Chọn quy mô (số VĐV tối đa) — phí tạo giải tính theo quy mô. |
-| D496 | `INSUFFICIENT_BALANCE` | Ví của bạn không đủ Xu trả phí tạo giải. |
-| D497 | `INSUFFICIENT_TREASURY` | Quỹ CLB không đủ Xu trả phí tạo giải. |
-| D498 | `RACE_NOT_FOUND` | Không tìm thấy giải (hoặc giải chỉ dành cho thành viên CLB). |
-| D499 | `RACE_CANCELLED` | Giải đã bị hủy. |
-| D500 | `REGISTRATION_CLOSED` | Đã hết hạn đăng ký. |
-| D501 | `RACE_FULL` | Giải đã đủ số VĐV. |
-| D502 | `INVALID_DISTANCE` | Cự ly không có trong giải. |
-| D503 | `RACE_STARTED` | Giải đã bắt đầu, không rút tên được nữa. |
-| D504 | `NOT_REGISTERED` | Bạn chưa đăng ký giải này. |
-| D505 | `INVALID_TITLE` | Tên giải cần từ 3 đến 120 ký tự. |
-| D506 | `INVALID_TIME_RANGE` | Thời gian kết thúc phải sau thời gian bắt đầu. |
-| D507 | `INVALID_DURATION` | Giải kéo dài tối đa 3 tháng và chưa kết thúc. |
-| D508 | `INVALID_REG_CLOSE` | Hạn đăng ký phải trước khi giải kết thúc. |
-| D509 | `INVALID_AUDIENCE` | Giải nội bộ cần chọn CLB. |
-| D510 | `INVALID_MAX` | Số VĐV tối đa từ 2 đến 100.000. |
-| D511 | `INVALID_BIB_PREFIX` | Tiền tố BIB chỉ gồm chữ và số, tối đa 6 ký tự. |
-| D512 | `INVALID_DISTANCES` | Chọn 1–6 cự ly, mỗi cự ly từ 1 đến 250 km. |
-| D513 | `INVALID_BIB_DESIGN` | Thiết kế BIB không hợp lệ. |
-| D514 | `INVALID_BIB_IMAGE` | Ảnh phải được tải lên từ trình thiết kế BIB của giải này. |
-| D515 | `INVALID_IMAGE_TYPE` | Chỉ nhận ảnh PNG, JPG hoặc WebP. |
-| D516 | `IMAGE_TOO_LARGE` | Ảnh quá lớn, không nén được. Thử ảnh nhỏ hơn. |
-| D517 | `AUTH_REQUIRED` | Phiên đăng nhập đã hết, vui lòng đăng nhập lại. |
+| D500 | `FORBIDDEN` | Bạn không có quyền làm việc này. |
+| D501 | `APP_OUTDATED` | Ứng dụng vừa được cập nhật — tải lại trang rồi lưu lại thiết kế. |
+| D502 | `RACE_ORGANIZER_REQUIRED` | Chỉ CLB hoặc cá nhân được RaceHub cấp quyền mới tạo được giải chạy. Liên hệ admin để đăng ký. |
+| D503 | `CAPACITY_REQUIRED` | Chọn quy mô (số VĐV tối đa) — phí tạo giải tính theo quy mô. |
+| D504 | `INSUFFICIENT_BALANCE` | Ví của bạn không đủ Xu trả phí tạo giải. |
+| D505 | `INSUFFICIENT_TREASURY` | Quỹ CLB không đủ Xu trả phí tạo giải. |
+| D506 | `RACE_NOT_FOUND` | Không tìm thấy giải (hoặc giải chỉ dành cho thành viên CLB). |
+| D507 | `RACE_CANCELLED` | Giải đã bị hủy. |
+| D508 | `REGISTRATION_CLOSED` | Đã hết hạn đăng ký. |
+| D509 | `RACE_FULL` | Giải đã đủ số VĐV. |
+| D510 | `INVALID_DISTANCE` | Cự ly không có trong giải. |
+| D511 | `RACE_STARTED` | Giải đã bắt đầu, không rút tên được nữa. |
+| D512 | `NOT_REGISTERED` | Bạn chưa đăng ký giải này. |
+| D513 | `INVALID_TITLE` | Tên giải cần từ 3 đến 120 ký tự. |
+| D514 | `INVALID_TIME_RANGE` | Thời gian kết thúc phải sau thời gian bắt đầu. |
+| D515 | `INVALID_DURATION` | Giải kéo dài tối đa 3 tháng và chưa kết thúc. |
+| D516 | `INVALID_REG_CLOSE` | Hạn đăng ký phải trước khi giải kết thúc. |
+| D517 | `INVALID_AUDIENCE` | Giải nội bộ cần chọn CLB. |
+| D518 | `INVALID_MAX` | Số VĐV tối đa từ 2 đến 100.000. |
+| D519 | `INVALID_BIB_PREFIX` | Tiền tố BIB chỉ gồm chữ và số, tối đa 6 ký tự. |
+| D520 | `INVALID_DISTANCES` | Chọn 1–6 cự ly, mỗi cự ly từ 1 đến 250 km. |
+| D521 | `INVALID_BIB_DESIGN` | Thiết kế BIB không hợp lệ. |
+| D522 | `INVALID_BIB_IMAGE` | Ảnh phải được tải lên từ trình thiết kế BIB của giải này. |
+| D523 | `INVALID_IMAGE_TYPE` | Chỉ nhận ảnh PNG, JPG hoặc WebP. |
+| D524 | `IMAGE_TOO_LARGE` | Ảnh quá lớn, không nén được. Thử ảnh nhỏ hơn. |
+| D525 | `AUTH_REQUIRED` | Phiên đăng nhập đã hết, vui lòng đăng nhập lại. |
 
 **features/referral/api/referralApi.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D518 | `AUTH_REQUIRED` | Bạn cần đăng nhập để nhận lời mời. |
-| D519 | `CANNOT_REFER_SELF` | Bạn không thể tự giới thiệu chính mình. |
-| D520 | `ALREADY_REFERRED` | Tài khoản của bạn đã nhận lời mời của người khác trước đó. |
-| D521 | `REFERRER_NOT_FOUND` | Mã giới thiệu không đúng. Kiểm tra lại 8 ký tự trên link / tin nhắn mời. |
-| D522 | `REFERRAL_WINDOW_EXPIRED` | Chỉ nhập được mã giới thiệu trong 14 ngày đầu sau khi tạo tài khoản. |
+| D526 | `AUTH_REQUIRED` | Bạn cần đăng nhập để nhận lời mời. |
+| D527 | `CANNOT_REFER_SELF` | Bạn không thể tự giới thiệu chính mình. |
+| D528 | `ALREADY_REFERRED` | Tài khoản của bạn đã nhận lời mời của người khác trước đó. |
+| D529 | `REFERRER_NOT_FOUND` | Mã giới thiệu không đúng. Kiểm tra lại 8 ký tự trên link / tin nhắn mời. |
+| D530 | `REFERRAL_WINDOW_EXPIRED` | Chỉ nhập được mã giới thiệu trong 14 ngày đầu sau khi tạo tài khoản. |
 
 **features/social/api/socialApi.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D523 | `SPAM` | Làm phiền / spam |
-| D524 | `INVALID_TARGET` | Không thực hiện được với chính bạn. |
-| D525 | `USER_NOT_FOUND` | Không tìm thấy runner này. |
-| D526 | `BLOCKED` | Hai bạn đang chặn nhau nên không làm được việc này. |
-| D527 | `DM_NOT_ALLOWED` | Chỉ nhắn được khi người này theo dõi bạn, là bạn kết nối, cùng CLB hoặc đã từng nhắn cho bạn. |
-| D528 | `RATE_LIMITED` | Bạn thao tác hơi nhanh. Nghỉ một chút rồi thử lại nhé. |
-| D529 | `EMPTY_MESSAGE` | Tin nhắn đang trống (tối đa 2000 ký tự). |
-| D530 | `NOT_AUTHOR` | Chỉ người gửi mới thu hồi được tin này. |
-| D531 | `NOT_FOUND` | Tin nhắn không còn nữa. |
-| D532 | `INVALID_REASON` | Hãy chọn lý do báo cáo. |
+| D531 | `SPAM` | Làm phiền / spam |
+| D532 | `INVALID_TARGET` | Không thực hiện được với chính bạn. |
+| D533 | `USER_NOT_FOUND` | Không tìm thấy runner này. |
+| D534 | `BLOCKED` | Hai bạn đang chặn nhau nên không làm được việc này. |
+| D535 | `DM_NOT_ALLOWED` | Chỉ nhắn được khi người này theo dõi bạn, là bạn kết nối, cùng CLB hoặc đã từng nhắn cho bạn. |
+| D536 | `RATE_LIMITED` | Bạn thao tác hơi nhanh. Nghỉ một chút rồi thử lại nhé. |
+| D537 | `EMPTY_MESSAGE` | Tin nhắn đang trống (tối đa 2000 ký tự). |
+| D538 | `NOT_AUTHOR` | Chỉ người gửi mới thu hồi được tin này. |
+| D539 | `NOT_FOUND` | Tin nhắn không còn nữa. |
+| D540 | `INVALID_REASON` | Hãy chọn lý do báo cáo. |
+| D541 | `INVALID_EMOJI` | Cảm xúc này chưa được hỗ trợ. |
 
 **features/system/api/systemApi.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D533 | `INVALID_LEVEL` | Mức thông báo không hợp lệ. |
-| D534 | `INVALID_TITLE` | Tiêu đề cần 2–80 ký tự. |
-| D535 | `INVALID_MESSAGE` | Nội dung tối đa 500 ký tự. |
-| D536 | `INVALID_TIME_RANGE` | Thời điểm tự tắt phải ở tương lai. |
-| D537 | `FORBIDDEN` | Chỉ quản trị hệ thống mới làm được việc này. |
-| D538 | `INVALID_CONFIG` | Giá trị ngoài giới hạn cho phép — kiểm tra lại các ô vừa sửa. |
-| D539 | `VERSION_NOT_FOUND` | Không tìm thấy phiên bản này. |
+| D542 | `INVALID_LEVEL` | Mức thông báo không hợp lệ. |
+| D543 | `INVALID_TITLE` | Tiêu đề cần 2–80 ký tự. |
+| D544 | `INVALID_MESSAGE` | Nội dung tối đa 500 ký tự. |
+| D545 | `INVALID_TIME_RANGE` | Thời điểm tự tắt phải ở tương lai. |
+| D546 | `FORBIDDEN` | Chỉ quản trị hệ thống mới làm được việc này. |
+| D547 | `INVALID_CONFIG` | Giá trị ngoài giới hạn cho phép — kiểm tra lại các ô vừa sửa. |
+| D548 | `VERSION_NOT_FOUND` | Không tìm thấy phiên bản này. |
 
 **features/victory/api/victoryApi.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D540 | `NOT_PARTICIPANT` | Người này chưa tham gia thử thách. |
-| D541 | `NO_RESULT` | Chưa có kết quả để vinh danh — hãy chạy ít nhất một bài hợp lệ trong thử thách. |
-| D542 | `NOT_ELIGIBLE` | Chưa đạt thành tích này. |
-| D543 | `NOT_FOUND` | Không tìm thấy thành tích. |
-| D544 | `FORBIDDEN` | Chỉ người tạo thử thách, ban quản trị CLB hoặc admin mới vinh danh người khác và đặt danh hiệu. |
-| D545 | `RATE_LIMITED` | Bạn đã tạo quá nhiều ảnh hôm nay. Thử lại ngày mai. |
+| D549 | `NOT_PARTICIPANT` | Người này chưa tham gia thử thách. |
+| D550 | `NO_RESULT` | Chưa có kết quả để vinh danh — hãy chạy ít nhất một bài hợp lệ trong thử thách. |
+| D551 | `NOT_ELIGIBLE` | Chưa đạt thành tích này. |
+| D552 | `NOT_FOUND` | Không tìm thấy thành tích. |
+| D553 | `FORBIDDEN` | Chỉ người tạo thử thách, ban quản trị CLB hoặc admin mới vinh danh người khác và đặt danh hiệu. |
+| D554 | `RATE_LIMITED` | Bạn đã tạo quá nhiều ảnh hôm nay. Thử lại ngày mai. |
 
 **features/victory/model/victory.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D546 | `CHALLENGE` | Thử thách |
+| D555 | `CHALLENGE` | Thử thách |
 
 **features/voucher/api/voucherApi.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D547 | `FORBIDDEN` | Chỉ Ban tổ chức thử thách hoặc admin mới làm được việc này. |
-| D548 | `INVALID_URL` | Đường link / logo phải bắt đầu bằng https:// |
-| D549 | `INVALID_VOUCHER_CODE` | Nhập mã chung (ít nhất 3 ký tự). |
-| D550 | `INVALID_VOUCHER` | Thông tin voucher chưa hợp lệ (Top N từ 1 đến 100, chỉ áp cho thử thách). |
-| D551 | `TOO_MANY_CODES` | Tối đa 5.000 mã mỗi lần dán. |
-| D552 | `VOUCHER_NOT_FOUND` | Không tìm thấy voucher. |
+| D556 | `FORBIDDEN` | Chỉ Ban tổ chức thử thách hoặc admin mới làm được việc này. |
+| D557 | `INVALID_URL` | Đường link / logo phải bắt đầu bằng https:// |
+| D558 | `INVALID_VOUCHER_CODE` | Nhập mã chung (ít nhất 3 ký tự). |
+| D559 | `INVALID_VOUCHER` | Thông tin voucher chưa hợp lệ (Top N từ 1 đến 100, chỉ áp cho thử thách). |
+| D560 | `TOO_MANY_CODES` | Tối đa 5.000 mã mỗi lần dán. |
+| D561 | `VOUCHER_NOT_FOUND` | Không tìm thấy voucher. |
 
 **shared/lib/errors.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D553 | `AUTH_REQUIRED` | Bạn cần đăng nhập để tiếp tục. |
-| D554 | `FORBIDDEN` | Bạn không có quyền thực hiện thao tác này. |
-| D555 | `INSUFFICIENT_BALANCE` | Số dư Xu không đủ. |
-| D556 | `INSUFFICIENT_FUNDS` | Số dư Xu không đủ. |
-| D557 | `INVALID_TITLE` | Tên thử thách cần từ 3 đến 120 ký tự. |
-| D558 | `INVALID_TIME_RANGE` | Thời gian kết thúc phải sau thời gian bắt đầu. |
-| D559 | `INVALID_MAX_SLOTS` | Số người tham gia tối đa không hợp lệ (1 – 10.000). |
-| D560 | `INVALID_DISTANCE` | Cự ly không hợp lệ. |
-| D561 | `INVALID_PACE` | Khoảng pace không hợp lệ. |
-| D562 | `INVALID_CHALLENGE_TYPE` | Loại thử thách không hợp lệ. |
-| D563 | `IDEMPOTENCY_KEY_REQUIRED` | Yêu cầu không hợp lệ, vui lòng thử lại. |
-| D564 | `ACTIVITY_DUPLICATE` | Bài chạy này đã được lưu trước đó. |
-| D565 | `RATE_LIMITED` | Bạn thao tác quá nhanh, thử lại sau ít phút. |
-| D566 | `NOT_A_MEMBER` | Bạn chưa là thành viên CLB này. |
+| D562 | `AUTH_REQUIRED` | Bạn cần đăng nhập để tiếp tục. |
+| D563 | `FORBIDDEN` | Bạn không có quyền thực hiện thao tác này. |
+| D564 | `INSUFFICIENT_BALANCE` | Số dư Xu không đủ. |
+| D565 | `INSUFFICIENT_FUNDS` | Số dư Xu không đủ. |
+| D566 | `INVALID_TITLE` | Tên thử thách cần từ 3 đến 120 ký tự. |
+| D567 | `INVALID_TIME_RANGE` | Thời gian kết thúc phải sau thời gian bắt đầu. |
+| D568 | `INVALID_MAX_SLOTS` | Số người tham gia tối đa không hợp lệ (1 – 10.000). |
+| D569 | `INVALID_DISTANCE` | Cự ly không hợp lệ. |
+| D570 | `INVALID_PACE` | Khoảng pace không hợp lệ. |
+| D571 | `INVALID_CHALLENGE_TYPE` | Loại thử thách không hợp lệ. |
+| D572 | `IDEMPOTENCY_KEY_REQUIRED` | Yêu cầu không hợp lệ, vui lòng thử lại. |
+| D573 | `ACTIVITY_DUPLICATE` | Bài chạy này đã được lưu trước đó. |
+| D574 | `RATE_LIMITED` | Bạn thao tác quá nhanh, thử lại sau ít phút. |
+| D575 | `NOT_A_MEMBER` | Bạn chưa là thành viên CLB này. |
 
 ## E. Thông báo nhanh (toast)
 
@@ -899,7 +910,7 @@ Tổng: 114 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 56
 | E32 | success | Đã khôi phục — đang dùng bản v${v} | `features/admin/components/console/OpsPolicyTab.tsx:242` |
 | E33 | success | Đã chuyển chính sách · ${formatNumber(r.changed)} bài Strava được cập nhật | `features/admin/components/console/StravaTab.tsx:28` |
 | E34 | error | Ghi lý do (ít nhất 3 ký tự) | `features/admin/components/console/StravaTab.tsx:60` |
-| E35 | error | Hãy ghi lý do (ít nhất 3 ký tự). | `features/admin/components/console/UsersTab.tsx:164` |
+| E35 | error | Hãy ghi lý do (ít nhất 3 ký tự). | `features/admin/components/console/UsersTab.tsx:195` |
 | E36 | success | Đã tặng ${qty} lượt tạo cho ${target.name} | `features/admin/components/economy/PassesTab.tsx:38` |
 | E37 | success | Đã thu hồi vé | `features/admin/components/economy/PassesTab.tsx:49` |
 | E38 | success | Đã áp dụng chính sách phiên bản ${v} | `features/admin/components/economy/PolicyTab.tsx:79` |
@@ -909,8 +920,8 @@ Tổng: 114 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 56
 | E42 | success | Đã trả lại mẫu cho CLB | `features/admin/components/items/UniformReviewPanel.tsx:150` |
 | E43 | success | Đã chép ${label.toLowerCase()} | `features/billing/components/OrderSheet.tsx:25` |
 | E44 | success | Đã hủy đơn | `features/billing/components/OrderSheet.tsx:46` |
-| E45 | success | Đã sao chép link mời | `features/challenge/components/detail/ChallengeDetailScreen.tsx:565` |
-| E46 | error | Không sao chép được, hãy chọn và sao chép thủ công. | `features/challenge/components/detail/ChallengeDetailScreen.tsx:565` |
+| E45 | success | Đã sao chép link mời | `features/challenge/components/detail/ChallengeDetailScreen.tsx:563` |
+| E46 | error | Không sao chép được, hãy chọn và sao chép thủ công. | `features/challenge/components/detail/ChallengeDetailScreen.tsx:563` |
 | E47 | success | Đã đổi hạn đăng ký | `features/challenge/components/detail/ChallengeExtras.tsx:30` |
 | E48 | success | Đã lưu hạng mục của bạn | `features/challenge/components/detail/ConquestPanel.tsx:63` |
 | E49 | success | Đã chia đội và báo cho mọi người | `features/challenge/components/detail/PledgePanel.tsx:175` |
@@ -1014,93 +1025,94 @@ Tổng: 114 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 56
 | E147 | warning | Không nhập bài nào: ${skipped.join('; ')}. | `features/integrations/strava/components/StravaSyncCard.tsx:69` |
 | E148 | info | Không có bài chạy mới trên Strava. Bài vừa chạy có thể cần vài phút để Strava xử lý xong. | `features/integrations/strava/components/StravaSyncCard.tsx:70` |
 | E149 | success | Đã nhập ${s.imported} bài chạy | `features/integrations/strava/components/StravaSyncCard.tsx:72` |
-| E150 | success | Cảm ơn góp ý của bạn! | `features/knowledge/components/ArticleScreen.tsx:272` |
+| E150 | success | Cảm ơn góp ý của bạn! | `features/knowledge/components/ArticleScreen.tsx:288` |
 | E151 | success | Huy hiệu mới: Runner ham học 🎓 | `features/knowledge/components/ArticleScreen.tsx:53` |
 | E152 | success | Đã đọc xong bài | `features/knowledge/components/ArticleScreen.tsx:54` |
 | E153 | success | Đã sao chép link bài viết | `features/knowledge/components/ArticleScreen.tsx:99` |
-| E154 | success | Đã tải ảnh | `features/knowledge/components/cms/ArticleEditor.tsx:111` |
-| E155 | success | Đã gửi góp ý | `features/knowledge/components/cms/ArticleEditor.tsx:319` |
-| E156 | success | Đã xoá | `features/knowledge/components/cms/ArticleEditor.tsx:326` |
-| E157 | success | Đã thêm vào ban nội dung | `features/knowledge/components/cms/CmsScreen.tsx:261` |
-| E158 | success | Đã lưu tác giả | `features/knowledge/components/cms/CmsScreen.tsx:283` |
-| E159 | success | Đã cập nhật | `features/market/components/BibMarket.tsx:103` |
-| E160 | success | Đã gửi báo cáo — quản trị viên sẽ xem xét | `features/market/components/BibMarket.tsx:173` |
-| E161 | success | Đã gỡ CLB khỏi Quanh đây | `features/nearby/components/ClubPlaceSection.tsx:34` |
-| E162 | success | Đã lưu khu vực CLB | `features/nearby/components/ClubPlaceSection.tsx:43` |
-| E163 | success | Đã huỷ kết nối | `features/nearby/components/ConnectionsScreen.tsx:119` |
-| E164 | success | Đã rút lời mời | `features/nearby/components/ConnectionsScreen.tsx:130` |
-| E165 | success | Đã bỏ chặn ${name} | `features/nearby/components/ConnectionsScreen.tsx:145` |
-| E166 | success | Đã bật Quanh đây | `features/nearby/components/EnableSheet.tsx:70` |
-| E167 | error | Thiết bị không hỗ trợ định vị — hãy chạm trên bản đồ. | `features/nearby/components/LocationPicker.tsx:58` |
-| E168 | error | Không lấy được vị trí. Bạn có thể chạm trên bản đồ để chọn khu vực. | `features/nearby/components/LocationPicker.tsx:62` |
-| E169 | success | Đã ẩn bạn khỏi Quanh đây | `features/nearby/components/NearbyScreen.tsx:115` |
-| E170 | success | Đã cập nhật khu vực | `features/nearby/components/NearbyScreen.tsx:130` |
-| E171 | success | Đã rủ ${name} | `features/nearby/components/RunnerCard.tsx:118` |
-| E172 | success | Đã gửi báo cáo | `features/nearby/components/RunnerCard.tsx:165` |
-| E173 | success | Đã chặn ${name} | `features/nearby/components/RunnerCard.tsx:197` |
-| E174 | success | Đã gửi. Thông báo sẽ hiện sau vài giây. | `features/notification/components/PushSettings.tsx:56` |
-| E175 | success | Đã tắt thông báo trên thiết bị này | `features/notification/components/PushSettings.tsx:61` |
-| E176 | success | Đã bật thông báo trên thiết bị này | `features/notification/components/PushSettings.tsx:63` |
-| E177 | error | Bạn chưa cho phép thông báo. | `features/notification/components/PushSettings.tsx:64` |
-| E178 | error | Chưa xóa được thông báo. Thử lại sau. | `features/notification/hooks/useNotifications.ts:39` |
-| E179 | success | Đã bật thông báo | `features/onboarding/components/OnboardingScreen.tsx:289` |
-| E180 | error | Bạn chưa cho phép thông báo. Có thể bật lại trong Cài đặt. | `features/onboarding/components/OnboardingScreen.tsx:290` |
-| E181 | error | Không bật được thông báo. Thử lại trong Cài đặt. | `features/onboarding/components/OnboardingScreen.tsx:292` |
-| E182 | error | Có lỗi, thử lại nhé. | `features/onboarding/components/OnboardingScreen.tsx:339` |
-| E183 | success | Đã kết nối Strava! Bài chạy 30 ngày gần nhất đang được đồng bộ. | `features/onboarding/components/OnboardingScreen.tsx:42` |
-| E184 | success | Đã huỷ chiến dịch | `features/org/components/CampaignScreen.tsx:38` |
-| E185 | success | CLB đã rời tổ chức | `features/org/components/ClubOrgCard.tsx:27` |
-| E186 | success | Đã vào tổ chức | `features/org/components/JoinOrgScreen.tsx:25` |
-| E187 | success | Đã gửi yêu cầu — chờ quản trị tổ chức duyệt | `features/org/components/JoinOrgScreen.tsx:26` |
-| E188 | success | Đã xoá tổ chức demo | `features/org/components/admin/EnterpriseAdminTab.tsx:177` |
-| E189 | success | Đã tạo tổ chức · mã mời ${r.invite_code} | `features/org/components/admin/EnterpriseAdminTab.tsx:199` |
-| E190 | success | Đã cập nhật gói | `features/org/components/admin/EnterpriseAdminTab.tsx:247` |
-| E191 | success | Đã sửa bình luận | `features/org/components/tabs/FeedTab.tsx:158` |
-| E192 | success | Đã lưu | `features/org/components/tabs/MembersTab.tsx:110` |
-| E193 | error | Không tạo được file Excel, thử lại. | `features/org/components/tabs/MembersTab.tsx:177` |
-| E194 | error | Không tạo được file mẫu, thử lại. | `features/org/components/tabs/MembersTab.tsx:205` |
-| E195 | error | Không tạo được file Excel, thử lại. | `features/org/components/tabs/OverviewTab.tsx:56` |
-| E196 | success | Đã lưu | `features/org/components/tabs/SettingsTab.tsx:129` |
-| E197 | success | Đã lưu thông tin xuất hoá đơn | `features/org/components/tabs/SettingsTab.tsx:162` |
-| E198 | success | Đã lưu tên miền | `features/org/components/tabs/SettingsTab.tsx:190` |
-| E199 | success | Đã đổi mã mời — mã cũ hết hiệu lực | `features/org/components/tabs/SettingsTab.tsx:43` |
-| E200 | error | Không sao chép được | `features/org/components/tabs/SettingsTab.tsx:47` |
-| E201 | success | Đã lưu thương hiệu | `features/org/components/tabs/SettingsTab.tsx:79` |
-| E202 | success | Đã gửi lời mời — chờ ban quản trị CLB đồng ý | `features/org/components/tabs/UnitsTab.tsx:160` |
-| E203 | success | Đã đổi đơn vị | `features/org/components/tabs/UnitsTab.tsx:38` |
-| E204 | success | Đã bỏ CLB khỏi tổ chức | `features/org/components/tabs/UnitsTab.tsx:43` |
-| E205 | success | Đã đổi ảnh đại diện | `features/profile/components/AvatarPicker.tsx:50` |
-| E206 | success | Đã gỡ ảnh đại diện | `features/profile/components/AvatarPicker.tsx:55` |
-| E207 | error | Hãy chọn một file ảnh. | `features/profile/components/AvatarPicker.tsx:61` |
-| E208 | error | Không đọc được ảnh này. Thử ảnh JPG hoặc PNG khác. | `features/profile/components/AvatarPicker.tsx:67` |
-| E209 | error | Không tạo được ảnh từ nhân vật. Thử lại sau. | `features/profile/components/AvatarPicker.tsx:78` |
-| E210 | error | Không hủy được kết nối Strava. Thử lại sau. | `features/profile/components/MeScreen.tsx:89` |
-| E211 | success | Đã hủy kết nối Strava | `features/profile/components/MeScreen.tsx:90` |
-| E212 | success | Đã xoá tài khoản. Cảm ơn bạn đã chạy cùng RaceHub. | `features/profile/components/SettingsScreen.tsx:212` |
-| E213 | success | Đã cài RaceHub lên màn hình chính | `features/pwa/components/InstallApp.tsx:37` |
-| E214 | success | Đã có mạng trở lại | `features/pwa/components/OfflineBanner.tsx:25` |
-| E215 | success | Đã kết nối lại máy chủ | `features/pwa/components/OfflineBanner.tsx:27` |
-| E216 | success | Đã lưu thiết kế BIB — VĐV thấy ngay | `features/race/components/BibDesigner.tsx:40` |
-| E217 | success | Đã tạo giải | `features/race/components/CreateRaceScreen.tsx:62` |
-| E218 | success | Đã hủy giải và báo cho VĐV | `features/race/components/RaceDetailScreen.tsx:283` |
-| E219 | success | Đã rút tên | `features/race/components/RaceDetailScreen.tsx:92` |
-| E220 | success | Đã ghi nhận lời mời của ${x.referrer_name} | `features/referral/components/InviteScreen.tsx:118` |
-| E221 | success | Đã sao chép ${what} | `features/referral/components/InviteScreen.tsx:38` |
-| E222 | error | Không sao chép được, hãy chọn và sao chép thủ công. | `features/referral/components/InviteScreen.tsx:38` |
-| E223 | info | Đã bỏ bài chạy | `features/run/components/RunScreen.tsx:352` |
-| E224 | success | Đã gửi bài chạy ${formatKm(item.payload.p_distance_m)} km lên RaceHub | `features/run/hooks/usePendingRuns.ts:55` |
-| E225 | error | Không gửi được một bài chạy lưu trên máy | `features/run/hooks/usePendingRuns.ts:69` |
-| E226 | info | Đã sao chép | `features/social/components/DirectChatScreen.tsx:111` |
-| E227 | success | Đã theo dõi ${name} | `features/social/components/FollowPanel.tsx:33` |
-| E228 | success | Đã gửi báo cáo | `features/social/components/ReportRunnerSheet.tsx:22` |
-| E229 | error | Không chia sẻ được. Hãy lưu ảnh rồi đăng. | `features/victory/components/VictoryEditor.tsx:122` |
-| E230 | error | Hãy chọn ảnh. | `features/victory/components/VictoryEditor.tsx:196` |
-| E231 | success | Đã đăng lên bảng tin CLB | `features/victory/components/VictoryEditor.tsx:315` |
-| E232 | error | Không vẽ được nhân vật. Thử ảnh đại diện nhé. | `features/victory/components/VictoryEditor.tsx:75` |
-| E233 | success | Đã thu hồi mã xác thực | `features/victory/components/VictoryHome.tsx:129` |
-| E234 | success | Đã thêm ${r.added} mã${r.issued ? | `features/voucher/components/VoucherForm.tsx:25` |
-| E235 | success | Đã lưu voucher tài trợ | `features/voucher/components/VoucherForm.tsx:29` |
-| E236 | success | Đã sao chép mã | `features/voucher/components/VoucherWallet.tsx:47` |
-| E237 | error | Tối đa ${max} phần tử | `shared/design/studio/Studio.tsx:73` |
-| E238 | success | Đã tải ảnh về máy | `shared/ui/SaveImage.tsx:21` |
-| E239 | success | Đã mở bảng chia sẻ — chọn "Lưu ảnh" để lưu vào máy | `shared/ui/SaveImage.tsx:22` |
+| E154 | success | Đã xóa bài | `features/knowledge/components/WriteScreen.tsx:97` |
+| E155 | success | Đã tải ảnh | `features/knowledge/components/cms/ArticleEditor.tsx:111` |
+| E156 | success | Đã gửi góp ý | `features/knowledge/components/cms/ArticleEditor.tsx:319` |
+| E157 | success | Đã xoá | `features/knowledge/components/cms/ArticleEditor.tsx:326` |
+| E158 | success | Đã thêm vào ban nội dung | `features/knowledge/components/cms/CmsScreen.tsx:261` |
+| E159 | success | Đã lưu tác giả | `features/knowledge/components/cms/CmsScreen.tsx:283` |
+| E160 | success | Đã cập nhật | `features/market/components/BibMarket.tsx:103` |
+| E161 | success | Đã gửi báo cáo — quản trị viên sẽ xem xét | `features/market/components/BibMarket.tsx:173` |
+| E162 | success | Đã gỡ CLB khỏi Quanh đây | `features/nearby/components/ClubPlaceSection.tsx:34` |
+| E163 | success | Đã lưu khu vực CLB | `features/nearby/components/ClubPlaceSection.tsx:43` |
+| E164 | success | Đã huỷ kết nối | `features/nearby/components/ConnectionsScreen.tsx:119` |
+| E165 | success | Đã rút lời mời | `features/nearby/components/ConnectionsScreen.tsx:130` |
+| E166 | success | Đã bỏ chặn ${name} | `features/nearby/components/ConnectionsScreen.tsx:145` |
+| E167 | success | Đã bật Quanh đây | `features/nearby/components/EnableSheet.tsx:70` |
+| E168 | error | Thiết bị không hỗ trợ định vị — hãy chạm trên bản đồ. | `features/nearby/components/LocationPicker.tsx:58` |
+| E169 | error | Không lấy được vị trí. Bạn có thể chạm trên bản đồ để chọn khu vực. | `features/nearby/components/LocationPicker.tsx:62` |
+| E170 | success | Đã ẩn bạn khỏi Quanh đây | `features/nearby/components/NearbyScreen.tsx:115` |
+| E171 | success | Đã cập nhật khu vực | `features/nearby/components/NearbyScreen.tsx:130` |
+| E172 | success | Đã rủ ${name} | `features/nearby/components/RunnerCard.tsx:118` |
+| E173 | success | Đã gửi báo cáo | `features/nearby/components/RunnerCard.tsx:165` |
+| E174 | success | Đã chặn ${name} | `features/nearby/components/RunnerCard.tsx:197` |
+| E175 | success | Đã gửi. Thông báo sẽ hiện sau vài giây. | `features/notification/components/PushSettings.tsx:56` |
+| E176 | success | Đã tắt thông báo trên thiết bị này | `features/notification/components/PushSettings.tsx:61` |
+| E177 | success | Đã bật thông báo trên thiết bị này | `features/notification/components/PushSettings.tsx:63` |
+| E178 | error | Bạn chưa cho phép thông báo. | `features/notification/components/PushSettings.tsx:64` |
+| E179 | error | Chưa xóa được thông báo. Thử lại sau. | `features/notification/hooks/useNotifications.ts:39` |
+| E180 | success | Đã bật thông báo | `features/onboarding/components/OnboardingScreen.tsx:289` |
+| E181 | error | Bạn chưa cho phép thông báo. Có thể bật lại trong Cài đặt. | `features/onboarding/components/OnboardingScreen.tsx:290` |
+| E182 | error | Không bật được thông báo. Thử lại trong Cài đặt. | `features/onboarding/components/OnboardingScreen.tsx:292` |
+| E183 | error | Có lỗi, thử lại nhé. | `features/onboarding/components/OnboardingScreen.tsx:339` |
+| E184 | success | Đã kết nối Strava! Bài chạy 30 ngày gần nhất đang được đồng bộ. | `features/onboarding/components/OnboardingScreen.tsx:42` |
+| E185 | success | Đã huỷ chiến dịch | `features/org/components/CampaignScreen.tsx:38` |
+| E186 | success | CLB đã rời tổ chức | `features/org/components/ClubOrgCard.tsx:27` |
+| E187 | success | Đã vào tổ chức | `features/org/components/JoinOrgScreen.tsx:25` |
+| E188 | success | Đã gửi yêu cầu — chờ quản trị tổ chức duyệt | `features/org/components/JoinOrgScreen.tsx:26` |
+| E189 | success | Đã xoá tổ chức demo | `features/org/components/admin/EnterpriseAdminTab.tsx:177` |
+| E190 | success | Đã tạo tổ chức · mã mời ${r.invite_code} | `features/org/components/admin/EnterpriseAdminTab.tsx:199` |
+| E191 | success | Đã cập nhật gói | `features/org/components/admin/EnterpriseAdminTab.tsx:247` |
+| E192 | success | Đã sửa bình luận | `features/org/components/tabs/FeedTab.tsx:158` |
+| E193 | success | Đã lưu | `features/org/components/tabs/MembersTab.tsx:110` |
+| E194 | error | Không tạo được file Excel, thử lại. | `features/org/components/tabs/MembersTab.tsx:177` |
+| E195 | error | Không tạo được file mẫu, thử lại. | `features/org/components/tabs/MembersTab.tsx:205` |
+| E196 | error | Không tạo được file Excel, thử lại. | `features/org/components/tabs/OverviewTab.tsx:56` |
+| E197 | success | Đã lưu | `features/org/components/tabs/SettingsTab.tsx:129` |
+| E198 | success | Đã lưu thông tin xuất hoá đơn | `features/org/components/tabs/SettingsTab.tsx:162` |
+| E199 | success | Đã lưu tên miền | `features/org/components/tabs/SettingsTab.tsx:190` |
+| E200 | success | Đã đổi mã mời — mã cũ hết hiệu lực | `features/org/components/tabs/SettingsTab.tsx:43` |
+| E201 | error | Không sao chép được | `features/org/components/tabs/SettingsTab.tsx:47` |
+| E202 | success | Đã lưu thương hiệu | `features/org/components/tabs/SettingsTab.tsx:79` |
+| E203 | success | Đã gửi lời mời — chờ ban quản trị CLB đồng ý | `features/org/components/tabs/UnitsTab.tsx:160` |
+| E204 | success | Đã đổi đơn vị | `features/org/components/tabs/UnitsTab.tsx:38` |
+| E205 | success | Đã bỏ CLB khỏi tổ chức | `features/org/components/tabs/UnitsTab.tsx:43` |
+| E206 | success | Đã đổi ảnh đại diện | `features/profile/components/AvatarPicker.tsx:50` |
+| E207 | success | Đã gỡ ảnh đại diện | `features/profile/components/AvatarPicker.tsx:55` |
+| E208 | error | Hãy chọn một file ảnh. | `features/profile/components/AvatarPicker.tsx:61` |
+| E209 | error | Không đọc được ảnh này. Thử ảnh JPG hoặc PNG khác. | `features/profile/components/AvatarPicker.tsx:67` |
+| E210 | error | Không tạo được ảnh từ nhân vật. Thử lại sau. | `features/profile/components/AvatarPicker.tsx:78` |
+| E211 | error | Không hủy được kết nối Strava. Thử lại sau. | `features/profile/components/MeScreen.tsx:89` |
+| E212 | success | Đã hủy kết nối Strava | `features/profile/components/MeScreen.tsx:90` |
+| E213 | success | Đã xoá tài khoản. Cảm ơn bạn đã chạy cùng RaceHub. | `features/profile/components/SettingsScreen.tsx:212` |
+| E214 | success | Đã cài RaceHub lên màn hình chính | `features/pwa/components/InstallApp.tsx:37` |
+| E215 | success | Đã có mạng trở lại | `features/pwa/components/OfflineBanner.tsx:25` |
+| E216 | success | Đã kết nối lại máy chủ | `features/pwa/components/OfflineBanner.tsx:27` |
+| E217 | success | Đã lưu thiết kế BIB — VĐV thấy ngay | `features/race/components/BibDesigner.tsx:40` |
+| E218 | success | Đã tạo giải | `features/race/components/CreateRaceScreen.tsx:62` |
+| E219 | success | Đã hủy giải và báo cho VĐV | `features/race/components/RaceDetailScreen.tsx:283` |
+| E220 | success | Đã rút tên | `features/race/components/RaceDetailScreen.tsx:92` |
+| E221 | success | Đã ghi nhận lời mời của ${x.referrer_name} | `features/referral/components/InviteScreen.tsx:118` |
+| E222 | success | Đã sao chép ${what} | `features/referral/components/InviteScreen.tsx:38` |
+| E223 | error | Không sao chép được, hãy chọn và sao chép thủ công. | `features/referral/components/InviteScreen.tsx:38` |
+| E224 | info | Đã bỏ bài chạy | `features/run/components/RunScreen.tsx:352` |
+| E225 | success | Đã gửi bài chạy ${formatKm(item.payload.p_distance_m)} km lên RaceHub | `features/run/hooks/usePendingRuns.ts:55` |
+| E226 | error | Không gửi được một bài chạy lưu trên máy | `features/run/hooks/usePendingRuns.ts:69` |
+| E227 | info | Đã sao chép | `features/social/components/DirectChatScreen.tsx:136` |
+| E228 | success | Đã theo dõi ${name} | `features/social/components/FollowPanel.tsx:33` |
+| E229 | success | Đã gửi báo cáo | `features/social/components/ReportRunnerSheet.tsx:24` |
+| E230 | error | Không chia sẻ được. Hãy lưu ảnh rồi đăng. | `features/victory/components/VictoryEditor.tsx:122` |
+| E231 | error | Hãy chọn ảnh. | `features/victory/components/VictoryEditor.tsx:196` |
+| E232 | success | Đã đăng lên bảng tin CLB | `features/victory/components/VictoryEditor.tsx:315` |
+| E233 | error | Không vẽ được nhân vật. Thử ảnh đại diện nhé. | `features/victory/components/VictoryEditor.tsx:75` |
+| E234 | success | Đã thu hồi mã xác thực | `features/victory/components/VictoryHome.tsx:136` |
+| E235 | success | Đã thêm ${r.added} mã${r.issued ? | `features/voucher/components/VoucherForm.tsx:25` |
+| E236 | success | Đã lưu voucher tài trợ | `features/voucher/components/VoucherForm.tsx:29` |
+| E237 | success | Đã sao chép mã | `features/voucher/components/VoucherWallet.tsx:47` |
+| E238 | error | Tối đa ${max} phần tử | `shared/design/studio/Studio.tsx:73` |
+| E239 | success | Đã tải ảnh về máy | `shared/ui/SaveImage.tsx:21` |
+| E240 | success | Đã mở bảng chia sẻ — chọn "Lưu ảnh" để lưu vào máy | `shared/ui/SaveImage.tsx:22` |

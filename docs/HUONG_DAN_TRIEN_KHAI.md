@@ -33,7 +33,7 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
 > ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
-> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 011600** + chạy lại 003500),
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 011700** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
 >
@@ -162,6 +162,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001011400_admin_list.sql` | **Danh sách quản trị viên** (Quản trị → Người dùng): ai đang có quyền admin, email, lần đăng nhập, ngày được cấp. Cấp / gỡ quyền: mở hồ sơ người dùng | Chạy lại 3500 |
 | `20261001011500_social_follow_dm.sql` | **Mạng xã hội runner**: thông báo bài chạy mới dạng chúc mừng; **sửa bình luận** (người viết); **Theo dõi runner** (nút trên hồ sơ, bảng tin *Đang theo dõi* ở Trang chủ, gợi ý theo dõi); **Tin nhắn 1-1** (nút 💬 trên cùng, hộp thư, chặn / báo cáo, thu hồi tin; nhắn được khi người nhận theo dõi mình, bạn kết nối, cùng CLB hoặc đã nhắn trước) | Chạy lại 3500 |
 | `20261001011600_victory_studio.sql` | **Victory Studio** (☰ → Ảnh vinh danh; nút *Tạo ảnh vinh danh* ở thử thách và bài chạy ≥ 5 km): 12 mẫu, 5 khổ (Story, 4:5, 1:1, 16:9, A4), số liệu do máy chủ điền (không sửa được), chọn thông số hiển thị, nhân vật 2D, lời chúc, mã QR xác thực → trang công khai `/v/<mã>`; BTC / ban quản trị CLB vinh danh bất kỳ thành viên với danh hiệu tự đặt | Chạy lại 3500 |
+| `20261001011700_feedback_round3.sql` | **Chỉnh sửa lần 3**: thách đấu CLB mới — sau khi CLB đăng ký, từng thành viên bấm *Đăng ký thi đấu* mới được tính (giải cũ giữ cách tính cũ); bấm vào CLB trên BXH → bảng chi tiết (ngày chạy, pace TB, km) có tìm runner; thả cảm xúc cho tin nhắn; runner soạn bài / đăng ebook PDF (Knowledge → *Viết bài*), admin duyệt trong CMS, bài đăng đầu tiên được thưởng Xu (mặc định 30, đổi bằng khóa `contentRewardXu` trong chính sách kinh tế); admin tìm / mời người dùng theo email | Chạy lại 3500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 

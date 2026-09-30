@@ -3,6 +3,7 @@ import type { PGlite } from '@electric-sql/pglite'
 import { createDb, asUser } from './load-schema'
 
 // Migration 003600: Thách đấu CLB (nhiều CLB) — duyệt admin, chỉ ban quản trị CLB đăng ký
+// (cách tính cũ: mọi thành viên; từ 011700 thành viên phải tự đăng ký — xem feedback-round3.test.ts)
 const id = (n: number) => `00000000-0000-0000-0000-0000000036${String(n).padStart(2, '0')}`
 const [OA, OB, OC, A1, B1, C1, U, AD] = [1, 2, 3, 4, 5, 6, 7, 8].map(id)
 const CA = '00000000-0000-0000-0000-0000000036c1', CB = '00000000-0000-0000-0000-0000000036c2', CC = '00000000-0000-0000-0000-0000000036c3'
@@ -37,7 +38,7 @@ describe('Thách đấu CLB (003600)', () => {
   let db: PGlite
   let userCup = '', hostCup = ''
   beforeAll(async () => {
-    db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed })
+    db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed, until: '20261001011600' })
     await db.query(`update public.profiles set role = 'SYSTEM_ADMIN' where id = $1`, [AD])
   }, 240_000)
 

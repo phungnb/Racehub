@@ -119,7 +119,7 @@ function Row({ r, role, cat, onOpen }: { r: CmsRow; role: CmsMeta['role']; cat: 
     <div className="rounded-[var(--radius-card)] border border-border bg-surface hover:border-fg-subtle">
       <button type="button" onClick={onOpen} className="w-full p-3 text-left">
         <div className="flex items-start gap-2">
-          <p className="min-w-0 flex-1 font-semibold leading-snug">{r.content_type === 'NEWS' && '📰 '}{r.title}</p>
+          <p className="min-w-0 flex-1 font-semibold leading-snug">{r.content_type === 'NEWS' && '📰 '}{r.content_type === 'EBOOK' && '📘 '}{r.title}</p>
           <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold', STATUS_TONE[r.status as ArticleStatus])}>{STATUS_LABEL[r.status as ArticleStatus]}</span>
         </div>
         <p className="mt-1 text-xs text-fg-muted">

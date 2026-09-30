@@ -2,7 +2,7 @@
 import { supabase } from '@/shared/lib/supabase'
 import { must, systemErrorMessage } from '@/shared/lib/errors'
 
-export type ContentType = 'ARTICLE' | 'NEWS'
+export type ContentType = 'ARTICLE' | 'NEWS' | 'EBOOK'
 export type ArticleStatus = 'DRAFT' | 'REVIEW' | 'SCHEDULED' | 'PUBLISHED' | 'ARCHIVED'
 export type ContentRole = 'ADMIN' | 'EDITOR' | 'WRITER' | 'EXPERT'
 export type CtaKind = 'GOAL' | 'CHALLENGES' | 'CHALLENGE' | 'RACES' | 'RACE' | 'MARKET' | 'PARTNER' | 'CLUBS' | 'CLUB' | 'NEARBY'
@@ -19,6 +19,8 @@ export interface SeriesProgress { id: string; title: string; description: string
 export interface KnowledgeHome { categories: Category[]; featured: ArticleCard[]; news: ArticleCard[]; continue: ArticleCard[]; series: SeriesProgress[]; saved_count: number }
 export interface Article extends ArticleCard {
   body: string; preview: boolean; status: ArticleStatus; updated_at: string; source_url: string | null; ctas: Cta[]
+  /** Ebook (PDF) đính kèm; bài của runner (không phải ban nội dung) — migration 011700 */
+  attachment_url?: string | null; community?: boolean
   needs_expert_review: boolean; expert_reviewed_at: string | null; expert_name: string | null
   category: { id: string; name: string; icon: string; market_kind: 'COACH' | 'SHOP' | 'SERVICE' | null }
   author: { id: string; name: string; title: string | null; bio: string | null; avatar_url: string | null; kind: string; verified: boolean; partner_id: string | null } | null
@@ -109,7 +111,39 @@ export async function uploadContentImage(file: File): Promise<string> {
   return supabase.storage.from('content-media').getPublicUrl(path).data.publicUrl
 }
 
+/** Ebook PDF ≤ 10 MB → content-media/<uid>/…pdf (runner nào cũng tải được vào thư mục của mình) */
+export async function uploadContentPdf(file: File): Promise<string> {
+  if (file.type !== 'application/pdf') throw new Error('PDF_TYPE')
+  if (file.size > 10 * 1024 * 1024) throw new Error('PDF_SIZE')
+  const { data: u } = await supabase.auth.getUser()
+  if (!u.user) throw new Error('FORBIDDEN')
+  const path = `${u.user.id}/${Date.now()}.pdf`
+  const { error } = await supabase.storage.from('content-media').upload(path, file, { cacheControl: '31536000', upsert: false, contentType: file.type })
+  if (error) throw error
+  return supabase.storage.from('content-media').getPublicUrl(path).data.publicUrl
+}
+
+/** Bài runner tự soạn (migration 011700) */
+export interface Submission {
+  id: string; slug: string; title: string; summary: string | null; body: string; category_id: string; content_type: 'ARTICLE' | 'EBOOK'
+  cover_image_url: string | null; attachment_url: string | null; status: ArticleStatus; review_note: string | null; reward_xu: number
+  published_at: string | null; updated_at: string
+}
+export interface SubmissionInput {
+  id?: string; title: string; summary: string; body: string; category_id: string; content_type: 'ARTICLE' | 'EBOOK'
+  cover_image_url: string | null; attachment_url: string | null; submit: boolean
+}
+export const mySubmissions = () => call<Submission[]>('knowledge_my_submissions').then((x) => x ?? [])
+export const submitArticle = (p: SubmissionInput) => call<{ id: string; status: ArticleStatus }>('knowledge_submit', { p })
+export const deleteSubmission = (id: string) => call<void>('knowledge_delete_submission', { p_id: id })
+export const writerCategories = () => call<{ id: string; name: string; needs_expert: boolean }[]>('knowledge_categories').then((x) => x ?? [])
+
 const MESSAGES: Record<string, string> = {
+  ALREADY_PUBLISHED: 'Bài đã đăng thì không sửa được nữa — liên hệ ban biên tập nếu cần chỉnh.',
+  BODY_TOO_LONG: 'Nội dung quá dài (tối đa 60.000 ký tự).',
+  RATE_LIMITED: 'Bạn đã tạo nhiều bài hôm nay. Mai viết tiếp nhé!',
+  PDF_TYPE: 'Ebook phải là tệp PDF.',
+  PDF_SIZE: 'Tệp PDF tối đa 10 MB.',
   ARTICLE_NOT_FOUND: 'Không tìm thấy bài viết (có thể đã gỡ hoặc chưa đăng).',
   EXPERT_REVIEW_REQUIRED: 'Bài thuộc chủ đề sức khoẻ / giáo án — cần chuyên gia duyệt chuyên môn trước khi đăng.',
   TITLE_TOO_SHORT: 'Tiêu đề cần ít nhất 5 ký tự.',
@@ -117,7 +151,7 @@ const MESSAGES: Record<string, string> = {
   SLUG_TAKEN: 'Đường dẫn này đã có bài khác dùng — đổi tiêu đề hoặc đường dẫn.',
   INVALID_CATEGORY: 'Chọn chuyên mục.',
   INVALID_URL: 'Link ảnh / nguồn phải bắt đầu bằng https://',
-  BODY_TOO_SHORT: 'Nội dung quá ngắn để đăng.',
+  BODY_TOO_SHORT: 'Nội dung quá ngắn: bài viết cần ít nhất 300 ký tự; ebook cần tệp PDF + vài dòng giới thiệu.',
   INVALID_SCHEDULE: 'Giờ hẹn đăng phải ở tương lai.',
   CANNOT_REVIEW_OWN: 'Không tự duyệt chuyên môn bài của mình.',
   NOTE_REQUIRED: 'Ghi rõ góp ý để người viết sửa.',

@@ -2,6 +2,7 @@
 export { KnowledgeHomeSection } from './components/KnowledgeHomeSection'
 export { KnowledgeScreen } from './components/KnowledgeScreen'
 export { ArticleScreen } from './components/ArticleScreen'
+export { WriteScreen } from './components/WriteScreen'
 export { StudioScreen } from './components/cms/StudioScreen'
 export { CmsScreen } from './components/cms/CmsScreen'
 export { Markdown } from './components/Markdown'

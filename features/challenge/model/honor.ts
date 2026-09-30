@@ -85,6 +85,7 @@ export const HONOR_BINDS: Binds = {
   ...Object.fromEntries(Array.from({ length: 10 }, (_, i) => [
     [`r${i + 1}_name`, { label: `Tên hạng ${i + 1}`, sample: SAMPLE_NAMES[i] }],
     [`r${i + 1}_value`, { label: `Thành tích hạng ${i + 1}`, sample: `${(320 - i * 23).toLocaleString('vi-VN')} km` }],
+    [`r${i + 1}_rank`, { label: `Số thứ hạng ${i + 1}`, sample: String(i + 1) }],
   ]).flat()),
 }
 export const HONOR_PHOTO_BINDS: Record<string, string> = {
@@ -152,7 +153,7 @@ export function autoHonorPoster(format: HonorFormat, template: HonorTemplate, n:
     const ph = sq(s.w)
     layers.push(
       photoLayer({ x: s.x, y: s.y, bind: `r${r}`, w: s.w, h: ph, border: r === 1 ? 10 : 7, border_color: medal[i], shape: 'circle' }),
-      textLayer({ x: s.x + s.w * 0.36, y: s.y + ph * 0.36, text: String(r), font: 'montserrat', size: S(r === 1 ? 0.04 : 0.032), w: 0.1,
+      textLayer({ x: s.x + s.w * 0.36, y: s.y + ph * 0.36, bind: `r${r}_rank`, font: 'montserrat', size: S(r === 1 ? 0.04 : 0.032), w: 0.1,
         color: 'bg', fx: 'pill', fx_color: medal[i] }),
       textLayer({ x: s.x, y: s.y + ph / 2 + 0.035 * g.k * (1350 / H), bind: `r${r}_name`, font: t.name, size: S(r === 1 ? 0.04 : 0.032),
         w: slots === 3 ? (r === 1 ? 0.36 : 0.28) : 0.42, color: 'number', upper: t.name !== 'vibes' }),
@@ -233,9 +234,15 @@ export function resolveHonor(d: StoredHonorDesign | null | undefined, mode: Hono
     const template = d.template && d.template in HONOR_TEMPLATES ? d.template : 'podium'
     design = { v: 2, format, template, colors: cleanColors(d.colors), bg_url: d.bg_url ?? null,
       bg_opacity: typeof d.bg_opacity === 'number' ? Math.min(1, Math.max(0, d.bg_opacity)) : 1, decor: d.decor !== false,
-      layers: cleanLayers(d.layers, ALL_BINDS, MAX_HONOR_LAYERS) }
+      layers: cleanLayers(d.layers, ALL_BINDS, MAX_HONOR_LAYERS).map(legacyRankPill) }
   }
   return { ...design, palette: { ...HONOR_TEMPLATES[design.template].colors, ...design.colors } }
+}
+
+/** Mẫu cũ ghi cứng số "1/2/3" trên huy hiệu → gắn với trường hạng để tự ẩn khi không đủ người được vinh danh */
+function legacyRankPill(l: Layer): Layer {
+  return l.type === 'text' && l.bind === 'custom' && l.fx === 'pill' && /^[1-3]$/.test(l.text.trim())
+    ? { ...l, bind: `r${l.text.trim()}_rank` } : l
 }
 
 export function honorPayload(d: HonorDesign) {
@@ -271,6 +278,7 @@ export function honorData(ctx: HonorContext, cat: { key: string; title: string }
   for (const r of rows) {
     values[`r${r.rank}_name`] = r.display_name
     values[`r${r.rank}_value`] = honorValue(cat.key, r.value, ctx.objective)
+    values[`r${r.rank}_rank`] = String(r.rank)
     photos[`r${r.rank}`] = r.hidden ? null : r.photo_url ?? r.avatar_url
   }
   if (me) {

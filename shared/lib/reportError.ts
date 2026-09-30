@@ -7,8 +7,17 @@ const SKIP: ErrorKind[] = ['OFFLINE', 'AUTH', 'RATE_LIMIT']
 const sent = new Map<string, number>()
 let disabled = false
 
+/**
+ * Lỗi nghiệp vụ do máy chủ chủ động từ chối (raise exception 'MA_LOI', mã Postgres P0001) — vd. tự xác nhận đơn của mình,
+ * hết hạn đăng ký — là quy tắc đúng, đã báo tận tay người dùng, không phải sự cố hệ thống → không ghi vào nhật ký lỗi.
+ */
+export function isBusinessRule(e: unknown) {
+  const x = e as { code?: string; message?: string } | null
+  return x?.code === 'P0001' && /^[A-Z][A-Z0-9_]{2,60}$/.test((x.message ?? '').trim())
+}
+
 export function reportError(e: unknown, path = typeof location === 'undefined' ? '' : location.pathname) {
-  if (disabled || typeof window === 'undefined') return
+  if (disabled || typeof window === 'undefined' || isBusinessRule(e)) return
   const d = describeError(e)
   if (SKIP.includes(d.kind)) return
   const now = Date.now()

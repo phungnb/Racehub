@@ -131,12 +131,13 @@ describe('RaceHub Knowledge (006200)', () => {
     expect(Number((await rpc<Row>(db, ADM, `select public.admin_inbox() as r`)).content)).toBe(1)             // bài giáo án đang chờ duyệt lại
   })
 
-  it('kho ảnh content-media: chỉ ban nội dung tải vào thư mục của mình', async () => {
+  it('kho ảnh content-media: mỗi người chỉ tải vào thư mục của mình (runner cũng soạn bài từ 011700)', async () => {
     await db.exec(`alter table storage.objects enable row level security; grant select, insert on storage.objects to authenticated;`)
     const put = (uid: string, name: string) => asUser(db, uid, '/storage/v1/object', `insert into storage.objects (bucket_id, name) values ('content-media', $1)`, [name])
     expect(await fails(put(WRITER, `${WRITER}/bia.jpg`))).toBe('OK')
     expect(await fails(put(WRITER, `${EDITOR}/bia.jpg`))).toMatch(/row-level security|policy/i)
-    expect(await fails(put(READER, `${READER}/bia.jpg`))).toMatch(/row-level security|policy/i)
+    expect(await fails(put(READER, `${READER}/bia.jpg`))).toBe('OK')
+    expect(await fails(put(READER, `${WRITER}/bia2.jpg`))).toMatch(/row-level security|policy/i)
   })
   it('admin duyệt ngay trong danh sách: bài mẫu Chờ duyệt (không có người tạo) → duyệt chuyên môn + đăng một bước', async () => {
     const a = await artId(db, 'lo-trinh-0-den-5-km')

@@ -36,12 +36,19 @@ export function VictoryHome() {
       ) : q.isError ? (
         <ErrorState message="Không tải được thành tích." error={q.error} onRetry={() => void q.refetch()} />
       ) : tab === 'HONOR' ? (
-        <Group icon={Users} title="Vinh danh thành viên" hint="Chọn thử thách → chọn runner → đặt danh hiệu (tùy chọn). Số liệu tự lấy từ kết quả.">
-          {managed.map((c) => (
-            <Item key={c.ref} href={routes.victoryCreate('CHALLENGE', c.ref, { pick: true })} title={c.title}
-              subtitle={`${c.participants ?? 0} người tham gia · kết thúc ${c.date ?? ''}`} />
-          ))}
-        </Group>
+        <div className="space-y-4">
+          <Group icon={Users} title="Vinh danh thành viên" hint="Chọn thử thách → chọn runner → đặt danh hiệu (tùy chọn). Số liệu tự lấy từ kết quả.">
+            {managed.map((c) => (
+              <Item key={c.ref} href={routes.victoryCreate('CHALLENGE', c.ref, { pick: true })} title={c.title}
+                subtitle={`${c.participants ?? 0} người tham gia · kết thúc ${c.date ?? ''}`} />
+            ))}
+          </Group>
+          <Group icon={Award} title="Vinh danh thử thách" hint="Bảng tôn vinh chung của cả giải: Top thành tích, danh hiệu, ảnh nhóm — công bố cho mọi người.">
+            {managed.map((c) => (
+              <Item key={c.ref} href={`${routes.challenge(c.ref)}?tab=honor`} title={c.title} subtitle="Mở tab Vinh danh của thử thách" />
+            ))}
+          </Group>
+        </div>
       ) : (
         <Mine />
       )}

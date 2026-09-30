@@ -8,10 +8,12 @@ import { cn } from '@/shared/lib/cn'
 import { blockRunner, REPORT_REASONS, reportRunner, socialErrorMessage, type ReportReason } from '../api/socialApi'
 
 /** Báo cáo một runner (từ hồ sơ / tin nhắn); người bị báo cáo không biết ai báo cáo */
-export function ReportRunnerSheet({ userId, name, context, onClose }: { userId: string; name: string; context: 'DM' | 'PROFILE'; onClose: () => void }) {
+export function ReportRunnerSheet({ userId, name, context, initialNote = '', onClose }: {
+  userId: string; name: string; context: 'DM' | 'PROFILE'; initialNote?: string; onClose: () => void
+}) {
   const qc = useQueryClient()
   const [reason, setReason] = useState<ReportReason | null>(null)
-  const [note, setNote] = useState('')
+  const [note, setNote] = useState(initialNote.slice(0, 500))
   const [alsoBlock, setAlsoBlock] = useState(context === 'DM')
   const send = useMutation({
     mutationFn: async () => {

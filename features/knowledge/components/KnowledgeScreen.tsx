@@ -36,11 +36,17 @@ export function KnowledgeScreen() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Kiến thức Runner" subtitle="Học để chạy tốt hơn · tin tức chạy bộ" action={role.data ? (
-        <Link href={routes.learnStudio} className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-border px-3 text-sm font-semibold hover:border-fg-subtle">
-          <PenSquare className="size-4" aria-hidden />Soạn bài
+      <PageHeader title="Kiến thức Runner" subtitle="Học để chạy tốt hơn · tin tức chạy bộ" action={
+        <Link href={role.data ? routes.learnStudio : routes.learnWrite} className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-border px-3 text-sm font-semibold hover:border-fg-subtle">
+          <PenSquare className="size-4" aria-hidden />{role.data ? 'Soạn bài' : 'Viết bài'}
         </Link>
-      ) : undefined} />
+      } />
+      {!role.data && (
+        <Link href={routes.learnWrite} className="flex items-center gap-3 rounded-2xl border border-coin/30 bg-coin/5 p-3 text-sm hover:bg-coin/10">
+          <span className="text-2xl" aria-hidden>✍️</span>
+          <span className="min-w-0 flex-1"><b>Chia sẻ bài viết / ebook chạy bộ</b><span className="block text-xs text-fg-muted">Được duyệt và đăng → cộng Xu tự động</span></span>
+        </Link>
+      )}
 
       <form role="search" onSubmit={(e) => { e.preventDefault(); go({ q: q.trim() }) }} className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" aria-hidden />

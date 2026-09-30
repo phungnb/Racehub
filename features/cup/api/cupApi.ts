@@ -27,7 +27,10 @@ export interface Cup {
   host: CupClub | null
   creator: { id: string; display_name: string | null; avatar_url: string | null } | null
   clubs: number
-  my_clubs: (CupClub & { staff: boolean; joined: boolean })[]
+  my_clubs: (CupClub & { staff: boolean; joined: boolean; signed_up?: boolean })[]
+  /** Từ 011700: thành viên phải tự đăng ký thi đấu mới được tính */
+  require_signup?: boolean
+  my_signup?: string | null
   can_manage: boolean
   can_review: boolean
   standings: CupStanding[] | null
@@ -59,7 +62,16 @@ export const cancelCup = (id: string) => call<Cup>('cancel_club_cup', { p_cup_id
 export const joinCup = (id: string, clubId: string) => call<Cup>('join_club_cup', { p_cup_id: id, p_club_id: clubId })
 export const leaveCup = (id: string, clubId: string) => call<Cup>('leave_club_cup', { p_cup_id: id, p_club_id: clubId })
 
+export const joinCupAsMember = (id: string, clubId: string) => call<Cup>('join_cup_as_member', { p_cup_id: id, p_club_id: clubId })
+export const leaveCupAsMember = (id: string) => call<Cup>('leave_cup_as_member', { p_cup_id: id })
+export interface ClubBoardRow { rank: number; user_id: string; display_name: string | null; avatar_url: string | null; km: number; runs: number; days: number; moving_s: number; pace_s: number | null }
+export const getClubBoard = (id: string, clubId: string) =>
+  call<{ club: CupClub; rows: ClubBoardRow[] }>('club_cup_club_board', { p_cup_id: id, p_club_id: clubId })
+
 const MESSAGES: Record<string, string> = {
+  ALREADY_SIGNED_UP: 'Bạn đã đăng ký thi đấu cho một CLB khác trong giải này.',
+  CLUB_NOT_IN_CUP: 'CLB chưa được ban quản trị đăng ký vào thách đấu.',
+  NOT_A_MEMBER: 'Bạn chưa là thành viên CLB này.',
   FORBIDDEN: 'Bạn không có quyền làm việc này.',
   CUP_NOT_FOUND: 'Không tìm thấy thách đấu (hoặc đang chờ duyệt).',
   CLUB_STAFF_REQUIRED: 'Chỉ Chủ nhiệm / Quản trị viên của CLB mới đăng ký CLB vào thách đấu.',
