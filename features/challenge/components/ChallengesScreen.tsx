@@ -39,7 +39,7 @@ export function ChallengesScreen() {
       <Link href="/races" className="flex items-center gap-3 rounded-[var(--radius-card)] border border-brand/30 bg-gradient-to-r from-brand/15 to-surface p-3 hover:border-brand/60">
         <span className="grid size-10 place-items-center rounded-xl bg-brand/20 text-brand"><Flag className="size-5" aria-hidden /></span>
         <span className="flex-1"><span className="block font-semibold">Giải chạy</span>
-          <span className="block text-xs text-fg-muted">Đăng ký nhận BIB · 5K · 10K · Half · Full · giấy chứng nhận</span></span>
+          <span className="block text-xs text-fg-muted">Tổ chức các giải đấu, sự kiện chạy bộ · nhận BIB, giấy chứng nhận</span></span>
         <ChevronRight className="size-5 text-fg-subtle" aria-hidden />
       </Link>
       <Link href="/cups" className="flex items-center gap-3 rounded-[var(--radius-card)] border border-live/30 bg-gradient-to-r from-live/15 to-surface p-3 hover:border-live/60">

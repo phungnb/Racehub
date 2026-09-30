@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  ArrowLeft, ArrowRight, Award, BadgeCheck, Bookmark, CheckCircle2, ChevronDown, Clock, ExternalLink, ListTree, Share2, ShieldCheck,
+  ArrowLeft, ArrowRight, Award, BadgeCheck, Bookmark, CheckCircle2, ChevronDown, Clock, ExternalLink, FileDown, ListTree, Share2, ShieldCheck,
   ThumbsDown, ThumbsUp,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -113,7 +113,7 @@ function Reader({ a }: { a: Article }) {
 
       <header className="space-y-3">
         <Link href={`${routes.learn}?c=${a.category.id}`} className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-brand">
-          <CategoryIcon name={a.category.icon} className="size-3.5" />{a.content_type === 'NEWS' ? 'Tin tức · ' : ''}{a.category.name}
+          <CategoryIcon name={a.category.icon} className="size-3.5" />{a.content_type === 'NEWS' ? 'Tin tức · ' : a.content_type === 'EBOOK' ? 'Ebook · ' : ''}{a.category.name}
         </Link>
         <h1 className="text-2xl font-bold leading-tight">{a.title}</h1>
         {a.summary && <p className="text-[15px] text-fg-muted">{a.summary}</p>}
@@ -142,8 +142,24 @@ function Reader({ a }: { a: Article }) {
       {a.needs_expert_review && a.expert_reviewed_at && (
         <p className="flex gap-2 rounded-xl border border-brand/30 bg-brand/5 p-3 text-xs text-fg-muted">
           <ShieldCheck className="size-4 shrink-0 text-brand" aria-hidden />
-          <span>Nội dung đã được {a.expert_name ? <b className="text-fg">{a.expert_name}</b> : 'chuyên gia'} duyệt chuyên môn. Thông tin mang tính tham khảo chung, không thay cho chẩn đoán hay tư vấn cá nhân của nhân viên y tế.</span>
+          <span>Nội dung đã được kiểm duyệt chuyên môn. Thông tin mang tính tham khảo chung, không thay cho chẩn đoán hay tư vấn cá nhân của nhân viên y tế.</span>
         </p>
+      )}
+
+      {a.community && !a.preview && (
+        <p className="flex gap-2 rounded-xl border border-border bg-surface p-3 text-xs text-fg-muted">
+          <BadgeCheck className="size-4 shrink-0 text-brand" aria-hidden />
+          <span>Bài viết của cộng đồng runner, đã được ban biên tập RaceHub duyệt trước khi đăng. <Link href={routes.learnWrite} className="font-semibold text-brand">Chia sẻ bài của bạn →</Link></span>
+        </p>
+      )}
+
+      {a.attachment_url && (
+        <a href={a.attachment_url} target="_blank" rel="noopener noreferrer" download
+          className="flex min-h-12 items-center gap-3 rounded-xl border border-brand/40 bg-brand/10 p-3 text-sm font-semibold hover:bg-brand/15">
+          <FileDown className="size-5 shrink-0 text-brand" aria-hidden />
+          <span className="min-w-0 flex-1">{a.content_type === 'EBOOK' ? 'Tải ebook (PDF)' : 'Tải tài liệu đính kèm'}</span>
+          <ExternalLink className="size-4 text-fg-subtle" aria-hidden />
+        </a>
       )}
 
       {toc.length >= 3 && (

@@ -43,7 +43,8 @@ function AdminList({ onPick }: { onPick: (id: string, name: string) => void }) {
               <button type="button" onClick={() => onPick(a.id, a.display_name ?? a.email ?? 'Admin')} className="flex w-full items-center gap-3 py-2 text-left">
                 <Avatar src={a.avatar_url} name={a.display_name} size="sm" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{a.display_name ?? 'Chưa đặt tên'}{a.is_me ? ' (bạn)' : ''}</span>
+                  <span className="block truncate text-sm font-semibold">{a.display_name ?? 'Chưa đặt tên'}{a.is_me ? ' (bạn)' : ''}
+                    {!a.email && <span className="ml-1.5 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-bold text-warning">không đăng nhập được</span>}</span>
                   <span className="block truncate text-xs text-fg-muted">{a.email ?? '—'} · đăng nhập {fmt(a.last_sign_in_at)}{a.granted_at ? ` · cấp quyền ${fmt(a.granted_at)}` : ''}</span>
                 </span>
               </button>
@@ -51,8 +52,38 @@ function AdminList({ onPick }: { onPick: (id: string, name: string) => void }) {
           ))}
         </ul>
       )}
-      <p className="text-xs text-fg-subtle">Cấp thêm admin: tìm người đó ở ô dưới → mở hồ sơ → <b>Cấp quyền admin</b>. Đơn nạp / mua gói của một admin phải do admin khác xác nhận.</p>
+      <AddAdminByEmail />
+      <p className="text-xs text-fg-subtle">Hoặc tìm người đó ở ô dưới → mở hồ sơ → <b>Cấp quyền admin</b>. Tài khoản <b>không có email / chưa từng đăng nhập</b> không dùng được — nên gỡ quyền. Đơn nạp / mua gói của một admin phải do admin khác xác nhận.</p>
     </Card>
+  )
+}
+
+/** Thêm admin bằng email: có tài khoản → cấp quyền ngay; chưa có → gửi thư mời đăng ký rồi tự thành admin */
+function AddAdminByEmail() {
+  const qc = useQueryClient()
+  const [email, setEmail] = useState('')
+  const [confirm, setConfirm] = useState(false)
+  const add = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/admin/add-admin', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email.trim() }) })
+      const j = await res.json().catch(() => ({})) as { ok?: boolean; invited?: boolean; already?: boolean; error?: string; detail?: string | null }
+      if (!res.ok || !j.ok) throw new Error(j.error === 'INVALID_EMAIL' ? 'Email chưa đúng.' : j.error === 'INVITE_FAILED' ? `Không gửi được thư mời${j.detail ? `: ${j.detail}` : ''}.` : consoleErrorMessage({ message: j.error ?? '' }))
+      return j
+    },
+    onSuccess: (j) => {
+      toast.success(j.already ? 'Tài khoản này đã là admin' : j.invited ? `Đã gửi thư mời tới ${email.trim()} — đăng ký xong là admin` : `Đã cấp quyền admin cho ${email.trim()}`)
+      setEmail(''); setConfirm(false)
+      void qc.invalidateQueries({ queryKey: ['admin', 'admins'] })
+    },
+    onError: (e) => { toast.error((e as Error).message); setConfirm(false) },
+  })
+  return (
+    <form className="flex gap-2 pt-1" onSubmit={(e) => { e.preventDefault(); if (email.trim()) setConfirm(true) }}>
+      <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email người cần thêm làm admin" aria-label="Email admin mới" className="h-10" />
+      <Button type="submit" size="sm" className="h-10 shrink-0" disabled={!email.trim()}>Thêm admin</Button>
+      <ConfirmSheet open={confirm} onClose={() => setConfirm(false)} title={`Cấp quyền admin cho ${email.trim()}?`} confirmLabel="Cấp quyền" loading={add.isPending}
+        description="Người này có TOÀN QUYỀN quản trị RaceHub. Chưa có tài khoản thì RaceHub gửi thư mời đăng ký tới email này." onConfirm={() => add.mutate()} />
+    </form>
   )
 }
 

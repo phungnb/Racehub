@@ -3,12 +3,14 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Check, Crown, Gift, KeyRound, Medal, Swords, X } from 'lucide-react'
+import { ArrowLeft, Check, ChevronRight, Crown, Gift, KeyRound, Medal, Search, Swords, UserCheck, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Card, EmptyState, ErrorState, Field, Sheet, Skeleton, Textarea } from '@/shared/ui'
+import { Avatar, Button, Card, EmptyState, ErrorState, Field, Input, RankSearch, Sheet, Skeleton, Textarea } from '@/shared/ui'
+import { filterSearch, matchesSearch } from '@/shared/lib/search'
+import { formatPace } from '@/shared/lib/format'
 import { cn } from '@/shared/lib/cn'
 import { ClubAvatar } from '@/features/club'
-import { cancelCup, cupErrorMessage, getCup, joinCup, leaveCup, reviewCup, type Cup } from '../api/cupApi'
+import { cancelCup, cupErrorMessage, getClubBoard, getCup, joinCup, joinCupAsMember, leaveCup, leaveCupAsMember, reviewCup, type Cup, type CupStanding } from '../api/cupApi'
 import { canJoin, cupPhase, METRIC_LABEL } from '../model/cup'
 import { fmtTime, PhaseChip } from './CupCard'
 
@@ -41,6 +43,7 @@ export function CupDetailScreen({ id }: { id: string }) {
 
       <ReviewBox c={c} />
       {c.status === 'OPEN' && <JoinBox c={c} now={now} />}
+      {c.status === 'OPEN' && c.require_signup && <MemberSignup c={c} now={now} />}
       {c.standings && c.status !== 'PENDING_REVIEW' && c.status !== 'REJECTED' && <Standings c={c} live={phase === 'LIVE'} />}
       {c.can_manage && (c.status === 'PENDING_REVIEW' || (c.status === 'OPEN' && phase === 'REGISTRATION')) && <CancelButton c={c} />}
     </div>
@@ -97,7 +100,7 @@ function JoinBox({ c, now }: { c: Cup; now: number }) {
       <p className="flex items-center gap-2 text-sm font-semibold"><KeyRound className="size-4 text-coin" aria-hidden />Đăng ký CLB</p>
       {!staff.length && (
         <p className="text-sm text-fg-muted">Chỉ Chủ nhiệm / Quản trị viên mới đăng ký CLB được. Nhắn ban quản trị CLB của bạn nếu muốn tham gia.
-          {c.my_clubs.some((m) => m.joined) && ' CLB của bạn đã có trong thách đấu — cứ chạy là km được tính!'}</p>
+          {c.my_clubs.some((m) => m.joined) && (c.require_signup ? ' CLB của bạn đã có trong thách đấu — bấm Đăng ký thi đấu bên dưới để km được tính.' : ' CLB của bạn đã có trong thách đấu — cứ chạy là km được tính!')}</p>
       )}
       {staff.map((m) => (
         <div key={m.id} className="flex items-center gap-3 rounded-xl border border-border p-2.5">
@@ -122,32 +125,116 @@ const MEDAL = ['text-medal-gold', 'text-medal-silver', 'text-medal-bronze']
 function Standings({ c, live }: { c: Cup; live: boolean }) {
   const mine = new Set(c.my_clubs.filter((m) => m.joined).map((m) => m.id))
   const rows = c.standings ?? []
+  const [term, setTerm] = useState('')
+  const [open, setOpen] = useState<CupStanding | null>(null)
+  const shown = rows.filter((s) => !term.trim() || matchesSearch(term, s.name))
   return (
     <section className="space-y-2">
       <h2 className="flex items-center gap-2 text-sm font-bold">
         <Swords className="size-4 text-fg-muted" aria-hidden />Bảng xếp hạng {live && <span className="rounded-full bg-danger/15 px-2 py-0.5 text-[10px] font-bold text-danger">TRỰC TIẾP</span>}
       </h2>
-      {!rows.length ? <EmptyState icon={Swords} title="Chưa có CLB nào" description="Ban quản trị CLB bấm Đăng ký để đưa CLB vào thách đấu." /> : (
+      {rows.length > 3 && (
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" aria-hidden />
+          <Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Tìm CLB…" aria-label="Tìm CLB trên bảng xếp hạng" className="pl-9" />
+        </div>
+      )}
+      {!rows.length ? <EmptyState icon={Swords} title="Chưa có CLB nào" description="Ban quản trị CLB bấm Đăng ký để đưa CLB vào thách đấu." /> : !shown.length ? (
+        <p className="py-4 text-center text-sm text-fg-muted">Không có CLB nào khớp “{term}”.</p>
+      ) : (
         <ol className="space-y-1.5">
-          {rows.map((s) => (
-            <li key={s.club_id} className={cn('flex items-center gap-3 rounded-xl border px-3 py-2.5', mine.has(s.club_id) ? 'border-brand/50 bg-brand/10' : 'border-border bg-surface')}>
-              <span className="grid w-7 place-items-center font-mono text-sm font-bold text-fg-muted">
-                {s.rank <= 3 && c.status === 'FINISHED' ? (s.rank === 1 ? <Crown className={cn('size-5', MEDAL[0])} aria-label="Hạng 1" /> : <Medal className={cn('size-5', MEDAL[s.rank - 1])} aria-label={`Hạng ${s.rank}`} />) : s.rank}
-              </span>
-              <ClubAvatar club={s} size="sm" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{s.name}</span>
-                <span className="block text-[11px] text-fg-muted">{s.runners}/{s.members} người chạy{c.metric === 'AVG_KM' && ` · ${s.km.toLocaleString('vi-VN')} km`}</span>
-              </span>
-              <span className="shrink-0 text-right">
-                <span className="block font-mono text-base font-bold tabular">{(c.metric === 'TOTAL_KM' ? s.km : s.avg_km).toLocaleString('vi-VN')}</span>
-                <span className="block text-[10px] text-fg-muted">{METRIC_LABEL[c.metric].unit}</span>
-              </span>
+          {shown.map((s) => (
+            <li key={s.club_id}>
+              <button type="button" onClick={() => setOpen(s)} aria-label={`Xem bảng xếp hạng thành viên ${s.name}`}
+                className={cn('flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left hover:border-fg-subtle', mine.has(s.club_id) ? 'border-brand/50 bg-brand/10' : 'border-border bg-surface')}>
+                <span className="grid w-7 place-items-center font-mono text-sm font-bold text-fg-muted">
+                  {s.rank <= 3 && c.status === 'FINISHED' ? (s.rank === 1 ? <Crown className={cn('size-5', MEDAL[0])} aria-label="Hạng 1" /> : <Medal className={cn('size-5', MEDAL[s.rank - 1])} aria-label={`Hạng ${s.rank}`} />) : s.rank}
+                </span>
+                <ClubAvatar club={s} size="sm" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{s.name}</span>
+                  <span className="block text-[11px] text-fg-muted">{s.runners}/{s.members} người chạy{c.metric === 'AVG_KM' && ` · ${s.km.toLocaleString('vi-VN')} km`}</span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block font-mono text-base font-bold tabular">{(c.metric === 'TOTAL_KM' ? s.km : s.avg_km).toLocaleString('vi-VN')}</span>
+                  <span className="block text-[10px] text-fg-muted">{METRIC_LABEL[c.metric].unit}</span>
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-fg-subtle" aria-hidden />
+              </button>
             </li>
           ))}
         </ol>
       )}
+      {open && <ClubBoardSheet cupId={c.id} club={open} onClose={() => setOpen(null)} />}
     </section>
+  )
+}
+
+/** BXH thành viên của một CLB trong giải: tên, ngày chạy, pace TB, tổng km — tìm runner */
+function ClubBoardSheet({ cupId, club, onClose }: { cupId: string; club: CupStanding; onClose: () => void }) {
+  const q = useQuery({ queryKey: ['cup', cupId, 'club', club.club_id], queryFn: () => getClubBoard(cupId, club.club_id) })
+  const [term, setTerm] = useState('')
+  const rows = q.data?.rows ?? []
+  const shown = filterSearch(rows, term, (r) => [r.display_name])
+  return (
+    <Sheet open onClose={onClose} title={club.name} description={`Hạng ${club.rank} · ${club.km.toLocaleString('vi-VN')} km · ${club.runners}/${club.members} người chạy`}>
+      <div className="space-y-2">
+        {rows.length > 5 && <RankSearch value={term} onChange={setTerm} total={rows.length} matched={shown.length} placeholder="Tìm runner…" />}
+        {q.isPending ? <Skeleton className="h-40" /> : q.isError ? <ErrorState message={cupErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
+          : !rows.length ? <p className="py-6 text-center text-sm text-fg-muted">Chưa có thành viên nào được tính.</p> : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-left text-[11px] uppercase text-fg-subtle">
+                  <tr><th className="py-1.5 pr-2">#</th><th className="py-1.5">Runner</th><th className="py-1.5 text-right">Ngày</th><th className="py-1.5 text-right">Pace</th><th className="py-1.5 text-right">Km</th></tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {shown.map((r) => (
+                    <tr key={r.user_id}>
+                      <td className="py-2 pr-2 font-mono text-fg-muted">{r.rank}</td>
+                      <td className="py-2"><span className="flex min-w-0 items-center gap-2"><Avatar src={r.avatar_url} name={r.display_name} size="xs" /><span className="truncate font-medium">{r.display_name ?? 'Runner'}</span></span></td>
+                      <td className="py-2 text-right font-mono">{r.days}</td>
+                      <td className="py-2 text-right font-mono">{r.pace_s ? formatPace(r.pace_s) : '—'}</td>
+                      <td className="py-2 text-right font-mono font-bold">{Number(r.km).toLocaleString('vi-VN')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+      </div>
+    </Sheet>
+  )
+}
+
+/** Thành viên tự đăng ký thi đấu cho CLB (CLB đã được ban quản trị đăng ký); chỉ người đã đăng ký mới được tính km */
+function MemberSignup({ c, now }: { c: Cup; now: number }) {
+  const join = useCupMutation(c.id, (club: string) => joinCupAsMember(c.id, club), 'Đã đăng ký thi đấu — km của bạn sẽ được tính cho CLB')
+  const leave = useCupMutation(c.id, () => leaveCupAsMember(c.id), 'Đã rút đăng ký')
+  const joined = c.my_clubs.filter((m) => m.joined)
+  if (!joined.length || now >= Date.parse(c.end_at)) return null
+  const started = now >= Date.parse(c.start_at)
+  return (
+    <Card className="space-y-2 border-brand/40 p-4">
+      <p className="flex items-center gap-2 text-sm font-semibold"><UserCheck className="size-4 text-brand" aria-hidden />Đăng ký thi đấu</p>
+      <p className="text-xs text-fg-muted">Chỉ thành viên đã đăng ký mới được tính km cho CLB. Mỗi người thi đấu cho một CLB.</p>
+      {joined.map((m) => {
+        const mineHere = c.my_signup === m.id
+        return (
+          <div key={m.id} className="flex items-center gap-3 rounded-xl border border-border p-2.5">
+            <ClubAvatar club={m} size="sm" />
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold">{m.name}</span>
+            {mineHere ? (
+              started ? <span className="text-xs font-semibold text-brand">Đang thi đấu</span>
+                : <Button size="sm" variant="ghost" onClick={() => leave.mutate(undefined)} loading={leave.isPending}>Rút</Button>
+            ) : (
+              <Button size="sm" onClick={() => join.mutate(m.id)} loading={join.isPending && join.variables === m.id} disabled={!!c.my_signup}>
+                {c.my_signup ? 'Đã thi đấu CLB khác' : 'Đăng ký thi đấu'}
+              </Button>
+            )}
+          </div>
+        )
+      })}
+    </Card>
   )
 }
 

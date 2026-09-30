@@ -48,6 +48,7 @@ export const routes = {
   learn: '/learn',
   learnArticle: (slug: string) => `/learn/${encodeURIComponent(slug)}`,
   learnStudio: '/learn/studio',
+  learnWrite: '/learn/write',
   nearby: '/nearby',
   nearbyConnections: '/nearby/connections',
   nearbyEvent: (id: string) => `/nearby/events/${encodeURIComponent(id)}`,

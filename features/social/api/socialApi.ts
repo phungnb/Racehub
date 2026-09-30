@@ -26,7 +26,8 @@ export interface FeedActivity {
   is_me: boolean
   user: Runner
 }
-export interface DirectMessage { id: string; sender_id: string | null; mine: boolean; created_at: string; deleted: boolean; body: string | null }
+export interface DirectMessage { id: string; sender_id: string | null; mine: boolean; created_at: string; deleted: boolean; body: string | null; reactions?: DmReaction[] }
+export interface DmReaction { emoji: string; count: number; mine: boolean }
 export interface DirectThread { user: Runner; can_message: boolean; blocked: boolean; blocked_by_me: boolean; messages: DirectMessage[] }
 export interface InboxItem { user: Runner; last_message_at: string; last: DirectMessage | null; unread: number }
 export type ReportReason = 'SPAM' | 'HARASSMENT' | 'FAKE' | 'UNSAFE' | 'OTHER'
@@ -50,6 +51,9 @@ export const getDirectThread = (user: string) => call<DirectThread>('direct_thre
 export const getInbox = () => call<InboxItem[]>('direct_inbox').then((x) => x ?? [])
 export const getUnreadMessages = () => call<number>('direct_unread_count').then((x) => x ?? 0)
 export const deleteDirectMessage = (id: string) => call<void>('delete_direct_message', { p_id: id })
+/** Thả / đổi / bỏ cảm xúc cho một tin nhắn (chạm lại cùng emoji để bỏ) */
+export const reactDirectMessage = (id: string, emoji: string) => call<unknown>('react_direct_message', { p_id: id, p_emoji: emoji })
+export const DM_REACTIONS = ['❤️', '👍', '😂', '😮', '😢', '🔥', '👏', '🏃'] as const
 
 export const blockRunner = (user: string) => call<void>('block_user', { p_user: user })
 export const unblockRunner = (user: string) => call<void>('unblock_user', { p_user: user })
@@ -70,6 +74,7 @@ const MESSAGES: Record<string, string> = {
   NOT_AUTHOR: 'Chỉ người gửi mới thu hồi được tin này.',
   NOT_FOUND: 'Tin nhắn không còn nữa.',
   INVALID_REASON: 'Hãy chọn lý do báo cáo.',
+  INVALID_EMOJI: 'Cảm xúc này chưa được hỗ trợ.',
 }
 export function socialErrorMessage(e: unknown): string {
   const raw = (e as { message?: string } | null)?.message ?? ''

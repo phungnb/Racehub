@@ -16,7 +16,7 @@ export function ArticleRow({ a, className }: { a: Card; className?: string }) {
       <div className="min-w-0 flex-1 py-0.5">
         <p className="line-clamp-2 font-semibold leading-snug">{a.title}</p>
         <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-fg-muted">
-          {a.content_type === 'NEWS' ? <span className="inline-flex items-center gap-1 text-xp"><Newspaper className="size-3" aria-hidden />Tin tức</span> : <span>{a.category_name}</span>}
+          {a.content_type === 'NEWS' ? <span className="inline-flex items-center gap-1 text-xp"><Newspaper className="size-3" aria-hidden />Tin tức</span> : <span>{a.content_type === 'EBOOK' ? '📘 Ebook · ' : ''}{a.category_name}</span>}
           <span aria-hidden>·</span>
           {a.content_type === 'NEWS' ? <span>{formatDate(a.published_at)}</span> : <span className="inline-flex items-center gap-1"><Clock className="size-3" aria-hidden />{a.reading_time_minutes} phút đọc</span>}
         </p>
