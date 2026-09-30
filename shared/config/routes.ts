@@ -5,6 +5,7 @@ export const routes = {
   resetPassword: '/reset-password',
   feed: '/feed',
   challenges: '/challenges',
+  challengeHonorStudio: (id: string) => `/challenges/${encodeURIComponent(id)}/vinh-danh`,
   challenge: (id: string, code?: string | null) => `/challenges/${encodeURIComponent(id)}${code ? `?code=${encodeURIComponent(code)}` : ''}`,
   newChallenge: '/challenges/new',
   run: '/run',

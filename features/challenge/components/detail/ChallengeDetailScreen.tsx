@@ -99,9 +99,8 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
         journey={!!d.me && d.me.status !== 'LEFT' && (d.me.current_progress > 0 || !!d.me.completed_at)}
         completed={!!d.me?.completed_at}
         members={d.can_manage && phase !== 'UPCOMING'}
-        board={showHonor}
-        challengeId={c.id}
-        onBoard={() => { setTab('HONOR'); requestAnimationFrame(() => document.getElementById('challenge-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })) }} />
+        board={showHonor || phase !== 'UPCOMING'}
+        challengeId={c.id} />
 
       <div className="grid grid-cols-3 gap-2">
         <MiniStat icon={Users} label="Tham gia" value={`${formatNumber(d.stats.participants)}${c.format !== 'COLLECTIVE' && c.format !== 'SOLO_GOAL' ? `/${formatNumber(c.max_slots)}` : ''}`} />
@@ -109,7 +108,6 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
         <MiniStat icon={Coins} label="Thưởng" value={c.reward_xu > 0 ? `${formatNumber(c.reward_xu)} Xu` : '—'} tone={c.reward_xu > 0 ? 'text-coin' : undefined} />
       </div>
 
-      <div id="challenge-tabs" className="scroll-mt-28" />
       <SegmentedControl value={tab} onChange={setTab} options={[
         { value: 'RANK', label: 'Bảng xếp hạng' },
         ...(showHonor ? [{ value: 'HONOR' as const, label: 'Vinh danh' }] : []),

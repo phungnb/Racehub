@@ -24,6 +24,11 @@ export const getFacts = (kind: VicKind, ref: string, user?: string | null) =>
   call<VicFacts>('victory_facts', { p_kind: kind, p_ref: ref, p_user: user ?? null })
 export const issueVictory = (kind: VicKind, ref: string, user: string | null, award: string | null, design: unknown) =>
   call<Issued>('issue_victory', { p_kind: kind, p_ref: ref, p_user: user, p_award: award, p_design: design })
+/** Victory Studio theo gói (011800): VIP, thành viên CLB Pro / doanh nghiệp, hoặc thử thách của CLB Pro */
+export type AccessVia = 'FREE' | 'ADMIN' | 'VIP' | 'CLUB_PRO' | 'ORG' | 'EVENT'
+export interface VictoryAccess { unlocked: boolean; via: AccessVia | null }
+export const getAccess = (challengeId?: string | null) =>
+  call<VictoryAccess>('victory_access', { p_challenge: challengeId ?? null }).catch(() => ({ unlocked: true, via: null }) as VictoryAccess)
 export const recordExport = (code: string, design: unknown) => call<void>('record_victory_export', { p_code: code, p_design: design })
 export const myVictories = () => call<MyVictory[]>('my_victories').then((x) => x ?? [])
 export const revokeVictory = (code: string) => call<void>('revoke_victory', { p_code: code })
@@ -35,6 +40,7 @@ const MESSAGES: Record<string, string> = {
   NOT_FOUND: 'Không tìm thấy thành tích.',
   FORBIDDEN: 'Chỉ người tạo thử thách, ban quản trị CLB hoặc admin mới vinh danh người khác và đặt danh hiệu.',
   RATE_LIMITED: 'Bạn đã tạo quá nhiều ảnh hôm nay. Thử lại ngày mai.',
+  VICTORY_LOCKED: 'Victory Studio dành cho runner VIP, thành viên CLB Pro hoặc doanh nghiệp. Nâng cấp để xuất ảnh.',
 }
 export function victoryErrorMessage(e: unknown): string {
   const raw = (e as { message?: string } | null)?.message ?? ''

@@ -22,7 +22,7 @@ const fails = async (p: Promise<unknown>) => { try { await p } catch (e) { retur
 describe('trang quản trị (005600)', () => {
   let db: PGlite
   beforeAll(async () => {
-    db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed })
+    db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed, until: '20261001011700' })  // trước Quản trị chính (011800)
     await db.query(`update public.profiles set role = 'SYSTEM_ADMIN' where id = $1`, [ADM])
     await db.exec(`
       insert into public.challenges (id, title, start_date, end_date, target_value, target_km, min_km, status, created_by, target_audience)

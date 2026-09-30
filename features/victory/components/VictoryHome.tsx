@@ -11,6 +11,8 @@ import { routes } from '@/shared/config/routes'
 import { getSources, myVictories, revokeVictory, victoryErrorMessage, type MyVictory, type SourceItem } from '../api/victoryApi'
 import { KIND_LABEL, type VicKind } from '../model/victory'
 import { victoryKeys } from '../hooks/keys'
+import { useVictoryAccess } from '../hooks/useVictoryAccess'
+import { VictoryUpsell } from './VictoryUpsell'
 
 const STATE: Record<string, { label: string; tone: string }> = {
   COMPLETED: { label: 'Hoàn thành', tone: 'bg-brand/15 text-brand' },
@@ -23,9 +25,11 @@ export function VictoryHome() {
   const [tab, setTab] = useState<'MINE' | 'HONOR' | 'HISTORY'>('MINE')
   const q = useQuery({ queryKey: victoryKeys.sources, queryFn: getSources })
   const managed = q.data?.managed ?? []
+  const access = useVictoryAccess()
   return (
     <div className="space-y-4 animate-fade-in">
       <PageHeader title="Victory Studio" subtitle="Tạo ảnh vinh danh đẹp, đúng thành tích, chỉ vài chạm" />
+      {!access.unlocked && <VictoryUpsell />}
       <SegmentedControl value={tab} onChange={setTab} options={[
         { value: 'MINE', label: 'Thành tích' },
         ...(managed.length ? [{ value: 'HONOR' as const, label: 'Vinh danh', count: managed.length }] : []),
@@ -45,7 +49,7 @@ export function VictoryHome() {
           </Group>
           <Group icon={Award} title="Vinh danh thử thách" hint="Bảng tôn vinh chung của cả giải: Top thành tích, danh hiệu, ảnh nhóm — công bố cho mọi người.">
             {managed.map((c) => (
-              <Item key={c.ref} href={`${routes.challenge(c.ref)}?tab=honor`} title={c.title} subtitle="Mở tab Vinh danh của thử thách" />
+              <Item key={c.ref} href={routes.challengeHonorStudio(c.ref)} title={c.title} subtitle="Thiết kế ảnh tôn vinh cả giải" />
             ))}
           </Group>
         </div>

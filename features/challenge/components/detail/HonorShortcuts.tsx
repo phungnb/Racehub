@@ -9,12 +9,12 @@ import { routes } from '@/shared/config/routes'
  * Ba lối vinh danh đặt ngang hàng trên trang thử thách:
  * - Ảnh hành trình: runner tự tạo ảnh cho chặng của mình
  * - Vinh danh thành viên: BTC chọn bất kỳ ai, đặt danh hiệu riêng
- * - Vinh danh thử thách: bảng tôn vinh chung (Top, danh hiệu, ảnh nhóm) — mở tab Vinh danh
+ * - Vinh danh thử thách: thiết kế ảnh tôn vinh cả giải (Top, hạng mục BTC công bố) — studio riêng như 2 mục trên
  */
-export function HonorShortcuts({ journey, completed, members, board, challengeId, onBoard }: {
-  journey: boolean; completed: boolean; members: boolean; board: boolean; challengeId: string; onBoard: () => void
+export function HonorShortcuts({ journey, completed, members, board, challengeId }: {
+  journey: boolean; completed: boolean; members: boolean; board: boolean; challengeId: string
 }) {
-  const items: { key: string; icon: LucideIcon; title: string; sub: string; href?: string; onClick?: () => void; tone: string }[] = []
+  const items: { key: string; icon: LucideIcon; title: string; sub: string; href: string; tone: string }[] = []
   if (journey) items.push({
     key: 'journey', icon: ImageIcon, title: completed ? 'Ảnh vinh danh' : 'Ảnh hành trình', sub: 'Của riêng bạn',
     href: routes.victoryCreate('CHALLENGE', challengeId), tone: 'from-coin/25 to-brand/25 text-fg',
@@ -24,8 +24,8 @@ export function HonorShortcuts({ journey, completed, members, board, challengeId
     href: routes.victoryCreate('CHALLENGE', challengeId, { pick: true }), tone: 'from-brand/20 to-xp/20 text-fg',
   })
   if (board) items.push({
-    key: 'board', icon: Award, title: 'Vinh danh thử thách', sub: 'Bảng tôn vinh cả giải',
-    onClick: onBoard, tone: 'from-success/20 to-coin/20 text-fg',
+    key: 'board', icon: Award, title: 'Vinh danh thử thách', sub: 'Ảnh tôn vinh cả giải',
+    href: routes.challengeHonorStudio(challengeId), tone: 'from-success/20 to-coin/20 text-fg',
   })
   if (items.length === 0) return null
   return (
@@ -39,9 +39,7 @@ export function HonorShortcuts({ journey, completed, members, board, challengeId
           </>
         )
         const cls = cn('flex min-h-[5.5rem] flex-col items-center justify-center gap-1 rounded-2xl border border-border bg-gradient-to-br p-2 text-center hover:opacity-90', it.tone)
-        return it.href
-          ? <Link key={it.key} href={it.href} className={cls}>{body}</Link>
-          : <button key={it.key} type="button" onClick={it.onClick} className={cls}>{body}</button>
+        return <Link key={it.key} href={it.href} className={cls}>{body}</Link>
       })}
     </section>
   )

@@ -10,9 +10,10 @@ import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import type { AccountHit } from '../../api/adminApi'
-import { adminListAdmins, adminSetUserBan, adminSetUserRole, adminUserDetail, auditLabel, consoleErrorMessage, type AdminUserDetail } from '../../api/consoleApi'
+import { adminSetUserBan, adminSetUserRole, adminUserDetail, auditLabel, consoleErrorMessage, type AdminUserDetail } from '../../api/consoleApi'
 import { AccountPicker } from '../economy/AccountPicker'
 import { inboxKey } from './InboxPanel'
+import { teamKey, useAdminTeam } from './TeamTab'
 
 const fmt = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : '—')
 
@@ -21,69 +22,11 @@ export function UsersTab() {
   const [pick, setPick] = useState<AccountHit | null>(null)
   return (
     <div className="space-y-3">
-      <AdminList onPick={(id, name) => setPick({ kind: 'USER', id, name, subtitle: 'Quản trị viên', balance: 0 })} />
       <AccountPicker id="admin-user" value={pick} onChange={setPick} />
       {!pick ? <p className="text-sm text-fg-muted">Tìm người dùng để xem hồ sơ, số dư, CLB, giao dịch gần đây; khóa tài khoản vi phạm hoặc cấp quyền quản trị.</p>
         : pick.kind === 'CLUB' ? <Card className="text-sm">Đây là CLB — xem ở nhóm <b>Cộng đồng → CLB Pro</b> hoặc <Link className="text-brand underline" href={routes.club(pick.id)}>mở trang CLB</Link>.</Card>
         : <UserDetail id={pick.id} />}
     </div>
-  )
-}
-
-/** Ai đang là quản trị viên hệ thống; cấp thêm: tìm người dùng bên dưới → "Cấp quyền admin" */
-function AdminList({ onPick }: { onPick: (id: string, name: string) => void }) {
-  const q = useQuery({ queryKey: ['admin', 'admins'], queryFn: adminListAdmins })
-  return (
-    <Card className="space-y-2">
-      <p className="flex items-center gap-2 font-semibold"><ShieldCheck className="size-4 text-brand" aria-hidden />Quản trị viên hiện tại{q.data ? ` (${q.data.length})` : ''}</p>
-      {q.isPending ? <Skeleton className="h-12" /> : q.isError ? <p className="text-xs text-danger">{consoleErrorMessage(q.error, 'Không tải được danh sách admin.')}</p> : (
-        <ul className="divide-y divide-border">
-          {q.data.map((a) => (
-            <li key={a.id}>
-              <button type="button" onClick={() => onPick(a.id, a.display_name ?? a.email ?? 'Admin')} className="flex w-full items-center gap-3 py-2 text-left">
-                <Avatar src={a.avatar_url} name={a.display_name} size="sm" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{a.display_name ?? 'Chưa đặt tên'}{a.is_me ? ' (bạn)' : ''}
-                    {!a.email && <span className="ml-1.5 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-bold text-warning">không đăng nhập được</span>}</span>
-                  <span className="block truncate text-xs text-fg-muted">{a.email ?? '—'} · đăng nhập {fmt(a.last_sign_in_at)}{a.granted_at ? ` · cấp quyền ${fmt(a.granted_at)}` : ''}</span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <AddAdminByEmail />
-      <p className="text-xs text-fg-subtle">Hoặc tìm người đó ở ô dưới → mở hồ sơ → <b>Cấp quyền admin</b>. Tài khoản <b>không có email / chưa từng đăng nhập</b> không dùng được — nên gỡ quyền. Đơn nạp / mua gói của một admin phải do admin khác xác nhận.</p>
-    </Card>
-  )
-}
-
-/** Thêm admin bằng email: có tài khoản → cấp quyền ngay; chưa có → gửi thư mời đăng ký rồi tự thành admin */
-function AddAdminByEmail() {
-  const qc = useQueryClient()
-  const [email, setEmail] = useState('')
-  const [confirm, setConfirm] = useState(false)
-  const add = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/admin/add-admin', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email.trim() }) })
-      const j = await res.json().catch(() => ({})) as { ok?: boolean; invited?: boolean; already?: boolean; error?: string; detail?: string | null }
-      if (!res.ok || !j.ok) throw new Error(j.error === 'INVALID_EMAIL' ? 'Email chưa đúng.' : j.error === 'INVITE_FAILED' ? `Không gửi được thư mời${j.detail ? `: ${j.detail}` : ''}.` : consoleErrorMessage({ message: j.error ?? '' }))
-      return j
-    },
-    onSuccess: (j) => {
-      toast.success(j.already ? 'Tài khoản này đã là admin' : j.invited ? `Đã gửi thư mời tới ${email.trim()} — đăng ký xong là admin` : `Đã cấp quyền admin cho ${email.trim()}`)
-      setEmail(''); setConfirm(false)
-      void qc.invalidateQueries({ queryKey: ['admin', 'admins'] })
-    },
-    onError: (e) => { toast.error((e as Error).message); setConfirm(false) },
-  })
-  return (
-    <form className="flex gap-2 pt-1" onSubmit={(e) => { e.preventDefault(); if (email.trim()) setConfirm(true) }}>
-      <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email người cần thêm làm admin" aria-label="Email admin mới" className="h-10" />
-      <Button type="submit" size="sm" className="h-10 shrink-0" disabled={!email.trim()}>Thêm admin</Button>
-      <ConfirmSheet open={confirm} onClose={() => setConfirm(false)} title={`Cấp quyền admin cho ${email.trim()}?`} confirmLabel="Cấp quyền" loading={add.isPending}
-        description="Người này có TOÀN QUYỀN quản trị RaceHub. Chưa có tài khoản thì RaceHub gửi thư mời đăng ký tới email này." onConfirm={() => add.mutate()} />
-    </form>
   )
 }
 
@@ -163,9 +106,13 @@ function Actions({ u }: { u: AdminUserDetail }) {
   const qc = useQueryClient()
   const [sheet, setSheet] = useState<'ban' | 'unban' | 'admin' | 'member' | null>(null)
   const [reason, setReason] = useState('')
+  const team = useAdminTeam().data
+  // Cấp / gỡ quyền admin: chỉ Quản trị chính; không ai tác động được Quản trị chính (011800)
+  const target = team?.admins.find((a) => a.id === u.id)
+  const canRole = !team || (team.me.is_owner && !target?.is_owner && team.me.id !== u.id)
   const done = (msg: string) => {
     toast.success(msg); setSheet(null); setReason('')
-    void qc.invalidateQueries({ queryKey: ['admin', 'user', u.id] }); void qc.invalidateQueries({ queryKey: inboxKey })
+    void qc.invalidateQueries({ queryKey: ['admin', 'user', u.id] }); void qc.invalidateQueries({ queryKey: inboxKey }); void qc.invalidateQueries({ queryKey: teamKey })
   }
   const act = useMutation({
     mutationFn: () => sheet === 'ban' ? adminSetUserBan(u.id, true, reason) : sheet === 'unban' ? adminSetUserBan(u.id, false, reason)
@@ -176,7 +123,7 @@ function Actions({ u }: { u: AdminUserDetail }) {
   const meta = {
     ban: { title: 'Khóa tài khoản?', desc: 'Người này bị đăng xuất khỏi mọi thiết bị và không đăng nhập lại được cho tới khi mở khóa. Dữ liệu vẫn giữ nguyên.', label: 'Khóa tài khoản', need: true },
     unban: { title: 'Mở khóa tài khoản?', desc: 'Người này đăng nhập lại được ngay.', label: 'Mở khóa', need: false },
-    admin: { title: 'Cấp quyền quản trị?', desc: 'Người này có TOÀN QUYỀN quản trị RaceHub (Xu, đơn hàng, người dùng…). Chỉ cấp cho người thật sự tin cậy.', label: 'Cấp quyền admin', need: false },
+    admin: { title: 'Cấp quyền quản trị?', desc: 'Người này vào đội quản trị nhưng CHƯA có nhóm quyền nào — chọn nhóm quyền ở tab Đội quản trị. Chỉ cấp cho người thật sự tin cậy.', label: 'Cấp quyền admin', need: false },
     member: { title: 'Gỡ quyền quản trị?', desc: 'Người này trở lại tài khoản thường.', label: 'Gỡ quyền', need: false },
   } as const
   const m = sheet ? meta[sheet] : null
@@ -185,7 +132,10 @@ function Actions({ u }: { u: AdminUserDetail }) {
       {u.banned_at
         ? <Button size="sm" variant="secondary" onClick={() => setSheet('unban')}><Unlock className="size-4" aria-hidden />Mở khóa</Button>
         : <Button size="sm" variant="danger" disabled={u.role === 'SYSTEM_ADMIN'} onClick={() => setSheet('ban')}><Ban className="size-4" aria-hidden />Khóa tài khoản</Button>}
-      {u.role === 'SYSTEM_ADMIN'
+      {!canRole ? (
+        <p className="flex items-center gap-1.5 text-xs text-fg-subtle"><ShieldCheck className="size-3.5" aria-hidden />
+          {target?.is_owner ? 'Quản trị chính — chỉ đổi được bằng key hệ thống.' : 'Chỉ Quản trị chính cấp / gỡ quyền admin (tab Đội quản trị).'}</p>
+      ) : u.role === 'SYSTEM_ADMIN'
         ? <Button size="sm" variant="secondary" onClick={() => setSheet('member')}><ShieldOff className="size-4" aria-hidden />Gỡ quyền admin</Button>
         : <Button size="sm" variant="secondary" disabled={!!u.banned_at} onClick={() => setSheet('admin')}><ShieldCheck className="size-4" aria-hidden />Cấp quyền admin</Button>}
       <p className="flex w-full items-center gap-1.5 text-xs text-fg-subtle"><Crown className="size-3.5" aria-hidden />Cộng / trừ Xu, tặng gói VIP: nhóm <b>Kinh tế → Cộng/Trừ Xu</b> và <b>Kinh doanh → Gói & giá</b>.</p>
