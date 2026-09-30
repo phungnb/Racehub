@@ -4,7 +4,7 @@ Tạo tự động bằng `python3 scripts/list-messages.py` — **không sửa 
 
 `{…}` là phần tự điền (tên người, số km, số Xu…). Một số câu ghép theo điều kiện nên hiện dạng `{case when …}`.
 
-Tổng: 113 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 559 câu báo lỗi · 234 thông báo nhanh (toast).
+Tổng: 114 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 566 câu báo lỗi · 239 thông báo nhanh (toast).
 
 ## A. Thông báo (chuông + thông báo đẩy)
 
@@ -118,11 +118,12 @@ Tổng: 113 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 55
 | A106 | SHINE | Bạn đã đạt Tỏa sáng {v_names[private.shine_tier(v_new) + 1]} ✨ | Ảnh đại diện của bạn có khung mới. Cảm ơn cộng đồng đã tiếp sức! | `shine_on_gift` |
 | A107 | SYSTEM | {case when v_role = 'SYSTEM_ADMIN' then '} | {coalesce(p_reason, '')} | `admin_set_user_role` |
 | A108 | THANKS | {display_name(v_uid)} cảm ơn bạn đã tiếp sức 💛 | Món quà của bạn đã tiếp thêm năng lượng cho buổi chạy. | `send_thanks` |
-| A109 | VIP | Bạn đã là {v_name} | Hiệu lực tới {to_char(v_row.ends_at at time zone 'Asia}. Lượt tạo thử thách tháng này đã được cấp. | `grant_subscription` |
-| A110 | VIP | Bạn được cấp quyền tổ chức giải chạy | — | `admin_set_race_organizer` |
-| A111 | VOUCHER | Bạn nhận voucher từ {c.sponsor_name} 🎟️ | {c.title} | `issue_voucher` |
-| A112 | p_kind | {p_title} | {p_body} | `notify_club` |
-| A113 | p_kind text | {p_title text} | {p_body text} | `notify` |
+| A109 | VICTORY | {coalesce(v_award, v_facts->>'headline')} 🏅 | {display_name(v_uid)} vinh danh bạn trong thử thách {coalesce(v_facts->>'title', '')} | `issue_victory` |
+| A110 | VIP | Bạn đã là {v_name} | Hiệu lực tới {to_char(v_row.ends_at at time zone 'Asia}. Lượt tạo thử thách tháng này đã được cấp. | `grant_subscription` |
+| A111 | VIP | Bạn được cấp quyền tổ chức giải chạy | — | `admin_set_race_organizer` |
+| A112 | VOUCHER | Bạn nhận voucher từ {c.sponsor_name} 🎟️ | {c.title} | `issue_voucher` |
+| A113 | p_kind | {p_title} | {p_body} | `notify_club` |
+| A114 | p_kind text | {p_title text} | {p_body text} | `notify` |
 
 ## B. Lời báo trạng thái bài chạy
 
@@ -813,35 +814,52 @@ Tổng: 113 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 55
 | D538 | `INVALID_CONFIG` | Giá trị ngoài giới hạn cho phép — kiểm tra lại các ô vừa sửa. |
 | D539 | `VERSION_NOT_FOUND` | Không tìm thấy phiên bản này. |
 
+**features/victory/api/victoryApi.ts**
+
+| # | Mã | Câu báo |
+|---|---|---|
+| D540 | `NOT_PARTICIPANT` | Người này chưa tham gia thử thách. |
+| D541 | `NO_RESULT` | Chưa có kết quả để vinh danh — hãy chạy ít nhất một bài hợp lệ trong thử thách. |
+| D542 | `NOT_ELIGIBLE` | Chưa đạt thành tích này. |
+| D543 | `NOT_FOUND` | Không tìm thấy thành tích. |
+| D544 | `FORBIDDEN` | Chỉ người tạo thử thách, ban quản trị CLB hoặc admin mới vinh danh người khác và đặt danh hiệu. |
+| D545 | `RATE_LIMITED` | Bạn đã tạo quá nhiều ảnh hôm nay. Thử lại ngày mai. |
+
+**features/victory/model/victory.ts**
+
+| # | Mã | Câu báo |
+|---|---|---|
+| D546 | `CHALLENGE` | Thử thách |
+
 **features/voucher/api/voucherApi.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D540 | `FORBIDDEN` | Chỉ Ban tổ chức thử thách hoặc admin mới làm được việc này. |
-| D541 | `INVALID_URL` | Đường link / logo phải bắt đầu bằng https:// |
-| D542 | `INVALID_VOUCHER_CODE` | Nhập mã chung (ít nhất 3 ký tự). |
-| D543 | `INVALID_VOUCHER` | Thông tin voucher chưa hợp lệ (Top N từ 1 đến 100, chỉ áp cho thử thách). |
-| D544 | `TOO_MANY_CODES` | Tối đa 5.000 mã mỗi lần dán. |
-| D545 | `VOUCHER_NOT_FOUND` | Không tìm thấy voucher. |
+| D547 | `FORBIDDEN` | Chỉ Ban tổ chức thử thách hoặc admin mới làm được việc này. |
+| D548 | `INVALID_URL` | Đường link / logo phải bắt đầu bằng https:// |
+| D549 | `INVALID_VOUCHER_CODE` | Nhập mã chung (ít nhất 3 ký tự). |
+| D550 | `INVALID_VOUCHER` | Thông tin voucher chưa hợp lệ (Top N từ 1 đến 100, chỉ áp cho thử thách). |
+| D551 | `TOO_MANY_CODES` | Tối đa 5.000 mã mỗi lần dán. |
+| D552 | `VOUCHER_NOT_FOUND` | Không tìm thấy voucher. |
 
 **shared/lib/errors.ts**
 
 | # | Mã | Câu báo |
 |---|---|---|
-| D546 | `AUTH_REQUIRED` | Bạn cần đăng nhập để tiếp tục. |
-| D547 | `FORBIDDEN` | Bạn không có quyền thực hiện thao tác này. |
-| D548 | `INSUFFICIENT_BALANCE` | Số dư Xu không đủ. |
-| D549 | `INSUFFICIENT_FUNDS` | Số dư Xu không đủ. |
-| D550 | `INVALID_TITLE` | Tên thử thách cần từ 3 đến 120 ký tự. |
-| D551 | `INVALID_TIME_RANGE` | Thời gian kết thúc phải sau thời gian bắt đầu. |
-| D552 | `INVALID_MAX_SLOTS` | Số người tham gia tối đa không hợp lệ (1 – 10.000). |
-| D553 | `INVALID_DISTANCE` | Cự ly không hợp lệ. |
-| D554 | `INVALID_PACE` | Khoảng pace không hợp lệ. |
-| D555 | `INVALID_CHALLENGE_TYPE` | Loại thử thách không hợp lệ. |
-| D556 | `IDEMPOTENCY_KEY_REQUIRED` | Yêu cầu không hợp lệ, vui lòng thử lại. |
-| D557 | `ACTIVITY_DUPLICATE` | Bài chạy này đã được lưu trước đó. |
-| D558 | `RATE_LIMITED` | Bạn thao tác quá nhanh, thử lại sau ít phút. |
-| D559 | `NOT_A_MEMBER` | Bạn chưa là thành viên CLB này. |
+| D553 | `AUTH_REQUIRED` | Bạn cần đăng nhập để tiếp tục. |
+| D554 | `FORBIDDEN` | Bạn không có quyền thực hiện thao tác này. |
+| D555 | `INSUFFICIENT_BALANCE` | Số dư Xu không đủ. |
+| D556 | `INSUFFICIENT_FUNDS` | Số dư Xu không đủ. |
+| D557 | `INVALID_TITLE` | Tên thử thách cần từ 3 đến 120 ký tự. |
+| D558 | `INVALID_TIME_RANGE` | Thời gian kết thúc phải sau thời gian bắt đầu. |
+| D559 | `INVALID_MAX_SLOTS` | Số người tham gia tối đa không hợp lệ (1 – 10.000). |
+| D560 | `INVALID_DISTANCE` | Cự ly không hợp lệ. |
+| D561 | `INVALID_PACE` | Khoảng pace không hợp lệ. |
+| D562 | `INVALID_CHALLENGE_TYPE` | Loại thử thách không hợp lệ. |
+| D563 | `IDEMPOTENCY_KEY_REQUIRED` | Yêu cầu không hợp lệ, vui lòng thử lại. |
+| D564 | `ACTIVITY_DUPLICATE` | Bài chạy này đã được lưu trước đó. |
+| D565 | `RATE_LIMITED` | Bạn thao tác quá nhanh, thử lại sau ít phút. |
+| D566 | `NOT_A_MEMBER` | Bạn chưa là thành viên CLB này. |
 
 ## E. Thông báo nhanh (toast)
 
@@ -891,8 +909,8 @@ Tổng: 113 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 55
 | E42 | success | Đã trả lại mẫu cho CLB | `features/admin/components/items/UniformReviewPanel.tsx:150` |
 | E43 | success | Đã chép ${label.toLowerCase()} | `features/billing/components/OrderSheet.tsx:25` |
 | E44 | success | Đã hủy đơn | `features/billing/components/OrderSheet.tsx:46` |
-| E45 | success | Đã sao chép link mời | `features/challenge/components/detail/ChallengeDetailScreen.tsx:553` |
-| E46 | error | Không sao chép được, hãy chọn và sao chép thủ công. | `features/challenge/components/detail/ChallengeDetailScreen.tsx:553` |
+| E45 | success | Đã sao chép link mời | `features/challenge/components/detail/ChallengeDetailScreen.tsx:565` |
+| E46 | error | Không sao chép được, hãy chọn và sao chép thủ công. | `features/challenge/components/detail/ChallengeDetailScreen.tsx:565` |
 | E47 | success | Đã đổi hạn đăng ký | `features/challenge/components/detail/ChallengeExtras.tsx:30` |
 | E48 | success | Đã lưu hạng mục của bạn | `features/challenge/components/detail/ConquestPanel.tsx:63` |
 | E49 | success | Đã chia đội và báo cho mọi người | `features/challenge/components/detail/PledgePanel.tsx:175` |
@@ -1075,9 +1093,14 @@ Tổng: 113 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 55
 | E226 | info | Đã sao chép | `features/social/components/DirectChatScreen.tsx:111` |
 | E227 | success | Đã theo dõi ${name} | `features/social/components/FollowPanel.tsx:33` |
 | E228 | success | Đã gửi báo cáo | `features/social/components/ReportRunnerSheet.tsx:22` |
-| E229 | success | Đã thêm ${r.added} mã${r.issued ? | `features/voucher/components/VoucherForm.tsx:25` |
-| E230 | success | Đã lưu voucher tài trợ | `features/voucher/components/VoucherForm.tsx:29` |
-| E231 | success | Đã sao chép mã | `features/voucher/components/VoucherWallet.tsx:47` |
-| E232 | error | Tối đa ${max} phần tử | `shared/design/studio/Studio.tsx:73` |
-| E233 | success | Đã tải ảnh về máy | `shared/ui/SaveImage.tsx:21` |
-| E234 | success | Đã mở bảng chia sẻ — chọn "Lưu ảnh" để lưu vào máy | `shared/ui/SaveImage.tsx:22` |
+| E229 | error | Không chia sẻ được. Hãy lưu ảnh rồi đăng. | `features/victory/components/VictoryEditor.tsx:122` |
+| E230 | error | Hãy chọn ảnh. | `features/victory/components/VictoryEditor.tsx:196` |
+| E231 | success | Đã đăng lên bảng tin CLB | `features/victory/components/VictoryEditor.tsx:315` |
+| E232 | error | Không vẽ được nhân vật. Thử ảnh đại diện nhé. | `features/victory/components/VictoryEditor.tsx:75` |
+| E233 | success | Đã thu hồi mã xác thực | `features/victory/components/VictoryHome.tsx:129` |
+| E234 | success | Đã thêm ${r.added} mã${r.issued ? | `features/voucher/components/VoucherForm.tsx:25` |
+| E235 | success | Đã lưu voucher tài trợ | `features/voucher/components/VoucherForm.tsx:29` |
+| E236 | success | Đã sao chép mã | `features/voucher/components/VoucherWallet.tsx:47` |
+| E237 | error | Tối đa ${max} phần tử | `shared/design/studio/Studio.tsx:73` |
+| E238 | success | Đã tải ảnh về máy | `shared/ui/SaveImage.tsx:21` |
+| E239 | success | Đã mở bảng chia sẻ — chọn "Lưu ảnh" để lưu vào máy | `shared/ui/SaveImage.tsx:22` |

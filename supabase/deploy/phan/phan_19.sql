@@ -214,7 +214,9 @@ begin
       'ok', to_regprocedure('public.admin_list_admins()') is not null),
     jsonb_build_object('file', '20261001011500', 'label', 'Theo dõi runner, bảng tin Đang theo dõi, tin nhắn 1-1, sửa bình luận, thông báo hoạt động mới',
       'ok', to_regclass('public.direct_messages') is not null and to_regprocedure('public.following_feed(timestamptz,integer)') is not null
-            and to_regprocedure('public.edit_post_comment(uuid,text)') is not null));
+            and to_regprocedure('public.edit_post_comment(uuid,text)') is not null),
+    jsonb_build_object('file', '20261001011600', 'label', 'Victory Studio: ảnh vinh danh (thử thách, bài chạy, cột mốc km, Level, huy hiệu), mã xác thực /v/…, BTC vinh danh thành viên',
+      'ok', to_regclass('public.victory_certificates') is not null and to_regprocedure('public.issue_victory(text,text,uuid,text,jsonb)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

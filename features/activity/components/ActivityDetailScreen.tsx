@@ -18,6 +18,7 @@ import { compareNotes, decodePolyline, fastestSplit, splitPace, splitsFromPoints
 import { RouteMap } from './RouteMap'
 import { ReviewNotice } from './ReviewNotice'
 import { ShareActivitySheet } from './ShareActivity'
+import { VictoryButton } from '@/features/victory'
 import { ActivityGpsQuality } from './ActivityGpsQuality'
 
 const SOURCE_LABEL: Record<string, string> = { STRAVA: 'Strava', DIRECT_GPS: 'GPS RaceHub', GARMIN: 'Garmin', COROS: 'COROS' }
@@ -74,6 +75,11 @@ export function ActivityDetailScreen({ id }: { id: string }) {
           <Button size="sm" onClick={() => setSharing(true)} className="mt-1 shrink-0"><Share2 className="size-4" aria-hidden />Chia sẻ</Button>
         )}
       </div>
+
+      {/* Victory Studio: bài từ 5 km đã duyệt → ảnh vinh danh (5K, 10K, Half, Marathon, kỷ lục cá nhân) */}
+      {a.is_mine && a.validation_status === 'APPROVED' && a.distance_m >= 5000 && (
+        <VictoryButton kind="RUN" refId={a.id} className="w-full" />
+      )}
 
       {!a.is_mine && (
         <div className="flex items-center gap-3">

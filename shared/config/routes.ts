@@ -39,6 +39,10 @@ export const routes = {
   help: '/help',
   helpPage: (slug: string) => `/help/${encodeURIComponent(slug)}`,
   activities: '/activities',
+  victory: '/victory',
+  victoryCreate: (kind: string, ref: string, opts: { user?: string | null; pick?: boolean } = {}) =>
+    `/victory/create?kind=${encodeURIComponent(kind)}&ref=${encodeURIComponent(ref)}${opts.user ? `&user=${encodeURIComponent(opts.user)}` : ''}${opts.pick ? '&pick=1' : ''}`,
+  victoryVerify: (code: string) => `/v/${encodeURIComponent(code)}`,
   athlete: (id: string) => `/athletes/${encodeURIComponent(id)}`,
   activity: (id: string) => `/activities/${encodeURIComponent(id)}`,
   learn: '/learn',
