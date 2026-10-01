@@ -1,7 +1,7 @@
--- RaceHub: gộp 87 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 88 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -22343,6 +22343,58 @@ begin
 end $$;
 
 -- ===================================================================
+-- 20261001012300_perf_rls_admin_check.sql
+-- ===================================================================
+-- Tăng tốc đọc dữ liệu: các chính sách RLS gọi is_system_admin() cho TỪNG DÒNG. Bọc thành (select public.is_system_admin())
+-- để Postgres tính 1 lần cho cả câu truy vấn (khuyến nghị của Supabase). Quyền truy cập giữ nguyên tuyệt đối:
+-- chỉ đổi cách viết biểu thức, không thêm/bớt điều kiện. Chạy lại nhiều lần an toàn (đã bọc thì bỏ qua).
+do $$
+declare
+  r record;
+  v_qual text;
+  v_check text;
+  pat constant text := '(?<!SELECT )(public\.)?is_system_admin\(\)';
+begin
+  for r in
+    select schemaname, tablename, policyname, qual, with_check
+      from pg_policies
+     where schemaname = 'public'
+       and (coalesce(qual, '') ~ pat or coalesce(with_check, '') ~ pat)
+  loop
+    v_qual := case when r.qual is null then null else regexp_replace(r.qual, pat, '( SELECT public.is_system_admin())', 'g') end;
+    v_check := case when r.with_check is null then null else regexp_replace(r.with_check, pat, '( SELECT public.is_system_admin())', 'g') end;
+    if v_qual is not null and v_check is not null then
+      execute format('alter policy %I on %I.%I using (%s) with check (%s)', r.policyname, r.schemaname, r.tablename, v_qual, v_check);
+    elsif v_qual is not null then
+      execute format('alter policy %I on %I.%I using (%s)', r.policyname, r.schemaname, r.tablename, v_qual);
+    else
+      execute format('alter policy %I on %I.%I with check (%s)', r.policyname, r.schemaname, r.tablename, v_check);
+    end if;
+  end loop;
+end $$;
+
+-- club_is_member / club_is_staff được RLS gọi cho từng dòng. Kiểm tra thành viên (1 lần tra chỉ mục) TRƯỚC,
+-- chỉ khi không phải thành viên mới kiểm tra quyền admin hệ thống (nhiều lượt tra cứu). Kết quả y hệt bản cũ.
+create or replace function public.club_is_member(p_club uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select case
+    when exists (select 1 from public.club_members
+                  where club_id = p_club and user_id = auth.uid() and status = 'APPROVED') then true
+    else public.is_system_admin()
+  end
+$$;
+
+create or replace function public.club_is_staff(p_club uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select case
+    when exists (select 1 from public.club_members
+                  where club_id = p_club and user_id = auth.uid() and status = 'APPROVED'
+                    and role in ('OWNER', 'CAPTAIN')) then true
+    else public.is_system_admin()
+  end
+$$;
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -22569,7 +22621,16 @@ begin
         and not has_table_privilege('anon', 'public.profiles', 'SELECT')
         and not has_column_privilege('authenticated', 'public.profiles', 'xu', 'SELECT')),
     jsonb_build_object('file', '20261001012000', 'label', 'Thử thách theo mục tiêu: tham gia bắt buộc kèm mục tiêu (một bước)',
-      'ok', to_regprocedure('public.join_challenge_pledge(uuid,numeric,text)') is not null));
+      'ok', to_regprocedure('public.join_challenge_pledge(uuid,numeric,text)') is not null),
+    jsonb_build_object('file', '20261001012100', 'label', 'Tăng tốc tab CLB: đếm tin chưa đọc tối đa 100',
+      'ok', to_regprocedure('public.my_clubs_inbox()') is not null
+        and pg_get_functiondef('public.my_clubs_inbox()'::regprocedure) ~ 'limit 100'),
+    jsonb_build_object('file', '20261001012200', 'label', 'Tăng tốc Trang chủ: kiểm tra bù huy hiệu tối đa 1 lần / 10 phút',
+      'ok', to_regclass('private.achievement_catchup') is not null and to_regprocedure('private.catch_up_achievements(uuid)') is not null),
+    jsonb_build_object('file', '20261001012300', 'label', 'Tăng tốc phân quyền: kiểm tra thành viên CLB trước, quyền admin tính 1 lần / truy vấn',
+      'ok', pg_get_functiondef('public.club_is_member(uuid)'::regprocedure) ~* 'case\s+when exists'
+        and not exists (select 1 from pg_policies where schemaname = 'public'
+                         and (coalesce(qual, '') || ' ' || coalesce(with_check, '')) ~ '(?<!SELECT )(public\.)?is_system_admin\(\)')));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
