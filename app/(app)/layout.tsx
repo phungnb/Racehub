@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
-import { useMyProfile, useSession, takePendingRedirect } from '@/features/auth'
+import { useMyProfile, useSession, takePendingRedirect, takeSignedOut } from '@/features/auth'
 import { routes } from '@/shared/config/routes'
 import { ErrorState } from '@/shared/ui'
 import { TopBar } from './_components/TopBar'
@@ -26,7 +26,8 @@ export default function AppLayout({ children }: LayoutProps<'/'>) {
   useEffect(() => {
     if (loading) return
     if (!session) {
-      router.replace(`${routes.login}?next=${encodeURIComponent(pathname)}`)
+      // Tự đăng xuất → đăng nhập lại về Trang chủ; hết phiên giữa chừng → quay lại đúng trang đang xem
+      router.replace(takeSignedOut() ? routes.login : `${routes.login}?next=${encodeURIComponent(pathname)}`)
       return
     }
     const pending = takePendingRedirect()
