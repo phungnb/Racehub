@@ -944,7 +944,7 @@ Tổng: 117 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 58
 | E56 | success | Đã đổi ảnh vinh danh | `features/challenge/components/honor/HonorPanel.tsx:176` |
 | E57 | success | Đã đổi ảnh | `features/challenge/components/honor/HonorPanel.tsx:228` |
 | E58 | success | Đã lưu hạng mục vinh danh | `features/challenge/components/honor/HonorSetup.tsx:37` |
-| E59 | success | Đã đặt làm mẫu ảnh nhóm của tab Vinh danh | `features/challenge/components/honor/HonorStudioScreen.tsx:76` |
+| E59 | success | Đã đặt làm mẫu ảnh nhóm của tab Vinh danh thử thách | `features/challenge/components/honor/HonorStudioScreen.tsx:117` |
 | E60 | error | Đã tạo thử thách nhưng chưa bật được mục tiêu tự đăng ký: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:105` |
 | E61 | error | Đã tạo thử thách nhưng chưa lưu được thể lệ (sửa lại ở tab Luật chơi): ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:109` |
 | E62 | error | Đã tạo thử thách nhưng chưa bật được tự lặp lại: ${challengeErrorMessage(e)} | `features/challenge/components/wizard/CreateChallengeScreen.tsx:113` |
@@ -1102,7 +1102,7 @@ Tổng: 117 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 58
 | E214 | error | Không tạo được ảnh từ nhân vật. Thử lại sau. | `features/profile/components/AvatarPicker.tsx:78` |
 | E215 | error | Không hủy được kết nối Strava. Thử lại sau. | `features/profile/components/MeScreen.tsx:89` |
 | E216 | success | Đã hủy kết nối Strava | `features/profile/components/MeScreen.tsx:90` |
-| E217 | success | Đã xoá tài khoản. Cảm ơn bạn đã chạy cùng RaceHub. | `features/profile/components/SettingsScreen.tsx:212` |
+| E217 | success | Đã xoá tài khoản. Cảm ơn bạn đã chạy cùng RaceHub. | `features/profile/components/SettingsScreen.tsx:215` |
 | E218 | success | Đã cài RaceHub lên màn hình chính | `features/pwa/components/InstallApp.tsx:37` |
 | E219 | success | Đã có mạng trở lại | `features/pwa/components/OfflineBanner.tsx:25` |
 | E220 | success | Đã kết nối lại máy chủ | `features/pwa/components/OfflineBanner.tsx:27` |
@@ -1116,7 +1116,7 @@ Tổng: 117 thông báo · 7 lời báo bài chạy · 10 câu giọng HLV · 58
 | E228 | info | Đã bỏ bài chạy | `features/run/components/RunScreen.tsx:352` |
 | E229 | success | Đã gửi bài chạy ${formatKm(item.payload.p_distance_m)} km lên RaceHub | `features/run/hooks/usePendingRuns.ts:55` |
 | E230 | error | Không gửi được một bài chạy lưu trên máy | `features/run/hooks/usePendingRuns.ts:69` |
-| E231 | info | Đã sao chép | `features/social/components/DirectChatScreen.tsx:136` |
+| E231 | info | Đã sao chép | `features/social/components/DirectChatScreen.tsx:126` |
 | E232 | success | Đã theo dõi ${name} | `features/social/components/FollowPanel.tsx:33` |
 | E233 | success | Đã gửi báo cáo | `features/social/components/ReportRunnerSheet.tsx:24` |
 | E234 | error | Không chia sẻ được. Hãy lưu ảnh rồi đăng. | `features/victory/components/VictoryEditor.tsx:125` |
