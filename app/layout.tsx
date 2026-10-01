@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Be_Vietnam_Pro, JetBrains_Mono } from 'next/font/google'
+import { preconnect } from 'react-dom'
 import { Providers } from './providers'
 import { ICONS } from '@/shared/config/brand'
 import './globals.css'
@@ -28,6 +29,8 @@ export const viewport: Viewport = {
 }
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
+  // Mở sẵn kết nối tới Supabase ngay khi nhận trang, song song với lúc tải/chạy JS (đỡ ~0,5–1 giây cho yêu cầu đầu tiên)
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL) preconnect(process.env.NEXT_PUBLIC_SUPABASE_URL, { crossOrigin: 'anonymous' })
   return (
     <html lang="vi" className={`${sans.variable} ${mono.variable} h-full antialiased`}>
       <body className="min-h-full">
