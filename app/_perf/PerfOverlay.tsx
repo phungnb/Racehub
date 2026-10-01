@@ -44,11 +44,18 @@ export default function PerfOverlay() {
   useEffect(() => { patchApiFetch() }, [])
   useEffect(() => { perfRouteStart(pathname) }, [pathname])
 
-  const { requests, routes } = perfData()
+  const { requests, routes, inflight } = perfData()
+  // Có yêu cầu đang chờ: vẽ lại mỗi giây để thấy nó treo bao lâu
+  const [now, setNow] = useState(0)
+  useEffect(() => {
+    if (!inflight.length) return
+    const t = setInterval(() => setNow(performance.now()), 1000)
+    return () => clearInterval(t)
+  }, [inflight.length])
   const cur = routes[0]
   const here = requests.filter((r) => r.route === cur?.route).slice(0, 40)
   const slow = [...here].sort((a, b) => b.ms - a.ms).slice(0, 8)
-  const copy = () => void navigator.clipboard?.writeText(JSON.stringify({ boot, routes, requests: requests.slice(0, 150) }, null, 1))
+  const copy = () => void navigator.clipboard?.writeText(JSON.stringify({ boot, waiting: inflight.map((r) => ({ name: r.name, ms: Math.round(performance.now() - r.t0) })), routes, requests: requests.slice(0, 150) }, null, 1))
 
   if (!open) {
     return <button onClick={() => setOpen(true)} className="fixed bottom-24 left-2 z-[200] rounded-full bg-black/80 px-3 py-1 font-mono text-xs text-lime-300">⏱ perf</button>
@@ -67,6 +74,8 @@ export default function PerfOverlay() {
         </p>
       )}
       <p>Mở trang: <b className="text-lime-300">{cur?.readyMs != null ? `${cur.readyMs} ms` : 'đang tải…'}</b> · {cur?.requests ?? 0} yêu cầu</p>
+      {inflight.length > 0 && <p className="mt-1 text-white/60">Đang chờ:</p>}
+      {inflight.map((r, i) => <p key={i} className="text-red-300">{now ? `${Math.max(0, Math.round(now - r.t0))} ms` : "…"} · {r.name}</p>)}
       <p className="mt-1 text-white/60">Chậm nhất:</p>
       {slow.map((r, i) => (
         <p key={i} className={r.ms > 800 ? 'text-red-300' : r.ms > 300 ? 'text-amber-200' : ''}>{r.ms} ms · {r.name}{r.status >= 400 ? ` (${r.status})` : ''}</p>
