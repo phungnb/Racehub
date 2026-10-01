@@ -22,6 +22,7 @@ function authErrorMessage(message: string): string {
   if (m.includes('already registered') || m.includes('already exists')) return 'Email này đã có tài khoản. Hãy bấm Đăng nhập (hoặc Quên mật khẩu).'
   if (m.includes('password should be') || m.includes('weak password')) return 'Mật khẩu quá yếu: cần ít nhất 6 ký tự.'
   if (m.includes('invalid') && m.includes('email')) return 'Email không hợp lệ. Vui lòng kiểm tra lại.'
+  if (m.includes('email logins are disabled') || m.includes('email provider is disabled')) return 'Đăng nhập bằng email / số điện thoại đang tạm tắt. Vui lòng dùng "Tiếp tục với Google" hoặc thử lại sau.'
   if (m.includes('signups not allowed')) return 'Hiện chưa mở đăng ký bằng email. Vui lòng dùng "Tiếp tục với Google".'
   return message
 }
