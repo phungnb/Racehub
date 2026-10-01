@@ -12,6 +12,7 @@ import { Button, Card, ConfirmSheet, ErrorState, Field, Input, Skeleton, Textare
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import { markSignedOut, useSession } from '@/features/auth'
+import { ContactButton } from '@/features/help'
 import { PushSettingsCard, unsubscribeThisDevice } from '@/features/notification'
 import { getMyProfile, profileErrorMessage, updateMyProfile } from '../api/profileApi'
 import {
@@ -35,6 +36,7 @@ export function SettingsScreen() {
           <ArrowLeft className="size-5" aria-hidden />
         </Link>
         <h1 className="text-xl font-bold">Cài đặt</h1>
+        <ContactButton className="ml-auto" />
       </div>
 
       <SectionTitle>Hồ sơ</SectionTitle>

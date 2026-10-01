@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { PlanCompare } from '@/features/billing'
-import { ContactCard, HelpBody, HelpShell, type HelpPage } from '@/features/help'
+import { ContactCard, ContactFab, HelpBody, HelpShell, type HelpPage } from '@/features/help'
 import { PurchaseOnly } from '@/features/system'
 import { createSupabaseServerClient } from '@/shared/lib/supabase-server'
 import { loadHelpPage } from '@/shared/lib/help-page-server'
@@ -32,6 +32,7 @@ export default async function PlansPage() {
           </section>
         )}
         <ContactCard className="mt-8 border-t border-border pt-6" title="Cần tư vấn gói?" note="Nhắn admin để được tư vấn, hỗ trợ thanh toán hoặc xuất hoá đơn." />
+        <ContactFab title="Cần tư vấn gói?" note="Nhắn admin để được tư vấn chọn gói, hỗ trợ thanh toán hoặc xuất hoá đơn." />
       </PurchaseOnly>
     </HelpShell>
   )

@@ -15,7 +15,7 @@ import type { Profile } from '@/shared/types/profile'
 import { helpMenu } from '../api/helpApi'
 import { useCanPurchase, useOpsPolicy } from '@/features/system'
 import { markSignedOut } from '@/features/auth'
-import { ContactCard } from './ContactCard'
+import { ContactMenuRow } from './Contact'
 import { companyLine, featuredMenu, groupMenu, SECTION_LABEL, STATIC_POLICIES, staticHref } from '../model/help'
 
 /**
@@ -185,7 +185,7 @@ function Drawer({ profile, onSignOut, onClose }: { profile: Profile | null; onSi
             </section>
           )}
 
-          <ContactCard className="mb-3 px-3" />
+          <div className="mb-3 px-1"><ContactMenuRow /></div>
 
           {profile && ops.features.orgs && (
             <section className="mb-3">
