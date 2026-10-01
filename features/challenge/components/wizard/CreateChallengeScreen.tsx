@@ -8,7 +8,7 @@ import { ArrowLeft, CalendarRange, Check, CheckCircle2, ChevronRight, Coins, Fla
 import { toast } from 'sonner'
 import { useMyProfile } from '@/features/auth'
 import { isStaff, useClubInbox } from '@/features/club'
-import { Button, Card, Field, Input, Textarea } from '@/shared/ui'
+import { Button, Card, ClockPicker, Field, Input, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { capacityTier, creationFee, DEFAULT_POLICY, runPolicyText, xuToVnd } from '@/shared/lib/economy'
@@ -525,12 +525,14 @@ function ConquestSection({ d, set, error }: { d: ChallengeDraft; set: (p: Partia
               )}
             </div>
             {c.mode === 'FIXED' && (
-              <label className="flex items-center gap-2 text-sm">
-                <span className="w-28 shrink-0 text-fg-muted">{pace ? 'Pace ≤' : 'Thời gian ≤'}</span>
-                <Input aria-label={`Mục tiêu hạng mục ${x.label}`} inputMode="numeric" className="font-mono" value={x.target}
-                  placeholder={pace ? '6:00' : '1:00:00'} onChange={(e) => setCat(i, { target: e.target.value })} />
-                <span className="shrink-0 text-xs text-fg-subtle">{pace ? '/km' : parseClock(x.target) && x.km > 0 ? `≈ ${formatClock((parseClock(x.target) ?? 0) / x.km)}/km` : ''}</span>
-              </label>
+              <div className="space-y-1 text-sm">
+                <span className="text-fg-muted">{pace ? 'Pace ≤' : 'Thời gian ≤'}</span>
+                <ClockPicker label={`Mục tiêu hạng mục ${x.label}`} mode={pace ? 'pace' : 'time'}
+                  maxHours={Math.max(3, Math.ceil((x.km * 12) / 60))}
+                  value={parseClock(x.target) ?? (pace ? 360 : Math.max(60, Math.round(x.km * 6) * 60))}
+                  onChange={(sec) => setCat(i, { target: formatClock(sec) })} />
+                {!pace && parseClock(x.target) && x.km > 0 ? <span className="block text-xs text-fg-subtle">≈ {formatClock((parseClock(x.target) ?? 0) / x.km)}/km</span> : null}
+              </div>
             )}
           </li>
         ))}
