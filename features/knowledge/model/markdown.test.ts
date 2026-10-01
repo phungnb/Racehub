@@ -23,3 +23,14 @@ describe('markdown Knowledge', () => {
     expect(slugify('Chạy 10K đầu tiên!')).toBe('chay-10k-dau-tien')
   })
 })
+
+describe('link trần', () => {
+  it('https://… tự thành link, bỏ dấu câu cuối; javascript: thì không', () => {
+    expect(parseInline('Zalo: https://zalo.me/0865784913.')).toEqual([
+      { t: 'text', v: 'Zalo: ' },
+      { t: 'a', href: 'https://zalo.me/0865784913', c: [{ t: 'text', v: 'zalo.me/0865784913' }] },
+      { t: 'text', v: '.' },
+    ])
+    expect(parseInline('javascript:alert(1)')).toEqual([{ t: 'text', v: 'javascript:alert(1)' }])
+  })
+})
