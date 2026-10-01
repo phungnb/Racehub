@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { supabase } from '@/shared/lib/supabase'
 import { Loader2, Eye, EyeOff, Mail, Lock, User, ArrowLeft, CheckCircle2, Gift } from 'lucide-react'
 import { peekPendingReferral, savePendingReferral } from '../model/pending-actions'
+import { looksLikePhone, normalizeVnPhone, phoneEmail } from '../model/phone'
 import { enabledProviders, signInWithProvider, socialErrorMessage, type OAuthProvider } from '../model/socialAuth'
 
 const CALLBACK_ERROR: Record<string, string> = {
@@ -25,6 +26,13 @@ function authErrorMessage(message: string): string {
   return message
 }
 
+const PHONE_SIGNUP_ERROR: Record<string, string> = {
+  INVALID_PHONE: 'Số điện thoại không hợp lệ. Nhập số di động Việt Nam, ví dụ 0912345678.',
+  WEAK_PASSWORD: 'Mật khẩu cần ít nhất 6 ký tự.',
+  PHONE_TAKEN: 'Số điện thoại này đã có tài khoản. Hãy bấm Đăng nhập.',
+  RATE_LIMIT: 'Bạn thao tác quá nhiều lần. Vui lòng thử lại sau ít phút.',
+}
+
 type Mode = 'login' | 'register' | 'forgot'
 
 export default function AuthScreen({ onAuthSuccess, next = '/feed', callbackError, initialMode }: {
@@ -44,8 +52,8 @@ export default function AuthScreen({ onAuthSuccess, next = '/feed', callbackErro
 
   const resolveEmailInput = (input: string) => {
     const cleanInput = input.trim()
-    if (/^[0-9+]+$/.test(cleanInput)) {
-      return `${cleanInput}@phone.racehub.vn`
+    if (looksLikePhone(cleanInput)) {
+      return phoneEmail(normalizeVnPhone(cleanInput) ?? cleanInput.replace(/[\s.\-()]/g, ''))
     }
     return cleanInput
   }
@@ -74,9 +82,15 @@ export default function AuthScreen({ onAuthSuccess, next = '/feed', callbackErro
     const processedEmail = resolveEmailInput(identifier)
 
     if (mode === 'login') {
-      const result = await safeAuthCall(() =>
+      let result = await safeAuthCall(() =>
         supabase.auth.signInWithPassword({ email: processedEmail, password })
       )
+      // Tài khoản số điện thoại tạo trước khi chuẩn hóa số (vd. +84…): thử lại đúng như đã gõ
+      const rawPhoneEmail = `${identifier.trim()}@phone.racehub.vn`
+      if (result?.error && /^[0-9+]+$/.test(identifier.trim()) && rawPhoneEmail !== processedEmail) {
+        const retry = await safeAuthCall(() => supabase.auth.signInWithPassword({ email: rawPhoneEmail, password }))
+        if (retry && !retry.error) result = retry
+      }
     if (result) {
       if (result.error) {
         setErrorMsg(authErrorMessage(result.error.message))
@@ -87,6 +101,11 @@ export default function AuthScreen({ onAuthSuccess, next = '/feed', callbackErro
     } else if (mode === 'register') {
       // Mã giới thiệu: lưu lại, sau khi vào app sẽ tự áp dụng (trang /join/<mã>)
       if (referral.trim()) savePendingReferral(referral.trim().toUpperCase())
+      if (looksLikePhone(identifier)) {
+        await registerWithPhone()
+        setLoading(false)
+        return
+      }
       const result = await safeAuthCall(() =>
         supabase.auth.signUp({
           email: processedEmail,
@@ -117,6 +136,37 @@ export default function AuthScreen({ onAuthSuccess, next = '/feed', callbackErro
       }
     }
     setLoading(false)
+  }
+
+  // Đăng ký bằng số điện thoại: máy chủ tạo tài khoản (không gửi thư xác nhận), rồi đăng nhập luôn
+  const registerWithPhone = async () => {
+    const phone = normalizeVnPhone(identifier)
+    if (!phone) {
+      setErrorMsg('Số điện thoại không hợp lệ. Nhập số di động Việt Nam, ví dụ 0912345678.')
+      return
+    }
+    let code = ''
+    try {
+      const res = await fetch('/api/auth/phone-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, password, displayName: displayName.trim() }),
+      })
+      if (!res.ok) code = ((await res.json().catch(() => ({}))) as { error?: string }).error ?? 'SIGNUP_FAILED'
+    } catch {
+      setErrorMsg('Không thể kết nối đến máy chủ. Vui lòng thử lại sau.')
+      return
+    }
+    if (code) {
+      setErrorMsg(PHONE_SIGNUP_ERROR[code] ?? 'Không đăng ký được. Vui lòng thử lại sau.')
+      return
+    }
+    const login = await safeAuthCall(() => supabase.auth.signInWithPassword({ email: phoneEmail(phone), password }))
+    if (login && !login.error) onAuthSuccess()
+    else if (login) {
+      setErrorMsg('Đăng ký thành công! Vui lòng bấm Đăng nhập.')
+      switchMode('login')
+    }
   }
 
   const handleSocial = async (p: OAuthProvider) => {
