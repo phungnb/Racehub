@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/shared/lib/supabase'
 import {
-  cancelChallenge, changeTeam, getChallenge, getLeaderboard, getTeamStandings, joinChallenge, leaveChallenge, listChallenges,
+  cancelChallenge, changeTeam, getChallenge, getLeaderboard, getTeamStandings, joinChallenge, joinChallengePledge, leaveChallenge, listChallenges,
   settleIfDue, type ChallengeTab,
 } from '../api/challengeApi'
 import { settlementDue } from '../model/challenge'
@@ -78,6 +78,7 @@ export function useChallengeActions(id: string) {
   }
   return {
     join: useMutation({ mutationFn: (v: { code?: string | null; teamId?: string | null }) => joinChallenge(id, v.code, v.teamId), onSuccess: refresh }),
+    joinPledge: useMutation({ mutationFn: (v: { km: number; code?: string | null }) => joinChallengePledge(id, v.km, v.code), onSuccess: refresh }),
     leave: useMutation({ mutationFn: () => leaveChallenge(id), onSuccess: refresh }),
     changeTeam: useMutation({ mutationFn: (teamId: string) => changeTeam(id, teamId), onSuccess: refresh }),
     cancel: useMutation({ mutationFn: (reason?: string) => cancelChallenge(id, reason), onSuccess: refresh }),

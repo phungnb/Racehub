@@ -1,7 +1,7 @@
--- RaceHub: gộp 84 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 85 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -22160,6 +22160,32 @@ revoke select on public.club_members, public.club_treasury_log, public.profile_s
   public.ledger_entries, public.ledger_transactions, public.wallet_transactions from anon;
 
 -- ===================================================================
+-- 20261001012000_pledge_required.sql
+-- ===================================================================
+-- 012000: Thử thách theo mục tiêu (pledge): tham gia BẮT BUỘC kèm mục tiêu.
+--   join_challenge_pledge(id, km, code): vào thử thách + đặt mục tiêu trong CÙNG một giao dịch — mục tiêu không hợp lệ / đã khóa
+--   thì không vào (không còn người "tham gia nhưng chưa đăng ký mục tiêu").
+--   Người đã vào từ trước mà chưa có mục tiêu: app nhắc đăng ký (set_my_pledge vẫn dùng như cũ).
+-- Chạy được trong SQL Editor, chạy lại an toàn.
+
+create or replace function public.join_challenge_pledge(p_challenge_id uuid, p_km numeric, p_code text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_join jsonb;
+begin
+  perform private.require_uid();
+  if not exists (select 1 from public.challenges where id = p_challenge_id) then raise exception 'CHALLENGE_NOT_FOUND'; end if;
+  if not exists (select 1 from public.challenges where id = p_challenge_id and pledge_enabled) then raise exception 'PLEDGE_NOT_SUPPORTED'; end if;
+  if p_km is null or p_km <= 0 then raise exception 'PLEDGE_REQUIRED'; end if;
+  v_join := public.join_challenge(p_challenge_id, p_code, null);
+  perform public.set_my_pledge(p_challenge_id, p_km);
+  return coalesce(v_join, '{}'::jsonb) || jsonb_build_object('pledge_km', round(p_km, 1));
+end $$;
+
+revoke all on function public.join_challenge_pledge(uuid, numeric, text) from public, anon;
+grant execute on function public.join_challenge_pledge(uuid, numeric, text) to authenticated;
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -22384,7 +22410,9 @@ begin
         and not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'profiles'
                          and policyname in ('Allow public select profile', 'Public profiles are viewable by everyone'))
         and not has_table_privilege('anon', 'public.profiles', 'SELECT')
-        and not has_column_privilege('authenticated', 'public.profiles', 'xu', 'SELECT')));
+        and not has_column_privilege('authenticated', 'public.profiles', 'xu', 'SELECT')),
+    jsonb_build_object('file', '20261001012000', 'label', 'Thử thách theo mục tiêu: tham gia bắt buộc kèm mục tiêu (một bước)',
+      'ok', to_regprocedure('public.join_challenge_pledge(uuid,numeric,text)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

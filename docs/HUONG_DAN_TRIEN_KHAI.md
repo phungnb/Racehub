@@ -35,7 +35,7 @@ Nếu thiếu một biến bắt buộc, route `/api/connect/strava` sẽ báo l
 > ⚠️ **KHẨN CẤP.** Database production hiện có lỗ hổng cho phép **bất kỳ ai, kể cả người chưa đăng nhập, tự tạo Xu, tự phong admin và đọc token Strava của người khác.** Chi tiết xem [BAO_CAO_BAO_MAT.md](./BAO_CAO_BAO_MAT.md). Hãy chạy migration **càng sớm càng tốt**.
 
 > ✅ **Cách nhanh nhất (khuyên dùng) cho đợt ra mắt:** nếu **Quản trị → Hệ thống** báo thiếu các migration từ **003700** trở đi (đã chạy đủ tới 003600) → mở file
-> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 011900** + chạy lại 003500),
+> [`supabase/deploy/chay_tu_003700.sql`](../supabase/deploy/chay_tu_003700.sql) (gộp sẵn **003700 → 012000** + chạy lại 003500),
 > dán **toàn bộ** vào **Supabase → SQL Editor → New query → Run**. Cả file chạy trong **một giao dịch**: lỗi ở đâu thì không có gì thay đổi
 > (không bị dừng giữa chừng như chạy từng file); chạy lại lần nữa vẫn an toàn. Xong vào **Quản trị → Hệ thống**: mọi dòng migration phải xanh.
 >
@@ -167,6 +167,7 @@ Chạy các file trong `supabase/migrations/`, đúng thứ tự:
 | `20261001011700_feedback_round3.sql` | **Chỉnh sửa lần 3**: thách đấu CLB mới — sau khi CLB đăng ký, từng thành viên bấm *Đăng ký thi đấu* mới được tính (giải cũ giữ cách tính cũ); bấm vào CLB trên BXH → bảng chi tiết (ngày chạy, pace TB, km) có tìm runner; thả cảm xúc cho tin nhắn; runner soạn bài / đăng ebook PDF (Knowledge → *Viết bài*), admin duyệt trong CMS, bài đăng đầu tiên được thưởng Xu (mặc định 30, đổi bằng khóa `contentRewardXu` trong chính sách kinh tế); admin tìm / mời người dùng theo email | Chạy lại 3500 |
 | `20261001011800_feedback_round4.sql` | **Chỉnh sửa lần 4**: Victory Studio lấy đúng *Mục tiêu đăng ký* (km runner tự đăng ký); Victory Studio thành tính năng trả phí (VIP, thành viên CLB Pro / doanh nghiệp, giải của CLB Pro — admin mở cho tất cả bằng khóa `victoryStudioFree = true` trong chính sách kinh tế); studio *Vinh danh thử thách* riêng; **Quản trị chính + phân quyền admin theo nhóm** (xem [QUAN_TRI_HE_THONG.md](QUAN_TRI_HE_THONG.md)). **Sau khi chạy:** vào SQL Editor chạy `select private.admin_set_owner('email-cua-ban');` để đặt Quản trị chính | Chạy lại 3500 |
 | `20261001011900_profiles_privacy.sql` | **Vá lộ dữ liệu (quan trọng)**: bỏ 2 policy cũ cho phép ai có anon key đọc toàn bộ bảng `profiles` (role, Xu, Strava ID, mã giới thiệu…). Khách chưa đăng nhập không đọc được hồ sơ, `club_members`, `club_treasury_log`, `profile_settings`, sổ cái; người đã đăng nhập chỉ thấy tên / ảnh / level / giới tính / giới thiệu của người khác; hồ sơ đầy đủ của chính mình qua `my_account()` | Chạy lại 3500 |
+| `20261001012000_pledge_required.sql` | **Thử thách theo mục tiêu: bắt buộc chọn mục tiêu khi tham gia.** Hàm `join_challenge_pledge` vào thử thách + đặt mục tiêu km trong cùng một bước — chưa chọn / chọn sai mục tiêu thì không vào được. Người đã vào từ trước mà chưa có mục tiêu: app hiện thẻ **Bắt buộc** nhắc chọn | Chạy lại 3500 |
 
 **Cách A — SQL Editor:** dán từng file theo thứ tự → Run. Mỗi file chạy lại nhiều lần vẫn an toàn.
 
