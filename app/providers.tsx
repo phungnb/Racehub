@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useState, useSyncExternalStore, type ReactNode } from 'react'
+import dynamic from 'next/dynamic'
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { toast, Toaster } from 'sonner'
 import { NativeAuthBridge, SessionProvider } from '@/features/auth'
@@ -9,6 +10,10 @@ import { SystemNoticeBanner } from '@/features/system'
 import { describeError, shouldRetry } from '@/shared/lib/errors'
 import { isResumeNoise, noteRequestFailure, noteRequestSuccess } from '@/shared/lib/connection'
 import { reportError } from '@/shared/lib/reportError'
+import { onPerf, perfEnabled } from '@/shared/lib/perf'
+
+// Bộ đo tốc độ chỉ tải khi mở app với ?perf=1
+const PerfOverlay = dynamic(() => import('./_perf/PerfOverlay'), { ssr: false })
 
 /**
  * Lỗi khi tải dữ liệu:
@@ -53,6 +58,7 @@ function makeQueryClient() {
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(makeQueryClient)
+  const perf = useSyncExternalStore(onPerf, perfEnabled, () => false)
   return (
     <QueryClientProvider client={queryClient}>
       <SystemNoticeBanner />
@@ -60,6 +66,7 @@ export function Providers({ children }: { children: ReactNode }) {
       <PwaBoot />
       <NativeAuthBridge />
       <Toaster theme="dark" position="top-center" richColors closeButton />
+      {perf && <PerfOverlay />}
     </QueryClientProvider>
   )
 }
