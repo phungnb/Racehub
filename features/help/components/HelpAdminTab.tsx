@@ -161,7 +161,7 @@ function Editor({ initial, preset, site, onClose }: { initial: HelpAdminPage | n
         <SegmentedControl value={mode} onChange={setMode} options={[{ value: 'edit', label: 'Soạn' }, { value: 'preview', label: 'Xem trước' }]} />
         {mode === 'edit' ? (
           <>
-            <p className="text-xs text-fg-muted">Markdown: <code>## Tiêu đề</code>, <code>- danh sách</code>, <code>**đậm**</code>, <code>[chữ](/help/…)</code>, <code>&gt; ghi chú</code>. Thông tin pháp nhân: <code>{'{{support_email}}'}</code>…</p>
+            <p className="text-xs text-fg-muted">Markdown: <code>## Tiêu đề</code>, <code>- danh sách</code>, <code>**đậm**</code>, <code>[chữ](/help/…)</code>, <code>&gt; ghi chú</code>. Thông tin pháp nhân: <code>{'{{support_email}}'}</code>… Nút bấm liên hệ: <code>{'{{zalo_link}}'}</code>, <code>{'{{telegram_link}}'}</code>, <code>{'{{phone_link}}'}</code>, <code>{'{{email_link}}'}</code>.</p>
             <Textarea value={f.body} onChange={(e) => set('body', e.target.value)} rows={18} maxLength={60000} className="font-mono text-sm" aria-label="Nội dung trang" />
           </>
         ) : <div className={cn('min-h-40', !f.body && 'text-fg-subtle')}>{f.body ? <Markdown blocks={blocks} /> : 'Chưa có nội dung'}</div>}
