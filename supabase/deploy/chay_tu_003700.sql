@@ -1,7 +1,7 @@
--- RaceHub: gộp 83 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 84 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -22122,6 +22122,44 @@ grant execute on function public.admin_set_permissions(uuid, text[], timestamptz
   public.victory_access(text), public.admin_set_user_role(uuid, text, text) to authenticated;
 
 -- ===================================================================
+-- 20261001011900_profiles_privacy.sql
+-- ===================================================================
+-- 011900: Vá lộ dữ liệu (kết quả quét bằng anon key, không đăng nhập).
+--   profiles: còn 2 policy cũ "Allow public select profile" / "Public profiles are viewable by everyone" (USING true, cho cả anon)
+--   → ai có anon key (nằm sẵn trong app web) đọc được MỌI cột của MỌI người: role, xu, strava_athlete_id, referral_code,
+--   banned_reason… Token Strava đã được dọn từ 000100 (cột luôn null) nên không lộ token.
+-- Sửa:
+--   1. Khách chưa đăng nhập: không đọc được profiles.
+--   2. Người đã đăng nhập: chỉ đọc CỘT CÔNG KHAI của người khác (id, tên, ảnh, level, giới tính, giới thiệu, ngày tham gia) — đủ cho các
+--      chỗ app ghép tên / ảnh (bảng tin, bình luận, thành viên CLB, quỹ, thông báo).
+--   3. Hồ sơ đầy đủ của CHÍNH MÌNH (Xu, XP, vai trò, Strava, mã giới thiệu…) đọc qua RPC my_account().
+--   4. club_members, club_treasury_log, profile_settings, sổ cái: khách chưa đăng nhập bị từ chối hẳn (trước đây trả
+--      200 + rỗng nhờ RLS; nay chặn thêm một lớp ở quyền bảng).
+-- RPC SECURITY DEFINER (mọi màn hình khác) không bị ảnh hưởng. Chạy được trong SQL Editor, chạy lại an toàn.
+
+-- 1 + 2. profiles
+drop policy if exists "Allow public select profile" on public.profiles;
+drop policy if exists "Public profiles are viewable by everyone" on public.profiles;
+drop policy if exists "profiles_select_signed_in" on public.profiles;
+create policy "profiles_select_signed_in" on public.profiles for select to authenticated using (true);
+
+revoke select on public.profiles from anon, authenticated;
+grant select (id, display_name, avatar_url, level, gender, bio, created_at) on public.profiles to authenticated;
+
+-- 3. Hồ sơ đầy đủ của chính mình (bỏ các cột token cũ)
+create or replace function public.my_account() returns jsonb
+language sql stable security definer set search_path = public as $$
+  select to_jsonb(p) - 'strava_access_token' - 'strava_refresh_token' - 'strava_token_expires_at'
+    from public.profiles p where p.id = auth.uid()
+$$;
+revoke all on function public.my_account() from public, anon;
+grant execute on function public.my_account() to authenticated;
+
+-- 4. Khách chưa đăng nhập không đọc các bảng riêng tư (RLS vẫn là lớp chính cho người đã đăng nhập)
+revoke select on public.club_members, public.club_treasury_log, public.profile_settings,
+  public.ledger_entries, public.ledger_transactions, public.wallet_transactions from anon;
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -22340,7 +22378,13 @@ begin
         and to_regprocedure('public.knowledge_submit(jsonb)') is not null and to_regprocedure('public.admin_find_user_by_email(text)') is not null),
     jsonb_build_object('file', '20261001011800', 'label', 'Chỉnh sửa lần 4: Victory lấy đúng mục tiêu đăng ký, Victory Studio theo gói (VIP / CLB Pro / doanh nghiệp), Quản trị chính + phân quyền admin theo nhóm',
       'ok', to_regclass('public.admin_permissions') is not null and to_regprocedure('public.admin_set_permissions(uuid,text[],timestamptz,text)') is not null
-        and to_regprocedure('public.victory_access(text)') is not null and to_regprocedure('private.admin_set_owner(text,boolean)') is not null));
+        and to_regprocedure('public.victory_access(text)') is not null and to_regprocedure('private.admin_set_owner(text,boolean)') is not null),
+    jsonb_build_object('file', '20261001011900', 'label', 'Vá lộ dữ liệu: khách không đọc được hồ sơ; người khác chỉ thấy tên / ảnh / level; hồ sơ đầy đủ qua my_account()',
+      'ok', to_regprocedure('public.my_account()') is not null
+        and not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'profiles'
+                         and policyname in ('Allow public select profile', 'Public profiles are viewable by everyone'))
+        and not has_table_privilege('anon', 'public.profiles', 'SELECT')
+        and not has_column_privilege('authenticated', 'public.profiles', 'xu', 'SELECT')));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

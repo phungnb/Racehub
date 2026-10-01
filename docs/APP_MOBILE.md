@@ -49,15 +49,39 @@ App cài được dựng bằng **Capacitor**. Nó là một "vỏ" native mở 
 | Chính sách quyền riêng tư | bắt buộc (một trang trên web RaceHub) | bắt buộc |
 | Khai báo đặc biệt | Dịch vụ nền loại *location* (Android 14): điền form trong Play Console + video ngắn quay cảnh ghi bài chạy | Giải thích chế độ nền "location" khi gửi duyệt: ghi bài chạy lúc khóa màn hình |
 
-### Android: dựng bản phát hành
+### Android: dựng bản phát hành — làm hết trên GitHub, không cần máy tính
+**Bước 1 — tạo khóa ký (một lần duy nhất):**
+1. GitHub → repo → **Settings → Secrets and variables → Actions → New repository secret**:
+   `ANDROID_KEYSTORE_PASSWORD` = mật khẩu mạnh tự đặt (≥ 12 ký tự). Ghi lại mật khẩu này ở nơi an toàn.
+2. **Actions → "Android — tạo khóa ký (chạy 1 lần)" → Run workflow**, gõ `TAO-KHOA` → chạy.
+3. Mở lần chạy vừa xong → tải artifact **racehub-keystore** → giải nén:
+   - `keystore-base64.txt`: chép **toàn bộ** nội dung vào secret mới `ANDROID_KEYSTORE_BASE64`.
+   - `racehub-release.jks`: cất bản sao ở nơi an toàn (Drive cá nhân). Mất khóa + mật khẩu thì phải xin Google đặt lại khóa tải lên.
+4. Xoá lần chạy đó (nút ⋯ → Delete workflow run) để xoá artifact. Repo nên để **Private**.
+
+**Bước 2 — dựng bản phát hành (mỗi lần muốn cập nhật app):**
+**Actions → "Android — bản phát hành (Google Play)" → Run workflow** → nhập tên phiên bản (vd. `1.0.0`) → chạy.
+Tải artifact về được:
+- `racehub-….aab` → tải lên **Google Play Console** (kênh *Kiểm thử nội bộ* trước).
+- `racehub-….apk` → cài thẳng lên máy Android để thử bản đã ký.
+
+Số phiên bản tự tăng mỗi lần chạy (Google Play bắt buộc). Giao diện cập nhật qua web (Vercel) — chỉ dựng lại app khi đổi
+phần native (quyền, plugin, icon, tên miền `CAP_SERVER_URL`).
+
+**Dựng bằng máy tính (nếu có Android Studio):**
 ```bash
-npm ci
-npx cap sync android
-# Tạo khóa ký MỘT LẦN, cất kỹ file + mật khẩu. Mất khóa = không cập nhật được app.
-keytool -genkey -v -keystore racehub-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias racehub
-npx cap open android      # Android Studio → Build → Generate Signed App Bundle (.aab)
+npm ci && npx cap sync android
+ANDROID_KEYSTORE_PATH=/đường/dẫn/racehub-release.jks ANDROID_KEYSTORE_PASSWORD=... \
+  ANDROID_VERSION_CODE=2 ANDROID_VERSION_NAME=1.0.1 ./android/gradlew -p android bundleRelease
 ```
-Tải file `.aab` lên Play Console. Nên phát hành ở kênh **Kiểm thử nội bộ** trước.
+
+**Lần đầu trên Google Play Console:**
+1. Tạo app → tên "RaceHub", ngôn ngữ Tiếng Việt, loại *Ứng dụng*, *Miễn phí*.
+2. Bật **Play App Signing** (mặc định) → tải `.aab` lên kênh **Kiểm thử nội bộ** → thêm email người thử.
+3. Điền: Chính sách quyền riêng tư (`https://<tên miền>/privacy`), An toàn dữ liệu (vị trí, ảnh, tên/email, hoạt động thể dục),
+   Xoá tài khoản (link trang hướng dẫn xoá trong app), Phân loại nội dung, Đối tượng (13+).
+4. **Quyền vị trí nền / dịch vụ nền loại location**: điền form khai báo + quay video ngắn cảnh bấm Chạy → tắt màn hình → km vẫn tăng.
+5. Tài khoản cá nhân mới tạo: Google yêu cầu **kiểm thử kín ≥ 12 người trong 14 ngày** trước khi được lên Production.
 
 ### iOS: dựng trên Mac
 ```bash

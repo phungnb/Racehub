@@ -40,7 +40,14 @@ export const useSession = () => useContext(SessionContext)
 export const profileQueryKey = (uid: string | undefined) => ['profile', uid] as const
 
 async function fetchOrCreateProfile(uid: string): Promise<Profile> {
-  const read = () => supabase.from('profiles').select('*').eq('id', uid).maybeSingle<Profile>()
+  // Hồ sơ đầy đủ của chính mình qua RPC (011900: bảng profiles chỉ còn cột công khai); máy chủ chưa có RPC → đọc bảng như cũ
+  const read = async (): Promise<{ data: Profile | null; error: Error | null }> => {
+    const r = await supabase.rpc('my_account')
+    if (!r.error) return { data: (r.data as Profile | null) ?? null, error: null }
+    if (!/my_account|PGRST202|schema cache/i.test(`${r.error.message} ${r.error.code ?? ''}`)) return { data: null, error: r.error }
+    const t = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle<Profile>()
+    return { data: t.data, error: t.error }
+  }
   const { data, error } = await read()
   if (error) throw error
   if (data) return data
