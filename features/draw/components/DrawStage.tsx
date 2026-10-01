@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Expand, Gift, Lock, ShieldCheck, Trophy, UserX, Volume2, VolumeX, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, ConfirmSheet } from '@/shared/ui'
+import { Avatar, Button, ConfirmSheet, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { drawAbsent, drawErrorMessage, drawNext, finishDraw, listDraws, startDraw, type DrawScope, type DrawWinner, type LuckyDraw } from '../api/drawApi'
 import { latestWinner, nextPrize, prizeProgress, reelNames, spinDelays } from '../model/stage'
@@ -169,7 +169,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
 
       {/* Chọn giải */}
       {d.status !== 'READY' && (
-        <nav aria-label="Chọn giải" className="flex gap-2 overflow-x-auto px-4 pb-2">
+        <nav aria-label="Chọn giải"><ScrollRow innerClassName="gap-2 px-4 pb-2">
           {progress.map((p) => (
             <button key={p.idx} type="button" disabled={!manage || p.left === 0 || phase === 'spinning'} onClick={() => setPrize(p.idx)} aria-pressed={cur === p.idx}
               className={cn('shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold transition',
@@ -177,7 +177,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
               {p.name} <span className="font-mono text-xs opacity-80">{p.won}/{p.qty}</span>
             </button>
           ))}
-        </nav>
+        </ScrollRow></nav>
       )}
 
       <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-5 px-4 text-center">

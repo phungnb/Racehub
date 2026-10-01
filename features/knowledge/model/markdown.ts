@@ -34,10 +34,10 @@ export function slugify(s: string) {
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80)
 }
 
-/** Chỉ link an toàn: http(s), mailto, hoặc đường dẫn nội bộ "/…" (không "//") */
+/** Chỉ link an toàn: http(s), mailto, tel (chỉ số), hoặc đường dẫn nội bộ "/…" (không "//") */
 export function safeHref(href: string): string | null {
   const h = href.trim()
-  if (/^https?:\/\//i.test(h) || /^mailto:/i.test(h)) return h
+  if (/^https?:\/\//i.test(h) || /^mailto:/i.test(h) || /^tel:\+?[0-9]{6,15}$/i.test(h)) return h
   if (h.startsWith('/') && !h.startsWith('//') && !h.startsWith('/\\')) return h
   return null
 }

@@ -161,13 +161,13 @@ function Editor({ initial, preset, site, onClose }: { initial: HelpAdminPage | n
         <SegmentedControl value={mode} onChange={setMode} options={[{ value: 'edit', label: 'Soạn' }, { value: 'preview', label: 'Xem trước' }]} />
         {mode === 'edit' ? (
           <>
-            <p className="text-xs text-fg-muted">Markdown: <code>## Tiêu đề</code>, <code>- danh sách</code>, <code>**đậm**</code>, <code>[chữ](/help/…)</code>, <code>&gt; ghi chú</code>. Thông tin pháp nhân: <code>{'{{support_email}}'}</code>…</p>
+            <p className="text-xs text-fg-muted">Markdown: <code>## Tiêu đề</code>, <code>- danh sách</code>, <code>**đậm**</code>, <code>[chữ](/help/…)</code>, <code>&gt; ghi chú</code>. Thông tin pháp nhân: <code>{'{{support_email}}'}</code>… Nút bấm liên hệ: <code>{'{{zalo_link}}'}</code>, <code>{'{{telegram_link}}'}</code>, <code>{'{{phone_link}}'}</code>, <code>{'{{email_link}}'}</code>.</p>
             <Textarea value={f.body} onChange={(e) => set('body', e.target.value)} rows={18} maxLength={60000} className="font-mono text-sm" aria-label="Nội dung trang" />
           </>
         ) : <div className={cn('min-h-40', !f.body && 'text-fg-subtle')}>{f.body ? <Markdown blocks={blocks} /> : 'Chưa có nội dung'}</div>}
       </Card>
-      <div className="fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl gap-2">
+      <div className="fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-md border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
+        <div className="flex gap-2">
           <Button loading={save.isPending} disabled={f.title.trim().length < 2 || !f.slug.trim()} onClick={() => save.mutate()}>Lưu trang</Button>
           <Button variant="secondary" onClick={onClose}>Huỷ</Button>
           {initial && <Button variant="ghost" className="ml-auto text-danger" aria-label="Xoá trang" onClick={() => setConfirmDel(true)}><Trash2 className="size-4" aria-hidden /></Button>}

@@ -7,6 +7,13 @@ describe('menu Hướng dẫn & Chính sách', () => {
     expect(out).toBe('Email: hotro@racehub.vn · MST *đang cập nhật* · {{la}}')
   })
 
+  it('mã chèn link liên hệ thành link bấm được; chưa nhập → "đang cập nhật"', () => {
+    const out = fillSiteInfo('{{zalo_link}} | {{telegram_link}} | {{phone_link}} | {{email_link}}',
+      { support_zalo: '0909 123 456', support_telegram: '@racehub_vn', support_phone: '0909123456' })
+    expect(out).toBe('[Nhắn Zalo: 0909 123 456](https://zalo.me/0909123456) | [Nhắn Telegram: @racehub_vn](https://t.me/racehub_vn)'
+      + ' | [Gọi điện: 0909123456](tel:0909123456) | *đang cập nhật*')
+  })
+
   it('Điều khoản + Quyền riêng tư luôn đứng đầu nhóm Chính sách', () => {
     const g = groupMenu([
       { slug: 'bat-dau', section: 'GUIDE', title: 'Bắt đầu', icon: null, summary: null },

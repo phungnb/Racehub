@@ -48,11 +48,25 @@ export const featuredMenu = (pages: HelpMenuItem[]) => FEATURED.map((f) => ({ ..
 
 export const MISSING = 'đang cập nhật'
 
-/** Thay {{khoá}} bằng thông tin pháp nhân; khoá chưa nhập → "đang cập nhật", khoá lạ giữ nguyên để admin thấy gõ sai */
+/** Mã chèn link bấm được: {{zalo_link}} → [Nhắn Zalo](https://zalo.me/…), tương tự Telegram / gọi điện / email */
+export const LINK_KEYS = [
+  { key: 'zalo_link', kind: 'zalo', text: 'Nhắn Zalo' },
+  { key: 'telegram_link', kind: 'telegram', text: 'Nhắn Telegram' },
+  { key: 'phone_link', kind: 'phone', text: 'Gọi điện' },
+  { key: 'email_link', kind: 'email', text: 'Gửi email' },
+] as const
+
+/** Thay {{khoá}} bằng thông tin pháp nhân / link liên hệ; khoá chưa nhập → "đang cập nhật", khoá lạ giữ nguyên để admin thấy gõ sai */
 export function fillSiteInfo(body: string, site: SiteInfo): string {
   const known = new Set<string>(SITE_KEYS.map((k) => k.key))
-  return body.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, (all, key: string) =>
-    known.has(key) ? (site[key as SiteKey]?.trim() || `*${MISSING}*`) : all)
+  const links = contactLinks(site)
+  return body.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, (all, key: string) => {
+    if (known.has(key)) return site[key as SiteKey]?.trim() || `*${MISSING}*`
+    const lk = LINK_KEYS.find((k) => k.key === key)
+    if (!lk) return all
+    const l = links.find((x) => x.kind === lk.kind)
+    return l ? `[${lk.text}: ${l.value}](${l.href})` : `*${MISSING}*`
+  })
 }
 
 /** Nhóm các trang theo mục, thêm trang pháp lý tĩnh vào đầu nhóm Chính sách */

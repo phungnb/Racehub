@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Coins, Pencil, Plus, Search, Shirt, Users } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Card, EmptyState, ErrorState, Input, SegmentedControl, Skeleton } from '@/shared/ui'
+import { Button, Card, EmptyState, ErrorState, Input, SegmentedControl, Skeleton, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { matchesSearch } from '@/shared/lib/search'
 import { formatCoin } from '@/shared/lib/format'
@@ -79,7 +79,7 @@ function ItemsPane() {
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" aria-hidden />
         <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm theo tên hoặc mã" className="pl-9" aria-label="Tìm vật phẩm" />
       </div>
-      <nav className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]" aria-label="Lọc vật phẩm">
+      <nav aria-label="Lọc vật phẩm" className="-mx-4"><ScrollRow innerClassName="gap-1.5 px-4 pb-1">
         {[{ key: 'all' as Filter, label: 'Đang bán' }, ...slots.map((s) => ({ key: s.slot as Filter, label: s.label })),
           { key: 'draft' as Filter, label: `Nháp · ${count('draft')}` }, { key: 'archived' as Filter, label: 'Ngừng bán' }, { key: 'retired' as Filter, label: 'Gỡ hẳn' }].map((f) => (
           <button key={f.key} onClick={() => setFilter(f.key)} aria-pressed={filter === f.key}
@@ -88,7 +88,7 @@ function ItemsPane() {
             {f.label}
           </button>
         ))}
-      </nav>
+      </ScrollRow></nav>
 
       {q.isPending ? (
         <div className="space-y-2">{[0, 1, 2, 3].map((k) => <Skeleton key={k} className="h-16" />)}</div>

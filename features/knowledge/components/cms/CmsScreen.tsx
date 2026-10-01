@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BadgeCheck, BarChart3, FileText, PenSquare, Plus, Search, ShieldCheck, UserPlus, Users } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, BarChart, Button, Card, EmptyState, ErrorState, Field, Input, SegmentedControl, Sheet, Skeleton, StatTile, SwitchRow, Textarea } from '@/shared/ui'
+import { Avatar, BarChart, Button, Card, EmptyState, ErrorState, Field, Input, SegmentedControl, Sheet, Skeleton, StatTile, SwitchRow, Textarea, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { supabase } from '@/shared/lib/supabase'
 import {
@@ -65,7 +65,7 @@ function Articles({ meta, onOpen }: { meta: CmsMeta; onOpen: (id: string) => voi
   const catName = (id: string) => meta.categories.find((c) => c.id === id)?.name ?? id
   return (
     <div className="space-y-3">
-      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+      <ScrollRow className="-mx-4" innerClassName="gap-1.5 px-4 pb-1">
         {FILTERS.map((f) => {
           const n = f.count?.(meta)
           return (
@@ -75,7 +75,7 @@ function Articles({ meta, onOpen }: { meta: CmsMeta; onOpen: (id: string) => voi
             </button>
           )
         })}
-      </div>
+      </ScrollRow>
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" aria-hidden />

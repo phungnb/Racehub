@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { ScrollText } from 'lucide-react'
-import { Button, Card, EmptyState, ErrorState, Skeleton } from '@/shared/ui'
+import { Button, Card, EmptyState, ErrorState, Skeleton, ScrollRow } from '@/shared/ui'
 import { adminAuditList, AUDIT_LABEL, auditLabel } from '../../api/consoleApi'
 
 const GROUPS: { value: string; label: string }[] = [
@@ -24,12 +24,12 @@ export function AuditTab() {
   const rows = q.data?.pages.flat() ?? []
   return (
     <div className="space-y-3">
-      <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+      <ScrollRow innerClassName="gap-1.5 pb-1">
         {GROUPS.map((g) => (
           <button key={g.value} type="button" aria-pressed={action === g.value} onClick={() => setAction(g.value)}
             className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold ${action === g.value ? 'border-brand bg-brand text-brand-fg' : 'border-border text-fg-muted'}`}>{g.label}</button>
         ))}
-      </div>
+      </ScrollRow>
       {q.isPending ? <Skeleton className="h-60" /> : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} />
         : !rows.length ? <EmptyState icon={ScrollText} title="Chưa có nhật ký" description="Mọi thao tác quản trị sẽ được ghi lại ở đây." />
         : (

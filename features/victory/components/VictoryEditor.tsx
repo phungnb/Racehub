@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Camera, Check, Download, Lock, Megaphone, RotateCcw, Search, Share2, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Input, PageHeader, Sheet, Skeleton, SwitchRow, useImageSaver } from '@/shared/ui'
+import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Input, PageHeader, Sheet, Skeleton, SwitchRow, useImageSaver, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import { matchesSearch } from '@/shared/lib/search'
@@ -154,12 +154,12 @@ function Designer({ facts: f, user, onChangePerson }: { facts: VicFacts; user: s
 
       {/* Mẫu */}
       <Section title="Mẫu">
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+        <ScrollRow className="-mx-1" innerClassName="gap-1.5 px-1 pb-1">
           {(['ALL', ...Object.keys(VIC_STYLES)] as (VicStyle | 'ALL')[]).map((s) => (
             <Chip key={s} on={style === s} onClick={() => setStyle(s)}>{s === 'ALL' ? 'Tất cả' : VIC_STYLES[s]}</Chip>
           ))}
-        </div>
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+        </ScrollRow>
+        <ScrollRow className="-mx-1" innerClassName="gap-2 px-1 pb-1">
           {templates.map((t) => {
             const d = VIC_TEMPLATES[t]
             return (
@@ -174,7 +174,7 @@ function Designer({ facts: f, user, onChangePerson }: { facts: VicFacts; user: s
               </button>
             )
           })}
-        </div>
+        </ScrollRow>
       </Section>
 
       {/* Khổ ảnh */}

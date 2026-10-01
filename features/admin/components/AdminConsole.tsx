@@ -3,7 +3,7 @@
 import { useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { Activity, Fingerprint, BookOpen, Link2, LifeBuoy, ShieldAlert, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, Building2, FlaskConical, SlidersHorizontal, ShieldCheck, Lock, type LucideIcon } from 'lucide-react'
-import { ErrorState, Skeleton } from '@/shared/ui'
+import { ErrorState, ScrollRow, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { adminErrorMessage } from '../api/adminApi'
 import { useEconomyOverview } from '../hooks/useAdmin'
@@ -103,7 +103,7 @@ export function AdminConsole() {
         <p className="text-sm text-fg-muted">Người dùng, cộng đồng, bán hàng, kinh tế Xu và sức khỏe hệ thống — mọi thao tác đều được ghi nhật ký.</p>
       </div>
       <nav className="space-y-2" aria-label="Khu vực quản trị">
-        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]" role="tablist" aria-label="Nhóm">
+        <ScrollRow className="-mx-4" innerClassName="gap-1.5 px-4 pb-1" role="tablist" label="Nhóm" activeKey={group.id}>
           {groups.map((g) => {
             const n = g.tabs.reduce((a, t) => a + count(t.badge), 0)
             return (
@@ -115,7 +115,7 @@ export function AdminConsole() {
               </button>
             )
           })}
-        </div>
+        </ScrollRow>
         {group.tabs.length > 1 && (
           <div className="flex flex-wrap gap-1.5" role="tablist" aria-label={group.label}>
             {group.tabs.map((t) => (

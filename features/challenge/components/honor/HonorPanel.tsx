@@ -5,7 +5,7 @@ import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Camera, Crown, Download, EyeOff, Eye, Megaphone, Palette, Settings2, Trophy, Undo2, UserSquare2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Skeleton, useImageSaver } from '@/shared/ui'
+import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Skeleton, useImageSaver, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import { useMyProfile } from '@/features/auth'
@@ -60,14 +60,14 @@ export function HonorPanel({ d, participants }: { d: ChallengeDetail; participan
       {mine.length > 0 && h.status === 'PUBLISHED' && <MyHonor h={h} d={d} ctx={ctx} mine={mine} />}
 
       {cats.length > 1 && (
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+        <ScrollRow className="-mx-1" innerClassName="gap-1.5 px-1 pb-1">
           {cats.map((c) => (
             <button key={c.key} type="button" aria-pressed={active?.key === c.key} onClick={() => setCat(c.key)}
               className={cn('shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold', active?.key === c.key ? 'border-brand bg-brand text-brand-fg' : 'border-border text-fg-muted')}>
               {c.title}
             </button>
           ))}
-        </div>
+        </ScrollRow>
       )}
       {active && (
         <>

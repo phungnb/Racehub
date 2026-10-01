@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ChevronRight, Coins, Gift, Lock, RotateCcw, Shirt, Sparkles, Timer, UserRound, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, ConfirmSheet, ErrorState, Skeleton } from '@/shared/ui'
+import { Button, ConfirmSheet, ErrorState, Skeleton, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
@@ -141,7 +141,7 @@ function Editor({ state }: { state: CharacterState }) {
           </Link>
         </div>
 
-        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none]" role="radiogroup" aria-label="Dáng nhân vật">
+        <ScrollRow className="-mx-4" innerClassName="gap-1.5 px-4" role="radiogroup" aria-label="Dáng nhân vật">
           {bodiesFor(gender).map((b) => (
             <button key={b} type="button" role="radio" aria-checked={body === b} onClick={() => setBody(b)}
               className={cn('flex shrink-0 items-center gap-1.5 rounded-full border py-1 pl-1 pr-3 text-xs font-semibold',
@@ -151,9 +151,9 @@ function Editor({ state }: { state: CharacterState }) {
               {BODIES[b].label}
             </button>
           ))}
-        </div>
+        </ScrollRow>
 
-        <nav role="tablist" aria-label="Ô trang phục" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+        <nav role="tablist" aria-label="Ô trang phục" className="-mx-4"><ScrollRow innerClassName="gap-2 px-4 pb-1">
           {tabs.map((t) => (
             <button key={t.slot} role="tab" aria-selected={tab === t.slot} onClick={() => setTab(t.slot)}
               className={cn('flex shrink-0 items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold',
@@ -161,7 +161,7 @@ function Editor({ state }: { state: CharacterState }) {
               <t.icon className="size-4" aria-hidden />{t.label}
             </button>
           ))}
-        </nav>
+        </ScrollRow></nav>
       </div>
 
       {state.gender_set === false && <GenderNudge />}
@@ -207,7 +207,7 @@ function Editor({ state }: { state: CharacterState }) {
       ))}
 
       {collections.length > 0 && (
-        <div role="group" aria-label="Bộ sưu tập" className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
+        <ScrollRow className="-mx-4" innerClassName="gap-2 px-4" role="group" aria-label="Bộ sưu tập">
           {[{ code: null as string | null, name: 'Tất cả' }, ...collections].map((c) => (
             <button key={c.code ?? 'all'} type="button" aria-pressed={col === c.code} onClick={() => setCol(c.code)}
               className={cn('shrink-0 rounded-full border px-3 py-1 text-xs font-semibold',
@@ -215,7 +215,7 @@ function Editor({ state }: { state: CharacterState }) {
               {c.name}
             </button>
           ))}
-        </div>
+        </ScrollRow>
       )}
 
       {body !== gender && list.some((i) => i.render_kind === 'LAYER' && !layerUrl(i, body)) && (

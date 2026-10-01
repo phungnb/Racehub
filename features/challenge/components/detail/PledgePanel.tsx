@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Check, Flag, Lock, Scale, Shuffle, Trophy } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, Input, RankSearch, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
+import { Avatar, Button, Card, Input, RankSearch, SectionTitle, Sheet, Skeleton, ScrollRow } from '@/shared/ui'
 import { filterSearch } from '@/shared/lib/search'
 import { DoneFilter, useDoneFilter } from './DoneFilter'
 import { cn } from '@/shared/lib/cn'
@@ -263,14 +263,14 @@ function PledgeRanking({ board, team, teamsById, onPick, options }: {
     <section className="space-y-2">
       <SectionTitle>Theo % mục tiêu</SectionTitle>
       {!team && levels.length > 1 && levels.length <= 12 && (
-        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]" role="radiogroup" aria-label="Lọc theo mục tiêu">
+        <ScrollRow innerClassName="gap-2 pb-1" role="radiogroup" aria-label="Lọc theo mục tiêu">
           {[null, ...levels].map((v) => (
             <button key={String(v)} type="button" role="radio" aria-checked={target === v} onClick={() => setTarget(v)}
               className={cn('min-h-9 shrink-0 rounded-full border px-3 text-sm font-medium', target === v ? 'border-fg bg-surface-2' : 'border-border text-fg-muted')}>
               {v === null ? 'Tất cả mục tiêu' : `${formatNumber(v)} km · ${board.members.filter((m) => m.pledge_km === v).length}`}
             </button>
           ))}
-        </div>
+        </ScrollRow>
       )}
       <DoneFilter mode={doneMode} onChange={setDoneMode} ended={false} total={all.length} done={all.filter((x) => x.m.completed).length} />
       {ranked.length > 5 && <RankSearch value={q} onChange={setQ} total={ranked.length} matched={list.length} />}

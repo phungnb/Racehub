@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { ChevronDown, ChevronRight, GraduationCap, Newspaper } from 'lucide-react'
-import { Card, Skeleton } from '@/shared/ui'
+import { Card, Skeleton, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { useStoredFlag } from '@/shared/lib/useStoredFlag'
 import { routes } from '@/shared/config/routes'
@@ -37,7 +37,7 @@ export function KnowledgeHomeSection() {
         <Link href={routes.learn} className="inline-flex min-h-11 shrink-0 items-center gap-0.5 text-sm font-semibold text-brand">Tất cả<ChevronRight className="size-4" aria-hidden /></Link>
       </div>
 
-      <nav aria-label="Chuyên mục" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+      <nav aria-label="Chuyên mục" className="-mx-4"><ScrollRow innerClassName="gap-2 px-4 pb-1">
         {chips.map((c) => {
           const Icon = categoryIcon(c.icon)
           return (
@@ -47,7 +47,7 @@ export function KnowledgeHomeSection() {
             </Link>
           )
         })}
-      </nav>
+      </ScrollRow></nav>
 
       {open && series && (
         <Link href={series.next_slug ? routes.learnArticle(series.next_slug) : routes.learn}

@@ -282,8 +282,8 @@ function Editor({ initial, meta, onClose }: { initial: CmsArticle | null; meta: 
       )}
 
       {/* Thanh thao tác: nằm trên thanh tab dưới cùng (z-50, cao 3.5rem) — trước đây bị thanh tab che mất các nút Duyệt / Đăng */}
-      <div className="fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-40 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl flex-wrap gap-2">
+      <div className="fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-md border-t border-border bg-bg/95 px-4 py-3 backdrop-blur">
+        <div className="flex flex-wrap gap-2">
           <Button variant="secondary" loading={save.isPending && !sheet} disabled={locked} onClick={() => void saveThen()}>Lưu</Button>
           {expert && needsExpert && !reviewed && id && (
             <>
