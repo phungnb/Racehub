@@ -7,7 +7,7 @@ import { NativeAuthBridge, SessionProvider } from '@/features/auth'
 import { PwaBoot } from '@/features/pwa'
 import { SystemNoticeBanner } from '@/features/system'
 import { describeError, shouldRetry } from '@/shared/lib/errors'
-import { noteRequestFailure, noteRequestSuccess } from '@/shared/lib/connection'
+import { isResumeNoise, noteRequestFailure, noteRequestSuccess } from '@/shared/lib/connection'
 import { reportError } from '@/shared/lib/reportError'
 
 /**
@@ -27,7 +27,7 @@ function makeQueryClient() {
     queryCache: new QueryCache({
       onError: (e, query) => {
         const d = track(e)
-        if (query.state.data !== undefined && d.kind !== 'OFFLINE') {
+        if (query.state.data !== undefined && d.kind !== 'OFFLINE' && !isResumeNoise()) {
           toast.warning(d.title, { id: `refresh-${d.kind}`, description: 'Đang hiện dữ liệu đã tải trước đó. ' + d.message })
         }
       },
