@@ -5,7 +5,7 @@ import { routes } from '@/shared/config/routes'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Crown, Trophy } from 'lucide-react'
-import { Avatar, EmptyState, ErrorState, LevelBadge, RankSearch, scrollToRow, SegmentedControl, Skeleton } from '@/shared/ui'
+import { Avatar, EmptyState, ErrorState, LevelBadge, RankSearch, ScrollRow, scrollToRow, SegmentedControl, Skeleton } from '@/shared/ui'
 import { filterSearch } from '@/shared/lib/search'
 import { cn } from '@/shared/lib/cn'
 import { formatDuration, formatKm } from '@/shared/lib/format'
@@ -40,7 +40,7 @@ export function ClubLeaderboardScreen({ clubId }: { clubId: string }) {
   const { isStaff } = useClub(clubId)
   return (
     <div className="space-y-4">
-      <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]" role="tablist" aria-label="Bảng xếp hạng">
+      <ScrollRow role="tablist" label="Bảng xếp hạng" activeKey={view} innerClassName="gap-1.5">
         {VIEWS.map((v) => (
           <button key={v.value} role="tab" aria-selected={view === v.value} onClick={() => setView(v.value)}
             className={cn('shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-semibold',
@@ -48,7 +48,7 @@ export function ClubLeaderboardScreen({ clubId }: { clubId: string }) {
             {v.label}
           </button>
         ))}
-      </div>
+      </ScrollRow>
       {view === 'points' ? <ClubPoints clubId={clubId} />
         : view === 'battles' ? <ClubBattles clubId={clubId} isStaff={isStaff} />
         : view === 'clubs' ? <ClubRankings clubId={clubId} />

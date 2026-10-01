@@ -2,17 +2,18 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Clock, Lock, Settings, ShieldOff, Users } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Clock, Lock, Search, Settings, ShieldOff, Users } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Card, ErrorState, Skeleton } from '@/shared/ui'
+import { Avatar, Button, Card, ErrorState, Input, LevelBadge, ScrollRow, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
-import { clubErrorMessage, joinClub, leaveClub } from '../../api/clubApi'
+import { matchesSearch } from '@/shared/lib/search'
+import { clubErrorMessage, joinClub, leaveClub, type ClubMember } from '../../api/clubApi'
 import { CLUB_THEMES, isProActive } from '../../model/theme'
-import { accentOf, JOIN_POLICY_LABEL } from '../../model/roles'
+import { accentOf, clubRank, JOIN_POLICY_LABEL, ROLE_LABEL } from '../../model/roles'
 import { useClub, useClubInbox, useClubMembers } from '../../hooks/useClub'
 import { clubKeys } from '../../hooks/keys'
 import { ClubAvatar } from './ClubAvatar'
@@ -22,7 +23,8 @@ export function ClubShell({ clubId, children }: { clubId: string; children: Reac
   const pathname = usePathname()
   const { club, membership, isMember, isStaff, isRealMember, isAdmin, isLoading, isError, error, refetch } = useClub(clubId)
   const inbox = useClubInbox()
-  const members = useClubMembers(clubId, isStaff)
+  const members = useClubMembers(clubId, isMember)
+  const [showMembers, setShowMembers] = useState(false)
   const unread = inbox.data?.find((c) => c.club_id === clubId)?.unread_count ?? 0
   const pending = isStaff ? (members.data ?? []).filter((m) => m.status === 'PENDING').length : 0
 
@@ -80,18 +82,28 @@ export function ClubShell({ clubId, children }: { clubId: string; children: Reac
               {pro && <span className="shrink-0 rounded-full bg-gradient-to-r from-coin to-amber-300 px-2 py-0.5 text-[11px] font-black text-bg shadow">✦ PRO</span>}
             </h1>
             {pro && club.tagline && <p className={cn('mt-0.5 text-sm font-medium italic', club.cover_url || theme ? 'text-white/90 drop-shadow' : 'text-fg-muted')}>“{club.tagline}”</p>}
-            <p className={cn('mt-1 flex items-center gap-1.5 text-sm', pro && (club.cover_url || theme) ? 'text-white/80' : 'text-fg-muted')}>
-              <Users className="size-4" aria-hidden />
-              <span className="font-mono tabular">{formatNumber(club.member_count)}</span> thành viên
-            </p>
+            {isMember ? (
+              <button type="button" onClick={() => setShowMembers(true)} aria-haspopup="dialog"
+                className={cn('-ml-2 mt-0.5 flex min-h-9 items-center gap-1.5 rounded-full px-2 text-sm underline-offset-4 hover:underline',
+                  pro && (club.cover_url || theme) ? 'text-white/85 hover:bg-black/20' : 'text-fg-muted hover:bg-surface-2 hover:text-fg')}>
+                <Users className="size-4" aria-hidden />
+                <span className="font-mono tabular">{formatNumber(club.member_count)}</span> thành viên
+                <ChevronRight className="size-4" aria-hidden />
+              </button>
+            ) : (
+              <p className={cn('mt-1 flex items-center gap-1.5 text-sm', pro && (club.cover_url || theme) ? 'text-white/80' : 'text-fg-muted')}>
+                <Users className="size-4" aria-hidden />
+                <span className="font-mono tabular">{formatNumber(club.member_count)}</span> thành viên
+              </p>
+            )}
           </div>
         </div>
       </header>
 
       {isMember ? (
         <>
-          <nav aria-label="Các mục của CLB"
-            className="sticky top-[var(--topbar-h)] z-30 flex gap-0.5 overflow-x-auto border-b border-border bg-bg/95 px-2 backdrop-blur-md scrollbar-none [mask-image:linear-gradient(to_right,black_88%,transparent)]">
+          <nav aria-label="Các mục của CLB" className="sticky top-[var(--topbar-h)] z-30 border-b border-border bg-bg/95 backdrop-blur-md">
+            <ScrollRow activeKey={pathname} innerClassName="gap-0.5 px-2">
             {tabs.map((t) => {
               const active = t.href === base ? pathname === base : pathname.startsWith(t.href)
               return (
@@ -108,15 +120,62 @@ export function ClubShell({ clubId, children }: { clubId: string; children: Reac
                 </Link>
               )
             })}
+            </ScrollRow>
           </nav>
           {/* Admin hệ thống xem hộ (toàn quyền, 007100) nhưng chưa là thành viên thật: vẫn cho tham gia như runner */}
           {isAdmin && !isRealMember && <AdminJoinBar clubId={clubId} status={membership?.status ?? null} />}
           <div className="px-4 pt-4">{children}</div>
+          <MembersSheet open={showMembers} onClose={() => setShowMembers(false)} members={members.data ?? []}
+            loading={members.isLoading} total={club.member_count} manageHref={`${base}/members`} />
         </>
       ) : (
         <div className="px-4 pt-4"><JoinGate clubId={clubId} status={membership?.status ?? null} /></div>
       )}
     </div>
+  )
+}
+
+/** Bấm "N thành viên" ở đầu trang CLB: danh sách thành viên (ban quản trị lên đầu), tìm nhanh, bấm để xem hồ sơ. */
+function MembersSheet({ open, onClose, members, loading, total, manageHref }: {
+  open: boolean; onClose: () => void; members: ClubMember[]; loading: boolean; total: number; manageHref: string
+}) {
+  const [q, setQ] = useState('')
+  const approved = members
+    .filter((m) => m.status === 'APPROVED')
+    .sort((a, b) => clubRank(b.role) - clubRank(a.role) || (a.profile?.display_name ?? '').localeCompare(b.profile?.display_name ?? '', 'vi'))
+  const shown = q.trim() ? approved.filter((m) => matchesSearch(q, m.profile?.display_name)) : approved
+  return (
+    <Sheet open={open} onClose={onClose} title={`Thành viên (${formatNumber(total)})`}
+      footer={<Link href={manageHref} onClick={onClose} className="flex min-h-11 items-center justify-center gap-1 rounded-xl bg-surface-2 text-sm font-semibold hover:text-fg">
+        Mở tab Thành viên <ChevronRight className="size-4" aria-hidden />
+      </Link>}>
+      {approved.length > 8 && (
+        <div className="relative mb-3">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" aria-hidden />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm thành viên…" className="pl-9" aria-label="Tìm thành viên" />
+        </div>
+      )}
+      {loading ? (
+        <div className="space-y-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-12" />)}</div>
+      ) : shown.length === 0 ? (
+        <p className="py-6 text-center text-sm text-fg-muted">{q.trim() ? 'Không tìm thấy thành viên.' : 'Chưa có thành viên.'}</p>
+      ) : (
+        <ul className="max-h-[60vh] divide-y divide-border overflow-y-auto overscroll-contain">
+          {shown.map((m) => (
+            <li key={m.id}>
+              <Link href={routes.athlete(m.user_id)} onClick={onClose} className="flex min-h-14 items-center gap-3 py-2 hover:bg-surface-2/50">
+                <Avatar src={m.profile?.avatar_url} name={m.profile?.display_name} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{m.profile?.display_name ?? 'Runner'}</span>
+                  {m.role !== 'MEMBER' && <span className="text-xs font-semibold text-brand">{ROLE_LABEL[m.role]}</span>}
+                </span>
+                <LevelBadge level={m.profile?.level} />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Sheet>
   )
 }
 
