@@ -12,7 +12,7 @@ import {
   type AthleteProfileData,
 } from '../api/athleteApi'
 import { FormChip, GiftWall, useGiftWall } from '@/features/game'
-import { ShineBadge } from '@/shared/ui'
+import { ImageViewer, ShineBadge } from '@/shared/ui'
 import { FollowPanel } from '@/features/social'
 import ActivityHistory from './ActivityHistory'
 
@@ -75,6 +75,7 @@ const PERIODS: [Period, string][] = [
 
 export default function AthleteProfile({ userId, onClose }: Props) {
   const [period, setPeriod] = useState<Period>('month')
+  const [viewAvatar, setViewAvatar] = useState(false)
   // Bậc Tỏa sáng (khung ảnh đại diện) lấy từ tường quà
   const wall = useGiftWall(userId)
   const shine = wall.data?.tier ?? 0
@@ -124,9 +125,14 @@ export default function AthleteProfile({ userId, onClose }: Props) {
               {/* Danh tính */}
               <div className="text-center space-y-2">
                 <div className="flex justify-center">
-                  {shine > 0
-                    ? <span className={`shine-frame shine-t${Math.min(4, shine)}`}><span className="shine-inner"><AthleteAvatar name={name} url={data.avatar_url} size={88} /></span></span>
-                    : <AthleteAvatar name={name} url={data.avatar_url} size={88} />}
+                  {/* Chạm ảnh đại diện → xem ảnh lớn */}
+                  <button type="button" disabled={!data.avatar_url} onClick={() => setViewAvatar(true)}
+                    aria-label={data.avatar_url ? `Xem ảnh đại diện của ${name}` : undefined} className="rounded-full disabled:cursor-default">
+                    {shine > 0
+                      ? <span className={`shine-frame shine-t${Math.min(4, shine)}`}><span className="shine-inner"><AthleteAvatar name={name} url={data.avatar_url} size={88} /></span></span>
+                      : <AthleteAvatar name={name} url={data.avatar_url} size={88} />}
+                  </button>
+                  <ImageViewer src={viewAvatar ? data.avatar_url ?? null : null} alt={`Ảnh đại diện của ${name}`} onClose={() => setViewAvatar(false)} />
                 </div>
                 {shine > 0 && <div className="flex justify-center"><ShineBadge tier={shine} /></div>}
                 <h3 className="text-lg font-black text-white">{name}</h3>
