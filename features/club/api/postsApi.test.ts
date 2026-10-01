@@ -9,7 +9,7 @@ function builder(table: string) {
   calls.push(rec)
   const b: Record<string, unknown> = {}
   for (const m of ['select', 'eq', 'in', 'lt', 'order', 'limit']) b[m] = (...a: unknown[]) => { rec.ops.push([m, ...a]); return b }
-  b.then = (ok: (r: Res) => unknown) => Promise.resolve(queue.shift()).then(ok)
+  b.then = (ok: (r: Res) => unknown) => Promise.resolve(queue.shift() as Res).then(ok)
   return b
 }
 vi.mock('@/shared/lib/supabase', () => ({ supabase: { from: (t: string) => builder(t) } }))
