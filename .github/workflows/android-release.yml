@@ -1,0 +1,59 @@
+name: Android — bản phát hành (Google Play)
+
+# Dựng bản phát hành ĐÃ KÝ:
+#   • racehub-<phiên bản>.aab — tải lên Google Play Console
+#   • racehub-<phiên bản>.apk — cài thẳng lên máy Android để thử
+# Cần các secret: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD (tạo bằng workflow "Android — tạo khóa ký").
+# Số phiên bản (versionCode) tự tăng theo số lần chạy — Google Play yêu cầu mỗi lần tải lên phải lớn hơn lần trước.
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Tên phiên bản hiển thị cho người dùng (vd. 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+env:
+  CAP_SERVER_URL: ${{ vars.CAP_SERVER_URL || 'https://racehub-iota.vercel.app' }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      - run: npx cap sync android
+      - name: Giải mã khóa ký
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KS" ]; then echo "::error::Chưa có secret ANDROID_KEYSTORE_BASE64 — chạy workflow 'Android — tạo khóa ký' trước"; exit 1; fi
+          echo "$KS" | base64 -d > "$RUNNER_TEMP/racehub-release.jks"
+      - name: Dựng .aab + .apk đã ký
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/racehub-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+          ANDROID_VERSION_NAME: ${{ inputs.version_name }}
+        run: ./gradlew bundleRelease assembleRelease --no-daemon
+      - name: Đặt tên file
+        run: |
+          mkdir dist
+          cp android/app/build/outputs/bundle/release/app-release.aab "dist/racehub-${{ inputs.version_name }}-${{ github.run_number }}.aab"
+          cp android/app/build/outputs/apk/release/app-release.apk "dist/racehub-${{ inputs.version_name }}-${{ github.run_number }}.apk"
+          rm -f "$RUNNER_TEMP/racehub-release.jks"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: racehub-android-${{ inputs.version_name }}-${{ github.run_number }}
+          path: dist/
+          retention-days: 30
