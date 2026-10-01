@@ -4,7 +4,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 // không làm được — trước hết là ghi GPS khi tắt màn hình / bỏ túi (plugin background-geolocation).
 // Cập nhật giao diện chỉ cần deploy web như thường; chỉ phải nộp lại app khi đổi phần native (plugin, quyền, icon).
 // Xem docs/APP_MOBILE.md.
-const serverUrl = process.env.CAP_SERVER_URL || 'https://racehub-iota.vercel.app'
+const serverUrl = process.env.CAP_SERVER_URL || 'https://racehubrun.com'
 
 const config: CapacitorConfig = {
   // Mã định danh app trên cửa hàng — KHÔNG đổi được sau khi đã nộp lần đầu
@@ -17,7 +17,7 @@ const config: CapacitorConfig = {
   server: {
     url: serverUrl,
     // Các trang được mở ngay trong app (đăng nhập Strava / Supabase); trang ngoài danh sách mở bằng trình duyệt
-    allowNavigation: [new URL(serverUrl).host, 'www.strava.com', 'strava.com', '*.supabase.co'],
+    allowNavigation: [new URL(serverUrl).host, 'www.racehubrun.com', 'www.strava.com', 'strava.com', '*.supabase.co'],
     errorPath: 'offline.html',
   },
   android: {

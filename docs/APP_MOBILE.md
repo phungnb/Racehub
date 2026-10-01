@@ -1,6 +1,6 @@
 # App RaceHub trên App Store / Google Play
 
-App cài được dựng bằng **Capacitor**. Nó là một "vỏ" native mở chính trang web RaceHub (`https://racehub-iota.vercel.app`), rồi thêm những việc web không làm được:
+App cài được dựng bằng **Capacitor**. Nó là một "vỏ" native mở chính trang web RaceHub (`https://racehubrun.com`), rồi thêm những việc web không làm được:
 
 | Tính năng | Web (PWA) | App cài |
 |---|---|---|
@@ -101,7 +101,7 @@ Trong Xcode:
 - [ ] Biến môi trường production trên Vercel đầy đủ. Mục "Kiểm tra hệ thống" hiện đúng Strava, VAPID và webhook.
 - [ ] Nhập **thông tin pháp nhân** (Quản trị → Hướng dẫn & chính sách): tên công ty, MST, địa chỉ, email hỗ trợ. Hai cửa hàng đều kiểm tra thông tin này.
 - [ ] Trang **Quyền riêng tư** và **Điều khoản** mở được khi chưa đăng nhập: `/privacy`, `/terms`.
-- [ ] Nên dùng **tên miền riêng** thay `racehub-iota.vercel.app` trước khi nộp. Đổi sau khi đã nộp thì phải dựng lại app.
+- [x] Tên miền riêng **racehubrun.com** (đổi tên miền sau khi đã nộp thì phải dựng lại app).
 
 **App**
 - [ ] Logo nguồn **1024×1024** (hiện là bản 512 phóng to): `python3 scripts/make-app-icons.py logo-1024.png`.
