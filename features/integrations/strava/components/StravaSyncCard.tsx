@@ -9,9 +9,11 @@ import { formatCoin } from '@/shared/lib/format'
 import { useInvalidateProfile } from '@/features/auth'
 import { SKIP_REASON_LABEL, type SyncSummary } from '../mapping'
 
-async function syncNow(): Promise<SyncSummary> {
+/** null = vừa đồng bộ xong trong 1 phút qua (máy khác / webhook vừa chạy) — không phải lỗi, không cần làm gì */
+async function syncNow(): Promise<SyncSummary | null> {
   const res = await fetch('/api/strava/sync', { method: 'POST' })
   const body = await res.json().catch(() => ({}))
+  if (res.status === 429 && body?.error === 'TOO_SOON') return null
   if (!res.ok) throw new Error(body?.message ?? 'Không đồng bộ được Strava.')
   return body as SyncSummary
 }
@@ -33,7 +35,7 @@ export function StravaAutoSync() {
   const auto = useMutation({
     mutationFn: syncNow,
     onSuccess: (s) => {
-      if (s.imported > 0) {
+      if (s && s.imported > 0) {
         refresh()
         toast.success(`Đã nhận ${s.imported} bài chạy mới từ Strava` + (s.earned_xu > 0 ? ` · +${formatCoin(s.earned_xu)} Xu` : ''))
       }
@@ -63,6 +65,7 @@ export function StravaSyncButton() {
   const m = useMutation({
     mutationFn: syncNow,
     onSuccess: (s) => {
+      if (!s) { toast.info('Vừa đồng bộ xong — bài chạy mới nhất đã có trong app. Thử lại sau 1 phút nếu cần.'); return }
       refresh()
       const skipped = Object.entries(s.skip_reasons ?? {}).map(([k, n]) => `${n} bài ${SKIP_REASON_LABEL[k] ?? 'không hợp lệ'}`)
       if (s.imported === 0) {

@@ -2,6 +2,7 @@
 // Mỗi mã lỗi chỉ gửi 1 lần / 5 phút / thiết bị; bỏ qua lỗi do mạng của người dùng hoặc phiên hết hạn.
 import { supabase } from './supabase'
 import { describeError, type ErrorKind } from './errors'
+import { isResumeNoise } from './connection'
 
 const SKIP: ErrorKind[] = ['OFFLINE', 'AUTH', 'RATE_LIMIT']
 const sent = new Map<string, number>()
@@ -20,6 +21,8 @@ export function reportError(e: unknown, path = typeof location === 'undefined' ?
   if (disabled || typeof window === 'undefined' || isBusinessRule(e)) return
   const d = describeError(e)
   if (SKIP.includes(d.kind)) return
+  // iPhone mở lại app từ nền: vài yêu cầu đầu hỏng ("Load failed") do mạng chưa kịp nối lại — không phải sự cố máy chủ
+  if (d.kind === 'NETWORK' && isResumeNoise()) return
   const now = Date.now()
   if ((sent.get(d.code) ?? 0) > now - 5 * 60_000) return
   sent.set(d.code, now)
