@@ -37,7 +37,10 @@ export function disablePerf() {
 const emit = () => { version++; listeners.forEach((l) => l()) }
 export const perfVersion = () => version
 export function onPerf(cb: () => void) { listeners.add(cb); return () => { listeners.delete(cb) } }
-export const perfData = () => ({ requests, routes })
+/** Yêu cầu chưa xong (để thấy cái nào đang treo) */
+const inflight = new Map<number, { name: string; t0: number }>()
+let seq = 0
+export const perfData = () => ({ requests, routes, inflight: [...inflight.values()] })
 
 /** Tên dễ đọc: rpc/my_game_state · table/clubs · auth/token · api/strava/sync */
 export function requestName(input: RequestInfo | URL): string {
@@ -79,14 +82,18 @@ export function perfRouteStart(route: string) {
 export const perfFetch: typeof fetch = async (input, init) => {
   if (!perfEnabled()) return fetch(input, init)
   const t0 = performance.now()
+  const id = ++seq
+  inflight.set(id, { name: requestName(input), t0 })
   pending++
   if (current) current.requests++
+  emit()
   let status = 0
   try {
     const res = await fetch(input, init)
     status = res.status
     return res
   } finally {
+    inflight.delete(id)
     pending--
     lastEnd = performance.now()
     requests.unshift({ name: requestName(input), ms: Math.round(lastEnd - t0), status, at: Date.now(), route: current?.route ?? '' })
