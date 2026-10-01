@@ -11,7 +11,7 @@ import { supabase } from '@/shared/lib/supabase'
 import { Button, Card, ConfirmSheet, ErrorState, Field, Input, Skeleton, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
-import { useSession } from '@/features/auth'
+import { markSignedOut, useSession } from '@/features/auth'
 import { PushSettingsCard, unsubscribeThisDevice } from '@/features/notification'
 import { getMyProfile, profileErrorMessage, updateMyProfile } from '../api/profileApi'
 import {
@@ -170,7 +170,7 @@ function AccountCard() {
       {confirm ? (
         <div className="flex gap-2">
           <Button variant="secondary" block onClick={() => setConfirm(false)}>Hủy</Button>
-          <Button variant="danger" block loading={leaving} onClick={() => { setLeaving(true); void unsubscribeThisDevice().finally(() => supabase.auth.signOut()) }}><LogOut className="size-4" aria-hidden />Đăng xuất</Button>
+          <Button variant="danger" block loading={leaving} onClick={() => { setLeaving(true); markSignedOut(); void unsubscribeThisDevice().finally(() => supabase.auth.signOut()) }}><LogOut className="size-4" aria-hidden />Đăng xuất</Button>
         </div>
       ) : (
         <Button variant="secondary" block onClick={() => setConfirm(true)}><LogOut className="size-4" aria-hidden />Đăng xuất</Button>
@@ -207,6 +207,7 @@ function DeleteAccount() {
     },
     onSuccess: async () => {
       await unsubscribeThisDevice().catch(() => undefined)
+      markSignedOut()
       try { localStorage.clear() } catch { /* bỏ qua */ }
       await supabase.auth.signOut().catch(() => undefined)
       toast.success('Đã xoá tài khoản. Cảm ơn bạn đã chạy cùng RaceHub.')

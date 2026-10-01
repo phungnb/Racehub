@@ -1,5 +1,6 @@
 'use client'
 
+import { ArrowLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -95,13 +96,14 @@ export default function AthleteProfile({ userId, onClose }: Props) {
   return (
     <div role="dialog" aria-modal="true" aria-label="Hồ sơ vận động viên" className="fixed inset-0 z-[60] bg-bg overflow-y-auto animate-fadeIn">
       <div className="max-w-md mx-auto min-h-full border-x border-border">
-        <header className="sticky top-0 z-10 bg-bg/90 backdrop-blur-md border-b border-border px-4 py-3 flex items-center gap-3">
+        {/* Màn toàn màn hình: chừa vùng tai thỏ / thanh trạng thái (safe-area) để nút quay lại không bị đè */}
+        <header className="sticky top-0 z-10 bg-bg/90 backdrop-blur-md border-b border-border px-3 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top))] flex items-center gap-2">
           <button
             onClick={onClose}
             aria-label="Quay lại"
-            className="w-8 h-8 rounded-full bg-surface hover:bg-surface-2 border border-border text-fg flex items-center justify-center cursor-pointer"
+            className="size-11 shrink-0 rounded-full hover:bg-surface-2 text-fg grid place-items-center cursor-pointer"
           >
-            ‹
+            <ArrowLeft className="size-5" aria-hidden />
           </button>
           <h2 className="text-sm font-bold text-white">Hồ sơ vận động viên</h2>
         </header>

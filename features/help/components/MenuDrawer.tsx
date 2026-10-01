@@ -14,6 +14,7 @@ import { ICONS } from '@/shared/config/brand'
 import type { Profile } from '@/shared/types/profile'
 import { helpMenu } from '../api/helpApi'
 import { useCanPurchase, useOpsPolicy } from '@/features/system'
+import { markSignedOut } from '@/features/auth'
 import { ContactCard } from './ContactCard'
 import { companyLine, featuredMenu, groupMenu, SECTION_LABEL, STATIC_POLICIES, staticHref } from '../model/help'
 
@@ -69,6 +70,7 @@ function Drawer({ profile, onSignOut, onClose }: { profile: Profile | null; onSi
 
   const signOut = async () => {
     setLeaving(true)
+    markSignedOut()
     await onSignOut?.().catch(() => undefined)
     await supabase.auth.signOut().catch(() => undefined)
     onClose()

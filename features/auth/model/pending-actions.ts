@@ -34,3 +34,16 @@ export function takePendingRedirect(): string | null {
   if (ref) { take(KEYS.referral); return `/join/${encodeURIComponent(ref)}?auto=1` }
   return null
 }
+
+/** Người dùng chủ động đăng xuất: lần đăng nhập sau về Trang chủ, không quay lại trang đang đứng lúc bấm (vd. Cài đặt) */
+const SIGNED_OUT = 'rh-signed-out'
+export function markSignedOut() {
+  try { sessionStorage.setItem(SIGNED_OUT, '1') } catch { /* bỏ qua */ }
+}
+export function takeSignedOut(): boolean {
+  try {
+    const v = sessionStorage.getItem(SIGNED_OUT) === '1'
+    sessionStorage.removeItem(SIGNED_OUT)
+    return v
+  } catch { return false }
+}
