@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { WalletView } from '@/features/game'
+import { ContactFab } from '@/features/help'
+import { PurchaseOnly } from '@/features/system'
 import { routes } from '@/shared/config/routes'
 
 // Ví Xu (MH25): màn riêng, mở từ ô Xu trên thanh trên cùng và từ trang Tôi
@@ -18,6 +20,7 @@ export default function WalletPage() {
         <h1 className="text-xl font-bold">Ví Xu</h1>
       </div>
       <WalletView />
+      <PurchaseOnly><ContactFab withNav title="Cần hỗ trợ nạp Xu?" note="Chuyển khoản chưa nhận Xu, cần hoá đơn hay hỏi về gói nạp: nhắn admin." /></PurchaseOnly>
     </div>
   )
 }

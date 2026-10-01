@@ -15,7 +15,8 @@ import { useActiveSales, useCreateOrder, useMyPlan, usePricing } from '../hooks/
 import { bestSale, saleBonusXu, salePrice, type Sale } from '../model/sale'
 import { OrderSheet, orderTitle, STATUS_META } from './OrderSheet'
 import { useCanPurchase } from '@/features/system'
-import { ContactCard } from '@/features/help'
+import { ContactCard, ContactFab } from '@/features/help'
+import { PurchaseOnly } from '@/features/system'
 
 type Tab = 'vip' | 'xu'
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('vi-VN')
@@ -209,6 +210,7 @@ export function PlanScreen() {
       <ContactCard title="Cần hỗ trợ mua / nâng cấp?" note="Chuyển khoản xong mà chưa kích hoạt, hoặc cần xuất hoá đơn: nhắn admin qua các kênh dưới đây." />
 
       <OrderSheet order={order} onClose={() => { setOrder(null); void mine.refetch() }} />
+      <PurchaseOnly><ContactFab withNav title="Cần tư vấn gói?" note="Tư vấn chọn gói, hỗ trợ thanh toán, chuyển khoản chưa kích hoạt hoặc xuất hoá đơn." /></PurchaseOnly>
     </div>
   )
 }
