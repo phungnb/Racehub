@@ -2,6 +2,10 @@
   "name": "racehub",
   "version": "0.1.0",
   "private": true,
+  "sideEffects": [
+    "*.css",
+    "./shared/design/fonts.ts"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
