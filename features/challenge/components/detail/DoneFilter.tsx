@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { cn } from '@/shared/lib/cn'
+import { ScrollRow } from '@/shared/ui'
 
 export type DoneMode = 'ALL' | 'DONE' | 'NOT'
 const PARAM: Record<DoneMode, string | null> = { ALL: null, DONE: 'da-xong', NOT: 'chua-xong' }
@@ -28,7 +29,7 @@ export function DoneFilter({ mode, onChange, done, total, ended }: { mode: DoneM
     { v: 'NOT', label: ended ? 'Không hoàn thành' : 'Chưa hoàn thành', n: total - done },
   ]
   return (
-    <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]" role="tablist" aria-label="Lọc theo kết quả">
+    <ScrollRow innerClassName="gap-1.5 pb-1" role="tablist" aria-label="Lọc theo kết quả">
       {opts.map((o) => (
         <button key={o.v} type="button" role="tab" aria-selected={mode === o.v} onClick={() => onChange(o.v)}
           className={cn('shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold',
@@ -36,6 +37,6 @@ export function DoneFilter({ mode, onChange, done, total, ended }: { mode: DoneM
           {o.label} · {o.n}
         </button>
       ))}
-    </div>
+    </ScrollRow>
   )
 }

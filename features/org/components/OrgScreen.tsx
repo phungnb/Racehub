@@ -4,7 +4,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle } from 'lucide-react'
-import { ErrorState, Skeleton } from '@/shared/ui'
+import { ErrorState, Skeleton, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { getOrg, orgErrorMessage } from '../api/orgApi'
 import { fmtDay } from '../model/org'
@@ -61,7 +61,7 @@ export function OrgScreen({ orgId }: { orgId: string }) {
       {o.is_admin && o.active && left !== null && left <= 30 && (
         <p className="rounded-xl border border-coin/40 bg-coin/10 p-3 text-sm">Gói còn {left} ngày — liên hệ RaceHub để gia hạn, tránh gián đoạn.</p>
       )}
-      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none]" role="tablist" aria-label="Mục tổ chức">
+      <ScrollRow className="-mx-4" innerClassName="gap-1.5 px-4" role="tablist" aria-label="Mục tổ chức">
         {tabs.map((t) => (
           <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}
             className={cn('flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold',
@@ -70,7 +70,7 @@ export function OrgScreen({ orgId }: { orgId: string }) {
             {!!t.badge && <span className="rounded-full bg-danger px-1.5 text-[11px] font-bold leading-4 text-white">{t.badge}</span>}
           </button>
         ))}
-      </div>
+      </ScrollRow>
       {tab === 'overview' && <OverviewTab org={o} />}
       {tab === 'feed' && <FeedTab org={o} />}
       {tab === 'campaigns' && <CampaignsTab org={o} />}

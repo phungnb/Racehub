@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Flag, Lock, Trophy } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, EmptyState, ErrorState, Input, RankSearch, Skeleton } from '@/shared/ui'
+import { Avatar, Button, Card, EmptyState, ErrorState, Input, RankSearch, Skeleton, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { filterSearch } from '@/shared/lib/search'
 import { challengeErrorMessage, getConquestBoard, setMyConquest, type ChallengeDetail, type ConquestBoard, type ConquestCategory } from '../../api/challengeApi'
@@ -30,7 +30,7 @@ export function ConquestPanel({ d, onPick }: { d: ChallengeDetail; onPick: (user
     <div className="space-y-4">
       {joined && <MyCategories d={d} b={b} />}
       {b.categories.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]" role="tablist" aria-label="Hạng mục">
+        <ScrollRow innerClassName="gap-2 pb-1" role="tablist" aria-label="Hạng mục">
           {b.categories.map((x) => (
             <button key={x.id} role="tab" aria-selected={active === x.id} onClick={() => setCat(x.id)}
               className={cn('flex min-h-10 shrink-0 flex-col items-start rounded-xl border px-3 py-1.5 text-left',
@@ -39,7 +39,7 @@ export function ConquestPanel({ d, onPick }: { d: ChallengeDetail; onPick: (user
               <span className="text-[11px] text-fg-muted">{x.achieved}/{x.entrants} đạt{x.target_s ? ` · ≤ ${targetText(b, x.target_s)}` : ''}</span>
             </button>
           ))}
-        </div>
+        </ScrollRow>
       )}
       {active && <CategoryBoard b={b} cat={b.categories.find((x) => x.id === active)!} onPick={onPick} />}
     </div>

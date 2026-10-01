@@ -4,7 +4,7 @@ import { useDeferredValue, useRef, useState } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Camera, CalendarDays, Check, ExternalLink, Images, MoreHorizontal, Pencil, Plus, Search, Trash2, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, ConfirmSheet, EmptyState, ErrorState, Field, Input, Sheet, Skeleton, SwitchRow, Textarea } from '@/shared/ui'
+import { Button, ConfirmSheet, EmptyState, ErrorState, Field, Input, Sheet, Skeleton, SwitchRow, Textarea, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { deleteAlbum, listAlbums, openAlbum, reviewAlbum, saveAlbum, type AlbumFilters, type AlbumInput, type ClubAlbum } from '../../api/albumsApi'
 import { clubErrorMessage } from '../../api/clubApi'
@@ -51,7 +51,7 @@ export function ClubPhotosScreen({ clubId, eventId }: { clubId: string; eventId?
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" aria-hidden />
         <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Tìm: tên giải, sự kiện, người chụp… (không cần dấu)" aria-label="Tìm album" className="pl-9" />
       </div>
-      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+      <ScrollRow className="-mx-4" innerClassName="gap-1.5 px-4 pb-1">
         {(['ALL', ...Object.keys(ALBUM_KINDS)] as (AlbumKind | 'ALL')[]).map((k) => (
           <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)}
             className={cn('h-9 shrink-0 rounded-full border px-3 text-xs font-semibold', kind === k ? 'border-brand bg-brand/15 text-fg' : 'border-border text-fg-muted')}>
@@ -63,7 +63,7 @@ export function ClubPhotosScreen({ clubId, eventId }: { clubId: string; eventId?
           <button key={y} type="button" aria-pressed={year === y} onClick={() => setYear(year === y ? null : y)}
             className={cn('h-9 shrink-0 rounded-full border px-3 text-xs font-semibold', year === y ? 'border-brand bg-brand/15 text-fg' : 'border-border text-fg-muted')}>{y}</button>
         ))}
-      </div>
+      </ScrollRow>
 
       {list.isPending ? <div className="grid grid-cols-2 gap-3">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="aspect-[4/5]" />)}</div>
         : list.isError ? <ErrorState message={clubErrorMessage(list.error)} error={list.error} onRetry={() => void list.refetch()} />

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { BookOpen, Bookmark, PenSquare, Search, X } from 'lucide-react'
-import { Button, EmptyState, ErrorState, Input, PageHeader, SegmentedControl, Skeleton } from '@/shared/ui'
+import { Button, EmptyState, ErrorState, Input, PageHeader, SegmentedControl, Skeleton, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import { knowledgeErrorMessage, type ContentType } from '../api/knowledgeApi'
@@ -60,7 +60,7 @@ export function KnowledgeScreen() {
       ]} />
 
       {tab === 'ARTICLE' && home.data && (
-        <nav aria-label="Chuyên mục" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+        <nav aria-label="Chuyên mục" className="-mx-4"><ScrollRow innerClassName="gap-1.5 px-4 pb-1">
           <button type="button" aria-pressed={!cat} onClick={() => go({ c: null })}
             className={cn('h-9 shrink-0 rounded-full border px-3 text-xs font-semibold', !cat ? 'border-brand bg-brand/15 text-fg' : 'border-border text-fg-muted')}>Tất cả</button>
           {home.data.categories.map((c) => {
@@ -73,15 +73,15 @@ export function KnowledgeScreen() {
               </button>
             )
           })}
-        </nav>
+        </ScrollRow></nav>
       )}
 
       {browsing && home.data && home.data.featured.length > 0 && (
         <section>
           <h2 className="mb-2 font-semibold">Bài viết nổi bật</h2>
-          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+          <ScrollRow className="-mx-4" innerClassName="gap-3 px-4 pb-1">
             {home.data.featured.map((a) => <FeatureCard key={a.id} a={a} />)}
-          </div>
+          </ScrollRow>
         </section>
       )}
 

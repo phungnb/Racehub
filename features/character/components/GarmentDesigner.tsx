@@ -7,7 +7,7 @@ import {
   AlignCenterHorizontal, ArrowDown, ArrowUp, Copy, ImagePlus, Maximize2, Minimize2, Redo2, Trash2, Type, Undo2, UserRound,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Input } from '@/shared/ui'
+import { Button, Input, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { FONTS, type FontKey } from '@/shared/design/engine'
 import { FontPicker } from '@/shared/design/studio/LayerInspector'
@@ -293,7 +293,7 @@ export function GarmentDesigner({ body, items, slot, layers, onLayers, upload, p
 
       {/* Danh sách lớp */}
       {value.length > 0 && (
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="listbox" aria-label="Các lớp in">
+        <ScrollRow className="-mx-1" innerClassName="gap-1.5 px-1 pb-1" role="listbox" aria-label="Các lớp in">
           {[...value].reverse().map((l) => (
             <button key={l.id} type="button" role="option" aria-selected={sel === l.id} onClick={() => setSel(l.id)}
               className={cn('flex max-w-40 shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold', sel === l.id ? 'border-brand bg-brand/15' : 'border-border text-fg-muted')}>
@@ -301,7 +301,7 @@ export function GarmentDesigner({ body, items, slot, layers, onLayers, upload, p
               <span className="truncate">{l.type === 'text' ? (l.text === NAME_TOKEN ? 'Tên runner' : l.text) : 'Ảnh'}</span>
             </button>
           ))}
-        </div>
+        </ScrollRow>
       )}
 
       {/* Thuộc tính lớp đang chọn */}

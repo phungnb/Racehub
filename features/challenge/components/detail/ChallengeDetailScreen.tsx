@@ -9,7 +9,7 @@ import {
   Repeat, Route, Share2, Shield, Timer, Trophy, Users, UsersRound, HeartPulse } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Field, LevelBadge, ProgressRing, RankSearch, scrollToRow, SegmentedControl, Sheet, Skeleton, Textarea } from '@/shared/ui'
+import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Field, LevelBadge, ProgressRing, RankSearch, scrollToRow, SegmentedControl, Sheet, Skeleton, Textarea, ScrollRow } from '@/shared/ui'
 import { filterSearch } from '@/shared/lib/search'
 import { routes } from '@/shared/config/routes'
 import { cn } from '@/shared/lib/cn'
@@ -309,7 +309,7 @@ function Leaderboard({ d, rows, loading, error, standings, onPick }: {
   return (
     <div className="space-y-2">
       {c.format === 'TEAM' && standings.length > 0 && (!c.pledge_enabled || !!c.teams_assigned_at) && (
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <ScrollRow innerClassName="gap-2 pb-1">
           {[{ team_id: 'ALL', name: 'Tất cả', color: 'var(--color-fg-muted)' }, ...standings].map((t) => (
             <button key={t.team_id} onClick={() => setTeam(t.team_id)} aria-pressed={team === t.team_id}
               className={cn('flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm font-medium',
@@ -317,10 +317,10 @@ function Leaderboard({ d, rows, loading, error, standings, onPick }: {
               <span className="size-2.5 rounded-full" style={{ background: t.color }} aria-hidden />{t.name}
             </button>
           ))}
-        </div>
+        </ScrollRow>
       )}
       {(rows?.length ?? 0) > 1 && c.format !== 'DUEL' && (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]" role="radiogroup" aria-label="Xếp hạng theo">
+        <ScrollRow innerClassName="items-center gap-1.5 pb-1" role="radiogroup" aria-label="Xếp hạng theo">
           <span className="shrink-0 text-xs text-fg-subtle">Xếp theo</span>
           {(Object.keys(SORT_LABEL) as SortKey[]).filter((k) => k !== 'PACE' || c.objective === 'DISTANCE').map((k) => (
             <button key={k} type="button" role="radio" aria-checked={sort === k} onClick={() => setSort(k)}
@@ -328,7 +328,7 @@ function Leaderboard({ d, rows, loading, error, standings, onPick }: {
               {k === 'SCORE' ? (c.objective === 'DISTANCE' ? 'Km' : SORT_LABEL.SCORE) : SORT_LABEL[k]}
             </button>
           ))}
-        </div>
+        </ScrollRow>
       )}
       {hasGoal && (
         <DoneFilter mode={doneMode} onChange={setDoneMode} ended={ended} total={inTeamAll.length}

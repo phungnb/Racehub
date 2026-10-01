@@ -8,7 +8,7 @@ import { DrawPanel } from '@/features/draw'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Award, BadgeCheck, CalendarDays, Clock, Download, Flag, Maximize2, Medal, Palette, ScrollText, Timer, Users, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Input, RankSearch, useImageSaver, scrollToRow, SectionTitle, Sheet, Skeleton } from '@/shared/ui'
+import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Input, RankSearch, useImageSaver, scrollToRow, SectionTitle, Sheet, Skeleton, ScrollRow } from '@/shared/ui'
 import { filterSearch } from '@/shared/lib/search'
 import { cn } from '@/shared/lib/cn'
 import { formatNumber } from '@/shared/lib/format'
@@ -200,7 +200,7 @@ function Results({ r }: { r: Race }) {
   return (
     <section>
       <SectionTitle>Kết quả</SectionTitle>
-      <div className="mb-3 flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
+      <ScrollRow className="mb-3" innerClassName="gap-1.5">
         {r.distances.map((d) => {
           const p = r.per_distance?.find((x) => Number(x.distance_km) === Number(d))
           return (
@@ -211,7 +211,7 @@ function Results({ r }: { r: Race }) {
             </button>
           )
         })}
-      </div>
+      </ScrollRow>
       {q.isPending ? <Skeleton className="h-40" /> : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : !all.length ? (
         <EmptyState icon={Timer} title="Chưa có ai đăng ký cự ly này" description="Kết quả tự cập nhật khi VĐV có bài chạy hợp lệ." />
       ) : (

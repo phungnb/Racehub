@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Download, LayoutGrid, Lock, Save, Trophy } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Card, EmptyState, ErrorState, Input, PageHeader, Skeleton, useImageSaver } from '@/shared/ui'
+import { Button, Card, EmptyState, ErrorState, Input, PageHeader, Skeleton, useImageSaver, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import { DesignCanvas } from '@/shared/design/DesignCanvas'
@@ -175,10 +175,10 @@ function Editor({ d, h, board }: { d: ChallengeDetail; h: HonorState | null; boa
 
       <Card className="space-y-3">
         <p className="text-sm font-bold">Nguồn vinh danh</p>
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+        <ScrollRow className="-mx-1" innerClassName="gap-1.5 px-1 pb-1">
           {cats.map((c) => <Chip key={c.key} on={src === c.key} onClick={() => { setSrc(c.key); auto(undefined, undefined, Math.max(1, c.count)) }}>{c.title}</Chip>)}
           <Chip on={src === LIVE} onClick={() => { setSrc(LIVE); auto(undefined, undefined, count) }}>BXH hiện tại</Chip>
-        </div>
+        </ScrollRow>
         {src === LIVE && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-fg-muted">Số người</span>

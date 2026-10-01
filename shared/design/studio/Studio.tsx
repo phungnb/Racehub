@@ -15,6 +15,7 @@ import {
 } from '../engine'
 import { LayerInspector } from './LayerInspector'
 import { imageAspect } from './bits'
+import { ScrollRow } from '@/shared/ui/ScrollRow'
 
 export interface QrSuggestion { key: string; title: string; hint: string; ready: boolean; layer: Partial<QrLayer> }
 
@@ -191,7 +192,7 @@ export function Studio(p: StudioProps) {
         </div>
 
         {/* Thanh công cụ */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+        <ScrollRow innerClassName="items-center gap-1 pb-0.5">
           <Button size="sm" variant="ghost" onClick={p.history.undo} disabled={!p.history.canUndo} aria-label="Hoàn tác" title="Hoàn tác (Ctrl+Z)"><Undo2 className="size-4" aria-hidden /></Button>
           <Button size="sm" variant="ghost" onClick={p.history.redo} disabled={!p.history.canRedo} aria-label="Làm lại" title="Làm lại (Ctrl+Y)"><Redo2 className="size-4" aria-hidden /></Button>
           <span className="mx-1 h-6 w-px shrink-0 bg-border" aria-hidden />
@@ -212,7 +213,7 @@ export function Studio(p: StudioProps) {
           <Tool icon={Shapes} label="Hình" on={adding === 'shape'} onClick={() => setAdding(adding === 'shape' ? null : 'shape')} />
           <span className="mx-1 h-6 w-px shrink-0 bg-border" aria-hidden />
           <Tool icon={Wand2} label="Tự động" onClick={() => { p.onAuto(); setSel(null) }} />
-        </div>
+        </ScrollRow>
 
         {adding === 'field' && (
           <AddRow title="Chèn trường dữ liệu (mỗi VĐV một giá trị)">

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { CalendarDays, ChevronRight, EyeOff, MapPin, Radar, Settings2, ShieldAlert, Users, UsersRound } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, EmptyState, ErrorState, PageHeader, SegmentedControl, Sheet, Skeleton } from '@/shared/ui'
+import { Avatar, Button, Card, EmptyState, ErrorState, PageHeader, SegmentedControl, Sheet, Skeleton, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import {
@@ -171,12 +171,12 @@ function Runners({ d, radius, onFallback }: { d: Discovery; radius: Radius; onFa
 
   return (
     <div className="space-y-3">
-      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
+      <ScrollRow className="-mx-4" innerClassName="gap-1.5 px-4 pb-1">
         <Select label="Pace" value={pace} options={PACE_FILTERS} onChange={setPace} />
         <Select label="Mục đích" value={purpose} options={{ ALL: 'Mọi mục đích', ...PURPOSES }} onChange={setPurpose} />
         <Select label="Mục tiêu" value={goal} options={{ ALL: 'Mọi mục tiêu', ...GOALS }} onChange={setGoal} />
         <Select label="Khung giờ" value={slot} options={{ ALL: 'Mọi khung giờ', ...SLOTS }} onChange={setSlot} />
-      </div>
+      </ScrollRow>
       {q.isPending ? <div className="space-y-3"><Skeleton className="h-44" /><Skeleton className="h-44" /></div>
         : q.isError ? <ErrorState message={nearbyErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
         : items.length === 0 ? (

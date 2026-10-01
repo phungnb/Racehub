@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Ban, Check, ImageUp, Layers, Palette, Pipette, Sparkles, Trash2, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, SegmentedControl, SwitchRow } from '@/shared/ui'
+import { Button, SegmentedControl, SwitchRow, ScrollRow } from '@/shared/ui'
 import { Slider } from '@/shared/design/studio/bits'
 import { cn } from '@/shared/lib/cn'
 import { BODIES, bodiesFor, PATTERNS, PRINT_ZONES, baseUrl, type Body, type Gender, type ItemPattern, type ItemPrint, type PatternKind, type PrintLayer, type TintSlot } from '../model/catalog'
@@ -193,7 +193,7 @@ export function KitStudio({ value, onChange, upload, clubLogoUrl, personalName, 
   return (
     <div className="space-y-4">
       {/* Dáng nhân vật để xem thử (cùng thiết kế lên mọi dáng) */}
-      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="radiogroup" aria-label="Nhân vật xem thử">
+      <ScrollRow className="-mx-1" innerClassName="gap-1.5 px-1 pb-1" role="radiogroup" aria-label="Nhân vật xem thử">
         {(['male', 'female'] as Gender[]).flatMap((g) => bodiesFor(g)).map((b) => (
           <button key={b} type="button" role="radio" aria-checked={body === b} onClick={() => setBody(b)} title={BODIES[b].label}
             className={cn('relative h-16 w-12 shrink-0 overflow-hidden rounded-xl border-2 bg-[#c4c4ce]', body === b ? 'border-brand' : 'border-transparent')}>
@@ -201,7 +201,7 @@ export function KitStudio({ value, onChange, upload, clubLogoUrl, personalName, 
             <img src={baseUrl(b)} alt={BODIES[b].label} className="absolute inset-0 size-full object-cover object-top" loading="lazy" />
           </button>
         ))}
-      </div>
+      </ScrollRow>
 
       {tab !== 'design' && (
       <div className="relative h-[26rem] overflow-hidden rounded-2xl border border-border bg-[#c4c4ce]">

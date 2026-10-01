@@ -10,6 +10,7 @@ import {
 } from '../engine'
 import { FONT_FAMILIES } from '../fonts'
 import { Chips, FileButton, PaintPicker, Pill, Slider } from './bits'
+import { ScrollRow } from '@/shared/ui/ScrollRow'
 
 export function previewFamily(f: FontKey) {
   if (f === 'sans') return 'var(--font-be-vietnam)'
@@ -25,7 +26,7 @@ export function FontPicker({ value, italic, sample, onChange }: { value: FontKey
       {(Object.keys(FONT_GROUPS) as FontGroup[]).map((g) => (
         <div key={g} className="space-y-1">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-fg-subtle">{FONT_GROUPS[g]}</p>
-          <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="group" aria-label={FONT_GROUPS[g]}>
+          <ScrollRow className="-mx-1" innerClassName="gap-1.5 px-1 pb-1" role="group" aria-label={FONT_GROUPS[g]}>
             {(Object.keys(FONTS) as FontKey[]).filter((f) => FONTS[f].group === g).map((f) => (
               <button key={f} type="button" aria-pressed={value === f} onClick={() => onChange(f)} title={FONTS[f].label}
                 className={cn('flex w-20 shrink-0 flex-col items-center rounded-lg border px-1 py-1.5', value === f ? 'border-brand bg-brand/15' : 'border-border')}>
@@ -33,7 +34,7 @@ export function FontPicker({ value, italic, sample, onChange }: { value: FontKey
                 <span className="mt-0.5 max-w-full truncate text-[9px] text-fg-muted">{FONTS[f].label}</span>
               </button>
             ))}
-          </div>
+          </ScrollRow>
         </div>
       ))}
     </div>
