@@ -286,6 +286,12 @@ export async function joinChallenge(id: string, code?: string | null, teamId?: s
   if (error) throw error
 }
 
+/** Thử thách theo mục tiêu: vào + đặt mục tiêu trong một bước (012000) — không có mục tiêu thì không vào được */
+export async function joinChallengePledge(id: string, km: number, code?: string | null) {
+  const { error } = await supabase.rpc('join_challenge_pledge', { p_challenge_id: id, p_km: km, p_code: code ?? null })
+  if (error) throw error
+}
+
 export async function leaveChallenge(id: string) {
   const { error } = await supabase.rpc('leave_challenge', { p_challenge_id: id })
   if (error) throw error
@@ -380,6 +386,7 @@ const MESSAGES: Record<string, string> = {
   INVALID_PLEDGE_CAP: '% vượt mục tiêu không hợp lệ.',
   INVALID_TEAM_SIZE: 'Mỗi đội từ 2 đến 50 người.',
   PLEDGE_NOT_SUPPORTED: 'Thử thách này không dùng mục tiêu tự đăng ký.',
+  PLEDGE_REQUIRED: 'Hãy chọn mục tiêu km của bạn để tham gia.',
   NOT_ENOUGH_MEMBERS: 'Chưa đủ người để chia đội.',
   CHALLENGE_NOT_FOUND: 'Không tìm thấy thử thách, hoặc bạn cần mã mời để xem.',
   CHALLENGE_CLOSED: 'Thử thách đã kết thúc hoặc đã bị hủy.',

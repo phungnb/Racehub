@@ -24,7 +24,7 @@ import { MemberDaysSheet } from './MemberDaysSheet'
 import { ChallengeBoostDays, RegDeadlineCard } from './ChallengeExtras'
 import { useChallenge, useChallengeActions } from '../../hooks/useChallenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
-import { PledgePanel } from './PledgePanel'
+import { PledgeChooser, PledgePanel } from './PledgePanel'
 import { DoneFilter, useDoneFilter } from './DoneFilter'
 import { RulesInfoCard } from './RulesInfo'
 import { TopSupported } from '@/features/game'
@@ -457,7 +457,8 @@ function ActionBar({ d, phase, code }: { d: ChallengeDetail; phase: ReturnType<t
   const router = useRouter()
   const c = d.challenge
   const a = useChallengeActions(c.id)
-  const [sheet, setSheet] = useState<'team' | 'invite' | 'menu' | 'leave' | 'cancel' | null>(null)
+  const [sheet, setSheet] = useState<'team' | 'invite' | 'menu' | 'leave' | 'cancel' | 'pledge' | null>(null)
+  const [pledgeKm, setPledgeKm] = useState<number | null>(null)
   const [reason, setReason] = useState('')
   const joined = !!d.me && d.me.status !== 'LEFT'
   const open = phase === 'UPCOMING' || phase === 'LIVE'
@@ -479,8 +480,9 @@ function ActionBar({ d, phase, code }: { d: ChallengeDetail; phase: ReturnType<t
       <div className="fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-md gap-2 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur-md">
         {canJoin ? (
           <Button block size="lg" loading={a.join.isPending}
-            onClick={() => pickTeam ? setSheet('team') : run(a.join.mutateAsync({ code }), c.format === 'DUEL' ? 'Đã nhận lời thách đấu!' : c.pledge_enabled ? 'Đã tham gia. Hãy đăng ký mục tiêu của bạn!' : isConquest(c.objective) ? 'Đã tham gia. Chọn hạng mục bạn muốn chinh phục!' : 'Đã tham gia. Chạy thôi!')}>
-            {pickTeam ? 'Chọn đội và tham gia' : c.format === 'TEAM' ? 'Tham gia và đăng ký mục tiêu' : c.format === 'DUEL' ? 'Nhận lời thách đấu' : 'Tham gia'}
+            onClick={() => pickTeam ? setSheet('team') : c.pledge_enabled ? setSheet('pledge')
+              : run(a.join.mutateAsync({ code }), c.format === 'DUEL' ? 'Đã nhận lời thách đấu!' : isConquest(c.objective) ? 'Đã tham gia. Chọn hạng mục bạn muốn chinh phục!' : 'Đã tham gia. Chạy thôi!')}>
+            {pickTeam ? 'Chọn đội và tham gia' : c.pledge_enabled ? 'Chọn mục tiêu và tham gia' : c.format === 'DUEL' ? 'Nhận lời thách đấu' : 'Tham gia'}
           </Button>
         ) : joined && open ? (
           <Button block size="lg" variant="secondary" onClick={() => setSheet('invite')}><Share2 className="size-4" aria-hidden />Mời bạn cùng tham gia</Button>
@@ -501,6 +503,15 @@ function ActionBar({ d, phase, code }: { d: ChallengeDetail; phase: ReturnType<t
           {canLeave && <MenuButton icon={LogOut} label="Rời thử thách" danger onClick={() => setSheet('leave')} />}
           {canCancel && <MenuButton icon={CircleSlash} label="Hủy thử thách" danger onClick={() => setSheet('cancel')} />}
         </div>
+      </Sheet>
+
+      {/* Thử thách theo mục tiêu: phải chọn mục tiêu mới vào được (vào + đặt mục tiêu cùng lúc, 012000) */}
+      <Sheet open={sheet === 'pledge'} onClose={() => setSheet(null)} title="Chọn mục tiêu của bạn"
+        description={c.format === 'TEAM' ? 'Bắt buộc. Ban quản trị chia đội sao cho tổng mục tiêu các đội bằng nhau.' : 'Bắt buộc. Hoàn thành mục tiêu bạn chọn là chiến thắng; đổi được trước giờ bắt đầu.'}
+        footer={<Button block size="lg" disabled={!pledgeKm} loading={a.joinPledge.isPending}
+          onClick={() => pledgeKm && run(a.joinPledge.mutateAsync({ km: pledgeKm, code }), `Đã tham gia với mục tiêu ${pledgeKm} km. Chạy thôi!`)}>
+          {pledgeKm ? `Tham gia với mục tiêu ${pledgeKm} km` : 'Chọn mục tiêu để tham gia'}</Button>}>
+        <PledgeChooser c={c} value={pledgeKm} onChange={setPledgeKm} />
       </Sheet>
 
       <Sheet open={sheet === 'team'} onClose={() => setSheet(null)} title={joined ? 'Đổi đội' : 'Chọn đội'}

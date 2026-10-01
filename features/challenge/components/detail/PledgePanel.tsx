@@ -78,7 +78,9 @@ function MyPledge({ d, locked }: { d: ChallengeDetail; locked: boolean }) {
 
   return (
     <Card className="space-y-3 border-brand/40">
-      <p className="flex items-center gap-2 font-semibold"><Flag className="size-4 text-brand" aria-hidden />{current === null ? 'Đăng ký mục tiêu của bạn' : 'Đổi mục tiêu'}</p>
+      <p className="flex items-center gap-2 font-semibold"><Flag className="size-4 text-brand" aria-hidden />{current === null ? 'Đăng ký mục tiêu của bạn' : 'Đổi mục tiêu'}
+        {current === null && <span className="rounded-full bg-danger/15 px-2 py-0.5 text-[11px] font-bold text-danger">Bắt buộc</span>}</p>
+      {current === null && <p className="text-sm text-danger">Bạn chưa có mục tiêu nên chưa tính được % hoàn thành trên bảng xếp hạng. Chọn mục tiêu ngay.</p>}
       <p className="text-xs text-fg-muted">
         {c.format === 'TEAM' ? 'Chọn theo năng lực của bạn — đội được chia để tổng mục tiêu các đội bằng nhau. Mục tiêu khóa khi chia đội' + (cap !== null ? `; chạy vượt chỉ được tính thêm tối đa ${cap}%.` : '.')
           : 'Hoàn thành mục tiêu bạn chọn là chiến thắng. Chọn trước giờ bắt đầu thì đổi được.'}
@@ -101,6 +103,38 @@ function MyPledge({ d, locked }: { d: ChallengeDetail; locked: boolean }) {
         </div>
       )}
     </Card>
+  )
+}
+
+/** Chọn mục tiêu km (mốc có sẵn hoặc tự nhập) — dùng khi bấm Tham gia: phải chọn xong mới vào được */
+export function PledgeChooser({ c, value, onChange }: { c: ChallengeDetail['challenge']; value: number | null; onChange: (km: number | null) => void }) {
+  const options = (c.pledge_options ?? []).map(Number)
+  const [text, setText] = useState(value != null ? String(value) : '')
+  const min = Number(c.pledge_min_km ?? 1), max = Number(c.pledge_max_km ?? 5000)
+  if (options.length) {
+    return (
+      <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Mục tiêu km">
+        {options.map((o) => (
+          <button key={o} type="button" role="radio" aria-checked={value === o} onClick={() => onChange(o)}
+            className={cn('min-h-12 rounded-xl border font-mono font-bold', value === o ? 'border-brand bg-brand text-brand-fg' : 'border-border hover:border-fg-subtle')}>
+            {o}<span className="block text-[10px] font-medium opacity-70">km</span>
+          </button>
+        ))}
+      </div>
+    )
+  }
+  const n = Number(text.replace(',', '.'))
+  const bad = text.trim() !== '' && !(n >= min && n <= max)
+  return (
+    <div className="space-y-1">
+      <Input inputMode="decimal" value={text} aria-label="Mục tiêu (km)" placeholder={`${min}–${max} km`}
+        onChange={(e) => {
+          setText(e.target.value)
+          const v = Number(e.target.value.replace(',', '.'))
+          onChange(v >= min && v <= max ? Math.round(v * 10) / 10 : null)
+        }} />
+      {bad && <p className="text-xs text-danger">Mục tiêu từ {min} đến {max} km.</p>}
+    </div>
   )
 }
 

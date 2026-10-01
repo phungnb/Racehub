@@ -220,7 +220,9 @@ begin
         and not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'profiles'
                          and policyname in ('Allow public select profile', 'Public profiles are viewable by everyone'))
         and not has_table_privilege('anon', 'public.profiles', 'SELECT')
-        and not has_column_privilege('authenticated', 'public.profiles', 'xu', 'SELECT')));
+        and not has_column_privilege('authenticated', 'public.profiles', 'xu', 'SELECT')),
+    jsonb_build_object('file', '20261001012000', 'label', 'Thử thách theo mục tiêu: tham gia bắt buộc kèm mục tiêu (một bước)',
+      'ok', to_regprocedure('public.join_challenge_pledge(uuid,numeric,text)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
