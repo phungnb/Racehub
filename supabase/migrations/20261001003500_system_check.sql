@@ -222,7 +222,16 @@ begin
         and not has_table_privilege('anon', 'public.profiles', 'SELECT')
         and not has_column_privilege('authenticated', 'public.profiles', 'xu', 'SELECT')),
     jsonb_build_object('file', '20261001012000', 'label', 'Thử thách theo mục tiêu: tham gia bắt buộc kèm mục tiêu (một bước)',
-      'ok', to_regprocedure('public.join_challenge_pledge(uuid,numeric,text)') is not null));
+      'ok', to_regprocedure('public.join_challenge_pledge(uuid,numeric,text)') is not null),
+    jsonb_build_object('file', '20261001012100', 'label', 'Tăng tốc tab CLB: đếm tin chưa đọc tối đa 100',
+      'ok', to_regprocedure('public.my_clubs_inbox()') is not null
+        and pg_get_functiondef('public.my_clubs_inbox()'::regprocedure) ~ 'limit 100'),
+    jsonb_build_object('file', '20261001012200', 'label', 'Tăng tốc Trang chủ: kiểm tra bù huy hiệu tối đa 1 lần / 10 phút',
+      'ok', to_regclass('private.achievement_catchup') is not null and to_regprocedure('private.catch_up_achievements(uuid)') is not null),
+    jsonb_build_object('file', '20261001012300', 'label', 'Tăng tốc phân quyền: kiểm tra thành viên CLB trước, quyền admin tính 1 lần / truy vấn',
+      'ok', pg_get_functiondef('public.club_is_member(uuid)'::regprocedure) ~* 'case\s+when exists'
+        and not exists (select 1 from pg_policies where schemaname = 'public'
+                         and (coalesce(qual, '') || ' ' || coalesce(with_check, '')) ~ '(?<!SELECT )(public\.)?is_system_admin\(\)')));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

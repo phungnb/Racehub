@@ -1,5 +1,5 @@
 -- RaceHub — PHẦN 19/20 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 011800, 011900, 012000, 012100, 012200
+-- Gồm: 011800, 011900, 012000, 012100, 012200, 012300
 -- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
 -- Xong thì chạy phần tiếp theo.
 begin;
@@ -604,7 +604,9 @@ declare
   v_week date := private.vn_week(v_now);
   cfg jsonb := private.game_config();
   s public.user_streaks;
-  w record;
+  w_km numeric;
+  w_runs integer;
+  w_days integer;
   v_gap integer;
   v_alive boolean;
   v_daily integer := 0;
@@ -619,7 +621,7 @@ begin
   perform private.settle_leagues_due();
   perform private.catch_up_achievements(v_uid);                  -- bắt kịp huy hiệu (tối đa 1 lần / 10 phút)
   s := private.ensure_streak(v_uid);
-  select * from private.week_run_stats(v_uid, v_week) into w;
+  select ws.km, ws.runs, ws.days into w_km, w_runs, w_days from private.week_run_stats(v_uid, v_week) as ws;
 
   v_gap := case when s.last_week is null then null else (v_week - s.last_week) / 7 - 1 end;
   -- Còn chuỗi: tuần này đã đạt, hoặc tuần trước đạt, hoặc số tuần hụt ≤ số khiên
@@ -678,9 +680,9 @@ begin
     'today', v_today, 'week_start', v_week,
     'checked_in', exists (select 1 from public.user_quest_progress p join public.quests q on q.id = p.quest_id
                            where p.user_id = v_uid and q.metric = 'CHECKIN' and p.period_start = v_today and p.progress >= 1),
-    'week', jsonb_build_object('km', round(coalesce(w.km, 0), 2), 'runs', coalesce(w.runs, 0), 'days', coalesce(w.days, 0)),
+    'week', jsonb_build_object('km', round(coalesce(w_km, 0), 2), 'runs', coalesce(w_runs, 0), 'days', coalesce(w_days, 0)),
     'streak', jsonb_build_object(
-      'goal', s.weekly_goal, 'week_days', coalesce(w.days, 0), 'done_this_week', s.last_week = v_week,
+      'goal', s.weekly_goal, 'week_days', coalesce(w_days, 0), 'done_this_week', s.last_week = v_week,
       'current', case when v_alive then s.current_weeks else 0 end, 'best', s.best_weeks, 'alive', v_alive,
       'at_risk_weeks', greatest(coalesce(v_gap, 0), 0), 'shields', s.shields,
       'max_shields', (cfg->>'maxShields')::int, 'shield_price', (cfg->>'shieldPrice')::numeric, 'daily', v_daily),
@@ -688,5 +690,57 @@ begin
     'league', coalesce(v_league, jsonb_build_object('group_id', null, 'tier', v_tier, 'tier_name', private.league_name(v_tier))),
     'unseen', v_events);
 end $$;
+
+-- ===================================================================
+-- 20261001012300_perf_rls_admin_check.sql
+-- ===================================================================
+-- Tăng tốc đọc dữ liệu: các chính sách RLS gọi is_system_admin() cho TỪNG DÒNG. Bọc thành (select public.is_system_admin())
+-- để Postgres tính 1 lần cho cả câu truy vấn (khuyến nghị của Supabase). Quyền truy cập giữ nguyên tuyệt đối:
+-- chỉ đổi cách viết biểu thức, không thêm/bớt điều kiện. Chạy lại nhiều lần an toàn (đã bọc thì bỏ qua).
+do $$
+declare
+  r record;
+  v_qual text;
+  v_check text;
+  pat constant text := '(?<!SELECT )(public\.)?is_system_admin\(\)';
+begin
+  for r in
+    select schemaname, tablename, policyname, qual, with_check
+      from pg_policies
+     where schemaname = 'public'
+       and (coalesce(qual, '') ~ pat or coalesce(with_check, '') ~ pat)
+  loop
+    v_qual := case when r.qual is null then null else regexp_replace(r.qual, pat, '( SELECT public.is_system_admin())', 'g') end;
+    v_check := case when r.with_check is null then null else regexp_replace(r.with_check, pat, '( SELECT public.is_system_admin())', 'g') end;
+    if v_qual is not null and v_check is not null then
+      execute format('alter policy %I on %I.%I using (%s) with check (%s)', r.policyname, r.schemaname, r.tablename, v_qual, v_check);
+    elsif v_qual is not null then
+      execute format('alter policy %I on %I.%I using (%s)', r.policyname, r.schemaname, r.tablename, v_qual);
+    else
+      execute format('alter policy %I on %I.%I with check (%s)', r.policyname, r.schemaname, r.tablename, v_check);
+    end if;
+  end loop;
+end $$;
+
+-- club_is_member / club_is_staff được RLS gọi cho từng dòng. Kiểm tra thành viên (1 lần tra chỉ mục) TRƯỚC,
+-- chỉ khi không phải thành viên mới kiểm tra quyền admin hệ thống (nhiều lượt tra cứu). Kết quả y hệt bản cũ.
+create or replace function public.club_is_member(p_club uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select case
+    when exists (select 1 from public.club_members
+                  where club_id = p_club and user_id = auth.uid() and status = 'APPROVED') then true
+    else public.is_system_admin()
+  end
+$$;
+
+create or replace function public.club_is_staff(p_club uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select case
+    when exists (select 1 from public.club_members
+                  where club_id = p_club and user_id = auth.uid() and status = 'APPROVED'
+                    and role in ('OWNER', 'CAPTAIN')) then true
+    else public.is_system_admin()
+  end
+$$;
 
 commit;
