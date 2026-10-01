@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Flag, Lock, Trophy } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, EmptyState, ErrorState, Input, RankSearch, Skeleton, ScrollRow } from '@/shared/ui'
+import { Avatar, Button, Card, ClockPicker, EmptyState, ErrorState, RankSearch, Skeleton, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { filterSearch } from '@/shared/lib/search'
 import { challengeErrorMessage, getConquestBoard, setMyConquest, type ChallengeDetail, type ConquestBoard, type ConquestCategory } from '../../api/challengeApi'
@@ -91,7 +91,7 @@ function MyCategories({ d, b }: { d: ChallengeDetail; b: ConquestBoard }) {
     <Card className="space-y-3 border-brand/40">
       <p className="flex items-center gap-2 font-semibold"><Flag className="size-4 text-brand" aria-hidden />Chọn hạng mục bạn muốn chinh phục</p>
       <p className="text-xs text-fg-muted">
-        {b.mode === 'SELF' ? `Nhập ${pace ? 'pace (phút:giây mỗi km)' : 'thời gian (giờ:phút:giây)'} mục tiêu của bạn cho từng hạng mục. ` : ''}
+        {b.mode === 'SELF' ? `Cuộn chọn ${pace ? 'pace (phút · giây mỗi km)' : 'thời gian (giờ · phút · giây)'} mục tiêu của bạn cho từng hạng mục. ` : ''}
         {started ? 'Thử thách đã bắt đầu: bạn thêm được hạng mục mới, nhưng không bỏ hay đổi mục tiêu đã đăng ký.' : 'Đổi được tới giờ xuất phát.'}
       </p>
       <ul className="space-y-2">
@@ -102,15 +102,21 @@ function MyCategories({ d, b }: { d: ChallengeDetail; b: ConquestBoard }) {
             <li key={x.id} className={cn('rounded-xl border p-2.5', on ? 'border-brand/60 bg-brand/5' : 'border-border')}>
               <label className="flex items-center gap-3">
                 <input type="checkbox" checked={on} disabled={locked} className="size-5 accent-[var(--color-brand)]"
-                  onChange={(e) => setPicked((p) => { const n = { ...p }; if (e.target.checked) n[x.id] = ''; else delete n[x.id]; return n })} />
+                  onChange={(e) => setPicked((p) => {
+                    const n = { ...p }
+                    // Gợi ý sẵn: mục tiêu của hạng mục, không có thì pace 6:00/km — người chạy chỉ cần cuộn chỉnh
+                    if (e.target.checked) n[x.id] = formatClock(x.target_s ?? (pace ? 360 : Math.max(60, Math.round((x.distance_m / 1000) * 6) * 60)))
+                    else delete n[x.id]
+                    return n
+                  })} />
                 <span className="flex-1"><span className="block font-semibold">{x.label}</span>
                   <span className="block text-xs text-fg-muted">{kmLabel(x.distance_m / 1000)}{x.target_s ? ` · mục tiêu ${targetText(b, x.target_s)}` : ''}</span></span>
                 {locked && <Lock className="size-4 text-fg-subtle" aria-label="Đã khóa" />}
               </label>
               {on && b.mode === 'SELF' && (
-                <Input className="mt-2 font-mono" inputMode="numeric" disabled={locked} aria-label={`Mục tiêu ${x.label}`}
-                  placeholder={pace ? 'VD 6:00' : 'VD 55:00 hoặc 1:55:00'} value={picked[x.id] ?? ''}
-                  onChange={(e) => setPicked((p) => ({ ...p, [x.id]: e.target.value }))} />
+                <ClockPicker className="mt-2" mode={pace ? 'pace' : 'time'} disabled={locked} label={`Mục tiêu ${x.label}`}
+                  maxHours={Math.max(3, Math.ceil((x.distance_m / 1000) * 12 / 60))}
+                  value={parseClock(picked[x.id] ?? '')} onChange={(sec) => setPicked((p) => ({ ...p, [x.id]: formatClock(sec) }))} />
               )}
             </li>
           )
