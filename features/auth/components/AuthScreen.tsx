@@ -12,6 +12,19 @@ const CALLBACK_ERROR: Record<string, string> = {
   oauth: 'Không đăng nhập được bằng tài khoản này. Thử lại hoặc dùng email.',
 }
 
+// Lỗi Supabase Auth (tiếng Anh) → câu tiếng Việt dễ hiểu
+function authErrorMessage(message: string): string {
+  const m = message.toLowerCase()
+  if (m.includes('email not confirmed')) return 'Email chưa được xác nhận. Vui lòng kiểm tra hộp thư và bấm vào liên kết xác nhận trước khi đăng nhập.'
+  if (m.includes('invalid login credentials')) return 'Sai tài khoản hoặc mật khẩu. Vui lòng kiểm tra lại!'
+  if (m.includes('rate limit') || m.includes('too many')) return 'Hệ thống đang nhận quá nhiều yêu cầu gửi email. Vui lòng thử lại sau ít phút, hoặc dùng "Tiếp tục với Google".'
+  if (m.includes('already registered') || m.includes('already exists')) return 'Email này đã có tài khoản. Hãy bấm Đăng nhập (hoặc Quên mật khẩu).'
+  if (m.includes('password should be') || m.includes('weak password')) return 'Mật khẩu quá yếu: cần ít nhất 6 ký tự.'
+  if (m.includes('invalid') && m.includes('email')) return 'Email không hợp lệ. Vui lòng kiểm tra lại.'
+  if (m.includes('signups not allowed')) return 'Hiện chưa mở đăng ký bằng email. Vui lòng dùng "Tiếp tục với Google".'
+  return message
+}
+
 type Mode = 'login' | 'register' | 'forgot'
 
 export default function AuthScreen({ onAuthSuccess, next = '/feed', callbackError, initialMode }: {
@@ -66,13 +79,7 @@ export default function AuthScreen({ onAuthSuccess, next = '/feed', callbackErro
       )
     if (result) {
       if (result.error) {
-        if (result.error.message.toLowerCase().includes('email not confirmed')) {
-          setErrorMsg('Email chưa được xác nhận. Vui lòng kiểm tra hộp thư và bấm vào liên kết xác nhận trước khi đăng nhập.')
-        } else if (result.error.message.toLowerCase().includes('invalid login credentials')) {
-          setErrorMsg('Sai tài khoản hoặc mật khẩu. Vui lòng kiểm tra lại!')
-        } else {
-          setErrorMsg(result.error.message)
-        }
+        setErrorMsg(authErrorMessage(result.error.message))
       } else {
         onAuthSuccess()
       }
@@ -91,7 +98,7 @@ export default function AuthScreen({ onAuthSuccess, next = '/feed', callbackErro
       if (result) {
         const { data, error } = result
         if (error) {
-          setErrorMsg(error.message)
+          setErrorMsg(authErrorMessage(error.message))
         } else if (data.session) {
           onAuthSuccess()
         } else {
@@ -146,7 +153,7 @@ export default function AuthScreen({ onAuthSuccess, next = '/feed', callbackErro
 
     if (result) {
       if (result.error) {
-        setErrorMsg(result.error.message)
+        setErrorMsg(authErrorMessage(result.error.message))
       } else {
         setResetSent(true)
       }

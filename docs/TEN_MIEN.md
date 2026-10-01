@@ -33,6 +33,18 @@ Thường chạy sau 5–30 phút, tối đa 24 giờ.
 - Apple Developer → Service ID → *Domains and Subdomains*: thêm `racehubrun.com`.
 (Đường quay về vẫn là `https://<project>.supabase.co/auth/v1/callback` — không đổi.)
 
+## 5b. Email gửi từ tên miền (bắt buộc trước khi mời nhiều người đăng ký)
+Máy gửi email có sẵn của Supabase chỉ gửi **vài email mỗi giờ** cho cả hệ thống → người đăng ký thứ 3–4 gặp lỗi
+*"email rate limit exceeded"*. Cần dùng dịch vụ gửi email riêng (SMTP), ví dụ **Resend** (miễn phí 3.000 email/tháng):
+1. resend.com → đăng ký → **Domains → Add Domain**: `racehubrun.com` → thêm các bản ghi DNS (TXT/MX) Resend hiện vào Namecheap → chờ **Verified**.
+2. Resend → **API Keys → Create** (chỉ quyền Sending). Không gửi key này qua chat.
+3. Supabase → **Authentication → Emails → SMTP Settings** → bật **Enable custom SMTP**:
+   - Sender email: `no-reply@racehubrun.com`, Sender name: `RaceHub`
+   - Host `smtp.resend.com`, Port `465`, Username `resend`, Password: API key vừa tạo → Save.
+4. Supabase → **Authentication → Rate Limits** → *Rate limit for sending emails*: tăng lên ~100/giờ.
+
+Tạm thời khi test: có thể tắt **Authentication → Sign In / Providers → Email → Confirm email** để đăng ký không cần gửi thư (bật lại trước khi ra mắt).
+
 ## 6. Kiểm tra
 - [ ] `https://racehubrun.com` mở được, có ổ khoá HTTPS; `www.racehubrun.com` tự chuyển về.
 - [ ] Đăng ký / đăng nhập email, Google, Apple.
