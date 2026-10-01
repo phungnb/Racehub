@@ -31,8 +31,13 @@ export async function POST(req: NextRequest) {
     const subs = (await list.json()) as { id: number; callback_url: string }[]
     const same = subs.find((s) => s.callback_url === callback)
     if (same) return NextResponse.json({ id: same.id, callback, already: true })
-    for (const s of subs) {   // webhook cũ trỏ tên miền khác
-      await fetch(`${API}/${s.id}?${auth}`, { method: 'DELETE', signal: AbortSignal.timeout(8000) })
+    const removed: string[] = []
+    for (const s of subs) {   // webhook cũ trỏ tên miền khác (vd racehub-iota.vercel.app) — Strava chỉ cho 1 webhook mỗi app
+      const del = await fetch(`${API}/${s.id}?${auth}`, { method: 'DELETE', signal: AbortSignal.timeout(8000) })
+      if (!del.ok && del.status !== 404) {
+        return NextResponse.json({ error: `Không xoá được webhook cũ (${s.callback_url}) — Strava trả mã ${del.status}. Thử lại sau ít phút.` }, { status: 502 })
+      }
+      removed.push(s.callback_url)
     }
     // Strava gọi ngược GET callback?hub.verify_token=… để xác minh trước khi trả kết quả
     const body = new URLSearchParams({ client_id: id, client_secret: secret, callback_url: callback, verify_token: verify })
@@ -42,7 +47,7 @@ export async function POST(req: NextRequest) {
       const why = j?.errors?.map((e) => [e.field, e.code].filter(Boolean).join(' ')).join(', ') || j?.message || `mã ${res.status}`
       return NextResponse.json({ error: `Strava chưa nhận webhook: ${why}. Kiểm tra STRAVA_WEBHOOK_VERIFY_TOKEN đã Redeploy chưa.` }, { status: 502 })
     }
-    return NextResponse.json({ id: j.id, callback, already: false })
+    return NextResponse.json({ id: j.id, callback, already: false, removed })
   } catch {
     return NextResponse.json({ error: 'Không gọi được Strava (mạng / hết giờ), thử lại sau.' }, { status: 504 })
   }

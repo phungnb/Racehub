@@ -404,9 +404,9 @@ export async function getServerCheck(): Promise<{ items: ServerCheckItem[]; orig
 }
 
 /** Đăng ký webhook Strava từ máy chủ (thay lệnh curl); trả mã subscription */
-export async function registerStravaWebhook(): Promise<{ id: number; callback: string; already: boolean }> {
+export async function registerStravaWebhook(): Promise<{ id: number; callback: string; already: boolean; removed: string[] }> {
   const res = await fetch('/api/admin/strava-webhook', { method: 'POST' })
-  const j = (await res.json().catch(() => null)) as { id?: number; callback?: string; already?: boolean; error?: string } | null
+  const j = (await res.json().catch(() => null)) as { id?: number; callback?: string; already?: boolean; removed?: string[]; error?: string } | null
   if (!res.ok || !j?.id) throw new Error(j?.error ?? `Lỗi ${res.status}`)
-  return { id: j.id, callback: j.callback ?? '', already: !!j.already }
+  return { id: j.id, callback: j.callback ?? '', already: !!j.already, removed: j.removed ?? [] }
 }
