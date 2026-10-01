@@ -13,7 +13,7 @@ on:
 
 env:
   # Địa chỉ web mà app mở; đặt biến CAP_SERVER_URL trong Settings → Secrets and variables → Actions → Variables nếu đổi tên miền
-  CAP_SERVER_URL: ${{ vars.CAP_SERVER_URL || 'https://racehub-iota.vercel.app' }}
+  CAP_SERVER_URL: ${{ vars.CAP_SERVER_URL || 'https://racehubrun.com' }}
 
 jobs:
   android:

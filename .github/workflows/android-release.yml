@@ -14,7 +14,7 @@ on:
         default: '1.0.0'
 
 env:
-  CAP_SERVER_URL: ${{ vars.CAP_SERVER_URL || 'https://racehub-iota.vercel.app' }}
+  CAP_SERVER_URL: ${{ vars.CAP_SERVER_URL || 'https://racehubrun.com' }}
 
 jobs:
   release:

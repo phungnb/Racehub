@@ -1,5 +1,7 @@
 # Hướng dẫn triển khai các thay đổi (Giai đoạn 0 + khung Giai đoạn 1)
 
+> **Tên miền chính: `racehubrun.com`** — các bước gắn tên miền (Vercel, DNS, Supabase, Strava, Google/Apple): xem [TEN_MIEN.md](TEN_MIEN.md).
+
 Làm theo **đúng thứ tự** dưới đây. Tổng thời gian khoảng 20 phút.
 
 ## Bước 1 — Sao lưu database
