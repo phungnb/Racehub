@@ -43,6 +43,9 @@ function makeQueryClient() {
         retry: (count, e) => count < 2 && shouldRetry(e),
         retryDelay: (n) => Math.min(1000 * 2 ** n, 8000),
         refetchOnWindowFocus: false,
+        // Dữ liệu vừa tải trong 30 giây coi như còn mới: quay lại màn vừa xem không tải lại hết từ đầu
+        // (sau khi bấm lưu / gửi, các màn vẫn tự tải lại vì mutation gọi invalidateQueries).
+        staleTime: 30_000,
       },
     },
   })
