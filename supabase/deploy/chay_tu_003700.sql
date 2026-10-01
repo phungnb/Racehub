@@ -22257,7 +22257,9 @@ declare
   v_week date := private.vn_week(v_now);
   cfg jsonb := private.game_config();
   s public.user_streaks;
-  w record;
+  w_km numeric;
+  w_runs integer;
+  w_days integer;
   v_gap integer;
   v_alive boolean;
   v_daily integer := 0;
@@ -22272,7 +22274,7 @@ begin
   perform private.settle_leagues_due();
   perform private.catch_up_achievements(v_uid);                  -- bắt kịp huy hiệu (tối đa 1 lần / 10 phút)
   s := private.ensure_streak(v_uid);
-  select * from private.week_run_stats(v_uid, v_week) into w;
+  select ws.km, ws.runs, ws.days into w_km, w_runs, w_days from private.week_run_stats(v_uid, v_week) as ws;
 
   v_gap := case when s.last_week is null then null else (v_week - s.last_week) / 7 - 1 end;
   -- Còn chuỗi: tuần này đã đạt, hoặc tuần trước đạt, hoặc số tuần hụt ≤ số khiên
@@ -22331,9 +22333,9 @@ begin
     'today', v_today, 'week_start', v_week,
     'checked_in', exists (select 1 from public.user_quest_progress p join public.quests q on q.id = p.quest_id
                            where p.user_id = v_uid and q.metric = 'CHECKIN' and p.period_start = v_today and p.progress >= 1),
-    'week', jsonb_build_object('km', round(coalesce(w.km, 0), 2), 'runs', coalesce(w.runs, 0), 'days', coalesce(w.days, 0)),
+    'week', jsonb_build_object('km', round(coalesce(w_km, 0), 2), 'runs', coalesce(w_runs, 0), 'days', coalesce(w_days, 0)),
     'streak', jsonb_build_object(
-      'goal', s.weekly_goal, 'week_days', coalesce(w.days, 0), 'done_this_week', s.last_week = v_week,
+      'goal', s.weekly_goal, 'week_days', coalesce(w_days, 0), 'done_this_week', s.last_week = v_week,
       'current', case when v_alive then s.current_weeks else 0 end, 'best', s.best_weeks, 'alive', v_alive,
       'at_risk_weeks', greatest(coalesce(v_gap, 0), 0), 'shields', s.shields,
       'max_shields', (cfg->>'maxShields')::int, 'shield_price', (cfg->>'shieldPrice')::numeric, 'daily', v_daily),

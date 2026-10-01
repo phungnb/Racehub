@@ -23,6 +23,7 @@ describe('Trang chủ nhẹ hơn: bắt kịp huy hiệu tối đa 1 lần / 10 
   it('lần đầu kiểm tra, mở lại trong 10 phút thì bỏ qua, quá 10 phút thì kiểm tra lại', async () => {
     const s1 = await state(db)
     expect(s1).toBeTruthy()
+    expect(s1.week).toEqual({ km: 0, runs: 0, days: 0 })   // số liệu tuần vẫn đúng sau khi viết lại
     const t1 = await checkedAt(db)
     expect(t1).toBeTruthy()
 
