@@ -19,10 +19,28 @@ function patchApiFetch() {
   }
 }
 
+export interface BootTiming { serverMs: number; htmlMs: number; jsKb: number; jsMs: number; appMs: number; sw: boolean }
+
+/** Khởi động app (lần mở đầu): máy chủ trả trang, tải HTML, tải JS, app chạy được — đo bằng Navigation/Resource Timing */
+function readBoot(): BootTiming | null {
+  const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
+  if (!nav) return null
+  const js = (performance.getEntriesByType('resource') as PerformanceResourceTiming[]).filter((r) => r.name.includes('/_next/static/') && r.name.endsWith('.js'))
+  return {
+    serverMs: Math.round(nav.responseStart - nav.startTime),
+    htmlMs: Math.round(nav.responseEnd - nav.startTime),
+    jsKb: Math.round(js.reduce((a, r) => a + (r.transferSize || 0), 0) / 1024),
+    jsMs: Math.round(js.reduce((a, r) => Math.max(a, r.responseEnd), 0)),
+    appMs: Math.round(performance.now()),
+    sw: !!navigator.serviceWorker?.controller,
+  }
+}
+
 export default function PerfOverlay() {
   const pathname = usePathname()
   const [open, setOpen] = useState(true)
   useSyncExternalStore(onPerf, perfVersion, () => 0)
+  const [boot] = useState(readBoot)
   useEffect(() => { patchApiFetch() }, [])
   useEffect(() => { perfRouteStart(pathname) }, [pathname])
 
@@ -30,7 +48,7 @@ export default function PerfOverlay() {
   const cur = routes[0]
   const here = requests.filter((r) => r.route === cur?.route).slice(0, 40)
   const slow = [...here].sort((a, b) => b.ms - a.ms).slice(0, 8)
-  const copy = () => void navigator.clipboard?.writeText(JSON.stringify({ routes, requests: requests.slice(0, 150) }, null, 1))
+  const copy = () => void navigator.clipboard?.writeText(JSON.stringify({ boot, routes, requests: requests.slice(0, 150) }, null, 1))
 
   if (!open) {
     return <button onClick={() => setOpen(true)} className="fixed bottom-24 left-2 z-[200] rounded-full bg-black/80 px-3 py-1 font-mono text-xs text-lime-300">⏱ perf</button>
@@ -43,6 +61,11 @@ export default function PerfOverlay() {
         <button onClick={() => setOpen(false)} className="rounded bg-white/15 px-1.5">Thu</button>
         <button onClick={disablePerf} className="rounded bg-white/15 px-1.5">Tắt</button>
       </div>
+      {boot && (
+        <p className="mb-1 text-white/80">
+          Khởi động: máy chủ <b className={boot.serverMs > 800 ? 'text-red-300' : ''}>{boot.serverMs}</b> · HTML {boot.htmlMs} · JS {boot.jsKb} KB xong lúc {boot.jsMs} · app chạy lúc <b className={boot.appMs > 3000 ? 'text-red-300' : ''}>{boot.appMs}</b> ms{boot.sw ? '' : ' · chưa có SW'}
+        </p>
+      )}
       <p>Mở trang: <b className="text-lime-300">{cur?.readyMs != null ? `${cur.readyMs} ms` : 'đang tải…'}</b> · {cur?.requests ?? 0} yêu cầu</p>
       <p className="mt-1 text-white/60">Chậm nhất:</p>
       {slow.map((r, i) => (
