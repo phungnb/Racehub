@@ -19,7 +19,7 @@ async function syncNow(): Promise<SyncSummary | null> {
 }
 
 /** Tự đồng bộ ngầm khi mở / quay lại app nếu lần trước đã quá khoảng này (dự phòng khi webhook Strava chậm hoặc lỗi) */
-const AUTO_SYNC_MS = 3 * 60_000
+const AUTO_SYNC_MS = 15 * 60_000
 const LAST_KEY = 'rh:strava:auto-sync'
 
 function useStravaRefresh() {

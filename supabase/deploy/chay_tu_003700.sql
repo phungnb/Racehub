@@ -1,7 +1,7 @@
--- RaceHub: gộp 85 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 86 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -22184,6 +22184,42 @@ end $$;
 
 revoke all on function public.join_challenge_pledge(uuid, numeric, text) from public, anon;
 grant execute on function public.join_challenge_pledge(uuid, numeric, text) to authenticated;
+
+-- ===================================================================
+-- 20261001012100_perf_clubs_inbox.sql
+-- ===================================================================
+-- Tăng tốc danh sách CLB (tab CLB): đếm tin chưa đọc tối đa 100 (giao diện chỉ hiện "99+"),
+-- không phải quét toàn bộ lịch sử chat của CLB chưa từng mở. Kết quả trả về giữ nguyên các cột.
+create or replace function public.my_clubs_inbox()
+returns table (
+  club_id uuid, name text, avatar_url text, accent_color text, role text, member_status text,
+  member_count integer, unread_count integer, last_message_body text, last_message_author text,
+  last_message_at timestamptz, pinned_title text
+)
+language sql stable security definer set search_path = public as $$
+  select c.id, c.name, c.avatar_url, c.accent_color, m.role, m.status, c.member_count,
+         case when m.status <> 'APPROVED' then 0 else (
+           select count(*)::int from (
+             select 1 from public.club_messages x
+              where x.club_id = c.id and x.deleted_at is null and x.author_id <> (select auth.uid())
+                and x.created_at > coalesce((select r.last_read_at from public.club_message_reads r
+                                              where r.club_id = c.id and r.user_id = (select auth.uid())), m.joined_at, '-infinity')
+              order by x.created_at desc
+              limit 100) u)
+         end,
+         lm.body, private.display_name(lm.author_id), lm.created_at,
+         (select coalesce(p.title, left(p.body, 80)) from public.club_posts p
+           where p.club_id = c.id and p.is_pinned and p.deleted_at is null
+           order by p.created_at desc limit 1)
+    from public.club_members m
+    join public.clubs c on c.id = m.club_id
+    left join lateral (
+      select x.body, x.author_id, x.created_at from public.club_messages x
+       where x.club_id = c.id and x.deleted_at is null and m.status = 'APPROVED'
+       order by x.created_at desc limit 1) lm on true
+   where m.user_id = (select auth.uid()) and m.status in ('APPROVED', 'PENDING')
+   order by coalesce(lm.created_at, m.joined_at) desc nulls last
+$$;
 
 -- ===================================================================
 -- 20261001003500_system_check.sql

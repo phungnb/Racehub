@@ -23,8 +23,9 @@ export function ClubShell({ clubId, children }: { clubId: string; children: Reac
   const pathname = usePathname()
   const { club, membership, isMember, isStaff, isRealMember, isAdmin, isLoading, isError, error, refetch } = useClub(clubId)
   const inbox = useClubInbox()
-  const members = useClubMembers(clubId, isMember)
   const [showMembers, setShowMembers] = useState(false)
+  // Danh sách thành viên chỉ tải khi mở bảng Thành viên; BQT cần ngay để đếm đơn chờ duyệt
+  const members = useClubMembers(clubId, isMember && (isStaff || showMembers))
   const unread = inbox.data?.find((c) => c.club_id === clubId)?.unread_count ?? 0
   const pending = isStaff ? (members.data ?? []).filter((m) => m.status === 'PENDING').length : 0
 

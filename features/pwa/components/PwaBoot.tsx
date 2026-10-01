@@ -16,7 +16,7 @@ export function PwaBoot() {
   const router = useRouter()
   const qc = useQueryClient()
 
-  // Quay lại app sau ≥ 20 giây, hoặc vừa có mạng lại → tải lại dữ liệu đang hiện (bài chạy mới, Xu, thông báo…)
+  // Quay lại app sau ≥ 2 phút, hoặc vừa có mạng lại → tải lại dữ liệu đang hiện (bài chạy mới, Xu, thông báo…)
   useEffect(() => {
     let hiddenAt: number | null = null
     const refresh = () => void qc.invalidateQueries({ refetchType: 'active' })

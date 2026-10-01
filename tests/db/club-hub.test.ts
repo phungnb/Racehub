@@ -125,6 +125,18 @@ describe('CLB lõi (000500)', () => {
     expect(await fails(db, OWNER, `insert into public.club_messages (club_id, body) values ($1, 'tin 21')`, [club])).toContain('RATE_LIMITED')
   })
 
+  it('hộp thư: đếm tin chưa đọc tối đa 100 (giao diện hiện 99+)', async () => {
+    const other = (await db.query<{ id: string }>(`insert into public.clubs (name, owner_id, invite_code) values ('CLB đông tin', $1, 'BUSY01') returning id`, [OWNER])).rows[0].id
+    await db.query(`insert into public.club_members (club_id, user_id, role, status, joined_at) values ($1, $2, 'MEMBER', 'APPROVED', now() - interval '1 day')
+      on conflict do nothing`, [other, CAPTAIN])
+    await db.exec(`set session_replication_role = replica`)
+    await db.query(`insert into public.club_messages (club_id, author_id, body, created_at)
+      select $1, $2, 'tin ' || g, now() - (g || ' seconds')::interval from generate_series(1, 130) g`, [other, OWNER])
+    await db.exec(`set session_replication_role = origin`)
+    const row = await one<{ unread_count: number }>(db, CAPTAIN, `select unread_count from public.my_clubs_inbox() where club_id = $1`, [other])
+    expect(row.unread_count).toBe(100)
+  })
+
   it('hộp thư: đếm tin chưa đọc, đọc xong về 0; thu hồi tin', async () => {
     const before = await one<{ unread_count: number }>(db, CAPTAIN, `select unread_count from public.my_clubs_inbox() where club_id = $1`, [club])
     expect(before.unread_count).toBe(21)
