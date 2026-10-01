@@ -191,7 +191,12 @@ function NotifyErrorsPanel() {
 function StravaWebhookButton({ onDone }: { onDone: () => void }) {
   const reg = useMutation({
     mutationFn: registerStravaWebhook,
-    onSuccess: (r) => { toast.success(r.already ? `Webhook đã có sẵn (mã ${r.id}).` : `Đã đăng ký webhook Strava (mã ${r.id}).`); onDone() },
+    onSuccess: (r) => {
+      const host = (u: string) => { try { return new URL(u).host } catch { return u } }
+      toast.success(r.already ? `Webhook đã trỏ đúng ${host(r.callback)} (mã ${r.id}).`
+        : `Đã đăng ký webhook Strava về ${host(r.callback)} (mã ${r.id})${r.removed.length ? ` — đã xoá webhook cũ: ${r.removed.map(host).join(', ')}` : ''}.`, { duration: 10000 })
+      onDone()
+    },
     onError: (e) => toast.error((e as Error).message, { duration: 12000 }),
   })
   return (

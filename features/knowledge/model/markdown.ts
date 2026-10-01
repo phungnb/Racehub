@@ -49,13 +49,15 @@ export function youtubeId(line: string): string | null {
 
 export function parseInline(s: string): Inline[] {
   const out: Inline[] = []
-  const re = /\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)/g
+  // Thêm: link trần https://… (không dấu ngoặc) tự thành link bấm được, bỏ dấu câu ở cuối
+  const re = /\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)|(https?:\/\/[^\s<>()[\]]*[^\s<>()[\].,;:!?'"])/g
   let last = 0
   for (let m = re.exec(s); m; m = re.exec(s)) {
     if (m.index > last) out.push({ t: 'text', v: s.slice(last, m.index) })
     if (m[1] !== undefined) out.push({ t: 'b', c: parseInline(m[1]) })
     else if (m[2] !== undefined) out.push({ t: 'i', c: parseInline(m[2]) })
     else if (m[3] !== undefined) out.push({ t: 'code', v: m[3] })
+    else if (m[6] !== undefined) out.push({ t: 'a', href: m[6], c: [{ t: 'text', v: m[6].replace(/^https?:\/\//, '') }] })
     else {
       const href = safeHref(m[5])
       out.push(href ? { t: 'a', href, c: parseInline(m[4]) } : { t: 'text', v: m[4] })
