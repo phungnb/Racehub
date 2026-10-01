@@ -48,7 +48,9 @@ begin
   perform private.settle_leagues_due();
   perform private.catch_up_achievements(v_uid);                  -- bắt kịp huy hiệu (tối đa 1 lần / 10 phút)
   s := private.ensure_streak(v_uid);
-  select ws.km, ws.runs, ws.days into w_km, w_runs, w_days from private.week_run_stats(v_uid, v_week) as ws;
+  w_km := (select ws.km from private.week_run_stats(v_uid, v_week) as ws);
+  w_runs := (select ws.runs from private.week_run_stats(v_uid, v_week) as ws);
+  w_days := (select ws.days from private.week_run_stats(v_uid, v_week) as ws);
 
   v_gap := case when s.last_week is null then null else (v_week - s.last_week) / 7 - 1 end;
   -- Còn chuỗi: tuần này đã đạt, hoặc tuần trước đạt, hoặc số tuần hụt ≤ số khiên
@@ -68,7 +70,7 @@ begin
     v_prev := d;
   end loop;
 
-  select coalesce(jsonb_agg(jsonb_build_object(
+  v_quests := (select coalesce(jsonb_agg(jsonb_build_object(
            'id', q.id, 'code', q.code, 'period', q.period, 'metric', q.metric, 'title', q.title, 'description', q.description,
            'icon', q.icon, 'target', q.target, 'reward_xu', q.reward_xu, 'reward_xp', q.reward_xp,
            'progress', least(coalesce(p.progress, 0), q.target), 'completed', p.completed_at is not null)
@@ -76,13 +78,12 @@ begin
     from public.quests q
     left join public.user_quest_progress p on p.quest_id = q.id and p.user_id = v_uid
          and p.period_start = case q.period when 'DAILY' then v_today else v_week end
-   where q.is_active
-    into v_quests;
+   where q.is_active);
 
-  select group_id from public.league_members where user_id = v_uid and week_start = v_week into v_group;
+  v_group := (select group_id from public.league_members where user_id = v_uid and week_start = v_week);
   v_tier := coalesce((select tier from public.user_league where user_id = v_uid), 1);
   if v_group is not null then
-    with lb as (
+    v_league := (with lb as (
       select lm.user_id, private.league_points(lm.user_id, v_week) as pts, lm.joined_at
         from public.league_members lm where lm.group_id = v_group),
     rk as (select user_id, pts, row_number() over (order by pts desc, joined_at) as rank from lb)
@@ -93,15 +94,13 @@ begin
              'points', (select pts from rk where user_id = v_uid),
              'promote', (select promote from private.league_zones((select count(*)::int from rk), v_tier)),
              'demote', (select demote from private.league_zones((select count(*)::int from rk), v_tier)),
-             'ends_at', private.vn_start(v_week + 7))
-      into v_league;
+             'ends_at', private.vn_start(v_week + 7)));
   end if;
 
-  select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at), '[]'::jsonb)
+  v_events := (select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at), '[]'::jsonb)
     from (select id, kind, title, subtitle, xu, xp, activity_id, payload, created_at from public.game_events
            where user_id = v_uid and seen_at is null and created_at > v_now - interval '7 days'
-           order by created_at desc limit 12) e
-    into v_events;
+           order by created_at desc limit 12) e);
 
   return jsonb_build_object(
     'today', v_today, 'week_start', v_week,
