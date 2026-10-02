@@ -257,7 +257,7 @@ function Designer({ facts: f, user, onChangePerson }: { facts: VicFacts; user: s
       </Section>
 
       <Card className="divide-y divide-border px-3 py-0">
-        <SwitchRow checked={o.showQr} onChange={(v) => set({ showQr: v })} label="Mã QR xác thực" description="Người xem quét để kiểm tra thành tích trên RaceHub" />
+        <SwitchRow checked={o.showQr} onChange={(v) => set({ showQr: v })} label="Mã QR" description="Người xem quét để mở thành tích này trên RaceHub (không cần đăng nhập, không cần nhập mã)" />
         {f.club && <SwitchRow checked={o.showClub} onChange={(v) => set({ showClub: v })} label={`Hiện tên CLB: ${f.club}`} />}
       </Card>
 

@@ -5,10 +5,10 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ExternalLink, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Card, ErrorState, Field, Input, Skeleton, Textarea } from '@/shared/ui'
+import { Button, Card, ErrorState, Field, Input, PlaceSearch, Skeleton, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
-import { PROVINCES } from '@/shared/lib/provinces'
+import { guessProvince, PROVINCES } from '@/shared/lib/provinces'
 import { ImagePick } from '@/shared/design/studio/bits'
 import {
   marketErrorMessage, myPartners, PARTNER_KIND, savePartner, uploadPartnerImage,
@@ -138,7 +138,9 @@ function PartnerForm({ init, onDone }: { init: Partner | PartnerKind; onDone: ()
             </select>
           </Field>
           <Field label="Địa chỉ (không bắt buộc)" htmlFor="pt-addr">
-            <Input id="pt-addr" value={d.address ?? ''} maxLength={160} onChange={(e) => set({ address: e.target.value })} placeholder={kind === 'COACH' ? 'VD: Tập tại hồ Gươm' : 'Số nhà, đường, phường'} />
+            <PlaceSearch id="pt-addr" value={d.address ?? ''} maxLength={160} onChange={(v) => set({ address: v })} map={false}
+              placeholder={kind === 'COACH' ? 'VD: Tập tại hồ Gươm' : 'Gõ tên đường / địa điểm để chọn nhanh'}
+              onPick={(p) => set({ address: [p.name, p.address].filter(Boolean).join(', ').slice(0, 160), area: d.area || guessProvince(p.address) })} />
           </Field>
         </div>
         <Field label="Giới thiệu chi tiết" htmlFor="pt-bio">

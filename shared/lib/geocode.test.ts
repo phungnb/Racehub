@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toPlaces } from './geocode'
+import { mergeRecent, toPlaces } from './geocode'
 
 describe('toPlaces', () => {
   it('gọn tên + địa chỉ, bỏ trùng, bỏ chỗ ngoài Việt Nam', () => {
@@ -16,5 +16,14 @@ describe('toPlaces', () => {
       { name: '12 Lê Duẩn', address: 'Hà Nội', lat: 21.01, lng: 105.84 },
     ])
     expect(toPlaces(null)).toEqual([])
+  })
+})
+
+describe('mergeRecent', () => {
+  const p = (name: string, lat = 21, lng = 105) => ({ name, address: '', lat, lng })
+  it('đưa lên đầu, bỏ trùng, giới hạn số lượng', () => {
+    expect(mergeRecent([p('A'), p('B')], p('B', 21.0001, 105.0001)).map((x) => x.name)).toEqual(['B', 'A'])
+    expect(mergeRecent([p('A')], p('A', 22, 106))).toHaveLength(2)
+    expect(mergeRecent([p('A'), p('B'), p('C')], p('D'), 3).map((x) => x.name)).toEqual(['D', 'A', 'B'])
   })
 })

@@ -54,6 +54,11 @@ describe('contactLinks', () => {
     expect(contactLinks({ support_zalo: 'https://zalo.me/g/abc123', support_telegram: '@ab' })).toEqual([
       { kind: 'zalo', label: 'Zalo', value: 'https://zalo.me/g/abc123', href: 'https://zalo.me/g/abc123' },
     ])
+    expect(contactLinks({ support_facebook: 'https://www.facebook.com/groups/racehubvn/', support_email: 'hotro@racehub.vn' }).map((c) => [c.kind, c.value, c.href])).toEqual([
+      ['facebook', 'facebook.com/groups/racehubvn', 'https://www.facebook.com/groups/racehubvn/'], ['email', 'hotro@racehub.vn', 'mailto:hotro@racehub.vn'],
+    ])
+    expect(contactLinks({ support_facebook: 'https://evil.com/facebook.com/x' })).toEqual([])
+    expect(contactLinks({ support_facebook: 'http://facebook.com/groups/x' })).toEqual([])
     expect(contactLinks({ support_zalo: 'javascript:alert(1)', support_email: 'khong-phai-email' })).toEqual([])
   })
 })

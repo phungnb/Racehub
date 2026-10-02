@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { EyeOff, Lock, MapPin, ShieldCheck, Timer } from 'lucide-react'
+import { EyeOff, Footprints, Lock, MapPin, ShieldCheck, Timer } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Field, Sheet, SwitchRow, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -55,6 +55,49 @@ export function PrefsForm({ value, onChange }: { value: DiscoveryInput; onChange
   )
 }
 
+/** Nội dung đồng ý "Khu hay chạy tự động" — hiện ở mọi nơi bật tính năng này */
+export const AUTO_AREA_TERMS = 'RaceHub ước lượng vùng ~2 km nơi bạn hay bắt đầu chạy, từ các bài chạy hợp lệ 60 ngày gần nhất (cần ≥ 2 bài cùng khu). ' +
+  'Không lưu điểm chính xác, không lộ tuyến chạy; người khác chỉ thấy khoảng cách ước chừng. Tắt là xoá ngay.'
+
+/** Khu hay chạy tự động: runner không phải mở app chọn vị trí mỗi ngày mà vẫn tìm thấy / được tìm thấy */
+export function AutoAreaCard({ me, onDone }: { me: Discovery; onDone?: () => void }) {
+  const [agree, setAgree] = useState(false)
+  const save = useNearbyMutation((p: DiscoveryInput) => setDiscovery(p))
+  if (me.auto_area && me.home) {
+    return <p className="rounded-xl bg-brand/10 p-3 text-sm">Đang dùng <b>khu hay chạy tự động</b> (từ {me.home.runs} bài chạy gần đây). Chọn khu vực tạm bên dưới nếu bạn đang ở nơi khác.</p>
+  }
+  return (
+    <div className="space-y-3 rounded-2xl border border-brand/40 bg-brand/5 p-3">
+      <div className="flex items-start gap-2.5">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand/20 text-brand"><Footprints className="size-5" aria-hidden /></span>
+        <div>
+          <p className="font-semibold">Tự động theo nơi hay chạy <span className="ml-1 rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold text-brand-fg">khuyên dùng</span></p>
+          <p className="text-xs text-fg-muted">{AUTO_AREA_TERMS}</p>
+        </div>
+      </div>
+      {me.auto_area && !me.home && (
+        <p className="rounded-lg bg-coin/10 px-2.5 py-2 text-xs text-coin">Đã bật nhưng chưa đủ dữ liệu: cần ≥ 2 bài chạy có GPS cùng một khu trong 60 ngày. Tạm thời hãy chọn khu vực bên dưới.</p>
+      )}
+      {!me.auto_area && (
+        <>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-[var(--color-brand)]" />
+            <span>Tôi đồng ý dùng điểm xuất phát bài chạy để ước lượng khu vực như trên.</span>
+          </label>
+          <Button block disabled={!agree} loading={save.isPending}
+            onClick={() => save.mutate({ auto_area: true, auto_consent: true }, {
+              onSuccess: (d) => {
+                if (d.located) { toast.success('Đã bật khu hay chạy tự động', { description: 'Không cần mở app chọn vị trí mỗi ngày nữa.' }); onDone?.() }
+                else toast.info('Đã bật — chưa đủ dữ liệu', { description: 'Cần ≥ 2 bài chạy có GPS cùng khu trong 60 ngày. Tạm thời hãy chọn khu vực bên dưới.' })
+              },
+              onError: (e) => toast.error(nearbyErrorMessage(e)),
+            })}>Dùng khu hay chạy</Button>
+        </>
+      )}
+    </div>
+  )
+}
+
 /** Bật Quanh đây lần đầu: 1) cam kết quyền riêng tư + đồng ý → 2) tuỳ chọn → 3) vị trí gần đúng */
 export function EnableSheet({ me, open, onClose }: { me: Discovery; open: boolean; onClose: () => void }) {
   const [step, setStep] = useState(me.enabled ? 3 : 1)
@@ -80,11 +123,11 @@ export function EnableSheet({ me, open, onClose }: { me: Discovery; open: boolea
         <div className="space-y-4">
           <p className="text-sm text-fg-muted">Tìm người chạy <b>cùng pace, cùng giờ, cùng mục tiêu</b> gần bạn, buổi chạy công khai và CLB quanh khu vực.</p>
           <ul className="space-y-2.5 text-sm">
-            <li className="flex gap-2.5"><MapPin className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden /><span>Chỉ lưu <b>vùng ~1 km</b> bạn chọn — không lưu điểm chính xác, không lấy từ GPS bài chạy, không theo dõi khi bạn đang chạy.</span></li>
+            <li className="flex gap-2.5"><MapPin className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden /><span>Chỉ lưu <b>vùng ~1–2 km</b> — không lưu điểm chính xác, không theo dõi khi bạn đang chạy. Bạn chọn: <b>tự động theo nơi hay xuất phát chạy</b> (không cần mở app mỗi ngày) hoặc tự chọn khu vực tạm thời.</span></li>
             <li className="flex gap-2.5"><Lock className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden /><span>Người khác chỉ thấy <b>tên gọi + chữ cái đầu họ</b> và <b>khoảng cách ước chừng</b> (đã làm tròn, có sai số).</span></li>
             <li className="flex gap-2.5"><Timer className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden /><span>Vị trí <b>tự hết hạn</b> sau 24 giờ / 7 / 30 ngày. Tắt tính năng = xoá vị trí ngay.</span></li>
             <li className="flex gap-2.5"><EyeOff className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden /><span>Chọn <b>ai thấy bạn</b>, chặn / báo cáo bất kỳ ai, ẩn mình một chạm.</span></li>
-            <li className="flex gap-2.5"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden /><span>Chỉ runner có <b>≥ 3 bài chạy hợp lệ</b> mới bật được (chống tài khoản ảo). Chưa có nhắn tin riêng — kết nối xong thì <b>rủ nhau vào buổi chạy</b>.</span></li>
+            <li className="flex gap-2.5"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden /><span>Chỉ runner có <b>≥ 3 bài chạy hợp lệ</b> mới bật được (chống tài khoản ảo). Kết nối xong thì <b>nhắn tin, rủ nhau vào buổi chạy</b>.</span></li>
           </ul>
           {!me.eligible && (
             <p className="rounded-xl bg-coin/10 p-3 text-sm text-coin">Bạn mới có {me.valid_runs}/3 bài chạy hợp lệ. Chạy thêm {3 - me.valid_runs} buổi nữa để bật Quanh đây.</p>
@@ -96,7 +139,13 @@ export function EnableSheet({ me, open, onClose }: { me: Discovery; open: boolea
         </div>
       )}
       {step === 2 && <PrefsForm value={prefs} onChange={setPrefs} />}
-      {step === 3 && <LocationPicker initialArea={me.presence?.area_label} onPick={submitPlace} busy={place.isPending} />}
+      {step === 3 && (
+        <div className="space-y-4">
+          <AutoAreaCard me={me} onDone={onClose} />
+          <p className="flex items-center gap-2 text-xs font-semibold text-fg-subtle"><span className="h-px flex-1 bg-border" />hoặc chọn khu vực tạm thời<span className="h-px flex-1 bg-border" /></p>
+          <LocationPicker initialArea={me.presence?.area_label} onPick={submitPlace} busy={place.isPending} />
+        </div>
+      )}
     </Sheet>
   )
 }

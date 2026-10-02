@@ -11,7 +11,7 @@ export const VISIBILITY: Record<Visibility, { label: string; hint: string }> = {
   CLUBS: { label: 'Chỉ thành viên CLB chung', hint: 'Người ở cùng ít nhất một CLB với bạn' },
 }
 export const PACE_FILTERS = { ALL: 'Mọi pace', FAST: 'Nhanh hơn 5:30', MID: '5:30–7:00', EASY: 'Chậm hơn 7:00', UNKNOWN: 'Chưa có dữ liệu' } as const
-export const REASONS: Record<Reason, string> = { PACE: 'Cùng pace', SLOT: 'Cùng khung giờ', GOAL: 'Cùng mục tiêu', CLUB: 'Cùng CLB', MUTUAL: 'Có bạn chung' }
+export const REASONS: Record<Reason, string> = { PACE: 'Cùng pace', SLOT: 'Cùng khung giờ', GOAL: 'Cùng mục tiêu', CLUB: 'Cùng CLB', MUTUAL: 'Có bạn chung', ACTIVE: 'Chạy đều tuần này' }
 export const REPORT_REASONS = { SPAM: 'Làm phiền / spam', HARASSMENT: 'Quấy rối', FAKE: 'Tài khoản giả', UNSAFE: 'Hành vi nguy hiểm', OTHER: 'Khác' } as const
 export const TTL: { hours: 24 | 168 | 720; label: string }[] = [{ hours: 24, label: '24 giờ' }, { hours: 168, label: '7 ngày' }, { hours: 720, label: '30 ngày' }]
 
@@ -37,4 +37,20 @@ export function expiresIn(iso: string, now = Date.now()) {
   const h = Math.max(0, (new Date(iso).getTime() - now) / 3_600_000)
   if (h < 1) return 'còn dưới 1 giờ'
   return h < 48 ? `còn ${Math.round(h)} giờ` : `còn ${Math.round(h / 24)} ngày`
+}
+
+/** "hôm nay" / "hôm qua" / "3 ngày trước" (theo số ngày máy chủ tính sẵn) */
+export function daysAgo(n: number | null | undefined): string | null {
+  if (n == null) return null
+  return n <= 0 ? 'hôm nay' : n === 1 ? 'hôm qua' : `${n} ngày trước`
+}
+
+/** Ngày "2026-10-01" (giờ VN) → "hôm nay" / "hôm qua" / "T4 01/10" */
+export function dayLabel(day: string, now = new Date()): string {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(now)
+  const diff = Math.round((Date.parse(today) - Date.parse(day)) / 86_400_000)
+  if (diff <= 0) return 'hôm nay'
+  if (diff === 1) return 'hôm qua'
+  const d = new Date(`${day}T00:00:00Z`)
+  return `${WEEKDAY[d.getUTCDay()]} ${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`
 }

@@ -240,7 +240,7 @@ export function victoryLayers(f: VicFacts, o: VicOptions, a: VicAssets): Layer[]
   if (foot) L.push(textLayer({ x: o.showQr ? (wide ? 0.62 : 0.42) : cx, y: y('foot', 0.92), text: foot, font: 'sans', size: S(0.024),
     w: o.showQr ? 0.6 : colW, color: 'text', opacity: 0.85 }))
   if (o.showQr && a.verifyUrl) {
-    L.push(qrLayer({ x: qx, y: qy, source: 'verify', w: qw, label: a.code ? `Mã ${a.code}` : 'Mã xác thực', card: true }))
+    L.push(qrLayer({ x: qx, y: qy, source: 'verify', w: qw, label: 'Quét xem trên RaceHub', card: true }))
   }
   return L
 }

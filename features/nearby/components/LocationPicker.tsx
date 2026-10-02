@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css'
 import { useEffect, useRef, useState } from 'react'
 import { LocateFixed, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Field, Input, SegmentedControl } from '@/shared/ui'
+import { Button, Field, Input, PlaceSearch, SegmentedControl } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { MAP_TILES } from '@/shared/config/map'
 import { toCell, TTL } from '../model/nearby'
@@ -27,6 +27,7 @@ export function LocationPicker({ initialArea, onPick, busy, submitLabel = 'Dùng
   const [area, setArea] = useState(initialArea ?? '')
   const [hours, setHours] = useState<24 | 168 | 720>(168)
   const [locating, setLocating] = useState(false)
+  const [query, setQuery] = useState('')
 
   const place = (lat: number, lng: number, source: 'DEVICE' | 'AREA') => {
     const c = { lat: toCell(lat), lng: toCell(lng) }
@@ -66,6 +67,9 @@ export function LocationPicker({ initialArea, onPick, busy, submitLabel = 'Dùng
 
   return (
     <div className="space-y-3">
+      <PlaceSearch id="nb-find" value={query} onChange={setQuery} locate={false} map={false} maxLength={80}
+        placeholder="Tìm khu bạn hay chạy: Hồ Tây, Công viên Yên Sở…"
+        onPick={(p) => { place(p.lat, p.lng, 'AREA'); setArea(p.name.slice(0, 60)) }} />
       <div className="flex gap-2">
         <Button variant="secondary" className="flex-1" onClick={locate} loading={locating}><LocateFixed className="size-4" aria-hidden />Vị trí hiện tại (một lần)</Button>
       </div>
@@ -73,7 +77,7 @@ export function LocationPicker({ initialArea, onPick, busy, submitLabel = 'Dùng
         <div ref={el} className="isolate z-0 h-64 overflow-hidden rounded-2xl border border-border bg-[#0e1116]" role="application" aria-label="Chạm để chọn khu vực" />
         {!pos && (
           <p className="pointer-events-none absolute inset-x-3 top-3 z-[400] flex items-center gap-1.5 rounded-xl bg-bg/85 px-3 py-2 text-xs text-fg-muted backdrop-blur">
-            <MapPin className="size-3.5 shrink-0" aria-hidden />Hoặc chạm lên bản đồ vào khu bạn hay chạy
+            <MapPin className="size-3.5 shrink-0" aria-hidden />Tìm tên ở trên, hoặc chạm lên bản đồ vào khu bạn hay chạy
           </p>
         )}
       </div>

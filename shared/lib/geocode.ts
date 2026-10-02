@@ -73,3 +73,42 @@ export async function positionIfAllowed(): Promise<{ lat: number; lng: number } 
     return await currentPosition(8_000)
   } catch { return null }
 }
+
+// ---------------------------------------------------------------------
+// Gợi ý nhanh kiểu app giao hàng: nơi đã chọn gần đây (chỉ lưu trên máy này) + nhớ kết quả tìm trong phiên
+// ---------------------------------------------------------------------
+const RECENT_KEY = 'rh.recentPlaces'
+const RECENT_MAX = 8
+
+/** Thêm địa điểm lên đầu danh sách gần đây, bỏ bản trùng (cùng tên + gần như cùng chỗ), giữ tối đa `max` */
+export function mergeRecent(list: Place[], p: Place, max = RECENT_MAX): Place[] {
+  const same = (a: Place) => a.name === p.name && Math.abs(a.lat - p.lat) < 0.0005 && Math.abs(a.lng - p.lng) < 0.0005
+  return [p, ...list.filter((a) => !same(a))].slice(0, max)
+}
+
+export function recentPlaces(): Place[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as unknown
+    return Array.isArray(v) ? v.filter((p): p is Place => !!p && typeof p.name === 'string' && Number.isFinite(p.lat) && Number.isFinite(p.lng)).slice(0, RECENT_MAX) : []
+  } catch { return [] }
+}
+
+export function rememberPlace(p: Place) {
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(mergeRecent(recentPlaces(), { name: p.name, address: p.address, lat: p.lat, lng: p.lng }))) } catch { /* chế độ riêng tư */ }
+}
+
+export function forgetRecentPlaces() {
+  try { localStorage.removeItem(RECENT_KEY) } catch { /* bỏ qua */ }
+}
+
+const cache = new Map<string, Place[]>()
+/** Như searchPlaces nhưng nhớ kết quả trong phiên (gõ lùi / gõ lại không phải chờ mạng) */
+export async function searchPlacesCached(q: string, near?: { lat: number; lng: number } | null, signal?: AbortSignal): Promise<Place[]> {
+  const key = `${q.trim().toLowerCase()}|${near ? `${near.lat.toFixed(2)},${near.lng.toFixed(2)}` : ''}`
+  const hit = cache.get(key)
+  if (hit) return hit
+  const r = await searchPlaces(q.trim(), near, signal)
+  if (cache.size > 100) cache.delete(cache.keys().next().value as string)
+  cache.set(key, r)
+  return r
+}

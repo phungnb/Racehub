@@ -51,6 +51,8 @@ export const routes = {
   learnStudio: '/learn/studio',
   learnWrite: '/learn/write',
   nearby: '/nearby',
+  hub: '/hub',
+  hubPost: (id: string) => `/hub?post=${encodeURIComponent(id)}`,
   nearbyConnections: '/nearby/connections',
   nearbyEvent: (id: string) => `/nearby/events/${encodeURIComponent(id)}`,
   races: '/races',

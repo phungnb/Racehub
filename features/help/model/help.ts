@@ -20,6 +20,7 @@ export const SITE_KEYS = [
   { key: 'support_phone', label: 'Điện thoại hỗ trợ', placeholder: '09…' },
   { key: 'support_zalo', label: 'Zalo hỗ trợ', placeholder: 'Số điện thoại Zalo hoặc link zalo.me/…' },
   { key: 'support_telegram', label: 'Telegram hỗ trợ', placeholder: '@tên hoặc link t.me/…' },
+  { key: 'support_facebook', label: 'Nhóm Facebook cộng đồng', placeholder: 'https://www.facebook.com/groups/…' },
   { key: 'report_email', label: 'Email nhận báo cáo vi phạm', placeholder: 'baocao@…' },
   { key: 'dpo_contact', label: 'Người phụ trách dữ liệu cá nhân', placeholder: 'Họ tên — email' },
   { key: 'min_age', label: 'Tuổi tối thiểu dùng app', placeholder: '16' },
@@ -52,6 +53,7 @@ export const MISSING = 'đang cập nhật'
 export const LINK_KEYS = [
   { key: 'zalo_link', kind: 'zalo', text: 'Nhắn Zalo' },
   { key: 'telegram_link', kind: 'telegram', text: 'Nhắn Telegram' },
+  { key: 'facebook_link', kind: 'facebook', text: 'Nhóm Facebook' },
   { key: 'phone_link', kind: 'phone', text: 'Gọi điện' },
   { key: 'email_link', kind: 'email', text: 'Gửi email' },
 ] as const
@@ -92,7 +94,7 @@ export function companyLine(site: SiteInfo): string[] {
   ].filter((x): x is string => !!x && x.trim().length > 0)
 }
 
-export type ContactKind = 'phone' | 'zalo' | 'telegram' | 'email'
+export type ContactKind = 'phone' | 'zalo' | 'telegram' | 'facebook' | 'email'
 export interface ContactLink { kind: ContactKind; label: string; value: string; href: string }
 
 const digits = (v: string) => v.replace(/[^\d+]/g, '')
@@ -113,6 +115,11 @@ export function contactLinks(site: SiteInfo): ContactLink[] {
   if (tg) {
     const name = tg.replace(/^https:\/\/(www\.)?t\.me\//i, '').replace(/^@/, '')
     if (/^[A-Za-z0-9_]{4,32}$/.test(name)) out.push({ kind: 'telegram', label: 'Telegram', value: `@${name}`, href: `https://t.me/${name}` })
+  }
+  const fb = site.support_facebook?.trim()
+  if (fb && /^https:\/\/((www|m|web)\.)?(facebook\.com|fb\.com)\/[^\s<>"']+$/i.test(fb)) {
+    const value = fb.replace(/^https:\/\/((www|m|web)\.)?/i, '').replace(/\/$/, '')
+    out.push({ kind: 'facebook', label: 'Nhóm Facebook', value, href: fb })
   }
   const email = site.support_email?.trim()
   if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) out.push({ kind: 'email', label: 'Email', value: email, href: `mailto:${email}` })

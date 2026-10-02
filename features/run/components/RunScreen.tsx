@@ -198,18 +198,19 @@ export function RunScreen({ onSaved }: { onSaved?: () => void }) {
       return <PocketMode distanceM={t.distanceM} clockLabel={clock.label} clockS={clock.value} pace={avgPace} status={status} onUnlock={() => setLocked(false)} />
     }
     return (
-      <div className="flex min-h-[75dvh] flex-col">
-        <div className="flex items-center justify-between">
-          <span className={cn('inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black tracking-wider',
-            status === 'ĐANG CHẠY' ? 'bg-brand text-brand-fg' : status === 'SẴN SÀNG' ? 'bg-brand/15 text-brand' : 'bg-warning/15 text-warning')}>
-            <span className={cn('size-2 rounded-full bg-current', status === 'ĐANG CHẠY' && 'animate-pulse')} />{status}
-          </span>
+      <div className="flex min-h-[75dvh] flex-col pt-[env(safe-area-inset-top)]">
+        {/* Thanh trạng thái điện thoại (giờ, pin) nằm trên cùng → chỉ để huy hiệu GPS nhỏ ở góc, trạng thái chạy nằm ngay dưới số km */}
+        <div className="flex justify-end">
           <GpsBadge gps={t.gps} />
         </div>
 
         <div className="flex flex-1 flex-col items-center justify-center py-8 text-center">
           <p className="font-mono tabular text-[5.5rem] font-black leading-none tracking-tight">{formatKm(t.distanceM)}</p>
           <p className="mt-2 text-sm font-semibold uppercase tracking-widest text-fg-subtle">Kilômét</p>
+          <span className={cn('mt-4 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-black tracking-wider',
+            status === 'ĐANG CHẠY' ? 'bg-brand text-brand-fg' : status === 'SẴN SÀNG' ? 'bg-brand/15 text-brand' : 'bg-warning/15 text-warning')}>
+            <span className={cn('size-2 rounded-full bg-current', status === 'ĐANG CHẠY' && 'animate-pulse')} />{status}
+          </span>
         </div>
 
         {t.phase === 'RUNNING' && !t.moved && <Notice tone="brand" icon={Footprints}>GPS sẵn sàng — bắt đầu chạy!</Notice>}
@@ -459,10 +460,11 @@ function RoundAction({ label, onClick, children }: { label: string; onClick: () 
 function PocketMode({ distanceM, clockLabel, clockS, pace, status, onUnlock }: { distanceM: number; clockLabel: string; clockS: number; pace: number; status: string; onUnlock: () => void }) {
   return (
     <div className="fixed inset-0 z-[80] flex flex-col items-center justify-between bg-black px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] text-white">
-      <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-black tracking-wider text-white/70">{status}</span>
+      <span aria-hidden />
       <div className="text-center">
         <p className="font-mono tabular text-[6.5rem] font-black leading-none text-brand">{formatKm(distanceM)}</p>
         <p className="mt-1 text-sm font-semibold uppercase tracking-widest text-white/50">Kilômét</p>
+        <span className="mt-3 inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-black tracking-wider text-white/70">{status}</span>
         <div className="mt-10 grid grid-cols-2 gap-10">
           <div><p className="text-xs uppercase tracking-wider text-white/50">{clockLabel}</p><p className="font-mono tabular text-4xl font-bold">{formatDuration(clockS)}</p></div>
           <div><p className="text-xs uppercase tracking-wider text-white/50">Pace TB</p><p className="font-mono tabular text-4xl font-bold">{formatPace(pace)}</p></div>
