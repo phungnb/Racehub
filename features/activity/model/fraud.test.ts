@@ -109,3 +109,105 @@ describe('ngưỡng do admin đặt (Chính sách vận hành)', () => {
     expect(analyzeRun(summary, s, [], strict).flags.map((f) => f.code)).toContain('SUSTAINED_SPEED')
   })
 })
+
+import { bestWindowSpeed, despike } from './fraud'
+
+describe('cú nhảy GPS và đường cong pace theo thời gian', () => {
+  it('bài 7,5 km pace 4:47 có 1 điểm GPS nhảy 73 km/h → vẫn hợp lệ (như ảnh báo nhầm)', () => {
+    const s = build([[1000, 3.48], [2, 20.3], [1140, 3.48]])        // 2 giây "nhảy" ~40 m (73 km/h)
+    const r = analyzeRun({ ...sum(s), maxSpeedMps: 20.3 }, s)
+    expect(r.verdict).toBe('OK')
+    expect(codes(r)).not.toContain('VEHICLE_BURST')
+    expect(codes(r)).not.toContain('PACE_CURVE')
+  })
+
+  it('đi xe 50 km/h liên tục 2 phút KHÔNG bị coi là cú nhảy GPS → chờ duyệt', () => {
+    const s = build([[900, 3], [120, 13.9], [900, 3]])
+    const r = analyzeRun(sum(s), s)
+    expect(codes(r)).toEqual(expect.arrayContaining(['VEHICLE_BURST', 'PACE_CURVE']))
+    expect(r.verdict).toBe('REVIEW')
+  })
+
+  it('5 phút pace 2:11/km (nhanh hơn kỷ lục 1500 m) → PACE_CURVE (SEVERE)', () => {
+    const s = build([[600, 3], [300, 7.6], [600, 3]])
+    const r = analyzeRun(sum(s), s)
+    expect(r.flags.find((f) => f.code === 'PACE_CURVE')).toMatchObject({ severity: 'SEVERE', durationS: 300 })
+    expect(r.reason).toContain('kỷ lục thế giới')
+  })
+
+  it('chạy nhanh nhưng trong khả năng con người (800 m trong 2:00) → không dính PACE_CURVE', () => {
+    const s = build([[900, 3], [120, 6.67], [900, 3]])
+    expect(codes(analyzeRun(sum(s), s))).not.toContain('PACE_CURVE')
+  })
+
+  it('không có streams: vận tốc tối đa một điểm chỉ là ghi chú, không tự chặn bài', () => {
+    const r = analyzeRun({ distanceM: 7460, movingS: 2140, maxSpeedMps: 20.3 }, null)
+    expect(r.verdict).toBe('OK')
+    expect(r.flags[0]).toMatchObject({ code: 'VEHICLE_BURST', severity: 'INFO' })
+  })
+
+  it('hàm phụ: bỏ cú nhảy ngắn, giữ đoạn nhanh kéo dài; tốc độ cửa sổ tốt nhất', () => {
+    const t = [0, 1, 2, 3, 4, 5]
+    expect(despike(t, [0, 3, 6, 56, 59, 62], 12)).toEqual([0, 3, 6, 6, 9, 12])       // nhảy 50 m trong 1 s → bỏ
+    const long = Array.from({ length: 31 }, (_, i) => i)
+    const car = long.map((i) => i * 14)                                                 // 14 m/s suốt 30 s → giữ
+    expect(despike(long, car, 12).at(-1)).toBe(420)
+    expect(bestWindowSpeed([0, 10, 20, 30], [0, 30, 130, 160], 10).mps).toBeCloseTo(10)
+  })
+})
+
+import { FRAUD_RULES, gpsErrorRegions } from './fraud'
+
+describe('mức kết luận và độc lập của bằng chứng', () => {
+  it('mỗi kết quả có phiên bản luật, số nhóm bằng chứng độc lập, mức cao nhất; mỗi dấu hiệu có số đo', () => {
+    const s = build([[600, 3], [300, 7.6], [600, 3]])
+    const r = analyzeRun(sum(s), s)
+    expect(r.engine).toMatch(/^ac-/)
+    expect(r.basis).toBe('DISQUALIFY')
+    const curve = r.flags.find((f) => f.code === 'PACE_CURVE')!
+    expect(curve).toMatchObject({ tier: 'DISQUALIFY', source: 'GPS' })
+    expect(curve.evidence).toMatchObject({ windowS: 300 })
+  })
+
+  it('giữ 17 km/h 3 phút là CẢNH BÁO, một mình không giữ bài; 20 km/h 2 phút là NGHI VẤN', () => {
+    const a = build([[600, 3], [240, 4.9], [600, 3]])
+    const ra = analyzeRun(sum(a), a)
+    expect(ra.flags.find((f) => f.code === 'SUSTAINED_SPEED')?.tier).toBe('WARN')
+    expect(ra.verdict).toBe('OK')
+    const b = build([[600, 3], [150, 5.8], [600, 3]])
+    expect(analyzeRun(sum(b), b)).toMatchObject({ verdict: 'REVIEW', basis: 'SUSPECT' })
+  })
+
+  it('tốc độ cao TRÙNG lúc GPS nhảy → coi là cùng một lỗi GPS, hạ mức, không cộng thành 2 bằng chứng', () => {
+    const s = build([[600, 3], [240, 4.9], [600, 3]])
+    for (const i of [610, 650, 700]) s.latlng![i] = [21.02, 105.82]      // 3 lần nhảy ngay trong đoạn nhanh
+    const r = analyzeRun(sum(s), s)
+    const sus = r.flags.find((f) => f.code === 'SUSTAINED_SPEED')!
+    expect(sus).toMatchObject({ gpsError: true, tier: 'NOTE' })
+    expect(r.independent).toBe(1)
+    expect(r.verdict).toBe('OK')
+  })
+
+  it('hai cảnh báo ở hai thời điểm khác nhau, hai nguồn khác nhau → độc lập → chờ duyệt', () => {
+    // Phút 10–14: giữ 17,6 km/h (cảnh báo tốc độ, GPS) · phút 24–29: pace 4:38 mà tim chỉ ~95 (cảnh báo tim, cảm biến tim)
+    const s = build([[600, 3], [240, 4.9], [600, 3], [330, 3.6], [600, 3]],
+      { hr: (t) => (t > 1440 && t <= 1770 ? 95 + (t % 3) : 150 + (t % 5)) })
+    const r = analyzeRun(sum(s), s)
+    expect(r.independent).toBeGreaterThanOrEqual(2)
+    expect(r.verdict).toBe('REVIEW')
+  })
+
+  it('danh mục quy tắc đủ lý do + đầu vào cho mọi mã', () => {
+    for (const r of Object.values(FRAUD_RULES)) {
+      expect(r.reason.length).toBeGreaterThan(10)
+      expect(r.inputs.length).toBeGreaterThan(5)
+      expect(r.warn || r.suspect || r.disqualify).toBeTruthy()
+    }
+  })
+
+  it('vùng lỗi GPS: nhảy điểm và khoảng mất dữ liệu dài', () => {
+    const t = [0, 1, 2, 60, 61], raw = [0, 3, 6, 9, 12], clean = [0, 3, 6, 9, 12]
+    expect(gpsErrorRegions(t, raw, clean, null, { sustained: { normal: { kmh: 17, s: 180 }, severe: { kmh: 20, s: 120 } }, vehicle: { kmh: 25, s: 30 }, teleport: { mps: 12, minCount: 3 } }))
+      .toEqual([[2, 60]])
+  })
+})
