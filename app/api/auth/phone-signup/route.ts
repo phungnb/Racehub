@@ -31,7 +31,8 @@ export async function POST(req: NextRequest) {
   if (password.length < 6 || password.length > 72) return NextResponse.json({ error: 'WEAK_PASSWORD' }, { status: 400 })
   const displayName = String(body.displayName ?? '').trim().slice(0, 60) || phone
 
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  // Vercel tự đặt x-real-ip = IP thật của người gọi (người dùng không giả được); x-forwarded-for chỉ là dự phòng khi chạy nơi khác
+  const ip = req.headers.get('x-real-ip')?.trim() || req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
   if (tooMany(ip)) return NextResponse.json({ error: 'RATE_LIMIT' }, { status: 429 })
 
   const admin = createSupabaseAdminClient()

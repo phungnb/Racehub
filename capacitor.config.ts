@@ -5,6 +5,11 @@ import type { CapacitorConfig } from '@capacitor/cli'
 // Cập nhật giao diện chỉ cần deploy web như thường; chỉ phải nộp lại app khi đổi phần native (plugin, quyền, icon).
 // Xem docs/APP_MOBILE.md.
 const serverUrl = process.env.CAP_SERVER_URL || 'https://racehubrun.com'
+// Chỉ cho mở trong app đúng dự án Supabase của RaceHub (đăng nhập Google / Apple qua Supabase Auth).
+// "*.supabase.co" cho phép MỌI dự án Supabase (ai cũng tạo được) chạy trong khung app — chỉ dùng khi chưa có biến môi trường.
+const supabaseHost = (() => {
+  try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').host } catch { return '*.supabase.co' }
+})()
 
 const config: CapacitorConfig = {
   // Mã định danh app trên cửa hàng — KHÔNG đổi được sau khi đã nộp lần đầu
@@ -17,7 +22,7 @@ const config: CapacitorConfig = {
   server: {
     url: serverUrl,
     // Các trang được mở ngay trong app (đăng nhập Strava / Supabase); trang ngoài danh sách mở bằng trình duyệt
-    allowNavigation: [new URL(serverUrl).host, 'www.racehubrun.com', 'www.strava.com', 'strava.com', '*.supabase.co'],
+    allowNavigation: [new URL(serverUrl).host, 'www.racehubrun.com', 'www.strava.com', 'strava.com', supabaseHost],
     errorPath: 'offline.html',
   },
   android: {

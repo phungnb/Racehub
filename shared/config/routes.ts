@@ -60,5 +60,7 @@ export const routes = {
 /** Chỉ chấp nhận đường dẫn nội bộ cho tham số ?next= (chống open redirect) */
 export function safeNext(next: string | null | undefined, fallback: string = routes.home) {
   if (!next || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) return fallback
+  // Trình duyệt bỏ ký tự tab / xuống dòng và coi "\\" như "/" khi đọc URL: "/<tab>/evil.com" thành "//evil.com" (trang ngoài)
+  if (/[\u0000-\u001f\u007f\\]/.test(next)) return fallback
   return next
 }
