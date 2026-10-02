@@ -19,7 +19,7 @@ import { clubKeys } from '../../hooks/keys'
 import { ClubAvatar } from './ClubAvatar'
 
 /** Khung chung cho mọi tab của một CLB: đầu trang có màu CLB + thanh tab dính khi cuộn. */
-export function ClubShell({ clubId, children }: { clubId: string; children: ReactNode }) {
+export function ClubShell({ clubId, children, banner }: { clubId: string; children: ReactNode; banner?: ReactNode }) {
   const pathname = usePathname()
   const { club, membership, isMember, isStaff, isRealMember, isAdmin, isLoading, isError, error, refetch } = useClub(clubId)
   const inbox = useClubInbox()
@@ -125,7 +125,7 @@ export function ClubShell({ clubId, children }: { clubId: string; children: Reac
           </nav>
           {/* Admin hệ thống xem hộ (toàn quyền, 007100) nhưng chưa là thành viên thật: vẫn cho tham gia như runner */}
           {isAdmin && !isRealMember && <AdminJoinBar clubId={clubId} status={membership?.status ?? null} />}
-          <div className="px-4 pt-4">{children}</div>
+          <div className="px-4 pt-4">{banner}{children}</div>
           <MembersSheet open={showMembers} onClose={() => setShowMembers(false)} members={members.data ?? []}
             loading={members.isLoading} total={club.member_count} manageHref={`${base}/members`} />
         </>

@@ -37,7 +37,7 @@ const run = (db: PGlite, uid: string, km: number, hoursAgo = (h -= 2)) => db.que
 describe('CLB đấu CLB (002600)', () => {
   let db: PGlite
   let bid = ''
-  beforeAll(async () => { db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed }) }, 240_000)
+  beforeAll(async () => { db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed, until: '20261001012600' }) }, 240_000)
 
   it('chỉ ban quản trị gửi lời thách; không gửi trùng; CLB kia chấp nhận', async () => {
     const start = new Date(Date.now() + 600_000).toISOString(), end = new Date(Date.now() + 3 * 86400_000).toISOString()

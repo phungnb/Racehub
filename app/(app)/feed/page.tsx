@@ -9,6 +9,7 @@ import { KnowledgeHomeSection } from '@/features/knowledge'
 import { Skeleton } from '@/shared/ui'
 import { CommunityFeed } from '@/features/club'
 import { HomeFeeds } from '@/features/social'
+import { MyMatchesCard } from '@/features/cup'
 
 export default function FeedPage() {
   const { profile } = useMyProfile()
@@ -19,6 +20,7 @@ export default function FeedPage() {
     <div className="space-y-6 animate-fade-in">
       <InstallCard />
       {profile ? <GameHub profile={profile} /> : <Skeleton className="h-52" />}
+      {meId && <MyMatchesCard />}
       <ExploreShortcuts />
       <KnowledgeHomeSection />
       {profile && (profile.strava_connected ? <StravaAutoSync /> : <ConnectDeviceCard />)}

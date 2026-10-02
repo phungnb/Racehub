@@ -3,4 +3,4 @@
 export { StravaAutoSync, StravaSyncButton } from './strava/components/StravaSyncCard'
 export { PoweredByStrava, StravaConnectButton, StravaShareNotice, ViewOnStrava } from './strava/components/StravaBrand'
 export { StravaShareCard, stravaShareKey } from './strava/components/StravaShareCard'
-export { adminSetStravaPolicy, adminStravaSharingStats, type StravaSharePolicy } from './strava/api/shareApi'
+export { adminSetStravaPolicy, adminStravaSharingStats, setStravaSharing, type StravaSharePolicy } from './strava/api/shareApi'

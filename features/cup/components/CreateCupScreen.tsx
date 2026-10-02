@@ -8,44 +8,41 @@ import { ArrowLeft, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, Field, Input, Skeleton, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
-import { createCup, cupErrorMessage, type CupMetric } from '../api/cupApi'
-import { METRIC_LABEL, validateCup } from '../model/cup'
+import { createCup, cupErrorMessage, type MatchTerms } from '../api/cupApi'
+import { validateCup } from '../model/cup'
+import { defaultTerms, rulesSummary, validateTerms } from '../model/match'
 import { useCupOrganizer } from '../hooks/useCupOrganizer'
+import { RulesForm } from './RulesForm'
 
-const pad = (n: number) => String(n).padStart(2, '0')
-const toLocal = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-const fromLocal = (v: string) => (v ? new Date(v).toISOString() : '')
-
-function defaults() {
-  const start = new Date(); start.setDate(start.getDate() + 3); start.setHours(0, 0, 0, 0)
+/** Mặc định: bắt đầu sau 3 ngày (đủ thời gian các CLB đăng ký), 2 tuần, trung bình km */
+function defaults(now: number): MatchTerms {
+  const t = defaultTerms(now)
+  const start = new Date(now); start.setDate(start.getDate() + 3); start.setHours(0, 0, 0, 0)
   const end = new Date(start); end.setDate(end.getDate() + 14); end.setMinutes(-1)
-  const close = new Date(start); close.setMinutes(-1)
-  return { start: toLocal(start), end: toLocal(end), close: toLocal(close) }
+  return { ...t, start_at: start.toISOString(), end_at: end.toISOString() }
 }
 
 /** Tạo Thách đấu CLB: dưới tên CLB mình quản trị (mở ngay), RaceHub (admin) hoặc cá nhân (chờ admin duyệt) */
 export function CreateCupScreen() {
   const router = useRouter()
   const org = useCupOrganizer()
-  const [dft] = useState(defaults)
   const [now] = useState(() => Date.now())
+  const [terms, setTerms] = useState<MatchTerms>(() => defaults(now))
   const [host, setHost] = useState<string | 'NONE' | null>(null)
   const [title, setTitle] = useState('')
   const [desc, setDesc] = useState('')
   const [prize, setPrize] = useState('')
-  const [metric, setMetric] = useState<CupMetric>('AVG_KM')
-  const [start, setStart] = useState(dft.start)
-  const [end, setEnd] = useState(dft.end)
-  const [close, setClose] = useState(dft.close)
   const [max, setMax] = useState('20')
   const hostId = host ?? org.staffClubs[0]?.club_id ?? 'NONE'
   const needsReview = hostId === 'NONE' && !org.isAdmin
-  const error = validateCup({ title, start: fromLocal(start), end: fromLocal(end), close: fromLocal(close), maxClubs: Number(max) }, now)
+  // Hạn CLB đăng ký = giờ chốt danh sách thi đấu (sau đó thành viên không đăng ký thêm được)
+  const close = new Date(Date.parse(terms.start_at) - terms.lock_hours * 3600_000).toISOString()
+  const error = validateCup({ title, start: terms.start_at, end: terms.end_at, close, maxClubs: Number(max) }, now) ?? validateTerms(terms, now, 'CUP')
 
   const create = useMutation({
     mutationFn: () => createCup({
-      title: title.trim(), description: desc.trim(), prize: prize.trim(), metric, max_clubs: Number(max),
-      start_at: fromLocal(start), end_at: fromLocal(end), reg_close_at: fromLocal(close), host_club_id: hostId === 'NONE' ? null : hostId,
+      ...terms, title: title.trim(), description: desc.trim(), prize: prize.trim(), max_clubs: Number(max),
+      reg_close_at: close, host_club_id: hostId === 'NONE' ? null : hostId,
     }),
     onSuccess: (c) => {
       toast.success(c.status === 'PENDING_REVIEW' ? 'Đã gửi — chờ admin duyệt, bạn sẽ nhận thông báo' : 'Đã mở thách đấu, mời các CLB đăng ký!')
@@ -90,33 +87,16 @@ export function CreateCupScreen() {
         <Input id="cup-prize" value={prize} onChange={(e) => setPrize(e.target.value)} maxLength={200} placeholder="VD: Cúp + 5 triệu quỹ CLB cho đội vô địch" />
       </Field>
 
-      <Field label="Cách tính điểm">
-        <div className="grid gap-2">
-          {(Object.keys(METRIC_LABEL) as CupMetric[]).map((m) => (
-            <button key={m} type="button" aria-pressed={metric === m} onClick={() => setMetric(m)}
-              className={cn('rounded-xl border p-3 text-left', metric === m ? 'border-brand bg-brand/10' : 'border-border')}>
-              <span className="block text-sm font-semibold">{METRIC_LABEL[m].title}</span>
-              <span className="block text-[11px] text-fg-muted">{METRIC_LABEL[m].hint}</span>
-            </button>
-          ))}
-        </div>
-      </Field>
-
-      <Card className="space-y-3">
-        <Field label="Bắt đầu" htmlFor="cup-start"><Input id="cup-start" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
-        <Field label="Kết thúc" htmlFor="cup-end"><Input id="cup-end" type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} /></Field>
-        <Field label="Hạn CLB đăng ký" htmlFor="cup-close" hint="Có thể cho đăng ký muộn, nhưng km chỉ tính từ lúc bắt đầu">
-          <Input id="cup-close" type="datetime-local" value={close} onChange={(e) => setClose(e.target.value)} />
-        </Field>
+      <Card className="space-y-4">
+        <RulesForm value={terms} onChange={setTerms} kind="CUP" />
         <Field label="Số CLB tối đa" htmlFor="cup-max">
           <Input id="cup-max" inputMode="numeric" value={max} onChange={(e) => setMax(e.target.value.replace(/\D/g, '').slice(0, 3))} />
         </Field>
       </Card>
 
       <ul className="space-y-1 text-xs text-fg-muted">
-        <li>• Chỉ Chủ nhiệm / Quản trị viên của một CLB mới đăng ký CLB đó.</li>
-        <li>• Tính bài chạy hợp lệ trong thời gian thi đấu, sau khi thành viên vào CLB. Người ở nhiều CLB chỉ tính cho CLB vào trước.</li>
-        <li>• Kết thúc 2 giờ sau giờ chốt (chờ bài đồng bộ muộn), mọi thành viên nhận thông báo thứ hạng.</li>
+        <li>• Chủ nhiệm / Quản trị viên đăng ký CLB; thành viên tự bấm &quot;Đăng ký thi đấu&quot; trước giờ chốt danh sách. Mỗi người thi đấu cho một CLB.</li>
+        {rulesSummary({ ...terms, kind: 'CUP', rules_version: 2, final_delay_hours: 48 }).map((r) => <li key={r}>• {r}</li>)}
       </ul>
       {error && title && <p className="text-xs text-danger">{error}</p>}
       <Button block size="lg" onClick={() => create.mutate()} loading={create.isPending} disabled={!!error}>
