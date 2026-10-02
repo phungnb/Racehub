@@ -19,10 +19,13 @@ hẹp: chỉ kiểm tra **đúng các lớp lỗi RaceHub đã gặp và đã v�
 |---|---|
 | `profiles` cho anon đọc mọi cột (policy `USING true`) | Dùng khóa anon đọc thử từng bảng, báo bảng nào trả dữ liệu khi chưa đăng nhập |
 | Token Strava nằm trong bảng ai cũng đọc | Soi cột của dòng đọc được; cột `*_token`, secret → NGHIÊM TRỌNG |
+| anon tự INSERT/UPDATE (clubs, activities, inventory, cột xu/role) | Đọc OpenAPI theo vai trò anon; bảng nào hiện `post/patch/delete` là anon ghi được — **không gửi lệnh ghi** |
+| RPC nguy hiểm anon gọi được (`user_topup_xu`, `admin_adjust_user_xu`…) | Đọc OpenAPI; RPC nào anon thấy trong `/rpc/` là anon gọi được — **không gọi RPC** |
 | Khóa `service_role` lọt ra front-end | Tải JS public, giải mã JWT, báo nếu `role=service_role` |
 
-Ngoài phạm vi (kiểm tra thủ công): RPC gọi được bởi anon, policy ghi quá rộng —
-vì kiểm tự động an toàn cho hai thứ này cần gửi lệnh ghi, trái nguyên tắc "không phá".
+**Vì sao an toàn:** PostgREST sinh bản OpenAPI theo vai trò của khóa gửi lên. Với khóa
+anon, quyền ghi và RPC gọi được của anon hiện ngay trong bản mô tả, nên secscan suy ra
+lỗ hổng chỉ bằng cách **đọc** — không có hàm POST/PATCH/DELETE nào trong mã nguồn.
 
 ## Dùng
 
@@ -37,7 +40,12 @@ node src/index.js --url https://racehub.vn \
 
 # Kiểm hộ người khác (sẽ hỏi xác nhận quyền):
 node src/index.js --url https://app-cua-khach.com --anon-key "<ANON_KEY>"
+
+# Bỏ qua các RPC công khai có chủ đích:
+node src/index.js --url https://app.com --anon-key "<KEY>" --allow-rpc search_public,get_leaderboard
 ```
+
+Chạy test: `npm test` (offline, không chạm mạng).
 
 `--anon-key` là khóa **anon** công khai (nằm sẵn trong app web), không phải
 `service_role`. Thiếu nó thì chỉ chạy kiểm tra khóa lộ.
