@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { nativePlatform } from '@/shared/lib/native'
 import { useSession } from '@/features/auth'
 import { useOpsPolicy } from '@/features/system'
+import { speak } from '@/shared/lib/speech'
 import { keepAwake, reacquireAwake, releaseAwake } from '@/shared/lib/keepAwake'
 import { canTrackLocation, tracksInBackground, watchLocation, type LocationError, type LocationFix } from '../model/location'
 import { clearSnapshot, loadSnapshot, saveSnapshot, type RunSnapshot } from '../model/recovery'
@@ -40,12 +41,6 @@ const viewOf = (s: RunSession): View => ({
   splits: s.splits, gaps: [...s.gaps], gapS: s.gapS,
 })
 
-function speak(text: string) {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
-  const u = new SpeechSynthesisUtterance(text)
-  u.lang = 'vi-VN'
-  window.speechSynthesis.speak(u)
-}
 const vibrate = (pattern: number[]) => { try { navigator.vibrate?.(pattern) } catch { /* máy không hỗ trợ */ } }
 
 /**
