@@ -71,6 +71,8 @@ export interface CmsArticle {
   author_id: string | null; content_type: ContentType; status: ArticleStatus; published_at: string | null; source_url: string | null
   source_name: string | null; is_featured: boolean; series_id: string | null; series_order: number | null; ctas: Cta[]
   needs_expert_review: boolean; expert_reviewed_at: string | null; expert_name: string | null; expert_note: string | null; review_note: string | null
+  /** Ebook PDF (migration 012900) */
+  attachment_url: string | null
   created_by: string | null; created_by_name: string | null; reading_time_minutes: number
   tags: string[]; sources: { title: string; url: string | null; publisher: string | null }[]
   feedback: { helpful: boolean; comment: string; at: string }[]
@@ -144,6 +146,7 @@ const MESSAGES: Record<string, string> = {
   RATE_LIMITED: 'Bạn đã tạo nhiều bài hôm nay. Mai viết tiếp nhé!',
   PDF_TYPE: 'Ebook phải là tệp PDF.',
   PDF_SIZE: 'Tệp PDF tối đa 10 MB.',
+  EBOOK_PDF_REQUIRED: 'Ebook cần tải tệp PDF trước khi lưu.',
   ARTICLE_NOT_FOUND: 'Không tìm thấy bài viết (có thể đã gỡ hoặc chưa đăng).',
   EXPERT_REVIEW_REQUIRED: 'Bài thuộc chủ đề sức khoẻ / giáo án — cần chuyên gia duyệt chuyên môn trước khi đăng.',
   TITLE_TOO_SHORT: 'Tiêu đề cần ít nhất 5 ký tự.',

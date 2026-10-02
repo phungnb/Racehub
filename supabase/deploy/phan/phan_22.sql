@@ -253,7 +253,9 @@ begin
     jsonb_build_object('file', '20261001012800', 'label', 'Quanh đây v2 (khu hay chạy tự động, bảng tin quanh đây) + Hội quán runner + link nhóm Facebook',
       'ok', to_regclass('public.runner_home_area') is not null and to_regclass('public.hub_posts') is not null
         and to_regprocedure('public.hub_runners(jsonb)') is not null and to_regprocedure('public.nearby_feed(jsonb)') is not null
-        and 'support_facebook' = any (private.site_info_keys())));
+        and 'support_facebook' = any (private.site_info_keys())),
+    jsonb_build_object('file', '20261001012900', 'label', 'Trình soạn nội dung (CMS) đăng được Ebook PDF',
+      'ok', pg_get_functiondef('public.cms_save(jsonb)'::regprocedure) ~ 'EBOOK_PDF_REQUIRED'));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

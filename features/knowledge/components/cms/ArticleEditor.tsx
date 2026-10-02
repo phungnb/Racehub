@@ -11,7 +11,7 @@ import { Button, Card, ConfirmSheet, ErrorState, Field, Input, SegmentedControl,
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import {
-  cmsDelete, cmsExpertReview, cmsGet, cmsSave, cmsSetStatus, knowledgeErrorMessage, uploadContentImage,
+  cmsDelete, cmsExpertReview, cmsGet, cmsSave, cmsSetStatus, knowledgeErrorMessage, uploadContentImage, uploadContentPdf,
   type ArticleStatus, type CmsArticle, type CmsInput, type CmsMeta, type ContentType, type Cta, type CtaKind,
 } from '../../api/knowledgeApi'
 import { CTA_KINDS, STATUS_LABEL, STATUS_TONE } from '../../model/knowledge'
@@ -49,6 +49,7 @@ function Editor({ initial, meta, onClose }: { initial: CmsArticle | null; meta: 
   const body = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const coverRef = useRef<HTMLInputElement>(null)
+  const pdfRef = useRef<HTMLInputElement>(null)
   const status: ArticleStatus = initial?.status ?? 'DRAFT'
   const editor = meta.role === 'ADMIN' || meta.role === 'EDITOR'
   const expert = meta.role === 'ADMIN' || meta.role === 'EXPERT'
@@ -98,6 +99,11 @@ function Editor({ initial, meta, onClose }: { initial: CmsArticle | null; meta: 
     if (k === 'h2') line('## '); else if (k === 'h3') line('### '); else if (k === 'b') wrap('**'); else if (k === 'i') wrap('*')
     else if (k === 'ul') line('- '); else if (k === 'ol') line('1. '); else if (k === 'q') line('> '); else wrap('[', '](https://)', 'chữ hiển thị')
   }
+  const uploadPdf = async (file: File) => {
+    const t = toast.loading('Đang tải ebook…')
+    try { set('attachment_url', await uploadContentPdf(file)); toast.success('Đã đính kèm ebook', { id: t }) }
+    catch (e) { toast.error(knowledgeErrorMessage(e), { id: t }) }
+  }
   const upload = async (file: File, cover: boolean) => {
     const t = toast.loading('Đang tải ảnh…')
     try {
@@ -136,7 +142,18 @@ function Editor({ initial, meta, onClose }: { initial: CmsArticle | null; meta: 
 
       <Card className="space-y-4">
         <SegmentedControl value={f.content_type ?? 'ARTICLE'} onChange={(v: ContentType) => set('content_type', v)}
-          options={[{ value: 'ARTICLE', label: '📚 Kiến thức' }, { value: 'NEWS', label: '📰 Tin tức' }]} />
+          options={[{ value: 'ARTICLE', label: '📚 Kiến thức' }, { value: 'NEWS', label: '📰 Tin tức' }, { value: 'EBOOK', label: '📘 Ebook' }]} />
+        {f.content_type === 'EBOOK' && (
+          <Field label="Tệp ebook (PDF ≤ 10 MB)" hint="Nội dung bên dưới là phần giới thiệu ebook.">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="secondary" onClick={() => pdfRef.current?.click()} disabled={locked}>
+                <Upload className="size-4" aria-hidden />{f.attachment_url ? 'Đổi tệp PDF' : 'Tải ebook PDF'}
+              </Button>
+              {f.attachment_url && <a href={f.attachment_url} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate text-sm text-brand">📘 Xem tệp đã đính kèm</a>}
+              <input ref={pdfRef} type="file" accept="application/pdf" hidden onChange={(e) => { const x = e.target.files?.[0]; if (x) void uploadPdf(x); e.target.value = '' }} />
+            </div>
+          </Field>
+        )}
         <Field label="Chuyên mục" htmlFor="cms-cat">
           <select id="cms-cat" value={f.category_id} onChange={(e) => set('category_id', e.target.value)} className="h-11 w-full rounded-xl border border-border bg-bg px-3 text-[15px]">
             {meta.categories.map((c) => <option key={c.id} value={c.id}>{c.name}{c.needs_expert ? ' (cần duyệt chuyên môn)' : ''}</option>)}
