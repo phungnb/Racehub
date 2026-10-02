@@ -3,7 +3,8 @@ import { CalendarDays, Shield, Swords, Users } from 'lucide-react'
 import { Card } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import type { Cup } from '../api/cupApi'
-import { cupPhase, METRIC_LABEL, PHASE_LABEL, type CupPhase } from '../model/cup'
+import { cupPhase, PHASE_LABEL, type CupPhase } from '../model/cup'
+import { PHASE_INFO, rulesSummary } from '../model/match'
 
 export const fmtDay = (iso: string) => { const d = new Date(iso); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}` }
 export const fmtTime = (iso: string) => {
@@ -17,6 +18,11 @@ const TONE: Record<CupPhase, string> = {
 }
 
 export function PhaseChip({ c, now }: { c: Cup; now: number }) {
+  // Có giai đoạn từ máy chủ (012700) thì dùng; bản cũ tự tính
+  if (c.phase && PHASE_INFO[c.phase]) {
+    const p = PHASE_INFO[c.phase]
+    return <span className={cn('shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold', p.tone)}>{p.label}</span>
+  }
   const p = cupPhase(c, now)
   return <span className={cn('shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold', TONE[p])}>{PHASE_LABEL[p]}</span>
 }
@@ -35,7 +41,7 @@ export function CupCard({ c, now }: { c: Cup; now: number }) {
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-fg-muted">
           <span className="flex items-center gap-1"><CalendarDays className="size-3.5" aria-hidden />{fmtDay(c.start_at)} – {fmtDay(c.end_at)}</span>
           <span className="flex items-center gap-1"><Users className="size-3.5" aria-hidden />{c.clubs}/{c.max_clubs} CLB</span>
-          <span>{METRIC_LABEL[c.metric].title}</span>
+          <span>{rulesSummary(c)[0]}</span>
         </div>
       </Card>
     </Link>

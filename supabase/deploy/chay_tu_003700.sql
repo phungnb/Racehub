@@ -23730,6 +23730,7 @@ begin
     perform private.match_tick(r.id);
   end loop;
   return jsonb_build_object(
+    'can_challenge', public.club_is_staff(p_club_id),
     'rating', (select jsonb_build_object('rating', g.rating, 'played', g.played, 'wins', g.wins, 'draws', g.draws, 'losses', g.losses,
                                          'streak', g.streak, 'best_streak', g.best_streak)
                  from public.club_match_ratings g where g.club_id = p_club_id),

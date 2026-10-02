@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { routes } from '@/shared/config/routes'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Crown, Trophy } from 'lucide-react'
 import { Avatar, EmptyState, ErrorState, LevelBadge, RankSearch, ScrollRow, scrollToRow, SegmentedControl, Skeleton } from '@/shared/ui'
@@ -12,7 +12,6 @@ import { formatDuration, formatKm } from '@/shared/lib/format'
 import type { LeaderboardPeriod, LeaderboardRow } from '../../api/hubApi'
 import { useClub } from '../../hooks/useClub'
 import { useClubLeaderboard } from '../../hooks/useLeaderboard'
-import { ClubBattles } from './ClubBattles'
 import { ClubRankings } from './ClubRankings'
 import { BoostDays } from './BoostDays'
 import { ClubPoints } from './ClubPoints'
@@ -31,13 +30,13 @@ const VIEWS: { value: View; label: string }[] = [
   { value: 'clubs', label: 'Xếp hạng CLB' },
 ]
 
-/** Tab BXH: thành viên trong CLB · điểm CLB (009400) · CLB đấu CLB · xếp hạng CLB toàn hệ thống (?tab=points|battles|clubs) */
-export function ClubLeaderboardScreen({ clubId }: { clubId: string }) {
+/** Tab BXH: thành viên trong CLB · điểm CLB (009400) · CLB đấu CLB · xếp hạng CLB toàn hệ thống (?tab=points|battles|clubs).
+ *  Nội dung "Đấu CLB" do module cup cung cấp (truyền từ trang, tránh phụ thuộc vòng club ↔ cup). */
+export function ClubLeaderboardScreen({ clubId, battles }: { clubId: string; battles?: ReactNode }) {
   const sp = useSearchParams()
   const tab = sp.get('tab')
   const initial: View = tab === 'battles' || tab === 'clubs' || tab === 'points' ? tab : 'members'
   const [view, setView] = useState<View>(initial)
-  const { isStaff } = useClub(clubId)
   return (
     <div className="space-y-4">
       <ScrollRow role="tablist" label="Bảng xếp hạng" activeKey={view} innerClassName="gap-1.5">
@@ -50,7 +49,7 @@ export function ClubLeaderboardScreen({ clubId }: { clubId: string }) {
         ))}
       </ScrollRow>
       {view === 'points' ? <ClubPoints clubId={clubId} />
-        : view === 'battles' ? <ClubBattles clubId={clubId} isStaff={isStaff} />
+        : view === 'battles' ? battles
         : view === 'clubs' ? <ClubRankings clubId={clubId} />
         : <MemberLeaderboard clubId={clubId} />}
     </div>

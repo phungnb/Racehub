@@ -43,7 +43,7 @@ const notes = async (db: PGlite, uid: string, like = '%') =>
 const at = (h: number) => new Date(Date.now() + h * 3600_000).toISOString()
 const terms = (extra: Record<string, unknown> = {}) => JSON.stringify({ format: 'AVG', measure: 'KM', min_roster: 2, lock_hours: 1,
   start_at: at(48), end_at: at(48 + 7 * 24), ...extra })
-const duel = (club: string, opp: string, extra: Record<string, unknown> = {}) =>
+const duel = (club: string, opp: string) =>
   `select public.create_club_duel(($1::jsonb || jsonb_build_object('club_id', '${club}', 'opponent_id', '${opp}'))) as r`
 const view = `select public.club_cup($1) as r`
 const run = (db: PGlite, uid: string, km: number, hoursAgo: number, extra: { source?: string; status?: string; moving?: number } = {}) => db.query(`

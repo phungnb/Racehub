@@ -2,51 +2,76 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Check, ChevronRight, Crown, Gift, KeyRound, Medal, Search, Swords, UserCheck, X } from 'lucide-react'
-import { toast } from 'sonner'
+import { useQuery } from '@tanstack/react-query'
+import { ArrowLeft, Check, ChevronRight, Crown, Gift, KeyRound, Medal, Search, Swords, X } from 'lucide-react'
 import { Avatar, Button, Card, EmptyState, ErrorState, Field, Input, RankSearch, Sheet, Skeleton, Textarea } from '@/shared/ui'
 import { filterSearch, matchesSearch } from '@/shared/lib/search'
-import { formatPace } from '@/shared/lib/format'
 import { cn } from '@/shared/lib/cn'
 import { ClubAvatar } from '@/features/club'
-import { cancelCup, cupErrorMessage, getClubBoard, getCup, joinCup, joinCupAsMember, leaveCup, leaveCupAsMember, reviewCup, type Cup, type CupStanding } from '../api/cupApi'
-import { canJoin, cupPhase, METRIC_LABEL } from '../model/cup'
-import { fmtTime, PhaseChip } from './CupCard'
+import { cancelCup, cupErrorMessage, getClubBoard, getCup, joinCup, leaveCup, reviewCup, type Cup, type CupStanding } from '../api/cupApi'
+import { canJoin } from '../model/cup'
+import { formatContribution, formatScore, PHASE_INFO } from '../model/match'
+import { fmtTime } from './CupCard'
+import { DuelScoreboard, NegotiationBox, PhaseBadge, ResultBanner, RulesCard, SignupBox, useMatchMutation } from './MatchParts'
 
 export function CupDetailScreen({ id }: { id: string }) {
-  const q = useQuery({ queryKey: ['cup', id], queryFn: () => getCup(id), refetchInterval: 60_000 })
+  // Đang thi đấu: làm mới mỗi 20 giây (gần thời gian thực); khi khác: 60 giây
+  const q = useQuery({ queryKey: ['cup', id], queryFn: () => getCup(id),
+    refetchInterval: (query) => (query.state.data?.phase === 'LIVE' ? 20_000 : 60_000), refetchOnWindowFocus: true })
   const [now] = useState(() => Date.now())
   if (q.isPending) return <div className="space-y-3"><Skeleton className="h-40" /><Skeleton className="h-64" /></div>
   if (q.isError) return <ErrorState message={cupErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   const c = q.data
-  const phase = cupPhase(c, now)
+  const duel = c.kind === 'DUEL'
+  const back = duel ? `/clubs/${c.my_clubs.find((m) => m.joined)?.id ?? c.host?.id}/leaderboard?tab=battles` : '/cups'
+  const showBoard = c.standings && ['OPEN', 'PROVISIONAL', 'FINISHED'].includes(c.status)
   return (
     <div className="space-y-4 pb-6 animate-fade-in">
-      <Link href="/cups" className="inline-flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg"><ArrowLeft className="size-4" aria-hidden />Thách đấu CLB</Link>
+      <Link href={back} className="inline-flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg"><ArrowLeft className="size-4" aria-hidden />{duel ? 'Đấu CLB' : 'Thách đấu CLB'}</Link>
       <Card className="space-y-3 p-4">
         <div className="flex items-start justify-between gap-2">
-          <h1 className="text-xl font-bold leading-tight">{c.title}</h1>
-          <PhaseChip c={c} now={now} />
+          <h1 className="text-xl font-bold leading-tight">{duel ? `⚔ ${c.title}` : c.title}</h1>
+          <PhaseBadge c={c} />
         </div>
-        <p className="text-sm text-fg-muted">{c.host ? `${c.host.name} tổ chức` : `${c.creator?.display_name ?? 'RaceHub'} tổ chức`}</p>
+        {!duel && <p className="text-sm text-fg-muted">{c.host ? `${c.host.name} tổ chức` : `${c.creator?.display_name ?? 'RaceHub'} tổ chức`}</p>}
         <dl className="grid grid-cols-2 gap-2 text-sm">
           <Info label="Bắt đầu" value={fmtTime(c.start_at)} />
           <Info label="Kết thúc" value={fmtTime(c.end_at)} />
-          <Info label="Hạn đăng ký" value={fmtTime(c.reg_close_at)} />
-          <Info label="CLB" value={`${c.clubs} / ${c.max_clubs}`} />
+          {c.require_signup && <Info label="Chốt danh sách" value={fmtTime(c.roster_close_at)} />}
+          {duel ? <Info label="Trạng thái" value={PHASE_INFO[c.phase]?.label ?? ''} /> : <Info label="CLB" value={`${c.clubs} / ${c.max_clubs}`} />}
+          {!duel && c.status === 'OPEN' && <Info label="Hạn CLB đăng ký" value={fmtTime(c.reg_close_at)} />}
         </dl>
-        <p className="rounded-xl bg-surface-2 px-3 py-2 text-sm"><span className="font-semibold">Tính điểm: </span>{METRIC_LABEL[c.metric].title} · {METRIC_LABEL[c.metric].hint}</p>
         {c.prize && <p className="flex items-start gap-2 text-sm"><Gift className="mt-0.5 size-4 shrink-0 text-coin" aria-hidden />{c.prize}</p>}
-        {c.description && <p className="whitespace-pre-line text-sm text-fg-muted">{c.description}</p>}
+        {c.description && <p className="whitespace-pre-line text-sm italic text-fg-muted">{duel ? `“${c.description}”` : c.description}</p>}
+        {c.decline_reason && <p className="rounded-xl bg-surface-2 px-3 py-2 text-sm">Lý do từ chối: {c.decline_reason}</p>}
+        {c.cancel_reason && c.status === 'CANCELLED' && <p className="rounded-xl bg-surface-2 px-3 py-2 text-sm">{c.cancel_reason}</p>}
       </Card>
 
       <ReviewBox c={c} />
-      {c.status === 'OPEN' && <JoinBox c={c} now={now} />}
-      {c.status === 'OPEN' && c.require_signup && <MemberSignup c={c} now={now} />}
-      {c.standings && c.status !== 'PENDING_REVIEW' && c.status !== 'REJECTED' && <Standings c={c} live={phase === 'LIVE'} />}
-      {c.can_manage && (c.status === 'PENDING_REVIEW' || (c.status === 'OPEN' && phase === 'REGISTRATION')) && <CancelButton c={c} />}
+      {c.status === 'INVITED' && <NegotiationBox c={c} now={now} />}
+      <ResultBanner c={c} now={now} />
+      {c.status === 'OPEN' && !duel && <JoinBox c={c} now={now} />}
+      <SignupBox c={c} now={now} />
+      {showBoard && (duel ? <DuelScoreboard c={c} myClub={c.my_signup ?? c.my_clubs.find((m) => m.joined)?.id} /> : <Standings c={c} />)}
+      {showBoard && duel && <RosterLinks c={c} />}
+      <RulesCard c={c} />
+      {c.can_cancel && <CancelButton c={c} />}
     </div>
+  )
+}
+
+/** Trận 1–1: mở bảng VĐV từng CLB (người đã đăng ký, km tính / km gốc, pace) */
+function RosterLinks({ c }: { c: Cup }) {
+  const [open, setOpen] = useState<CupStanding | null>(null)
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-2">
+        {(c.standings ?? []).map((s) => (
+          <Button key={s.club_id} variant="secondary" size="sm" onClick={() => setOpen(s)}>VĐV {s.name} ({s.members})</Button>
+        ))}
+      </div>
+      {open && <ClubBoardSheet c={c} club={open} onClose={() => setOpen(null)} />}
+    </>
   )
 }
 
@@ -54,21 +79,12 @@ function Info({ label, value }: { label: string; value: string }) {
   return <div className="rounded-xl bg-surface-2 px-3 py-2"><dt className="text-[11px] text-fg-subtle">{label}</dt><dd className="font-semibold">{value}</dd></div>
 }
 
-function useCupMutation<T>(id: string, fn: (v: T) => Promise<Cup>, ok: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: fn,
-    onSuccess: (c) => { qc.setQueryData(['cup', id], (old: Cup | undefined) => ({ ...old, ...c, standings: c.standings ?? old?.standings ?? null })); void qc.invalidateQueries({ queryKey: ['cups'] }); toast.success(ok) },
-    onError: (e) => toast.error(cupErrorMessage(e)),
-  })
-}
-
 /** Chờ duyệt: admin duyệt / từ chối; người tạo thấy trạng thái; bị từ chối thì thấy lý do */
 function ReviewBox({ c }: { c: Cup }) {
   const [reject, setReject] = useState(false)
   const [note, setNote] = useState('')
-  const approve = useCupMutation(c.id, () => reviewCup(c.id, true), 'Đã duyệt — thách đấu mở đăng ký')
-  const deny = useCupMutation(c.id, () => reviewCup(c.id, false, note), 'Đã từ chối, người tạo nhận được lý do')
+  const approve = useMatchMutation(c.id, () => reviewCup(c.id, true), 'Đã duyệt — thách đấu mở đăng ký')
+  const deny = useMatchMutation(c.id, () => reviewCup(c.id, false, note), 'Đã từ chối, người tạo nhận được lý do')
   if (c.status === 'REJECTED') return <Card className="border-danger/40 p-4 text-sm"><p className="font-semibold text-danger">Không được duyệt</p>{c.review_note && <p className="mt-1 text-fg-muted">{c.review_note}</p>}</Card>
   if (c.status !== 'PENDING_REVIEW') return null
   if (!c.can_review) return <Card className="border-warning/40 p-4 text-sm text-fg-muted">Thách đấu đang chờ admin RaceHub duyệt. Bạn sẽ nhận thông báo khi có kết quả.</Card>
@@ -89,8 +105,8 @@ function ReviewBox({ c }: { c: Cup }) {
 
 /** Đăng ký CLB: chỉ CLB mình là Chủ nhiệm / Quản trị viên */
 function JoinBox({ c, now }: { c: Cup; now: number }) {
-  const join = useCupMutation(c.id, (club: string) => joinCup(c.id, club), 'Đã đăng ký CLB — thành viên đã được báo')
-  const leave = useCupMutation(c.id, (club: string) => leaveCup(c.id, club), 'Đã rút CLB khỏi thách đấu')
+  const join = useMatchMutation(c.id, (club: string) => joinCup(c.id, club), 'Đã đăng ký CLB — thành viên đã được báo')
+  const leave = useMatchMutation(c.id, (club: string) => leaveCup(c.id, club), 'Đã rút CLB khỏi thách đấu')
   const staff = c.my_clubs.filter((m) => m.staff)
   const open = canJoin(c, now)
   const started = now >= Date.parse(c.start_at)
@@ -122,7 +138,8 @@ function JoinBox({ c, now }: { c: Cup; now: number }) {
 
 const MEDAL = ['text-medal-gold', 'text-medal-silver', 'text-medal-bronze']
 
-function Standings({ c, live }: { c: Cup; live: boolean }) {
+function Standings({ c }: { c: Cup }) {
+  const live = c.phase === 'LIVE'
   const mine = new Set(c.my_clubs.filter((m) => m.joined).map((m) => m.id))
   const rows = c.standings ?? []
   const [term, setTerm] = useState('')
@@ -153,11 +170,10 @@ function Standings({ c, live }: { c: Cup; live: boolean }) {
                 <ClubAvatar club={s} size="sm" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">{s.name}</span>
-                  <span className="block text-[11px] text-fg-muted">{s.runners}/{s.members} người chạy{c.metric === 'AVG_KM' && ` · ${s.km.toLocaleString('vi-VN')} km`}</span>
+                  <span className="block text-[11px] text-fg-muted">{s.forfeited ? 'Thiếu người — xử thua' : `${s.runners}/${s.members} VĐV đã chạy · ${s.km.toLocaleString('vi-VN')} km`}</span>
                 </span>
                 <span className="shrink-0 text-right">
-                  <span className="block font-mono text-base font-bold tabular">{(c.metric === 'TOTAL_KM' ? s.km : s.avg_km).toLocaleString('vi-VN')}</span>
-                  <span className="block text-[10px] text-fg-muted">{METRIC_LABEL[c.metric].unit}</span>
+                  <span className="block font-mono text-base font-bold tabular">{formatScore(c, s.score)}</span>
                 </span>
                 <ChevronRight className="size-4 shrink-0 text-fg-subtle" aria-hidden />
               </button>
@@ -165,36 +181,38 @@ function Standings({ c, live }: { c: Cup; live: boolean }) {
           ))}
         </ol>
       )}
-      {open && <ClubBoardSheet cupId={c.id} club={open} onClose={() => setOpen(null)} />}
+      {open && <ClubBoardSheet c={c} club={open} onClose={() => setOpen(null)} />}
     </section>
   )
 }
 
 /** BXH thành viên của một CLB trong giải: tên, ngày chạy, pace TB, tổng km — tìm runner */
-function ClubBoardSheet({ cupId, club, onClose }: { cupId: string; club: CupStanding; onClose: () => void }) {
+function ClubBoardSheet({ c, club, onClose }: { c: Cup; club: CupStanding; onClose: () => void }) {
+  const cupId = c.id
   const q = useQuery({ queryKey: ['cup', cupId, 'club', club.club_id], queryFn: () => getClubBoard(cupId, club.club_id) })
   const [term, setTerm] = useState('')
   const rows = q.data?.rows ?? []
   const shown = filterSearch(rows, term, (r) => [r.display_name])
   return (
-    <Sheet open onClose={onClose} title={club.name} description={`Hạng ${club.rank} · ${club.km.toLocaleString('vi-VN')} km · ${club.runners}/${club.members} người chạy`}>
+    <Sheet open onClose={onClose} title={club.name} description={`Hạng ${club.rank} · ${formatScore(c, club.score)} · ${club.runners}/${club.members} VĐV đã chạy. Dòng mờ: chưa được tính (ngoài top / chưa đủ km tối thiểu).`}>
       <div className="space-y-2">
         {rows.length > 5 && <RankSearch value={term} onChange={setTerm} total={rows.length} matched={shown.length} placeholder="Tìm runner…" />}
         {q.isPending ? <Skeleton className="h-40" /> : q.isError ? <ErrorState message={cupErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
-          : !rows.length ? <p className="py-6 text-center text-sm text-fg-muted">Chưa có thành viên nào được tính.</p> : (
+          : !rows.length ? <p className="py-6 text-center text-sm text-fg-muted">Chưa có VĐV nào đăng ký.</p> : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-[11px] uppercase text-fg-subtle">
-                  <tr><th className="py-1.5 pr-2">#</th><th className="py-1.5">Runner</th><th className="py-1.5 text-right">Ngày</th><th className="py-1.5 text-right">Pace</th><th className="py-1.5 text-right">Km</th></tr>
+                  <tr><th className="py-1.5 pr-2">#</th><th className="py-1.5">Runner</th><th className="py-1.5 text-right">Ngày</th><th className="py-1.5 text-right">Pace</th><th className="py-1.5 text-right">{c.measure === 'TIME' ? 'Thời gian' : c.measure === 'PACE' ? 'Km' : 'Km tính'}</th></tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {shown.map((r) => (
-                    <tr key={r.user_id}>
+                    <tr key={r.user_id} className={cn(r.counted === false && 'opacity-50')}>
                       <td className="py-2 pr-2 font-mono text-fg-muted">{r.rank}</td>
                       <td className="py-2"><span className="flex min-w-0 items-center gap-2"><Avatar src={r.avatar_url} name={r.display_name} size="xs" /><span className="truncate font-medium">{r.display_name ?? 'Runner'}</span></span></td>
                       <td className="py-2 text-right font-mono">{r.days}</td>
-                      <td className="py-2 text-right font-mono">{r.pace_s ? formatPace(r.pace_s) : '—'}</td>
-                      <td className="py-2 text-right font-mono font-bold">{Number(r.km).toLocaleString('vi-VN')}</td>
+                      <td className="py-2 text-right font-mono">{formatContribution('PACE', r)}</td>
+                      <td className="py-2 text-right font-mono font-bold" title={r.raw_km != null && r.raw_km !== r.km ? `Km gốc ${r.raw_km} (đã áp trần ngày)` : undefined}>
+                        {c.measure === 'PACE' ? Number(r.km).toLocaleString('vi-VN') : formatContribution(c.measure, r).replace(' km', '')}{r.raw_km != null && r.raw_km > r.km ? '*' : ''}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -206,45 +224,13 @@ function ClubBoardSheet({ cupId, club, onClose }: { cupId: string; club: CupStan
   )
 }
 
-/** Thành viên tự đăng ký thi đấu cho CLB (CLB đã được ban quản trị đăng ký); chỉ người đã đăng ký mới được tính km */
-function MemberSignup({ c, now }: { c: Cup; now: number }) {
-  const join = useCupMutation(c.id, (club: string) => joinCupAsMember(c.id, club), 'Đã đăng ký thi đấu — km của bạn sẽ được tính cho CLB')
-  const leave = useCupMutation(c.id, () => leaveCupAsMember(c.id), 'Đã rút đăng ký')
-  const joined = c.my_clubs.filter((m) => m.joined)
-  if (!joined.length || now >= Date.parse(c.end_at)) return null
-  const started = now >= Date.parse(c.start_at)
-  return (
-    <Card className="space-y-2 border-brand/40 p-4">
-      <p className="flex items-center gap-2 text-sm font-semibold"><UserCheck className="size-4 text-brand" aria-hidden />Đăng ký thi đấu</p>
-      <p className="text-xs text-fg-muted">Chỉ thành viên đã đăng ký mới được tính km cho CLB. Mỗi người thi đấu cho một CLB.</p>
-      {joined.map((m) => {
-        const mineHere = c.my_signup === m.id
-        return (
-          <div key={m.id} className="flex items-center gap-3 rounded-xl border border-border p-2.5">
-            <ClubAvatar club={m} size="sm" />
-            <span className="min-w-0 flex-1 truncate text-sm font-semibold">{m.name}</span>
-            {mineHere ? (
-              started ? <span className="text-xs font-semibold text-brand">Đang thi đấu</span>
-                : <Button size="sm" variant="ghost" onClick={() => leave.mutate(undefined)} loading={leave.isPending}>Rút</Button>
-            ) : (
-              <Button size="sm" onClick={() => join.mutate(m.id)} loading={join.isPending && join.variables === m.id} disabled={!!c.my_signup}>
-                {c.my_signup ? 'Đã thi đấu CLB khác' : 'Đăng ký thi đấu'}
-              </Button>
-            )}
-          </div>
-        )
-      })}
-    </Card>
-  )
-}
-
 function CancelButton({ c }: { c: Cup }) {
   const [ask, setAsk] = useState(false)
-  const cancel = useCupMutation(c.id, () => cancelCup(c.id), 'Đã hủy thách đấu')
+  const cancel = useMatchMutation(c.id, () => cancelCup(c.id), 'Đã hủy thách đấu')
   return (
     <>
-      <Button block variant="ghost" onClick={() => setAsk(true)}>Hủy thách đấu</Button>
-      <Sheet open={ask} onClose={() => setAsk(false)} title="Hủy thách đấu?" description="Các CLB đã đăng ký sẽ nhận thông báo. Không hoàn tác được."
+      <Button block variant="ghost" onClick={() => setAsk(true)}>{c.kind === 'DUEL' ? 'Hủy trận' : 'Hủy thách đấu'}</Button>
+      <Sheet open={ask} onClose={() => setAsk(false)} title={c.kind === 'DUEL' ? 'Hủy trận?' : 'Hủy thách đấu?'} description="Các CLB sẽ nhận thông báo. Không hoàn tác được."
         footer={<Button block variant="danger" onClick={() => { cancel.mutate(undefined); setAsk(false) }} loading={cancel.isPending}>Hủy thách đấu</Button>}>
         <p className="text-sm text-fg-muted">{c.title}</p>
       </Sheet>
