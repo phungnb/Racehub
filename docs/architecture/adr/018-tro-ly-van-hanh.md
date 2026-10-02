@@ -32,13 +32,20 @@
    - Tin nhắc tester soạn sẵn theo từng người, để Phụng tự gửi qua Zalo/Messenger.
    - Một bài đăng fanpage/nhóm chạy bộ dựa trên số liệu thật trong tuần.
    - Báo cáo được gửi về điện thoại/email của Phụng qua thông báo của Routine, và lưu lại lịch sử để so sánh giữa các tuần.
-5. **Ranh giới cứng:**
+5. **Nội dung hằng tuần (bổ sung theo yêu cầu của Phụng ngày 2/10/2026):**
+   - **Lịch giải chạy:** Routine tìm trên web các giải sắp mở đăng ký hoặc sắp diễn ra ở Việt Nam, rồi soạn nháp một bài "Tin tức", chuyên mục `RACES`. Mỗi giải ghi tên, ngày, địa điểm, cự ly, hạn đăng ký và link trang chính thức của BTC. Tin tự viết bằng lời của RaceHub, không chép nguyên văn hay lấy ảnh của BTC (đúng quy tắc trong trình soạn tin).
+   - **Giáo án:** Routine tổng hợp nguyên tắc tập luyện từ nhiều nguồn có uy tín, rồi soạn giáo án riêng của RaceHub theo cự ly và trình độ (5K/10K/21K; mới chạy/trung bình), kèm danh sách nguồn tham khảo.
+     - Không chép nguyên văn giáo án của người khác: vi phạm quyền tác giả, và Google Play có thể gỡ app vì vi phạm sở hữu trí tuệ.
+     - Chuyên mục `TRAINING` bắt buộc chuyên gia duyệt ([KNOWLEDGE.md](../../KNOWLEDGE.md)). Phải có HLV hoặc người có chuyên môn duyệt trước khi đăng.
+   - Bản nháp được giao dưới dạng Markdown. Phụng dán vào CMS (`/learn/studio`), duyệt rồi đăng. Routine không ghi vào DB.
+   - Nhắc runner tham gia một giải cụ thể ("Tôi sẽ chạy giải này" kèm cron nhắc) là tính năng trong app. Việc này để vào backlog sau phát hành, cần ADR riêng.
+6. **Ranh giới cứng:**
    - Trợ lý không ghi vào DB, không gửi tin cho người dùng, không đăng bài.
    - Mọi số liệu trong bài đăng phải lấy từ view, không được ước đoán.
 
 **Hệ quả.**
 - Chi phí AI nằm trong gói Claude hiện có, không phát sinh hóa đơn API riêng. Đây là giả định, cần kiểm lại theo gói đang dùng.
-- Công sức ước tính khoảng 2,5 giờ: migration cho schema `ops` và role (1 giờ), prompt Routine (0,5 giờ), chạy thử và chỉnh (1 giờ).
+- Công sức ước tính khoảng 3,5 giờ (thêm 1 giờ cho phần nội dung hằng tuần): migration cho schema `ops` và role (1 giờ), prompt Routine (0,5 giờ), chạy thử và chỉnh (1 giờ).
 - Rủi ro lớn nhất là lộ chuỗi kết nối DB. Cách giảm thiểu:
   - Role chỉ đọc view tổng hợp.
   - Mật khẩu riêng, đổi được ngay mà không ảnh hưởng app.
