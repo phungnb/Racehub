@@ -163,7 +163,7 @@ async function ingest(admin: SupabaseClient, userId: string, a: StravaSummaryAct
   const { data, error } = await admin.rpc('ingest_provider_activity', {
     p_user_id: userId, p_source: 'STRAVA', p_external_id: String(a.id),
     p_activity: { ...mapStravaActivity(a), ...(risk && assessed ? {
-      risk: { verdict: risk.verdict, score: risk.score, level: risk.level, reason: risk.reason, clean_distance_m: risk.cleanDistanceM,
+      risk: { verdict: risk.verdict, score: risk.score, level: risk.level, reason: risk.reason,
         flags: risk.flags.map((f) => ({ code: f.code, severity: f.severity, tier: f.tier ?? null, message: f.message, atS: f.atS ?? null, durationS: f.durationS ?? null })) },
       // Lưu vết: kết quả đầy đủ + đầu vào; dữ liệu gốc (rút gọn) chỉ giữ khi bài có dấu hiệu, để xét lại / chỉnh luật sau này
       analysis: {

@@ -1,9 +1,11 @@
 # Chống gian lận bài chạy — quy tắc, ngưỡng, quy trình
 
-Phiên bản bộ phân tích: `ac-2026.10.3` (`FRAUD_ENGINE_VERSION` trong `features/activity/model/fraud.ts`).
+Phiên bản bộ phân tích: `ac-2026.10.4` (`FRAUD_ENGINE_VERSION` trong `features/activity/model/fraud.ts`).
 Danh mục quy tắc đầy đủ (lý do, dữ liệu đầu vào, ngưỡng, nguyên nhân báo nhầm) nằm trong code tại `FRAUD_RULES` — tài liệu này tóm tắt và giải thích nguyên tắc.
 
 ## 1. Nguyên tắc
+
+**RaceHub không sửa dữ liệu của đối tác.** Bài từ Strava / Garmin / COROS giữ nguyên km, thời gian, pace. Hệ thống chỉ phân loại bài: **hợp lệ**, **nghi vấn** (chờ người duyệt) hoặc **bị loại** (do người duyệt quyết định, có thể khôi phục).
 
 | Nguyên tắc | Cách làm |
 |---|---|
@@ -11,7 +13,7 @@ Danh mục quy tắc đầy đủ (lý do, dữ liệu đầu vào, ngưỡng, n
 | Ngưỡng tốc độ đối chiếu dữ liệu thực tế | Ngưỡng "đủ căn cứ loại" dựa trên **kỷ lục thế giới** theo thời lượng (+5% sai số GPS). Ngưỡng cảnh báo được đo trên bộ dữ liệu có nhãn (mục 4) và theo dõi tỷ lệ loại nhầm thật (mục 6). |
 | Tách ngưỡng cảnh báo và ngưỡng đủ căn cứ loại | 4 mức: **Ghi chú** → **Cảnh báo** → **Nghi vấn** → **Đủ căn cứ loại**. Chỉ "Đủ căn cứ loại" là bằng chứng mạnh; kể cả vậy hệ thống chỉ **giữ bài chờ duyệt**, người duyệt mới quyết định loại. |
 | Không dùng GPS gap đơn thuần để kết luận gian lận | Khoảng mất tín hiệu chỉ được đánh dấu là *vùng lỗi GPS*. Bài trong app: km không xác minh được hỏi người chạy ("chỉ tính phần có GPS"), không gắn cờ gian lận. |
-| Không dùng một điểm GPS để loại cả bài | Mọi tốc độ tính trên **cửa sổ trượt 30 giây**. Cú nhảy GPS ≤ 10 giây bị bỏ khỏi quãng đường (`despike`). Strava không có streams → "vận tốc tối đa" một điểm chỉ là **Ghi chú**. |
+| Không dùng một điểm GPS để loại cả bài | Mọi tốc độ tính trên **cửa sổ trượt 30 giây**. Cú nhảy GPS ≤ 10 giây được bỏ qua *khi tính tốc độ* (`despike`), km của bài vẫn giữ nguyên. Strava không có streams → "vận tốc tối đa" một điểm chỉ là **Ghi chú**. |
 | Kiểm tra các dấu hiệu có độc lập không | Cờ trùng vùng lỗi GPS (±30 giây) bị **hạ một mức** và gắn nhóm `GPS_ERROR`. Các cờ GPS trùng thời điểm nhau đếm là **một** nhóm. Giữ bài khi có ≥ 1 Nghi vấn/Đủ căn cứ, hoặc ≥ 2 nhóm Cảnh báo **độc lập**. |
 | Bộ dữ liệu đo tỷ lệ phân loại sai | `fraudCorpus.ts` (18 kiểu bài × 12, có hạt giống cố định) + `fraud.eval.test.ts` (chạy trong CI). |
 | Ghi lý do loại từng bài | `activity_analyses.flags` (mã, mức, nguồn, bằng chứng) + `activity_decisions.reason`. |
@@ -26,7 +28,7 @@ Danh mục quy tắc đầy đủ (lý do, dữ liệu đầu vào, ngưỡng, n
 | `SUSTAINED_SPEED` — giữ tốc độ cao lâu | GPS | ≥ 17 km/h ≥ 3′ | ≥ 20 km/h ≥ 2′ | — |
 | `VEHICLE_BURST` — giống đi xe | GPS | — | ≥ 25 km/h ≥ 30″ | — |
 | `GPS_TELEPORT` — GPS nhảy | GPS | ≥ 3 lần | — | — |
-| `GPS_DISTANCE_GAIN` — km do GPS nhảy | GPS | phần bỏ ≥ 500 m và ≥ 10% | — | — |
+| `GPS_DISTANCE_GAIN` — vị trí dịch chuyển | GPS | — (GPS lạc rồi quay về: chỉ ghi chú) | một cú dịch chuyển ≥ 1 km trong ≤ 10 giây | — |
 | `STRIDE` — sải chân | GPS+CADENCE | > 1,8 m ≥ 90″ | > 2,1 m ≥ 90″ | — |
 | `HR_PACE` — tim thấp / pace nhanh | GPS+HR | 3–5′ | ≥ 5′ | — |
 | `HISTORY` — khác thường ngày | HISTORY | ≥ 5 độ lệch chuẩn | — | — |
@@ -34,7 +36,17 @@ Danh mục quy tắc đầy đủ (lý do, dữ liệu đầu vào, ngưỡng, n
 
 Ngưỡng tốc độ (`SUSTAINED_SPEED`, `VEHICLE_BURST`, nhảy GPS) do admin chỉnh ở **Chính sách vận hành**, không cần sửa code.
 
-**Sửa km thay vì loại bài:** khi phần bị bỏ do cú nhảy GPS ≥ max(200 m, 3%), máy chủ ghi km đã làm sạch và lưu ghi chú "Bỏ X m do GPS nhảy…". Cách này vô hiệu hoá luôn kiểu gian lận "nhảy tuyến để đi tắt".
+### Cú nhảy GPS và kiểu gian lận "đi tắt"
+
+- **GPS nhảy là bình thường.** Ở đô thị, dưới cầu hay giữa nhà cao tầng, vị trí thường lạc vài chục đến vài trăm mét trong 1–3 giây rồi quay về. Strava cộng thêm một ít km do việc này. Trường hợp này chỉ được **ghi chú**: bài vẫn hợp lệ và km giữ nguyên.
+- **"Đi tắt" là gì:** tuyến chạy bị cắt rồi nối lại, ví dụ:
+  - sửa hoặc ghép file GPX trước khi tải lên Strava;
+  - dùng app giả vị trí;
+  - tắt rồi bật đồng hồ ở chỗ khác mà thiết bị vẫn nối thẳng hai điểm.
+
+  Dấu hiệu là vị trí **dịch chuyển một lần ≥ 1 km trong vài giây** (≥ 360 km/h), không quay về, rồi chạy tiếp bình thường từ chỗ mới. Trước và sau đó đều là tốc độ chạy bộ, nên các luật tốc độ theo đoạn 30 giây không thấy được.
+- **Cách xử lý:** bài bị đánh dấu **Nghi vấn**, km giữ nguyên và bài chờ người duyệt. Người duyệt xem bản đồ và bằng chứng (`maxJumpM`: cú nhảy lớn nhất; `addedM`: tổng km do nhảy; `withoutJumpsM`: km nếu bỏ các cú nhảy, chỉ để tham khảo), rồi quyết định **duyệt** hoặc **loại**. Nếu loại nhầm thì có thể khôi phục.
+- **Trường hợp dễ báo nhầm:** đồng hồ bắt GPS sai lúc mới bật, hoặc ra khỏi hầm dài. Chính vì vậy dấu hiệu này chỉ ở mức Nghi vấn, không phải "Đủ căn cứ loại".
 
 ## 3. Quy trình quyết định
 
@@ -48,11 +60,11 @@ Ngưỡng tốc độ (`SUSTAINED_SPEED`, `VEHICLE_BURST`, nhảy GPS) do admin 
 
 `npx vitest run features/activity/model/fraud.eval.test.ts` — 12 bài mỗi kiểu:
 
-| Nhóm | Số bài | Bị giữ / sửa km | Ghi chú |
+| Nhóm | Số bài | Chuyển người duyệt | Ghi chú |
 |---|---|---|---|
 | Bài thật phong trào (7 kiểu: đèn đỏ, tempo, 8×400 m, 5×1 km pace 3:15, 10 km pace 3:05, trail, không cảm biến) | 84 | **0%** | |
-| Bài thật có lỗi GPS (nhảy điểm, trôi nhà cao tầng, mất tín hiệu, kết hợp biến tốc) | 48 | **0%** | km nhảy được bỏ, không giữ bài |
-| Gian lận rõ (ô tô 5′, đạp xe, xe điện, xe máy từng đoạn, nhảy tuyến 2 km) | 60 | **100%** | nhảy tuyến được xử lý bằng sửa km |
+| Bài thật có lỗi GPS (nhảy điểm, trôi nhà cao tầng, mất tín hiệu, kết hợp biến tốc) | 48 | **0%** | chỉ ghi chú, km giữ nguyên |
+| Gian lận rõ (ô tô 5′, đạp xe, xe điện, xe máy từng đoạn, đi tắt 2 km) | 60 | **100%** chuyển duyệt | đi tắt: Nghi vấn, km giữ nguyên |
 | VĐV đỉnh cao 5 km pace 2:50 | 12 | 100% chuyển duyệt | Chấp nhận: hiếm, người duyệt xác nhận |
 | Ngồi xe kẹt đường 13–15 km/h | 12 | 0% | **Giới hạn đã biết**: tốc độ như người chạy |
 

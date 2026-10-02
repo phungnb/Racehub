@@ -242,9 +242,11 @@ begin
                          and (coalesce(qual, '') || ' ' || coalesce(with_check, '')) ~ '(?<!SELECT )(public\.)?is_system_admin\(\)')),
     jsonb_build_object('file', '20261001012400', 'label', 'Chống gian lận Strava: một điểm GPS nhảy không còn làm bài bị chặn',
       'ok', pg_get_functiondef('public.ingest_provider_activity(uuid,text,text,jsonb)'::regprocedure) ~ 'v_risk is null and v_max_speed'),
-    jsonb_build_object('file', '20261001012500', 'label', 'Chống gian lận: lưu phân tích + lịch sử quyết định, khôi phục bài loại nhầm, km bỏ cú nhảy GPS',
+    jsonb_build_object('file', '20261001012500', 'label', 'Chống gian lận: lưu phân tích + lịch sử quyết định, khôi phục bài loại nhầm',
       'ok', to_regclass('public.activity_analyses') is not null and to_regclass('public.activity_decisions') is not null
-        and to_regprocedure('public.restore_activity(uuid,text)') is not null and to_regprocedure('public.fraud_review_stats(integer)') is not null));
+        and to_regprocedure('public.restore_activity(uuid,text)') is not null and to_regprocedure('public.fraud_review_stats(integer)') is not null),
+    jsonb_build_object('file', '20261001012600', 'label', 'Giữ nguyên km của đối tác (Strava…); GPS nhảy chỉ dùng để phân loại',
+      'ok', pg_get_functiondef('public.ingest_provider_activity(uuid,text,text,jsonb)'::regprocedure) !~ 'v_clean'));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

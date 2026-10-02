@@ -10,9 +10,7 @@ describe('đánh giá bộ chống gian lận trên bộ dữ liệu có nhãn',
     const r = analyzeRun(run.summary, run.streams, run.history)
     const row = rows.get(run.kind) ?? { label: run.label, n: 0, review: 0, codes: new Map() }
     row.n++
-    // "Đi tắt" bằng cú nhảy tuyến: không cần giữ bài — km được tính lại (bỏ phần nhảy) là đã vô hiệu gian lận
-    const corrected = r.cleanDistanceM != null && run.summary.distanceM - r.cleanDistanceM >= 0.8 * (run.teleportM ?? Infinity)
-    if (r.verdict === 'REVIEW' || corrected) {
+    if (r.verdict === 'REVIEW') {
       row.review++
       for (const f of r.flags) if (f.tier !== 'NOTE') row.codes.set(`${f.code}:${f.tier}`, (row.codes.get(`${f.code}:${f.tier}`) ?? 0) + 1)
     }
@@ -22,7 +20,7 @@ describe('đánh giá bộ chống gian lận trên bộ dữ liệu có nhãn',
   const rate = (xs: { n: number; review: number }[]) => xs.reduce((s, x) => s + x.review, 0) / Math.max(1, xs.reduce((s, x) => s + x.n, 0))
 
   it('in bảng kết quả', () => {
-    console.table([...rows.entries()].map(([kind, x]) => ({ kind, label: x.label, n: x.n, giuHoacSuaKm: x.review,
+    console.table([...rows.entries()].map(([kind, x]) => ({ kind, label: x.label, n: x.n, chuyenDuyet: x.review,
       rate: `${Math.round((x.review / x.n) * 100)}%`, why: [...x.codes.entries()].map(([k, v]) => `${k}×${v}`).join(' ') })))
     expect(rows.size).toBeGreaterThan(10)
   })

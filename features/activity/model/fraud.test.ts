@@ -158,6 +158,29 @@ describe('cú nhảy GPS và đường cong pace theo thời gian', () => {
 
 import { FRAUD_RULES, gpsErrorRegions } from './fraud'
 
+describe('cú nhảy GPS: không sửa km đối tác, chỉ phân loại', () => {
+  const jump = (s: FraudStreams, at: number, m: number, back = 0) => {
+    for (let i = at; i < s.distance.length; i++) s.distance[i] += m
+    if (back) for (let i = at + back; i < s.distance.length; i++) s.distance[i] += m
+    return s
+  }
+  it('nhiều lần GPS lạc 150 m rồi quay về → bình thường: chỉ ghi chú, bài hợp lệ', () => {
+    const s = build([[2400, 3.0]])
+    for (const at of [300, 900, 1500, 2100]) jump(s, at, 150, 2)
+    const r = analyzeRun(sum(s), s)
+    expect(r.verdict).toBe('OK')
+    expect(r.flags.find((f) => f.code === 'GPS_DISTANCE_GAIN')).toMatchObject({ tier: 'NOTE' })
+  })
+  it('một lần vị trí dịch chuyển 2 km trong 1 giây rồi chạy tiếp → nghi vấn, chờ duyệt; km gốc không đổi', () => {
+    const s = jump(build([[2400, 3.0]]), 1200, 2000)
+    const r = analyzeRun(sum(s), s)
+    expect(r.verdict).toBe('REVIEW')
+    expect(r.flags.find((f) => f.code === 'GPS_DISTANCE_GAIN')).toMatchObject({ tier: 'SUSPECT' })
+    expect(r.flags.find((f) => f.code === 'GPS_DISTANCE_GAIN')!.evidence!.maxJumpM).toBeGreaterThanOrEqual(2000)
+    expect(s.distance.at(-1)).toBeCloseTo(9200)
+  })
+})
+
 describe('mức kết luận và độc lập của bằng chứng', () => {
   it('mỗi kết quả có phiên bản luật, số nhóm bằng chứng độc lập, mức cao nhất; mỗi dấu hiệu có số đo', () => {
     const s = build([[600, 3], [300, 7.6], [600, 3]])

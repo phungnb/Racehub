@@ -65,12 +65,12 @@ export interface FraudResult {
   /** Số nhóm bằng chứng độc lập (các dấu hiệu cùng một lỗi GPS / cùng thời điểm tính là một) */
   independent: number
   engine: string
-  /** Quãng đường (m) sau khi bỏ cú nhảy GPS — máy chủ dùng số này thay số của Strava khi chênh đáng kể; null nếu không có streams */
+  /** Quãng đường (m) nếu bỏ cú nhảy GPS — CHỈ để tham khảo khi duyệt, không thay km của đối tác; null nếu không có streams */
   cleanDistanceM: number | null
 }
 
 /** Phiên bản bộ quy tắc — lưu kèm mỗi kết quả để biết bài được xét bằng luật nào */
-export const FRAUD_ENGINE_VERSION = 'ac-2026.10.3'
+export const FRAUD_ENGINE_VERSION = 'ac-2026.10.4'
 
 export const FRAUD_CONFIG = {
   windowS: 30,
@@ -88,9 +88,9 @@ export const FRAUD_CONFIG = {
   gpsError: { gapS: 30, padS: 30 },
   // Cú nhảy GPS: chuỗi điểm liên tiếp nhanh hơn ngưỡng "nhảy" nhưng tổng thời gian ≤ maxS giây → bỏ quãng đó
   spike: { maxS: 10, contextS: 30, contextRatio: 0.5 },
-  // Quãng đường GPS "cộng thêm" do cú nhảy: luôn trả về quãng đường đã bỏ cú nhảy để máy chủ tính đúng km.
-  // Cảnh báo khi phần bị bỏ lớn (có thể là đi tắt) — một mình không giữ bài vì km đã được sửa.
-  gain: { warnM: 500, warnPct: 0.1 },
+  // Cú nhảy GPS: KHÔNG sửa km của đối tác (Strava…), chỉ dùng để phân loại. Nhảy nhỏ rồi quay về = bình thường (ghi chú).
+  // MỘT cú dịch chuyển ≥ jumpM mét trong ≤ spike.maxS giây (≥ 360 km/h) không thể là chạy / sóng yếu thông thường → nghi vấn, chờ duyệt.
+  gain: { jumpM: 1000 },
   // Tốc độ TB tối đa con người giữ được theo thời lượng (≈ kỷ lục thế giới nam: 400 m, 800 m, 1500 m, 5 km, 10 km, bán marathon,
   // marathon) + 5% sai số GPS. Vượt mức này trong cả một cửa sổ dài = không thể là chạy bộ.
   curve: { tolerance: 1.05, points: [
@@ -148,11 +148,11 @@ export const FRAUD_RULES: Record<FraudCode, FraudRule> = {
     falsePositives: 'Rất hay gặp ở đô thị — một mình không bao giờ giữ bài',
   },
   GPS_DISTANCE_GAIN: {
-    label: 'Km do GPS nhảy', source: 'GPS',
-    reason: 'Cú nhảy GPS ngắn cộng thêm quãng đường không có thật (hoặc cố ý "nhảy" tuyến để đi tắt). Km được tính lại theo quãng đường đã bỏ cú nhảy — không loại bài.',
-    inputs: 'Streams time + distance: chuỗi điểm > ngưỡng "nhảy" ≤ 10 giây, xung quanh 30 giây đang ở tốc độ chạy bộ',
-    warn: 'Phần bị bỏ ≥ 500 m và ≥ 10% bài', suspect: null, disqualify: null,
-    falsePositives: 'GPS rất kém (đã sửa km, một mình không giữ bài)',
+    label: 'Vị trí dịch chuyển', source: 'GPS',
+    reason: 'GPS lạc vài chục–vài trăm mét rồi quay về là BÌNH THƯỜNG (chỉ ghi chú). Một lần vị trí "dịch chuyển" ≥ 1 km trong vài giây (≥ 360 km/h) rồi chạy tiếp từ chỗ mới thì không thể do chạy hay sóng yếu thông thường — thường do sửa / ghép file tuyến hoặc app giả vị trí. Km của đối tác KHÔNG bị sửa; bài chờ người duyệt xác minh.',
+    inputs: 'Streams time + distance: chuỗi điểm nhanh hơn ngưỡng "nhảy" kéo dài ≤ 10 giây, xung quanh 30 giây đang ở tốc độ chạy bộ; đo từng cú nhảy riêng',
+    warn: null, suspect: 'Một cú dịch chuyển ≥ 1 km', disqualify: null,
+    falsePositives: 'Đồng hồ bắt GPS sai lúc mới bật / ra khỏi hầm dài — người duyệt xem bản đồ để quyết định',
   },
   STRIDE: {
     label: 'Sải chân', source: 'GPS+CADENCE',
@@ -475,11 +475,21 @@ export function analyzeRun(summary: FraudSummary, streams: FraudStreams | null, 
     cleanDistanceM = d[d.length - 1] - d[0]
     const rawM = streams.distance[streams.distance.length - 1] - streams.distance[0]
     const gain = rawM - cleanDistanceM
+    // Từng cú nhảy = chuỗi bước liên tiếp bị despike bỏ; cú lớn nhất cho biết "dịch chuyển" hay chỉ là GPS lạc rồi quay về
+    let maxJumpM = 0, maxJumpAtS = 0, cur = 0, curAt = 0
+    for (let i = 1; i < t.length; i++) {
+      const cut = (streams.distance[i] - streams.distance[i - 1]) - (d[i] - d[i - 1])
+      if (cut > 0) { if (cur === 0) curAt = t[i - 1] - t[0]; cur += cut } else cur = 0
+      if (cur > maxJumpM) { maxJumpM = cur; maxJumpAtS = curAt }
+    }
     if (gain >= 50) {
-      const big = gain >= FRAUD_CONFIG.gain.warnM && gain >= FRAUD_CONFIG.gain.warnPct * rawM
-      raw.push({ code: 'GPS_DISTANCE_GAIN', severity: big ? 'HIGH' : 'INFO', score: big ? 70 : 20, tier: big ? 'WARN' : 'NOTE',
-        evidence: { removedM: Math.round(gain), streamM: Math.round(rawM), cleanM: Math.round(cleanDistanceM) },
-        message: `Bỏ ${Math.round(gain)} m do GPS nhảy — km được tính lại ${(cleanDistanceM / 1000).toFixed(2)} km` })
+      const jump = maxJumpM >= FRAUD_CONFIG.gain.jumpM
+      const ev = { addedM: Math.round(gain), maxJumpM: Math.round(maxJumpM), reportedStreamM: Math.round(rawM), withoutJumpsM: Math.round(cleanDistanceM) }
+      raw.push(jump
+        ? { code: 'GPS_DISTANCE_GAIN', severity: 'SEVERE', score: 80, tier: 'SUSPECT', atS: maxJumpAtS, evidence: ev,
+            message: `Vị trí dịch chuyển ${Math.round(maxJumpM)} m trong vài giây — không thể do chạy bộ (có thể đi tắt / sửa tuyến); km giữ nguyên, cần người duyệt xác minh` }
+        : { code: 'GPS_DISTANCE_GAIN', severity: 'INFO', score: 20, tier: 'NOTE', evidence: ev,
+            message: `GPS nhảy cộng thêm khoảng ${Math.round(gain)} m (bình thường, km giữ nguyên)` })
     }
     raw.push(...ruleCurve(t, d), ...ruleSpeed(t, v, rules), ...ruleTeleport(t, streams.latlng, rules), ...ruleStride(t, d, streams.cadence), ...ruleHr(t, d, streams.heartrate))
   } else if ((summary.maxSpeedMps ?? 0) > rules.teleport.mps) {
