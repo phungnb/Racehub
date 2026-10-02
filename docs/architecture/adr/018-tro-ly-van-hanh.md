@@ -1,6 +1,6 @@
 # ADR-018: Trợ lý vận hành cho chủ dự án (ngoài app)
 
-**Trạng thái.** Đề xuất, chờ Phụng duyệt. Chưa có code.
+**Trạng thái.** Đã chấp nhận (Phụng duyệt ngày 2/10/2026). Chưa có code: migration schema `ops` và Routine làm ở PR sau.
 
 **Bối cảnh.**
 - RaceHub chưa phát hành. Tài khoản Google Play cá nhân bắt buộc kiểm thử kín ≥ 12 tester trong 14 ngày trước khi lên Production ([APP_MOBILE.md](../../APP_MOBILE.md)). Tester bỏ giữa chừng thì phải chạy lại, làm lùi ngày lên store.
