@@ -32,7 +32,7 @@ const run = (db: PGlite, uid: string, km: number, daysAgo: number) => db.query(`
 
 describe('góp ý vòng 3 (011700)', () => {
   let db: PGlite
-  beforeAll(async () => { db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed }) }, 300_000)
+  beforeAll(async () => { db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed, until: '20261001012600' }) }, 300_000)
 
   it('thách đấu CLB: chỉ thành viên đã đăng ký mới được tính; mỗi người một CLB; BXH chi tiết CLB', async () => {
     const cup = await rpc(db, OA, `select public.create_club_cup($1::jsonb) as r`, [JSON.stringify({ title: 'Cúp mùa thu Hà Nội', metric: 'TOTAL_KM', max_clubs: 10, host_club_id: CA,

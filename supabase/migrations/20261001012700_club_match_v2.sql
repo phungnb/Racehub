@@ -1,11 +1,3 @@
--- RaceHub — PHẦN 20/21 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 012700
--- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
--- Xong thì chạy phần tiếp theo.
-begin;
--- ===================================================================
--- 20261001012700_club_match_v2.sql
--- ===================================================================
 -- 012700: THI ĐẤU CLB v2 — một bộ luật cho cả "CLB đấu CLB" (1–1) và "Thách đấu nhiều CLB".
 -- • Gộp: trận 1–1 là một thách đấu (club_cups) kind = 'DUEL' có đúng 2 CLB. Trận cũ trong club_battles được chuyển sang
 --   (giữ id, giữ cách tính cũ: mọi thành viên, km). Hàm cũ create/respond/cancel_club_battle không dùng nữa.
@@ -1069,5 +1061,3 @@ revoke all on function public.settle_due_club_cups(), public.settle_due_club_bat
 grant execute on function public.settle_due_club_cups(), public.settle_due_club_battles() to service_role;
 
 notify pgrst, 'reload schema';
-
-commit;

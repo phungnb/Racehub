@@ -1,4 +1,4 @@
--- RaceHub — PHẦN 15/20 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub — PHẦN 15/21 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Gồm: 009500, 009600, 009700, 009800, 009900
 -- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
 -- Xong thì chạy phần tiếp theo.
