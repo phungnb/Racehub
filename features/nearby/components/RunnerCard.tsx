@@ -11,7 +11,7 @@ import {
   blockUser, inviteToRun, nearbyErrorMessage, reportUser, sendConnection, type NearbyRunner,
 } from '../api/nearbyApi'
 import { useNearbyClubs, useNearbyEvents, useNearbyMutation } from '../hooks/useNearby'
-import { eventWhen, formatKm, formatPace, GOALS, REASONS, REPORT_REASONS, SLOTS } from '../model/nearby'
+import { daysAgo, eventWhen, formatKm, formatPace, GOALS, REASONS, REPORT_REASONS, SLOTS } from '../model/nearby'
 
 const LINKISH = /(https?:\/\/|www\.|\.com\b|\.vn\b|zalo|telegram|t\.me|fb\.com|facebook|\d{9,})/i
 
@@ -31,7 +31,8 @@ export function RunnerCard({ r }: { r: NearbyRunner }) {
             {r.level != null && <LevelBadge level={r.level} />}
           </div>
           <p className="flex items-center gap-1 text-sm text-fg-muted">
-            <MapPin className="size-3.5 shrink-0" aria-hidden />{formatKm(r.km)}{r.area_label ? ` · ${r.area_label}` : ''}
+            <MapPin className="size-3.5 shrink-0" aria-hidden />{formatKm(r.km)}{r.area_label ? ` · ${r.area_label}` : r.where === 'HOME' ? ' · khu hay chạy' : ''}
+            {daysAgo(r.last_run_days) && <span className="text-fg-subtle"> · chạy {daysAgo(r.last_run_days)}</span>}
           </p>
           <p className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-fg-subtle">
             {pace && <span className="inline-flex items-center gap-1"><Timer className="size-3" aria-hidden />{pace}</span>}

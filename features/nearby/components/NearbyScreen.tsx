@@ -2,24 +2,27 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { CalendarDays, ChevronRight, EyeOff, MapPin, Radar, Settings2, ShieldAlert, Users, UsersRound } from 'lucide-react'
+import { CalendarDays, ChevronRight, EyeOff, Footprints, MapPin, MessageCircle, Newspaper, Radar, Settings2, ShieldAlert, UserPlus, Users, UsersRound } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, EmptyState, ErrorState, PageHeader, SegmentedControl, Sheet, Skeleton, ScrollRow } from '@/shared/ui'
+import { Avatar, Button, Card, EmptyState, ErrorState, LevelBadge, PageHeader, SegmentedControl, Sheet, Skeleton, ScrollRow, SwitchRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import {
-  clearPresence, nearbyErrorMessage, setDiscovery, setPresence, type Discovery, type DiscoveryInput, type Goal, type NearbyFilters,
-  type Purpose, type Radius, type Slot,
+  clearPresence, nearbyErrorMessage, sendConnection, setDiscovery, setPresence, type Discovery, type DiscoveryInput, type FeedPost, type FeedRun,
+  type Goal, type NearbyFilters, type Purpose, type Radius, type Slot,
 } from '../api/nearbyApi'
-import { useDiscovery, useNearbyClubs, useNearbyEvents, useNearbyMutation, useNearbyRunners } from '../hooks/useNearby'
-import { eventWhen, expiresIn, GOALS, PACE_FILTERS, PURPOSES, RADII, SLOTS } from '../model/nearby'
-import { EnableSheet, PrefsForm } from './EnableSheet'
+import { useDiscovery, useNearbyClubs, useNearbyEvents, useNearbyFeed, useNearbyMutation, useNearbyRunners } from '../hooks/useNearby'
+import { dayLabel, eventWhen, expiresIn, formatKm, formatPace, GOALS, PACE_FILTERS, PURPOSES, RADII, SLOTS } from '../model/nearby'
+import { AUTO_AREA_TERMS, EnableSheet, PrefsForm } from './EnableSheet'
 import { LocationPicker, type PickedPlace } from './LocationPicker'
 import { RunnerCard } from './RunnerCard'
 
-type Tab = 'runners' | 'events' | 'clubs'
+type Tab = 'feed' | 'runners' | 'events' | 'clubs'
 
-/** Runner quanh đây: runner hợp pace / giờ / mục tiêu, buổi chạy công khai và CLB gần khu vực bạn chọn */
+/**
+ * Runner quanh đây: bảng tin hoạt động gần mình, runner hợp pace / giờ / mục tiêu, buổi chạy công khai và CLB gần.
+ * Vị trí: khu hay chạy tự động (từ điểm xuất phát bài chạy — không cần mở app mỗi ngày) hoặc khu vực tạm tự chọn.
+ */
 export function NearbyScreen() {
   const me = useDiscovery()
   return (
@@ -38,9 +41,9 @@ export function NearbyScreen() {
 
 function Body({ d }: { d: Discovery }) {
   const [enableOpen, setEnableOpen] = useState(false)
-  const [tab, setTab] = useState<Tab>('runners')
+  const [tab, setTab] = useState<Tab>('feed')
   const [radius, setRadius] = useState<Radius>(d.radius_km)
-  const live = d.enabled && !!d.presence
+  const live = d.enabled && d.located
 
   if (d.suspended) {
     return (
@@ -55,21 +58,23 @@ function Body({ d }: { d: Discovery }) {
           <div className="flex items-start gap-3">
             <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-brand/20 text-brand"><Radar className="size-6" aria-hidden /></span>
             <div>
-              <p className="font-semibold">{d.enabled ? 'Vị trí của bạn đã hết hạn' : 'Tìm bạn chạy quanh bạn'}</p>
+              <p className="font-semibold">{d.enabled ? 'Chưa có khu vực' : 'Tìm bạn chạy quanh bạn'}</p>
               <p className="text-sm text-fg-muted">
-                {d.enabled ? 'Chọn lại khu vực để tiếp tục thấy và được thấy.' : 'Chỉ chia sẻ vùng ~1 km bạn chọn, tự hết hạn. Bạn quyết định ai thấy mình.'}
+                {d.enabled ? 'Bật "khu hay chạy tự động" để không phải chọn lại mỗi ngày, hoặc chọn khu vực tạm.'
+                  : 'Thấy runner, bài chạy và buổi chạy nhóm gần bạn — chỉ chia sẻ vùng ~1–2 km, bạn quyết định ai thấy mình.'}
               </p>
             </div>
           </div>
-          <Button block onClick={() => setEnableOpen(true)}>{d.enabled ? 'Chọn lại khu vực' : 'Bật Quanh đây'}</Button>
+          <Button block onClick={() => setEnableOpen(true)}>{d.enabled ? 'Chọn khu vực' : 'Bật Quanh đây'}</Button>
         </Card>
       )}
       {enableOpen && <EnableSheet me={d} open onClose={() => setEnableOpen(false)} />}
+      <HubBanner />
 
-      {d.presence && (
+      {d.located && (
         <>
           <SegmentedControl value={tab} onChange={setTab} options={[
-            { value: 'runners', label: 'Runner' }, { value: 'events', label: 'Buổi chạy' }, { value: 'clubs', label: 'CLB' },
+            { value: 'feed', label: 'Bảng tin' }, { value: 'runners', label: 'Runner' }, { value: 'events', label: 'Buổi chạy' }, { value: 'clubs', label: 'CLB' },
           ]} />
           <div className="flex items-center gap-1.5" role="group" aria-label="Bán kính">
             <span className="text-xs text-fg-muted">Trong</span>
@@ -80,6 +85,7 @@ function Body({ d }: { d: Discovery }) {
               </button>
             ))}
           </div>
+          {tab === 'feed' && <Feed radius={radius} onFallback={setTab} />}
           {tab === 'runners' && (d.enabled ? <Runners d={d} radius={radius} onFallback={setTab} />
             : <EmptyState icon={Users} title="Bật Quanh đây để thấy runner" description="Runner chỉ thấy nhau khi cả hai cùng bật." />)}
           {tab === 'events' && <Events radius={radius} />}
@@ -92,40 +98,61 @@ function Body({ d }: { d: Discovery }) {
 
 function StatusCard({ d }: { d: Discovery }) {
   const [sheet, setSheet] = useState<'move' | 'settings' | null>(null)
-  const hide = useNearbyMutation(() => clearPresence())
-  const p = d.presence!
+  // Ẩn ngay: xoá vị trí tạm + tắt khu hay chạy tự động
+  const hide = useNearbyMutation(async () => {
+    if (d.presence) await clearPresence()
+    if (d.auto_area) await setDiscovery({ auto_area: false })
+  })
+  const p = d.presence
+  const title = p ? (p.area_label ?? (p.source === 'DEVICE' ? 'Quanh vị trí của bạn' : 'Khu vực đã chọn')) : 'Khu hay chạy (tự động)'
+  const sub = p ? `Vị trí tạm · ${expiresIn(p.expires_at)}${d.auto_area ? ' · sau đó dùng khu hay chạy' : ''}`
+    : `Từ ${d.home?.runs ?? 0} bài chạy gần đây · tự cập nhật, không cần mở app`
   return (
     <Card className="space-y-3">
       <div className="flex items-center gap-3">
         <span className="relative grid size-11 shrink-0 place-items-center rounded-2xl bg-brand/15 text-brand">
-          <MapPin className="size-5" aria-hidden />
+          {p ? <MapPin className="size-5" aria-hidden /> : <Footprints className="size-5" aria-hidden />}
           <span className="absolute right-1 top-1 size-2.5 rounded-full bg-brand ring-2 ring-surface" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{p.area_label ?? (p.source === 'DEVICE' ? 'Quanh vị trí của bạn' : 'Khu vực đã chọn')}</p>
-          <p className="text-xs text-fg-muted">Đang hiện · {expiresIn(p.expires_at)} · {d.connections} kết nối</p>
+          <p className="truncate font-semibold">{title}</p>
+          <p className="text-xs text-fg-muted">Đang hiện · {sub} · {d.connections} kết nối</p>
         </div>
         <Button size="sm" variant="ghost" aria-label="Cài đặt Quanh đây" onClick={() => setSheet('settings')}><Settings2 className="size-5" aria-hidden /></Button>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="secondary" size="sm" disabled={p.moves_left === 0} onClick={() => setSheet('move')}>
-          <MapPin className="size-4" aria-hidden />Đổi khu vực{p.moves_left < 3 ? ` (${p.moves_left})` : ''}
+        <Button variant="secondary" size="sm" disabled={!!p && p.moves_left === 0} onClick={() => setSheet('move')}>
+          <MapPin className="size-4" aria-hidden />{p ? `Đổi khu vực${p.moves_left < 3 ? ` (${p.moves_left})` : ''}` : 'Đang ở nơi khác'}
         </Button>
         <Button variant="secondary" size="sm" loading={hide.isPending}
           onClick={() => hide.mutate(undefined, { onSuccess: () => toast.success('Đã ẩn bạn khỏi Quanh đây', { description: 'Vị trí đã xoá. Chọn lại khu vực để hiện.' }) })}>
           <EyeOff className="size-4" aria-hidden />Ẩn tôi ngay
         </Button>
       </div>
-      {sheet === 'move' && <MoveSheet area={p.area_label} onClose={() => setSheet(null)} />}
+      {sheet === 'move' && <MoveSheet area={p?.area_label ?? null} onClose={() => setSheet(null)} />}
       {sheet === 'settings' && <SettingsSheet d={d} onClose={() => setSheet(null)} />}
     </Card>
+  )
+}
+
+/** Lối vào Hội quán runner (toàn quốc) */
+function HubBanner() {
+  return (
+    <Link href={routes.hub} className="flex items-center gap-3 rounded-[var(--radius-card)] border border-violet-500/30 bg-gradient-to-r from-violet-500/15 to-transparent p-3 hover:border-violet-400/60">
+      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-violet-500/20 text-violet-300"><UsersRound className="size-5" aria-hidden /></span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-bold">Hội quán runner</span>
+        <span className="block text-xs text-fg-muted">Runner khắp Việt Nam: khoe thành tích, rủ đi giải, tìm pacer, tìm bạn hợp pace</span>
+      </span>
+      <ChevronRight className="size-4 shrink-0 text-fg-subtle" aria-hidden />
+    </Link>
   )
 }
 
 function MoveSheet({ area, onClose }: { area: string | null; onClose: () => void }) {
   const move = useNearbyMutation((x: PickedPlace) => setPresence(x.lat, x.lng, x.source, x.area, x.hours))
   return (
-    <Sheet open onClose={onClose} title="Đổi khu vực" description="Tối đa 3 lần / 24 giờ để không ai dò được vị trí chính xác của người khác.">
+    <Sheet open onClose={onClose} title="Khu vực tạm thời" description="Dùng khi bạn đang ở nơi khác (đi công tác, du lịch). Đổi tối đa 3 lần / 24 giờ để không ai dò được vị trí chính xác.">
       <LocationPicker initialArea={area} busy={move.isPending}
         onPick={(x) => move.mutate(x, { onSuccess: () => { toast.success('Đã cập nhật khu vực'); onClose() }, onError: (e) => toast.error(nearbyErrorMessage(e)) })} />
     </Sheet>
@@ -133,13 +160,17 @@ function MoveSheet({ area, onClose }: { area: string | null; onClose: () => void
 }
 
 function SettingsSheet({ d, onClose }: { d: Discovery; onClose: () => void }) {
-  const [prefs, setPrefs] = useState<DiscoveryInput>({ visible_to: d.visible_to, purposes: d.purposes, goals: d.goals, time_slots: d.time_slots, share_pace: d.share_pace, bio: d.bio })
-  const save = useNearbyMutation((p: DiscoveryInput) => setDiscovery(p))
+  const [prefs, setPrefs] = useState<DiscoveryInput>({
+    visible_to: d.visible_to, purposes: d.purposes, goals: d.goals, time_slots: d.time_slots, share_pace: d.share_pace, bio: d.bio, auto_area: d.auto_area,
+  })
+  const save = useNearbyMutation((p: DiscoveryInput) => setDiscovery({ ...p, auto_consent: p.auto_area && !d.auto_area ? true : undefined }))
   const run = (p: DiscoveryInput, msg: string) => save.mutate(p, { onSuccess: () => { toast.success(msg); onClose() }, onError: (e) => toast.error(nearbyErrorMessage(e)) })
   return (
     <Sheet open onClose={onClose} title="Cài đặt Quanh đây"
       footer={<Button block loading={save.isPending} onClick={() => run(prefs, 'Đã lưu')}>Lưu</Button>}>
       <div className="space-y-5">
+        <SwitchRow checked={!!prefs.auto_area} onChange={(on) => setPrefs({ ...prefs, auto_area: on })} icon={Footprints}
+          label="Khu hay chạy tự động" description={`${AUTO_AREA_TERMS} Bật = bạn đồng ý cách xử lý này.`} />
         <PrefsForm value={prefs} onChange={setPrefs} />
         <div className="rounded-xl border border-danger/30 p-3">
           <p className="text-sm font-semibold">Tắt Quanh đây</p>
@@ -256,5 +287,71 @@ function Clubs({ radius }: { radius: Radius }) {
         </li>
       ))}
     </ul>
+  )
+}
+
+/** Bảng tin quanh đây: ai vừa chạy gần mình + bài rủ chạy gần mình. Không tuyến, không giờ chính xác. */
+function Feed({ radius, onFallback }: { radius: Radius; onFallback: (t: Tab) => void }) {
+  const q = useNearbyFeed(radius)
+  if (q.isPending) return <div className="space-y-3"><Skeleton className="h-20" /><Skeleton className="h-20" /><Skeleton className="h-20" /></div>
+  if (q.isError) return <ErrorState message={nearbyErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
+  if (q.data.items.length === 0) {
+    return (
+      <EmptyState icon={Newspaper} title="Tuần này chưa có hoạt động quanh bạn"
+        description={q.data.people ? `Có ${q.data.people} runner trong ${radius} km nhưng 7 ngày qua chưa ai chia sẻ bài chạy.` : 'Quanh đây còn ít người bật. Rủ bạn bè cùng bật, hoặc đăng bài rủ chạy ở Hội quán.'}
+        action={<div className="flex gap-2">
+          <Button size="sm" variant="secondary" onClick={() => onFallback('events')}><CalendarDays className="size-4" aria-hidden />Buổi chạy</Button>
+          <Link href={routes.hub} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border px-3 text-sm font-semibold"><UsersRound className="size-4" aria-hidden />Hội quán</Link>
+        </div>} />
+    )
+  }
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-fg-muted">{q.data.people} runner trong {radius} km · 7 ngày qua · chỉ bài họ đã chia sẻ, không hiện tuyến chạy</p>
+      <ul className="space-y-2">
+        {q.data.items.map((x) => x.type === 'RUN'
+          ? <RunItem key={`r-${x.user.id}-${x.at}`} x={x} />
+          : <PostItem key={`p-${x.id}`} x={x} />)}
+      </ul>
+    </div>
+  )
+}
+
+function RunItem({ x }: { x: FeedRun }) {
+  const [sent, setSent] = useState(false)
+  const connect = useNearbyMutation(() => sendConnection(x.user.id, null))
+  const pace = formatPace(x.distance_m > 0 ? Math.round(x.moving_time_s / (x.distance_m / 1000)) : null)
+  return (
+    <li className="flex items-center gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-3">
+      <Avatar src={x.user.avatar_url} name={x.user.name} />
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-1.5 text-sm"><b className="truncate">{x.user.name}</b>{x.user.level != null && <LevelBadge level={x.user.level} />}</p>
+        <p className="text-sm">chạy <b>{(x.distance_m / 1000).toFixed(1).replace('.', ',')} km</b>{pace && <> · {pace}</>} · {dayLabel(x.day)}</p>
+        <p className="text-xs text-fg-subtle">{formatKm(x.km)}{x.where === 'HOME' ? ' · khu hay chạy' : ''}</p>
+      </div>
+      {x.connection === 'CONNECTED'
+        ? <Link href={routes.message(x.user.id)} aria-label={`Nhắn tin cho ${x.user.name}`} className="grid size-10 place-items-center rounded-xl border border-border text-brand"><MessageCircle className="size-4" aria-hidden /></Link>
+        : <Button size="sm" variant="secondary" disabled={sent} loading={connect.isPending} aria-label={`Kết nối với ${x.user.name}`}
+            onClick={() => connect.mutate(undefined, { onSuccess: () => { setSent(true); toast.success('Đã gửi lời mời kết nối') }, onError: (e) => toast.error(nearbyErrorMessage(e)) })}>
+            <UserPlus className="size-4" aria-hidden />{sent ? 'Đã gửi' : 'Kết nối'}
+          </Button>}
+    </li>
+  )
+}
+
+const POST_KIND: Record<string, string> = { BUDDY: 'Rủ chạy', RACE: 'Đi giải cùng', PACER: 'Cần pacer', SHARE: 'Khoe thành tích', ASK: 'Hỏi đáp' }
+
+function PostItem({ x }: { x: FeedPost }) {
+  return (
+    <li>
+      <Link href={routes.hubPost(x.id)} className="block space-y-1.5 rounded-[var(--radius-card)] border border-violet-500/30 bg-violet-500/5 p-3 hover:border-violet-400/60">
+        <p className="flex items-center gap-2 text-xs">
+          <span className="rounded-full bg-violet-500/20 px-2 py-0.5 font-bold text-violet-300">{POST_KIND[x.kind] ?? 'Bài đăng'}</span>
+          <span className="truncate text-fg-muted">{x.author.name} · {formatKm(x.km)}</span>
+        </p>
+        <p className="line-clamp-3 text-sm">{x.body}</p>
+        <p className="text-xs text-fg-subtle">{x.interest_count} người quan tâm · bấm để xem trong Hội quán</p>
+      </Link>
+    </li>
   )
 }

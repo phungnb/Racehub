@@ -6,6 +6,7 @@ import * as api from '../api/nearbyApi'
 export const nearbyKeys = {
   me: ['nearby', 'me'] as const,
   runners: (f: api.NearbyFilters) => ['nearby', 'runners', f] as const,
+  feed: (r: number) => ['nearby', 'feed', r] as const,
   events: (r: number) => ['nearby', 'events', r] as const,
   clubs: (r: number) => ['nearby', 'clubs', r] as const,
   connections: ['nearby', 'connections'] as const,
@@ -14,7 +15,8 @@ export const nearbyKeys = {
 }
 
 export const useDiscovery = () => useQuery({ queryKey: nearbyKeys.me, queryFn: api.getDiscovery })
-const ready = (d?: api.Discovery) => !!d?.enabled && !!d.presence
+/** Đã bật + có vị trí dùng được (vị trí tạm hoặc khu hay chạy tự động) */
+const ready = (d?: api.Discovery) => !!d?.enabled && !!d.located
 
 export function useNearbyRunners(f: api.NearbyFilters, d?: api.Discovery) {
   return useInfiniteQuery({
@@ -26,6 +28,7 @@ export function useNearbyRunners(f: api.NearbyFilters, d?: api.Discovery) {
     staleTime: 60_000,
   })
 }
+export const useNearbyFeed = (r: number, enabled = true) => useQuery({ queryKey: nearbyKeys.feed(r), queryFn: () => api.nearbyFeed(r), enabled, staleTime: 60_000 })
 export const useNearbyEvents = (r: number, enabled = true) => useQuery({ queryKey: nearbyKeys.events(r), queryFn: () => api.nearbyEvents(r), enabled })
 export const useNearbyClubs = (r: number, enabled = true) => useQuery({ queryKey: nearbyKeys.clubs(r), queryFn: () => api.nearbyClubs(r), enabled })
 export const useConnections = () => useQuery({ queryKey: nearbyKeys.connections, queryFn: api.myConnections })

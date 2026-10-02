@@ -1,20 +1,21 @@
 'use client'
 
 import Link from 'next/link'
-import { BookOpen, Gift, Medal, Radar, Store, type LucideIcon } from 'lucide-react'
+import { BookOpen, Gift, Medal, Radar, Store, UsersRound, type LucideIcon } from 'lucide-react'
 import { routes } from '@/shared/config/routes'
 import { useOpsPolicy } from '@/features/system'
 import type { FeatureKey } from '@/shared/lib/ops'
 
 const ITEMS: { href: string; label: string; icon: LucideIcon; tone: string; feature?: FeatureKey }[] = [
   { href: routes.nearby, label: 'Quanh đây', icon: Radar, tone: 'bg-live/15 text-live', feature: 'nearby' },
+  { href: routes.hub, label: 'Hội quán', icon: UsersRound, tone: 'bg-violet-500/15 text-violet-300', feature: 'nearby' },
   { href: routes.races, label: 'Giải chạy', icon: Medal, tone: 'bg-brand/15 text-brand', feature: 'races' },
   { href: routes.learn, label: 'Kiến thức Runner', icon: BookOpen, tone: 'bg-warning/15 text-warning', feature: 'knowledge' },
   { href: routes.market, label: 'Chợ Runner', icon: Store, tone: 'bg-sky-500/15 text-sky-400', feature: 'market' },
   { href: routes.invite, label: 'Mời bạn bè', icon: Gift, tone: 'bg-coin/15 text-coin' },
 ]
 
-/** Lối tắt trang chủ: runner quanh đây, giải chạy, Kiến thức Runner, Chợ Runner, mời bạn (Thách đấu CLB nằm trong tab Thử thách) */
+/** Lối tắt trang chủ: runner quanh đây, Hội quán runner, giải chạy, Kiến thức Runner, Chợ Runner, mời bạn (Thách đấu CLB nằm trong tab Thử thách) */
 export function ExploreShortcuts() {
   // Tính năng admin tắt (Chính sách vận hành) thì ẩn lối tắt
   const { features } = useOpsPolicy()

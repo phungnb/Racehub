@@ -241,7 +241,11 @@ begin
       'ok', pg_get_functiondef('public.ingest_provider_activity(uuid,text,text,jsonb)'::regprocedure) !~ 'v_clean'),
     jsonb_build_object('file', '20261001012700', 'label', 'Thi đấu CLB v2: luật thi đấu, đăng ký + chốt danh sách, kết quả tạm → chính thức, huy hiệu, điểm uy tín',
       'ok', to_regprocedure('public.create_club_duel(jsonb)') is not null and to_regprocedure('public.club_match_summary(uuid)') is not null
-        and to_regclass('public.club_match_ratings') is not null and private.sc_col('club_cups', 'roster_close_at')));
+        and to_regclass('public.club_match_ratings') is not null and private.sc_col('club_cups', 'roster_close_at')),
+    jsonb_build_object('file', '20261001012800', 'label', 'Quanh đây v2 (khu hay chạy tự động, bảng tin quanh đây) + Hội quán runner + link nhóm Facebook',
+      'ok', to_regclass('public.runner_home_area') is not null and to_regclass('public.hub_posts') is not null
+        and to_regprocedure('public.hub_runners(jsonb)') is not null and to_regprocedure('public.nearby_feed(jsonb)') is not null
+        and 'support_facebook' = any (private.site_info_keys())));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

@@ -50,7 +50,7 @@ export function ContactMenuRow() {
         <PulseIcon size="sm" />
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-bold">Liên hệ hỗ trợ</span>
-          <span className="block text-xs text-fg-muted">Zalo, Telegram, điện thoại — hỏi gì cũng được</span>
+          <span className="block text-xs text-fg-muted">Zalo, Telegram, nhóm Facebook — hỏi gì cũng được</span>
         </span>
       </button>
       {open && <ContactCard title="Chọn kênh liên hệ" />}

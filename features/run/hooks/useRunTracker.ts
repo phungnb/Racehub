@@ -2,6 +2,7 @@
 
 import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { nativePlatform } from '@/shared/lib/native'
 import { useSession } from '@/features/auth'
 import { useOpsPolicy } from '@/features/system'
@@ -273,13 +274,23 @@ export function useRunTracker() {
   // Quay lại → xin lại cả hai; đoạn bị mất được bộ máy GPS ghi thành "mất tín hiệu" (gaps) — không nối âm thầm.
   // Trong app cài: GPS vẫn chạy nền; chỉ lưu tạm ngay (hệ điều hành có thể đóng app lúc chạy nền) + thống kê.
   useEffect(() => {
+    let hiddenAt: number | null = null
     const onVis = () => {
       const p = phaseRef.current
       if (p !== 'RUNNING' && p !== 'PAUSED' && p !== 'LOCATING') return
       const now = Date.now()
-      if (document.visibilityState === 'hidden') { session.current.hidden(now); persist(true); return }
+      if (document.visibilityState === 'hidden') { hiddenAt = now; session.current.hidden(now); persist(true); return }
       session.current.visible(now)
       if (tracksInBackground()) return
+      // Bản web: báo rõ đoạn vừa mất (trình duyệt không cho ghi GPS khi tắt màn hình / chuyển app)
+      const lostS = hiddenAt ? Math.round((now - hiddenAt) / 1000) : 0
+      hiddenAt = null
+      if (p === 'RUNNING' && lostS >= 20) {
+        toast.warning(`GPS đã dừng ${lostS >= 120 ? `${Math.round(lostS / 60)} phút` : `${lostS} giây`} khi màn hình tắt / chuyển app`, {
+          description: 'Trình duyệt không cho ghi GPS khi chạy nền — đoạn này không được tính. Lần sau bấm "Khóa màn hình" thay cho nút nguồn, hoặc dùng app RaceHub (ghi được khi tắt màn hình).',
+          duration: 12_000,
+        })
+      }
       reacquireAwake()
       if (stopLocation.current) startWatch()
     }

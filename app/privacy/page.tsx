@@ -65,7 +65,12 @@ export default async function PrivacyPage() {
         <ul>
           <li>Tính năng <strong>tắt theo mặc định</strong>. Chỉ bật khi bạn đồng ý rõ ràng; bạn rút lại đồng ý bằng cách tắt Quanh đây trong ứng dụng.</li>
           <li>Chúng tôi chỉ lưu <strong>ô lưới khoảng 1 km</strong> bạn chọn (vị trí điện thoại lấy <strong>một lần</strong> ở độ chính xác thấp, hoặc điểm bạn chạm trên
-            bản đồ) — <strong>không lưu toạ độ chính xác</strong>, không lấy từ GPS bài chạy, không theo dõi liên tục hay khi ứng dụng chạy nền.</li>
+            bản đồ) — <strong>không lưu toạ độ chính xác</strong>, không theo dõi liên tục hay khi ứng dụng chạy nền.</li>
+          <li><strong>Khu hay chạy tự động</strong> (chỉ khi bạn bật và đồng ý riêng): chúng tôi ước lượng <strong>ô khoảng 2 km</strong> nơi bạn hay bắt đầu chạy,
+            từ điểm xuất phát các bài chạy hợp lệ trong 60 ngày (cần ít nhất 2 bài cùng khu), để bạn được tìm thấy mà không phải mở ứng dụng chọn vị trí.
+            Chỉ lưu ô lưới, không lưu điểm hay tuyến chạy; tắt tuỳ chọn này hoặc tắt Quanh đây là xoá ngay.</li>
+          <li><strong>Bảng tin quanh đây</strong> chỉ hiện các bài chạy bạn đã chia sẻ trong 7 ngày: ngày chạy, quãng đường, pace và khoảng cách ước chừng —
+            không hiện giờ chạy, tuyến chạy hay điểm xuất phát.</li>
           <li>Vị trí <strong>tự hết hạn</strong> sau 24 giờ, 7 hoặc 30 ngày (bạn chọn) và bị xoá ngay khi bạn bấm “Ẩn tôi ngay” hoặc tắt tính năng.
             Mỗi ngày chỉ đổi vị trí tối đa 3 lần, số lần tìm kiếm bị giới hạn để không ai dò được vị trí của người khác.</li>
           <li>Người khác chỉ thấy <strong>tên gọi và chữ cái đầu của họ</strong>, ảnh đại diện, cấp độ, <strong>khoảng cách ước chừng</strong> (đã làm tròn và cộng sai số cố định),
@@ -74,7 +79,18 @@ export default async function PrivacyPage() {
             dùng được tính năng. Hai người chỉ thấy nhau khi cài đặt của <strong>cả hai</strong> đều cho phép.</li>
           <li>Bạn có thể chặn hoặc báo cáo bất kỳ ai; người bị báo cáo không biết ai báo cáo. Báo cáo được quản trị viên xem xét; tài khoản nhận nhiều báo cáo
             bị tạm ẩn khỏi Quanh đây trong lúc chờ xử lý.</li>
-          <li>Phiên bản đầu <strong>không có nhắn tin riêng</strong>: sau khi kết nối, hai bên chỉ rủ nhau vào buổi chạy nhóm công khai hoặc CLB.</li>
+          <li>Sau khi kết nối, hai bên nhắn tin riêng trong ứng dụng hoặc rủ nhau vào buổi chạy nhóm công khai / CLB.</li>
+        </ul>
+      </section>
+      <section>
+        <h2>4c. Hội quán runner — hồ sơ chạy bộ toàn quốc</h2>
+        <ul>
+          <li><strong>Tự tham gia</strong>, cần đồng ý riêng và có ít nhất 3 bài chạy hợp lệ. Rời Hội quán là hồ sơ ẩn ngay và các bài đang mở bị đóng.</li>
+          <li>Runner đã đăng nhập RaceHub thấy: tên, ảnh, cấp độ, tỉnh / thành, giới thiệu, mục tiêu, khung giờ, pace điển hình (nếu bạn bật), thành tích ước tính
+            5K / 10K / Half / Full và số km 30 ngày / năm — <strong>chỉ tính từ các bài chạy bạn đã chia sẻ</strong>. Không hiện vị trí hay tuyến chạy.</li>
+          <li>Bài đăng không được chứa số điện thoại, đường link, Zalo / Facebook. Bài “gần tôi” chỉ gắn ô khu vực và khoảng cách ước chừng;
+            ứng dụng báo cho tối đa 30 runner ở gần đang bật Quanh đây (mỗi người tối đa 3 thông báo loại này / ngày).</li>
+          <li>Khi bạn bấm <strong>“Quan tâm”</strong> một bài, người đăng được nhắn tin cho bạn và ngược lại. 3 người báo cáo một bài thì bài tự ẩn chờ quản trị viên xem xét.</li>
         </ul>
       </section>
       <section>
