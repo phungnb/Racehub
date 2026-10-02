@@ -8,5 +8,10 @@ describe('safeNext', () => {
     expect(safeNext('//evil.com')).toBe('/feed')
     expect(safeNext('/\\evil.com')).toBe('/feed')
     expect(safeNext(null)).toBe('/feed')
+    // ký tự điều khiển / dấu "\\" bị trình duyệt bỏ / đổi → thành link ra trang ngoài
+    expect(safeNext('/\t/evil.com')).toBe('/feed')
+    expect(safeNext('/\n/evil.com')).toBe('/feed')
+    expect(safeNext('/a\\b')).toBe('/feed')
+    expect(safeNext('/welcome?step=club')).toBe('/welcome?step=club')
   })
 })
