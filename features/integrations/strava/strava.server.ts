@@ -1,7 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { serverEnv } from '@/shared/config/env.server'
-import { analyzeRun, speedRulesFrom, stravaStreams, type FraudResult, type SpeedRules } from '@/features/activity/server'
+import { analyzeRun, compactStreams, speedRulesFrom, stravaStreams, type FraudResult, type FraudStreams, type SpeedRules } from '@/features/activity/server'
 import { toOps } from '@/shared/lib/ops'
 import { mapStravaActivity, mapStravaDetail, summarize, syncWindowStart, tokenNeedsRefresh, type StravaSummaryActivity, type SyncSummary } from './mapping'
 
@@ -129,13 +129,15 @@ async function speedRules(admin: SupabaseClient): Promise<SpeedRules> {
   return rules
 }
 
-async function assessRisk(admin: SupabaseClient, userId: string, token: string, a: StravaSummaryActivity): Promise<FraudResult | null> {
+interface Assessed { result: FraudResult; streams: FraudStreams | null; rules: SpeedRules; historyN: number }
+
+async function assessRisk(admin: SupabaseClient, userId: string, token: string, a: StravaSummaryActivity): Promise<Assessed | null> {
   const n = mapStravaActivity(a)
   if (!RUN_SPORTS.has(n.sport_type) || n.distance_m < 200) return null
   const rules = await speedRules(admin)
   const summary = { sportType: n.sport_type, manual: n.manual, trainer: a.trainer === true, deviceName: n.device_name,
     distanceM: n.distance_m, movingS: n.moving_s, maxSpeedMps: n.max_speed_mps }
-  if (n.manual || Date.now() - Date.parse(n.started_at) > FRAUD_RECENT_MS) return analyzeRun(summary, null, [], rules)
+  if (n.manual || Date.now() - Date.parse(n.started_at) > FRAUD_RECENT_MS) return { result: analyzeRun(summary, null, [], rules), streams: null, rules, historyN: 0 }
   try {
     // Bài đã nhập (đồng bộ lại / webhook đổi tên) → không tải streams lần nữa
     const { data: existing } = await admin.from('activities').select('id').eq('source', 'STRAVA').eq('source_activity_id', String(a.id)).limit(1)
@@ -147,19 +149,30 @@ async function assessRisk(admin: SupabaseClient, userId: string, token: string, 
     ])
     const history = ((hist.data ?? []) as { moving_time_s: number; distance_m: number }[])
       .map((h) => h.moving_time_s / (h.distance_m / 1000))
-    return analyzeRun(summary, stravaStreams(raw), history, rules)
+    const streams = stravaStreams(raw)
+    return { result: analyzeRun(summary, streams, history, rules), streams, rules, historyN: history.length }
   } catch (e) {
     console.warn('[strava] fraud streams', (e as Error).message)
-    return analyzeRun(summary, null, [], rules)
+    return { result: analyzeRun(summary, null, [], rules), streams: null, rules, historyN: 0 }
   }
 }
 
 async function ingest(admin: SupabaseClient, userId: string, a: StravaSummaryActivity, detailed = false, token?: string) {
-  const risk = token ? await assessRisk(admin, userId, token, a) : null
+  const assessed = token ? await assessRisk(admin, userId, token, a) : null
+  const risk = assessed?.result ?? null
   const { data, error } = await admin.rpc('ingest_provider_activity', {
     p_user_id: userId, p_source: 'STRAVA', p_external_id: String(a.id),
-    p_activity: { ...mapStravaActivity(a), ...(risk ? { risk: { verdict: risk.verdict, score: risk.score, level: risk.level, reason: risk.reason,
-      flags: risk.flags.map((f) => ({ code: f.code, severity: f.severity, message: f.message, atS: f.atS ?? null, durationS: f.durationS ?? null })) } } : {}) },
+    p_activity: { ...mapStravaActivity(a), ...(risk && assessed ? {
+      risk: { verdict: risk.verdict, score: risk.score, level: risk.level, reason: risk.reason, clean_distance_m: risk.cleanDistanceM,
+        flags: risk.flags.map((f) => ({ code: f.code, severity: f.severity, tier: f.tier ?? null, message: f.message, atS: f.atS ?? null, durationS: f.durationS ?? null })) },
+      // Lưu vết: kết quả đầy đủ + đầu vào; dữ liệu gốc (rút gọn) chỉ giữ khi bài có dấu hiệu, để xét lại / chỉnh luật sau này
+      analysis: {
+        engine: risk.engine, verdict: risk.verdict, basis: risk.basis, score: risk.score, level: risk.level,
+        independent: risk.independent, clean_distance_m: risk.cleanDistanceM, flags: risk.flags,
+        inputs: { distance_m: a.distance ?? null, moving_s: a.moving_time ?? null, max_speed_mps: a.max_speed ?? null,
+          stream_points: assessed.streams?.time.length ?? 0, history_runs: assessed.historyN, rules: assessed.rules },
+        streams: assessed.streams && risk.flags.length ? compactStreams(assessed.streams) : null,
+      } } : {}) },
   })
   if (error) throw new Error(`INGEST_FAILED:${error.message}`)
   const r = data as Record<string, unknown>

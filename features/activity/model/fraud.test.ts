@@ -155,3 +155,59 @@ describe('cú nhảy GPS và đường cong pace theo thời gian', () => {
     expect(bestWindowSpeed([0, 10, 20, 30], [0, 30, 130, 160], 10).mps).toBeCloseTo(10)
   })
 })
+
+import { FRAUD_RULES, gpsErrorRegions } from './fraud'
+
+describe('mức kết luận và độc lập của bằng chứng', () => {
+  it('mỗi kết quả có phiên bản luật, số nhóm bằng chứng độc lập, mức cao nhất; mỗi dấu hiệu có số đo', () => {
+    const s = build([[600, 3], [300, 7.6], [600, 3]])
+    const r = analyzeRun(sum(s), s)
+    expect(r.engine).toMatch(/^ac-/)
+    expect(r.basis).toBe('DISQUALIFY')
+    const curve = r.flags.find((f) => f.code === 'PACE_CURVE')!
+    expect(curve).toMatchObject({ tier: 'DISQUALIFY', source: 'GPS' })
+    expect(curve.evidence).toMatchObject({ windowS: 300 })
+  })
+
+  it('giữ 17 km/h 3 phút là CẢNH BÁO, một mình không giữ bài; 20 km/h 2 phút là NGHI VẤN', () => {
+    const a = build([[600, 3], [240, 4.9], [600, 3]])
+    const ra = analyzeRun(sum(a), a)
+    expect(ra.flags.find((f) => f.code === 'SUSTAINED_SPEED')?.tier).toBe('WARN')
+    expect(ra.verdict).toBe('OK')
+    const b = build([[600, 3], [150, 5.8], [600, 3]])
+    expect(analyzeRun(sum(b), b)).toMatchObject({ verdict: 'REVIEW', basis: 'SUSPECT' })
+  })
+
+  it('tốc độ cao TRÙNG lúc GPS nhảy → coi là cùng một lỗi GPS, hạ mức, không cộng thành 2 bằng chứng', () => {
+    const s = build([[600, 3], [240, 4.9], [600, 3]])
+    for (const i of [610, 650, 700]) s.latlng![i] = [21.02, 105.82]      // 3 lần nhảy ngay trong đoạn nhanh
+    const r = analyzeRun(sum(s), s)
+    const sus = r.flags.find((f) => f.code === 'SUSTAINED_SPEED')!
+    expect(sus).toMatchObject({ gpsError: true, tier: 'NOTE' })
+    expect(r.independent).toBe(1)
+    expect(r.verdict).toBe('OK')
+  })
+
+  it('hai cảnh báo ở hai thời điểm khác nhau, hai nguồn khác nhau → độc lập → chờ duyệt', () => {
+    // Phút 10–14: giữ 17,6 km/h (cảnh báo tốc độ, GPS) · phút 24–29: pace 4:38 mà tim chỉ ~95 (cảnh báo tim, cảm biến tim)
+    const s = build([[600, 3], [240, 4.9], [600, 3], [330, 3.6], [600, 3]],
+      { hr: (t) => (t > 1440 && t <= 1770 ? 95 + (t % 3) : 150 + (t % 5)) })
+    const r = analyzeRun(sum(s), s)
+    expect(r.independent).toBeGreaterThanOrEqual(2)
+    expect(r.verdict).toBe('REVIEW')
+  })
+
+  it('danh mục quy tắc đủ lý do + đầu vào cho mọi mã', () => {
+    for (const r of Object.values(FRAUD_RULES)) {
+      expect(r.reason.length).toBeGreaterThan(10)
+      expect(r.inputs.length).toBeGreaterThan(5)
+      expect(r.warn || r.suspect || r.disqualify).toBeTruthy()
+    }
+  })
+
+  it('vùng lỗi GPS: nhảy điểm và khoảng mất dữ liệu dài', () => {
+    const t = [0, 1, 2, 60, 61], raw = [0, 3, 6, 9, 12], clean = [0, 3, 6, 9, 12]
+    expect(gpsErrorRegions(t, raw, clean, null, { sustained: { normal: { kmh: 17, s: 180 }, severe: { kmh: 20, s: 120 } }, vehicle: { kmh: 25, s: 30 }, teleport: { mps: 12, minCount: 3 } }))
+      .toEqual([[2, 60]])
+  })
+})

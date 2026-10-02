@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { SectionTitle } from '@/shared/ui'
-import { PendingRunCard } from '@/features/activity'
+import { PendingRunCard, RejectedRuns } from '@/features/activity'
 import { clubErrorMessage, listClubPendingRuns, reviewRun } from '../../api/clubApi'
 
 /** Ban quản trị CLB: bài chạy của thành viên bị hệ thống nghi gian lận, chờ xác minh */
@@ -19,8 +19,9 @@ export function ClubRunReview({ clubId }: { clubId: string }) {
     },
     onError: (e) => toast.error(clubErrorMessage(e)),
   })
-  if (!list.data?.length) return null
+  if (!list.data?.length) return <RejectedRuns clubId={clubId} />
   return (
+    <>
     <section id="review">
       <SectionTitle>Bài chạy chờ duyệt <span className="ml-1 rounded-full bg-warning px-2 text-sm text-bg">{list.data.length}</span></SectionTitle>
       <p className="-mt-1 mb-2 text-xs text-fg-muted">Hệ thống chống gian lận nghi ngờ các bài dưới đây. Xem lý do rồi xác nhận — bài hợp lệ được tính ngay.</p>
@@ -28,5 +29,7 @@ export function ClubRunReview({ clubId }: { clubId: string }) {
         {list.data.map((r) => <PendingRunCard key={r.id} run={r} busy={review.isPending} onReview={(status) => review.mutate({ id: r.id, status })} />)}
       </ul>
     </section>
+    <RejectedRuns clubId={clubId} />
+    </>
   )
 }
