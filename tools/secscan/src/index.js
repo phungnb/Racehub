@@ -11,6 +11,7 @@
 import { writeFile } from 'node:fs/promises'
 import { argv, exit, stdout } from 'node:process'
 import { requireAuthorization } from './auth.js'
+import { discover } from './discover.js'
 import { fetchSpec } from './supabase.js'
 import { checkExposedTables } from './checks/exposedTables.js'
 import { checkWritableTables } from './checks/writableTables.js'
@@ -37,7 +38,7 @@ function usage() {
   stdout.write(
     'secscan — rà soát cấu hình an toàn (read-only)\n\n' +
     '  --url <https://...>         (bắt buộc) địa chỉ app cần kiểm tra\n' +
-    '  --anon-key <KEY>            khóa anon công khai của Supabase (để kiểm tra bảng/RPC)\n' +
+    '  --anon-key <KEY>            khóa anon công khai (nếu bỏ trống, tự dò từ front-end)\n' +
     '  --supabase-url <https://..> địa chỉ PostgREST nếu khác domain app\n' +
     '  --allow-rpc a,b,c           các RPC công khai có chủ đích (bỏ qua khi báo lỗi)\n' +
     '  --i-am-authorized "<ai>"    bỏ qua hỏi xác nhận (chỉ cho app của chính mình/CI)\n' +
@@ -51,8 +52,8 @@ async function main() {
   if (args.help || !args.url) { usage(); exit(args.url ? 0 : 1) }
 
   const target = args.url
-  const base = normBase(args['supabase-url'] || args.url)
-  const anonKey = args['anon-key']
+  let anonKey = args['anon-key']
+  let base = args['supabase-url'] ? normBase(args['supabase-url']) : null
   const allowRpc = String(args['allow-rpc'] || '').split(',').map((s) => s.trim()).filter(Boolean)
 
   const auth = await requireAuthorization(target, args['i-am-authorized'])
@@ -61,6 +62,16 @@ async function main() {
 
   stdout.write('\n→ Kiểm tra khóa service_role lộ trong front-end...\n')
   results['key-in-bundle'] = await checkKeyInBundle({ target })
+
+  // Thiếu khóa anon hoặc địa chỉ Supabase → tự rút từ mã front-end (như công cụ thật).
+  if (!anonKey || !base) {
+    stdout.write('→ Tự dò khóa anon và địa chỉ Supabase từ front-end...\n')
+    const d = await discover(target)
+    if (d.error) stdout.write(`  (không dò được: ${d.error})\n`)
+    if (!anonKey && d.anonKey) { anonKey = d.anonKey; stdout.write('  đã tìm thấy khóa anon trong bundle.\n') }
+    if (!base && d.supabaseUrl) { base = normBase(d.supabaseUrl); stdout.write(`  đã tìm thấy địa chỉ Supabase: ${base}\n`) }
+  }
+  if (!base) base = normBase(args.url) // fallback: thử ngay trên domain app
 
   if (anonKey) {
     stdout.write('→ Đọc OpenAPI của PostgREST (một lần, bằng khóa anon)...\n')
@@ -72,7 +83,7 @@ async function main() {
     stdout.write('→ Kiểm tra RPC anon gọi được...\n')
     results['anon-rpc'] = await checkAnonRpc({ spec, allowRpc })
   } else {
-    const skip = { ok: true, note: 'Bỏ qua: chưa cung cấp --anon-key.', findings: [] }
+    const skip = { ok: true, note: 'Bỏ qua: không có khóa anon (không truyền --anon-key và không dò được từ front-end).', findings: [] }
     results['exposed-tables'] = skip
     results['writable-tables'] = { ...skip }
     results['anon-rpc'] = { ...skip }

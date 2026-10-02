@@ -32,7 +32,10 @@ lỗ hổng chỉ bằng cách **đọc** — không có hàm POST/PATCH/DELETE 
 Cần Node >= 18 (có `fetch` sẵn). Không cài thêm gói nào.
 
 ```bash
-# App của chính anh:
+# Chỉ cần URL — tự rút khóa anon và địa chỉ Supabase từ front-end:
+node src/index.js --url https://racehub.vn --i-am-authorized "Phụng" --out bao-cao.txt
+
+# Hoặc tự truyền khóa anon (khi không rút được tự động):
 node src/index.js --url https://racehub.vn \
   --anon-key "<ANON_KEY công khai>" \
   --i-am-authorized "Phụng" \
@@ -47,8 +50,10 @@ node src/index.js --url https://app.com --anon-key "<KEY>" --allow-rpc search_pu
 
 Chạy test: `npm test` (offline, không chạm mạng).
 
-`--anon-key` là khóa **anon** công khai (nằm sẵn trong app web), không phải
-`service_role`. Thiếu nó thì chỉ chạy kiểm tra khóa lộ.
+Mặc định, thiếu `--anon-key` thì công cụ **tự dò** khóa anon và địa chỉ Supabase
+từ mã front-end của trang (khóa anon là khóa công khai, nằm sẵn trong bundle JS).
+Nếu không dò được (app không dùng Supabase, hoặc nhúng khóa khác cách), truyền tay
+bằng `--anon-key`. Tuyệt đối không truyền khóa `service_role`.
 
 Mã thoát: `0` không có lỗi cao; `2` có lỗi NGHIÊM TRỌNG/CAO (tiện gắn CI của chính anh).
 
