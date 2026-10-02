@@ -109,3 +109,49 @@ describe('ngưỡng do admin đặt (Chính sách vận hành)', () => {
     expect(analyzeRun(summary, s, [], strict).flags.map((f) => f.code)).toContain('SUSTAINED_SPEED')
   })
 })
+
+import { bestWindowSpeed, despike } from './fraud'
+
+describe('cú nhảy GPS và đường cong pace theo thời gian', () => {
+  it('bài 7,5 km pace 4:47 có 1 điểm GPS nhảy 73 km/h → vẫn hợp lệ (như ảnh báo nhầm)', () => {
+    const s = build([[1000, 3.48], [2, 20.3], [1140, 3.48]])        // 2 giây "nhảy" ~40 m (73 km/h)
+    const r = analyzeRun({ ...sum(s), maxSpeedMps: 20.3 }, s)
+    expect(r.verdict).toBe('OK')
+    expect(codes(r)).not.toContain('VEHICLE_BURST')
+    expect(codes(r)).not.toContain('PACE_CURVE')
+  })
+
+  it('đi xe 50 km/h liên tục 2 phút KHÔNG bị coi là cú nhảy GPS → chờ duyệt', () => {
+    const s = build([[900, 3], [120, 13.9], [900, 3]])
+    const r = analyzeRun(sum(s), s)
+    expect(codes(r)).toEqual(expect.arrayContaining(['VEHICLE_BURST', 'PACE_CURVE']))
+    expect(r.verdict).toBe('REVIEW')
+  })
+
+  it('5 phút pace 2:11/km (nhanh hơn kỷ lục 1500 m) → PACE_CURVE (SEVERE)', () => {
+    const s = build([[600, 3], [300, 7.6], [600, 3]])
+    const r = analyzeRun(sum(s), s)
+    expect(r.flags.find((f) => f.code === 'PACE_CURVE')).toMatchObject({ severity: 'SEVERE', durationS: 300 })
+    expect(r.reason).toContain('kỷ lục thế giới')
+  })
+
+  it('chạy nhanh nhưng trong khả năng con người (800 m trong 2:00) → không dính PACE_CURVE', () => {
+    const s = build([[900, 3], [120, 6.67], [900, 3]])
+    expect(codes(analyzeRun(sum(s), s))).not.toContain('PACE_CURVE')
+  })
+
+  it('không có streams: vận tốc tối đa một điểm chỉ là ghi chú, không tự chặn bài', () => {
+    const r = analyzeRun({ distanceM: 7460, movingS: 2140, maxSpeedMps: 20.3 }, null)
+    expect(r.verdict).toBe('OK')
+    expect(r.flags[0]).toMatchObject({ code: 'VEHICLE_BURST', severity: 'INFO' })
+  })
+
+  it('hàm phụ: bỏ cú nhảy ngắn, giữ đoạn nhanh kéo dài; tốc độ cửa sổ tốt nhất', () => {
+    const t = [0, 1, 2, 3, 4, 5]
+    expect(despike(t, [0, 3, 6, 56, 59, 62], 12)).toEqual([0, 3, 6, 6, 9, 12])       // nhảy 50 m trong 1 s → bỏ
+    const long = Array.from({ length: 31 }, (_, i) => i)
+    const car = long.map((i) => i * 14)                                                 // 14 m/s suốt 30 s → giữ
+    expect(despike(long, car, 12).at(-1)).toBe(420)
+    expect(bestWindowSpeed([0, 10, 20, 30], [0, 30, 130, 160], 10).mps).toBeCloseTo(10)
+  })
+})

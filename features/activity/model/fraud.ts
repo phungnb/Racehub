@@ -4,6 +4,8 @@
 //  - Nhịp tim: bỏ 10 phút đầu (tim chưa lên), bỏ dữ liệu HR rơi/đứng im, phải kéo dài ≥ 3 phút
 //  - Sải chân: phải kéo dài đủ thời gian (bản cũ khai báo minDurationSec nhưng không dùng)
 //  - Thêm: điểm GPS "dịch chuyển tức thời", đoạn chạy ≥ 25 km/h kiểu xe máy / xe đạp
+//  - Cú nhảy GPS ngắn (≤ 10 s) bị bỏ khỏi quãng đường trước khi tính tốc độ — một điểm nhảy 70 km/h không làm cả bài thành "đi xe"
+//  - Đường cong pace theo thời gian: tốc độ TB tốt nhất trong mỗi cửa sổ 1 phút … 2 giờ so với kỷ lục thế giới cùng thời lượng
 // Kết luận chỉ là OK hoặc REVIEW (chờ ban quản trị duyệt) — không tự động từ chối người thật.
 
 export interface FraudStreams {
@@ -25,7 +27,7 @@ export interface FraudSummary {
 }
 
 export interface FraudFlag {
-  code: 'MANUAL' | 'TREADMILL' | 'SUSTAINED_SPEED' | 'VEHICLE_BURST' | 'GPS_TELEPORT' | 'STRIDE' | 'HR_PACE' | 'HISTORY'
+  code: 'MANUAL' | 'TREADMILL' | 'SUSTAINED_SPEED' | 'VEHICLE_BURST' | 'GPS_TELEPORT' | 'STRIDE' | 'HR_PACE' | 'HISTORY' | 'PACE_CURVE'
   severity: 'SEVERE' | 'HIGH' | 'INFO'
   score: number                          // 0–100 cho riêng quy tắc
   message: string
@@ -53,7 +55,15 @@ export const FRAUD_CONFIG = {
     table: [{ pace: 5.0, minHr: 115 }, { pace: 4.5, minHr: 125 }, { pace: 4.0, minHr: 135 }, { pace: 3.5, minHr: 145 }],
   },
   history: { minSamples: 10, z: 3, zCritical: 5 },
-  weights: { SUSTAINED_SPEED: 35, VEHICLE_BURST: 35, GPS_TELEPORT: 20, STRIDE: 30, HR_PACE: 25, HISTORY: 10 } as Record<string, number>,
+  // Cú nhảy GPS: chuỗi điểm liên tiếp nhanh hơn ngưỡng "nhảy" nhưng tổng thời gian ≤ maxS giây → bỏ quãng đó
+  spike: { maxS: 10 },
+  // Tốc độ TB tối đa con người giữ được theo thời lượng (≈ kỷ lục thế giới nam: 400 m, 800 m, 1500 m, 5 km, 10 km, bán marathon,
+  // marathon) + 5% sai số GPS. Vượt mức này trong cả một cửa sổ dài = không thể là chạy bộ.
+  curve: { tolerance: 1.05, points: [
+    { s: 60, mps: 8.6 }, { s: 120, mps: 7.9 }, { s: 300, mps: 7.0 }, { s: 600, mps: 6.8 },
+    { s: 1200, mps: 6.5 }, { s: 3600, mps: 6.1 }, { s: 7200, mps: 5.85 },
+  ] },
+  weights: { PACE_CURVE: 40, SUSTAINED_SPEED: 35, VEHICLE_BURST: 35, GPS_TELEPORT: 20, STRIDE: 30, HR_PACE: 25, HISTORY: 10 } as Record<string, number>,
   levels: { medium: 35, high: 65, critical: 85 },
 }
 
@@ -100,6 +110,44 @@ export function windowSpeeds(time: number[], distance: number[], windowS = FRAUD
   return out
 }
 
+/**
+ * Quãng đường cộng dồn sau khi bỏ cú nhảy GPS: chuỗi điểm liên tiếp có tốc độ tức thời > `maxMps` mà tổng thời gian
+ * ≤ `maxS` giây (điểm lạc rồi quay về). Đoạn nhanh kéo dài hơn (đi xe thật) được GIỮ NGUYÊN để các luật tốc độ bắt được.
+ */
+export function despike(time: number[], distance: number[], maxMps: number, maxS = FRAUD_CONFIG.spike.maxS): number[] {
+  const n = Math.min(time.length, distance.length)
+  const fast = new Array<boolean>(n).fill(false)
+  for (let i = 1; i < n; i++) {
+    const dt = time[i] - time[i - 1], dd = distance[i] - distance[i - 1]
+    fast[i] = dd > 0 && (dt <= 0 || dd / dt > maxMps)
+  }
+  const drop = new Array<boolean>(n).fill(false)
+  for (let i = 1; i < n; i++) {
+    if (!fast[i] || fast[i - 1]) continue
+    let j = i
+    while (j + 1 < n && fast[j + 1]) j++
+    if (time[j] - time[i - 1] <= maxS) for (let k = i; k <= j; k++) drop[k] = true
+  }
+  const out = new Array<number>(n)
+  let acc = 0
+  out[0] = distance[0] ?? 0
+  for (let i = 1; i < n; i++) { if (!drop[i]) acc += Math.max(0, distance[i] - distance[i - 1]); out[i] = (distance[0] ?? 0) + acc }
+  return out
+}
+
+/** Tốc độ TB tốt nhất (m/s) trên mọi cửa sổ dài ≥ `windowS` giây — "đường cong pace" của bài chạy */
+export function bestWindowSpeed(time: number[], distance: number[], windowS: number): { mps: number; atS: number } {
+  let best = 0, at = 0, j = 0
+  for (let i = 0; i < time.length; i++) {
+    if (j < i) j = i
+    while (j < time.length && time[j] - time[i] < windowS) j++
+    if (j >= time.length) break
+    const v = (distance[j] - distance[i]) / (time[j] - time[i])
+    if (v > best) { best = v; at = time[i] }
+  }
+  return { mps: best, atS: at }
+}
+
 /** Đoạn liên tục dài nhất có tốc độ ≥ ngưỡng: [thời lượng giây, giây bắt đầu] */
 export function longestRun(time: number[], speed: number[], minMps: number): [number, number] {
   let best = 0, bestAt = 0, start = -1
@@ -142,6 +190,21 @@ function ruleSpeed(t: number[], v: number[], c: SpeedRules): FraudFlag[] {
       message: `Di chuyển ≥ ${c.vehicle.kmh} km/h trong ${mmss(veh)} — giống đi xe` })
   }
   return out
+}
+
+function ruleCurve(t: number[], d: number[]): FraudFlag[] {
+  const c = FRAUD_CONFIG.curve
+  const total = t[t.length - 1] - t[0]
+  let worst: { ratio: number; s: number; mps: number; atS: number } | null = null
+  for (const p of c.points) {
+    if (total < p.s) break
+    const b = bestWindowSpeed(t, d, p.s)
+    const ratio = b.mps / (p.mps * c.tolerance)
+    if (ratio > 1 && (!worst || ratio > worst.ratio)) worst = { ratio, s: p.s, mps: b.mps, atS: b.atS }
+  }
+  if (!worst) return []
+  return [{ code: 'PACE_CURVE', severity: 'SEVERE', score: 100, atS: worst.atS, durationS: worst.s,
+    message: `Pace TB ${kmhToPace(worst.mps * 3.6)}/km suốt ${mmss(worst.s)} — nhanh hơn kỷ lục thế giới cùng thời lượng` }]
 }
 
 function ruleTeleport(t: number[], ll: [number, number][] | null | undefined, c: SpeedRules): FraudFlag[] {
@@ -239,11 +302,14 @@ function ruleHistory(s: FraudSummary, history: number[]): FraudFlag[] {
 export function analyzeRun(summary: FraudSummary, streams: FraudStreams | null, history: number[] = [], rules: SpeedRules = DEFAULT_SPEED): FraudResult {
   const flags: FraudFlag[] = [...ruleSummary(summary)]
   if (streams && streams.time.length >= 2 && streams.distance.length === streams.time.length) {
-    const { time: t, distance: d } = streams
+    const { time: t } = streams
+    // Bỏ cú nhảy GPS ngắn trước khi tính tốc độ (luật GPS_TELEPORT vẫn đếm các cú nhảy riêng)
+    const d = despike(t, streams.distance, rules.teleport.mps)
     const v = windowSpeeds(t, d)
-    flags.push(...ruleSpeed(t, v, rules), ...ruleTeleport(t, streams.latlng, rules), ...ruleStride(t, d, streams.cadence), ...ruleHr(t, d, streams.heartrate))
+    flags.push(...ruleCurve(t, d), ...ruleSpeed(t, v, rules), ...ruleTeleport(t, streams.latlng, rules), ...ruleStride(t, d, streams.cadence), ...ruleHr(t, d, streams.heartrate))
   } else if ((summary.maxSpeedMps ?? 0) > rules.teleport.mps) {
-    flags.push({ code: 'VEHICLE_BURST', severity: 'HIGH', score: 80, message: `Vận tốc tối đa > ${Math.round(rules.teleport.mps * 3.6)} km/h` })
+    // Không có streams: "vận tốc tối đa" là MỘT điểm (thường do GPS nhảy) → chỉ ghi chú, không tự chặn bài
+    flags.push({ code: 'VEHICLE_BURST', severity: 'INFO', score: 40, message: `Vận tốc tối đa một điểm ${Math.round((summary.maxSpeedMps ?? 0) * 3.6)} km/h (có thể do GPS nhảy)` })
   }
   flags.push(...ruleHistory(summary, history))
 

@@ -239,7 +239,9 @@ begin
     jsonb_build_object('file', '20261001012300', 'label', 'Tăng tốc phân quyền: kiểm tra thành viên CLB trước, quyền admin tính 1 lần / truy vấn',
       'ok', pg_get_functiondef('public.club_is_member(uuid)'::regprocedure) ~* 'case\s+when exists'
         and not exists (select 1 from pg_policies where schemaname = 'public'
-                         and (coalesce(qual, '') || ' ' || coalesce(with_check, '')) ~ '(?<!SELECT )(public\.)?is_system_admin\(\)')));
+                         and (coalesce(qual, '') || ' ' || coalesce(with_check, '')) ~ '(?<!SELECT )(public\.)?is_system_admin\(\)')),
+    jsonb_build_object('file', '20261001012400', 'label', 'Chống gian lận Strava: một điểm GPS nhảy không còn làm bài bị chặn',
+      'ok', pg_get_functiondef('public.ingest_provider_activity(uuid,text,text,jsonb)'::regprocedure) ~ 'v_risk is null and v_max_speed'));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
