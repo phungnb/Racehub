@@ -50,22 +50,25 @@ describe('Lưu vết chống gian lận + khôi phục (012500)', () => {
     await db.query(`update public.profiles set role = 'SYSTEM_ADMIN' where id = $1`, [ADM])
   }, 240_000)
 
-  it('GPS nhảy cộng thêm km → tính theo quãng đường đã bỏ cú nhảy; lưu phân tích + quyết định của hệ thống', async () => {
+  it('GPS nhảy → km của Strava giữ nguyên (không sửa dữ liệu đối tác); lưu phân tích + quyết định của hệ thống', async () => {
     const r = await ingest('12501', run({ started_at: hoursAgo(5), risk: { verdict: 'OK', score: 5, level: 'LOW', clean_distance_m: 5500 },
-      analysis: analysis({ clean_distance_m: 5500, flags: [{ code: 'GPS_DISTANCE_GAIN', tier: 'WARN', evidence: { removedM: 2000 } }] }) }))
+      analysis: analysis({ clean_distance_m: 5500, flags: [{ code: 'GPS_DISTANCE_GAIN', tier: 'NOTE', evidence: { addedM: 2000 } }] }) }))
     expect(r.validation_status).toBe('APPROVED')
     const a = await row('12501')
-    expect(Number(a.distance_m)).toBe(5500)
-    expect(a.review_detail).toContain('Bỏ 2000 m do GPS nhảy')
+    expect(Number(a.distance_m)).toBe(7500)
+    expect(a.review_detail).toBeNull()
     const an = (await db.query<Record<string, any>>(`select engine, reported_distance_m, clean_distance_m, flags from public.activity_analyses where activity_id = $1`, [a.id])).rows[0]
     expect(an).toMatchObject({ engine: 'ac-test' })
     expect(Number(an.reported_distance_m)).toBe(7500)
+    expect(Number(an.clean_distance_m)).toBe(5500)
     const dec = (await db.query<Record<string, any>>(`select actor_kind, to_status from public.activity_decisions where activity_id = $1`, [a.id])).rows
     expect(dec).toEqual([{ actor_kind: 'SYSTEM', to_status: 'APPROVED' }])
   })
 
-  it('chênh nhỏ (< 200 m / 3%) → giữ nguyên km của Strava', async () => {
-    await ingest('12502', run({ started_at: hoursAgo(9), risk: { verdict: 'OK', score: 0, level: 'LOW', clean_distance_m: 7400 }, analysis: analysis() }))
+  it('vị trí dịch chuyển (nghi vấn) → chờ duyệt, km vẫn giữ nguyên', async () => {
+    const r = await ingest('12502', run({ started_at: hoursAgo(9), risk: { verdict: 'REVIEW', score: 60, level: 'HIGH', reason: 'Vị trí dịch chuyển 2000 m' },
+      analysis: analysis({ verdict: 'REVIEW', basis: 'SUSPECT' }) }))
+    expect(r.validation_status).toBe('PENDING')
     expect(Number((await row('12502')).distance_m)).toBe(7500)
   })
 
@@ -114,7 +117,7 @@ describe('Lưu vết chống gian lận + khôi phục (012500)', () => {
     const list = (await asUser<{ r: any[] }>(db, ADM, '/rpc/rejected_activities', `select public.rejected_activities(null, 30) as r`, [])).rows[0].r
     expect(list.some((x) => x.overlap === false)).toBe(true)
     const st = (await asUser<{ r: any }>(db, ADM, '/rpc/fraud_review_stats', `select public.fraud_review_stats(90) as r`, [])).rows[0].r
-    expect(st).toMatchObject({ held: 2, restored: 1 })
+    expect(st).toMatchObject({ held: 3, restored: 1, still_pending: 1 })
     expect(st.approved_after_review).toBe(1)
     await expect(asUser(db, RUN, '/rpc/fraud_review_stats', `select public.fraud_review_stats(90)`, [])).rejects.toThrow()
   })

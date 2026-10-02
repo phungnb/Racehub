@@ -28,7 +28,7 @@ export interface PendingRun {
 const FLAG_LABEL: Record<string, string> = {
   MANUAL: 'Nhập tay', TREADMILL: 'Chạy máy', SUSTAINED_SPEED: 'Tốc độ duy trì', VEHICLE_BURST: 'Giống đi xe',
   GPS_TELEPORT: 'GPS nhảy', GPS_GAP: 'Mất tín hiệu GPS', STRIDE: 'Sải chân', HR_PACE: 'Tim thấp / pace nhanh', HISTORY: 'Khác thường ngày', PACE_CURVE: 'Nhanh hơn kỷ lục',
-  GPS_DISTANCE_GAIN: 'Km do GPS nhảy', DISTANCE_MISMATCH: 'Lệch km',
+  GPS_DISTANCE_GAIN: 'Vị trí dịch chuyển', DISTANCE_MISMATCH: 'Lệch km',
 }
 /** Mức của dấu hiệu (012500): cảnh báo ≠ đủ căn cứ loại */
 const TIER: Record<string, { label: string; tone: string }> = {
