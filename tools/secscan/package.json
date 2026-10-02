@@ -1,0 +1,17 @@
+{
+  "name": "secscan",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Công cụ rà soát cấu hình an toàn cho app dùng Supabase/PostgREST. Chỉ kiểm tra các lớp lỗi đã gặp ở RaceHub. Read-only, có cổng xác nhận quyền.",
+  "type": "module",
+  "bin": {
+    "secscan": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED"
+}
