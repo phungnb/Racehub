@@ -10,7 +10,8 @@ const sans = Be_Vietnam_Pro({
   subsets: ['latin', 'vietnamese'],
   weight: ['400', '500', '600', '700', '800'],
 })
-const mono = JetBrains_Mono({ variable: '--font-jetbrains', subsets: ['latin'] })
+// Font số (mono) ít dùng lúc mở trang: không tải trước, để băng thông cho font chữ chính
+const mono = JetBrains_Mono({ variable: '--font-jetbrains', subsets: ['latin'], preload: false })
 
 export const metadata: Metadata = {
   title: { default: 'RaceHub — Chạy bộ, thử thách & cộng đồng', template: '%s · RaceHub' },

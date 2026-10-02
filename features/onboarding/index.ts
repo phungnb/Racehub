@@ -2,3 +2,4 @@
 export { OnboardingScreen } from './components/OnboardingScreen'
 export { welcomeUrl } from './model/steps'
 export { IntroScreen } from './components/IntroScreen'
+export { INTRO_SEEN_COOKIE } from './model/intro'
