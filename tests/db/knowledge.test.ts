@@ -148,4 +148,17 @@ describe('RaceHub Knowledge (006200)', () => {
     await status(db, ADM, a, 'PUBLISHED')
     expect((await article(db, READER, 'lo-trinh-0-den-5-km')).slug).toBe('lo-trinh-0-den-5-km')
   })
+
+  it('CMS đăng Ebook (012900): bắt buộc PDF, giữ loại Ebook và tệp khi sửa', async () => {
+    const pdf = 'https://x.supabase.co/storage/v1/object/public/content-media/u/1.pdf'
+    const base = { title: 'Ebook giáo án 10K cơ bản', body: BODY, category_id: 'APP', content_type: 'EBOOK' }
+    expect(await fails(save(db, ADM, base))).toContain('EBOOK_PDF_REQUIRED')
+    expect(await fails(save(db, ADM, { ...base, attachment_url: 'http://x.vn/1.pdf' }))).toContain('INVALID_URL')
+    const a = await save(db, ADM, { ...base, attachment_url: pdf })
+    expect(await rpc<Row>(db, ADM, `select public.cms_get($1) as r`, [a])).toMatchObject({ content_type: 'EBOOK', attachment_url: pdf })
+    await save(db, ADM, { ...base, id: a, title: 'Ebook giáo án 10K (bản 2)' })          // bản app cũ không gửi attachment_url
+    expect(await rpc<Row>(db, ADM, `select public.cms_get($1) as r`, [a])).toMatchObject({ content_type: 'EBOOK', attachment_url: pdf })
+    await save(db, ADM, { ...base, id: a, content_type: 'NEWS', attachment_url: null })
+    expect(await rpc<Row>(db, ADM, `select public.cms_get($1) as r`, [a])).toMatchObject({ content_type: 'NEWS', attachment_url: null })
+  })
 })
