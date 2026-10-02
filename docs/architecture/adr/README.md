@@ -20,3 +20,4 @@ Mỗi ADR ghi lại **một** quyết định: bối cảnh, lựa chọn, lý d
 | [015](./015-game-layer.md) | Lớp game: nhiệm vụ, streak tuần + khiên, huy hiệu theo luật, league tuần, cổ vũ bằng Xu, chuỗi phần thưởng | Đã chấp nhận |
 | [016](./016-character-3d.md) | Nhân vật 3D mô-đun: GLB theo xương Mixamo, vật liệu tint, tủ đồ + shop | Bị thay bởi 017 |
 | [017](./017-character-2d.md) | Nhân vật 2D từ ảnh thật: đổi màu theo mặt nạ, xếp lớp PNG khung chuẩn 900 × 1350 | Đã chấp nhận |
+| [018](./018-tro-ly-van-hanh.md) | Trợ lý vận hành ngoài app: Routine Claude chỉ đọc schema `ops`, chỉ soạn nháp (báo cáo, tin giải chạy, giáo án) | Đã chấp nhận |
