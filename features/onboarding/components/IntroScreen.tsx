@@ -2,17 +2,19 @@
 
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import dynamic from 'next/dynamic'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import { ICONS } from '@/shared/config/brand'
 import { MenuDrawer } from '@/features/help'
-import { PaperDoll } from '@/features/character'
+import { INTRO_SEEN_COOKIE } from '../model/intro'
+
+// Nhân vật vẽ bằng canvas: tải sau, không chặn tiêu đề / nút đăng ký (đã có sẵn trong HTML từ máy chủ)
+const PaperDoll = dynamic(() => import('@/features/character').then((m) => m.PaperDoll), { ssr: false })
 
 const SEEN_KEY = 'rh_intro_seen'
-const noSubscribe = () => () => undefined
-const readSeen = () => { try { return localStorage.getItem(SEEN_KEY) === '1' } catch { return false } }
 const REGISTER = `${routes.login}?mode=register`
 const AUTOPLAY_MS = 5000
 
@@ -81,13 +83,15 @@ export function IntroScreen() {
   const track = useRef<HTMLDivElement>(null)
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
-  // Đã xem một lần → vào thẳng đăng nhập (?intro=1 để xem lại). null = đang render trên máy chủ
-  const seen = useSyncExternalStore(noSubscribe, readSeen, () => null)
-  const skip = seen === true && params.get('intro') !== '1'
-  const ready = seen !== null && !skip
-  useEffect(() => { if (skip) router.replace(routes.login) }, [skip, router])
+  // Đã xem một lần → máy chủ chuyển thẳng tới đăng nhập (cookie, app/page.tsx; ?intro=1 để xem lại).
+  // Máy cũ chỉ lưu trong localStorage: chuyển một lần ở đây và ghi thêm cookie cho lần sau.
+  useEffect(() => {
+    let old = false
+    try { old = localStorage.getItem(SEEN_KEY) === '1' } catch { /* chế độ riêng tư */ }
+    if (old && params.get('intro') !== '1') { saveSeenCookie(); router.replace(routes.login) }
+  }, [params, router])
 
-  const markSeen = () => { try { localStorage.setItem(SEEN_KEY, '1') } catch { /* bỏ qua */ } }
+  const markSeen = () => { try { localStorage.setItem(SEEN_KEY, '1') } catch { /* bỏ qua */ } saveSeenCookie() }
   const go = useCallback((i: number) => {
     const el = track.current
     if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' })
@@ -99,16 +103,15 @@ export function IntroScreen() {
     const onScroll = () => setIndex(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)))
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
-  }, [ready])
+  }, [])
 
   // Tự chuyển thẻ; dừng khi người dùng chạm / tắt chuyển động
   useEffect(() => {
-    if (!ready || paused || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    if (paused || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const t = window.setTimeout(() => go(index + 1 < SLIDES.length ? index + 1 : 0), AUTOPLAY_MS)
     return () => window.clearTimeout(t)
-  }, [index, paused, ready, go])
+  }, [index, paused, go])
 
-  if (!ready) return <div className="min-h-dvh bg-bg" />
   const last = index === SLIDES.length - 1
 
   return (
@@ -130,7 +133,9 @@ export function IntroScreen() {
             <div className="flex min-h-0 flex-1 items-center justify-center py-4">{s.visual}</div>
             <div className="pb-4 text-center">
               <p className="text-xs font-bold tracking-[0.2em] text-brand">{s.kicker}</p>
-              <h1 className="mt-2 text-[26px] font-extrabold leading-tight">{s.title}</h1>
+              {i === 0
+                ? <h1 className="mt-2 text-[26px] font-extrabold leading-tight">{s.title}</h1>
+                : <h2 className="mt-2 text-[26px] font-extrabold leading-tight">{s.title}</h2>}
               <p className="mx-auto mt-2 max-w-xs text-fg-muted">{s.text}</p>
             </div>
           </section>
@@ -160,6 +165,10 @@ export function IntroScreen() {
       </div>
     </main>
   )
+}
+
+function saveSeenCookie() {
+  document.cookie = `${INTRO_SEEN_COOKIE}=1; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`
 }
 
 function Doll({ body, label }: { body: 'male_run' | 'female_run'; label: string }) {
