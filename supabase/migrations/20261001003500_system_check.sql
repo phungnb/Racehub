@@ -247,7 +247,10 @@ begin
         and to_regprocedure('public.hub_runners(jsonb)') is not null and to_regprocedure('public.nearby_feed(jsonb)') is not null
         and 'support_facebook' = any (private.site_info_keys())),
     jsonb_build_object('file', '20261001012900', 'label', 'Trình soạn nội dung (CMS) đăng được Ebook PDF',
-      'ok', pg_get_functiondef('public.cms_save(jsonb)'::regprocedure) ~ 'EBOOK_PDF_REQUIRED'));
+      'ok', pg_get_functiondef('public.cms_save(jsonb)'::regprocedure) ~ 'EBOOK_PDF_REQUIRED'),
+    jsonb_build_object('file', '20261001013000', 'label', 'Trợ lý vận hành: schema ops (view tổng hợp) + role ops_reader chỉ đọc',
+      'ok', to_regclass('ops.tester_activity') is not null and to_regclass('ops.weekly_metrics') is not null
+        and to_regclass('ops.attention') is not null and exists (select 1 from pg_roles where rolname = 'ops_reader')));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
