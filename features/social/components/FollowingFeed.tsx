@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Footprints, UserPlus } from 'lucide-react'
+import { CommentsSheet, PostCard, type ClubPost } from '@/features/club'
+import { GiftButton } from '@/features/game'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, EmptyState, ErrorState, SegmentedControl, Skeleton } from '@/shared/ui'
 import { routes } from '@/shared/config/routes'
@@ -17,7 +19,7 @@ const PAGE = 20
  * Trang chủ: hai bảng tin — "Cộng đồng" (CLB, như cũ) và "Đang theo dõi" (hoạt động của runner mình theo dõi + của mình).
  * Nhớ lựa chọn trên máy.
  */
-export function HomeFeeds({ community }: { community: ReactNode }) {
+export function HomeFeeds({ community, meId }: { community: ReactNode; meId: string }) {
   const [tab, setTab] = useState<'COMMUNITY' | 'FOLLOWING'>(() => {
     try { return localStorage.getItem('rh.homeFeed') === 'FOLLOWING' ? 'FOLLOWING' : 'COMMUNITY' } catch { return 'COMMUNITY' }
   })
@@ -28,12 +30,14 @@ export function HomeFeeds({ community }: { community: ReactNode }) {
   return (
     <div className="space-y-3">
       <SegmentedControl value={tab} onChange={pick} options={[{ value: 'COMMUNITY', label: 'Cộng đồng' }, { value: 'FOLLOWING', label: 'Đang theo dõi' }]} />
-      {tab === 'COMMUNITY' ? community : <FollowingFeed />}
+      {tab === 'COMMUNITY' ? community : <FollowingFeed meId={meId} />}
     </div>
   )
 }
 
-export function FollowingFeed() {
+/** Thích · bình luận · tặng quà ngay tại bảng tin như "Cộng đồng" (bài AUTO_RUN của buổi chạy, 013100) */
+export function FollowingFeed({ meId }: { meId: string }) {
+  const [commentsFor, setCommentsFor] = useState<ClubPost | null>(null)
   const q = useInfiniteQuery({
     queryKey: socialKeys.feed,
     queryFn: ({ pageParam }) => followingFeed(pageParam, PAGE),
@@ -64,12 +68,15 @@ export function FollowingFeed() {
           description="Theo dõi các runner khác (bấm vào tên / ảnh ở bảng xếp hạng, CLB…) để thấy bài chạy của họ ở đây." />
       ) : (
         <>
-          {items.map((a) => <ActivityCard key={a.id} a={a} />)}
+          {items.map((a) => a.post
+            ? <PostCard key={a.id} post={a.post} meId={meId} isStaff={false} onComments={setCommentsFor} />
+            : <ActivityCard key={a.id} a={a} />)}
           <div ref={more} />
           {q.isFetchingNextPage && <Skeleton className="h-28" />}
         </>
       )}
       {others && <Suggestions compact />}
+      <CommentsSheet post={commentsFor} meId={meId} isStaff={false} onClose={() => setCommentsFor(null)} />
     </section>
   )
 }
@@ -96,6 +103,11 @@ function ActivityCard({ a }: { a: FeedActivity }) {
           ))}
         </dl>
       </Link>
+      {!a.is_me && (
+        <div className="border-t border-border pt-2">
+          <GiftButton className="w-full justify-center" toUser={a.user.id} toName={a.user.display_name ?? 'Runner'} toAvatar={a.user.avatar_url} activityId={a.id} />
+        </div>
+      )}
     </Card>
   )
 }

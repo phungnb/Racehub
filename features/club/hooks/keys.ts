@@ -11,6 +11,8 @@ export const clubKeys = {
   comments: (postId: string) => ['club-post', postId, 'comments'] as const,
   engagement: (postId: string) => ['club-post', postId, 'engagement'] as const,
   community: ['community-feed'] as const,
+  /** Bảng tin "Đang theo dõi" (features/social) — mỗi buổi chạy kèm bài AUTO_RUN (013100); cập nhật khi thích / bình luận */
+  following: ['social', 'feed'] as const,
   chat: (id: string) => ['club', id, 'chat'] as const,
   leaderboard: (id: string, period: string) => ['club', id, 'leaderboard', period] as const,
   treasury: (id: string) => ['club', id, 'treasury'] as const,

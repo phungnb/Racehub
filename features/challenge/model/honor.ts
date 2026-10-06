@@ -5,9 +5,10 @@ import {
   type Binds, type ColorKey, type DrawData, type DrawOptions, type FontKey, type Layer, type Layout, type Palette, type TextFx,
 } from '@/shared/design/engine'
 import { paintBackdrop } from '@/shared/design/backdrops'
+import { formatDuration } from '@/shared/lib/format'
 import { formatScore } from './challenge'
 
-export type HonorKind = 'TOP' | 'KM' | 'DAYS' | 'STREAK' | 'BREAKTHROUGH' | 'SUPPORTED' | 'CUSTOM1' | 'CUSTOM2' | 'CUSTOM3' | 'CUSTOM4' | 'CUSTOM5'
+export type HonorKind = 'TOP' | 'KM' | 'DAYS' | 'STREAK' | 'BREAKTHROUGH' | 'SUPPORTED' | 'CUSTOM1' | 'CUSTOM2' | 'CUSTOM3' | 'CUSTOM4' | 'CUSTOM5' | `DIST${number}`
 export const HONOR_KINDS: Record<'TOP' | 'KM' | 'DAYS' | 'STREAK' | 'BREAKTHROUGH' | 'SUPPORTED', { title: string; hint: string }> = {
   TOP: { title: 'Top thành tích', hint: 'Theo bảng xếp hạng của thử thách' },
   KM: { title: 'Nhiều km nhất', hint: 'Tổng km hợp lệ trong thử thách' },
@@ -16,6 +17,14 @@ export const HONOR_KINDS: Record<'TOP' | 'KM' | 'DAYS' | 'STREAK' | 'BREAKTHROUG
   BREAKTHROUGH: { title: 'Bứt phá nhất', hint: 'Km tăng nhiều nhất so với cùng khoảng thời gian trước thử thách (≥ 5 km)' },
   SUPPORTED: { title: 'Được tiếp sức nhiều nhất', hint: 'Nhận nhiều quà nhất trong thời gian thử thách' },
 }
+/** 013100: vinh danh theo cự ly — bài tốt nhất có cự ly ≥ hạng mục trong thời gian thử thách, thời gian quy đổi theo pace */
+export const HONOR_DISTANCES: { key: HonorKind; km: string; title: string }[] = [
+  { key: 'DIST5000', km: '5 km', title: 'Top 5 km nhanh nhất' },
+  { key: 'DIST10000', km: '10 km', title: 'Top 10 km nhanh nhất' },
+  { key: 'DIST21097', km: '21 km', title: 'Top Half Marathon (21 km)' },
+  { key: 'DIST42195', km: '42 km', title: 'Top Full Marathon (42 km)' },
+]
+export const isDistanceHonor = (key: string) => /^DIST\d{3,6}$/.test(key)
 export interface HonorCategory { key: HonorKind; title: string; count: number; users?: string[] | null }
 export const MAX_CATEGORIES = 8
 
@@ -29,7 +38,7 @@ export function honorValue(key: string, value: number | null | undefined, object
     case 'STREAK': return `${v} ngày liên tiếp`
     case 'BREAKTHROUGH': return `+${v.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km`
     case 'SUPPORTED': return `${v.toLocaleString('vi-VN')} Tỏa sáng`
-    default: return ''
+    default: return isDistanceHonor(key) ? formatDuration(v) : ''
   }
 }
 

@@ -111,7 +111,7 @@ export async function publishPolicy(current: Record<string, unknown>, next: Econ
 
 export async function listPendingActivities(): Promise<PendingActivity[]> {
   const { data, error } = await supabase.from('activities')
-    .select('id, title, distance_m, started_at, created_at, source, moving_time_s, validation_reason, review_detail, risk_score, risk_level, risk_flags, profiles!activities_user_id_fkey(display_name, avatar_url)')
+    .select('id, title, distance_m, started_at, created_at, source, moving_time_s, validation_reason, review_detail, owner_note, risk_score, risk_level, risk_flags, profiles!activities_user_id_fkey(display_name, avatar_url)')
     .eq('validation_status', 'PENDING').order('created_at', { ascending: false }).limit(100)
   if (error) throw error
   // Người duyệt đọc chi tiết kỹ thuật (009700: validation_reason là lời báo thân thiện cho người chạy)

@@ -22,6 +22,8 @@ export interface PendingRun {
   can_review?: boolean
   /** Bài bị loại vì trùng giờ với bài khác đang được tính — không khôi phục được */
   overlap?: boolean
+  /** 013100: giải trình của người chạy */
+  owner_note?: string | null
   profiles: { display_name: string | null; avatar_url?: string | null } | null
 }
 
@@ -71,6 +73,7 @@ export function PendingRunCard({ run: a, onReview, onRestore, busy }: {
           {a.risk_level && <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-bold', RISK_TONE[a.risk_level])}>{RISK_LABEL[a.risk_level]}{a.risk_score != null ? ` · ${a.risk_score}/100` : ''}</span>}
         </p>
         {reason && <p className="text-xs text-fg">{reason}</p>}
+        {a.owner_note && <p className="rounded-md bg-surface px-2 py-1.5 text-xs text-fg"><span className="font-semibold">Người chạy giải trình: </span>{a.owner_note}</p>}
         {!!a.risk_flags?.length && (
           <div className="flex flex-wrap gap-1.5">
             {a.risk_flags.map((f, i) => {

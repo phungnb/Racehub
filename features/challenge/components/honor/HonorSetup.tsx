@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { Avatar, Button, Input, Sheet } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { challengeErrorMessage, saveHonor, type HonorState, type LeaderboardEntry } from '../../api/challengeApi'
-import { HONOR_KINDS, MAX_CATEGORIES, type HonorCategory, type HonorKind } from '../../model/honor'
+import { HONOR_DISTANCES, HONOR_KINDS, MAX_CATEGORIES, type HonorCategory, type HonorKind } from '../../model/honor'
 
 type BaseKind = keyof typeof HONOR_KINDS
 const COUNTS = [1, 3, 5, 10]
@@ -25,6 +25,8 @@ export function HonorSetup({ challengeId, honor, participants, onClose }: {
   const patch = (k: string, p: Partial<HonorCategory>) => setCats((cs) => cs.map((c) => (c.key === k ? { ...c, ...p } : c)))
   const toggle = (k: BaseKind) => setCats((cs) => has(k) ? cs.filter((c) => c.key !== k)
     : cs.length >= MAX_CATEGORIES ? cs : [...cs, { key: k, title: HONOR_KINDS[k].title, count: k === 'TOP' ? 3 : 1 }])
+  const toggleDist = (k: HonorKind, title: string) => setCats((cs) => has(k) ? cs.filter((c) => c.key !== k)
+    : cs.length >= MAX_CATEGORIES ? cs : [...cs, { key: k, title, count: 3 }])
   const customs = cats.filter((c) => c.key.startsWith('CUSTOM'))
   const addCustom = () => {
     const free = [1, 2, 3, 4, 5].map((i) => `CUSTOM${i}` as HonorKind).find((k) => !has(k))
@@ -60,6 +62,22 @@ export function HonorSetup({ challengeId, honor, participants, onClose }: {
                   </span>
                 </label>
                 {c && <CategoryFields c={c} onChange={(p) => patch(k, p)} />}
+              </div>
+            )
+          })}
+        </div>
+        <div className="space-y-2">
+          <p className="text-sm font-semibold">Theo cự ly</p>
+          <p className="text-[11px] text-fg-muted">Bài chạy nhanh nhất có cự ly ≥ hạng mục trong thời gian thử thách; thời gian quy đổi theo pace trung bình (VD bài 21,3 km trong 1:52:00 tính cho 21 km là 1:50:56).</p>
+          {HONOR_DISTANCES.map((x) => {
+            const c = cats.find((y) => y.key === x.key)
+            return (
+              <div key={x.key} className={cn('space-y-2 rounded-xl border p-3', c ? 'border-brand/60 bg-brand/5' : 'border-border')}>
+                <label className="flex items-center gap-3">
+                  <input type="checkbox" checked={!!c} onChange={() => toggleDist(x.key, x.title)} className="size-5 accent-[var(--color-brand)]" />
+                  <span className="text-sm font-semibold">{x.km}</span>
+                </label>
+                {c && <CategoryFields c={c} onChange={(p) => patch(x.key, p)} />}
               </div>
             )
           })}

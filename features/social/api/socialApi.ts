@@ -1,6 +1,7 @@
 // Theo dõi runner + tin nhắn 1-1 (migration 011500). Mọi thao tác qua RPC — máy chủ kiểm tra quyền, chặn, riêng tư.
 import { supabase } from '@/shared/lib/supabase'
 import { systemErrorMessage } from '@/shared/lib/errors'
+import type { ClubPost } from '@/features/club'
 
 export interface FollowStatus {
   following: boolean
@@ -25,6 +26,8 @@ export interface FeedActivity {
   elevation_gain_m: number | null
   is_me: boolean
   user: Runner
+  /** 013100: bài AUTO_RUN của buổi chạy để thích / bình luận / tặng quà tại chỗ; null khi runner không ở CLB nào */
+  post?: ClubPost | null
 }
 export interface DirectMessage { id: string; sender_id: string | null; mine: boolean; created_at: string; deleted: boolean; body: string | null; reactions?: DmReaction[] }
 export interface DmReaction { emoji: string; count: number; mine: boolean }

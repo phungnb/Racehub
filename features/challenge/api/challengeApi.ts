@@ -261,6 +261,16 @@ export async function quoteChallenge(d: ChallengeDraft): Promise<ChallengeQuote>
 }
 
 /** Bật / tắt tự lặp lại (migration 007600) */
+/** 013100: người tạo / BTC sửa thử thách trước khi bắt đầu (không đổi thể thức, số người, đối tượng, giải thưởng) */
+export interface ChallengeEdit {
+  title: string; description: string | null; target_value: number; min_km: number; min_pace: number; max_pace: number
+  daily_cap_km: number | null; start_date: string; end_date: string
+}
+export async function updateChallenge(id: string, p: ChallengeEdit) {
+  const { error } = await supabase.rpc('update_challenge', { p_challenge_id: id, p })
+  if (error) throw error
+}
+
 export async function setChallengeRecurrence(id: string, recurrence: string) {
   const { error } = await supabase.rpc('set_challenge_recurrence', { p_challenge_id: id, p_recurrence: recurrence })
   if (error) throw error
@@ -402,6 +412,8 @@ const MESSAGES: Record<string, string> = {
   CANNOT_LEAVE_STARTED: 'Thử thách đội và 1-1 không rời được sau khi đã bắt đầu.',
   CANNOT_CANCEL_STARTED: 'Không hủy được khi thử thách đã bắt đầu và có người tham gia.',
   INVALID_TITLE: 'Tên thử thách cần từ 3 đến 120 ký tự.',
+  CHALLENGE_STARTED: 'Thử thách đã bắt đầu nên không sửa được nữa.',
+  DURATION_TOO_LONG: 'Không kéo dài thời gian thử thách so với lúc tạo (phí khởi tạo tính theo thời lượng). Có thể dời ngày hoặc rút ngắn.',
   DESC_TOO_LONG: 'Mô tả quá dài.',
   INVALID_TIME_RANGE: 'Thời gian không hợp lệ (kết thúc phải sau bắt đầu, tối thiểu 1 giờ, tối đa 1 năm).',
   TEAM_START_TOO_SOON: 'Thử thách đội cần bắt đầu sau ít nhất 10 phút.',
