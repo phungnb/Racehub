@@ -263,7 +263,9 @@ begin
       'ok', to_regprocedure('public.warned_activities(uuid,integer)') is not null),
     jsonb_build_object('file', '20261001013500', 'label', 'Chỉnh sửa lần 7: Ban tổ chức chấp nhận / huỷ kết quả quay thưởng',
       'ok', to_regclass('public.lucky_draw_rejections') is not null and to_regprocedure('public.confirm_lucky_draw(uuid)') is not null
-        and to_regprocedure('public.reject_lucky_draw(uuid,text)') is not null));
+        and to_regprocedure('public.reject_lucky_draw(uuid,text)') is not null),
+    jsonb_build_object('file', '20261001013600', 'label', 'Nhắc runner 3 ngày chưa chạy',
+      'ok', to_regprocedure('public.send_run_reminders()') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
