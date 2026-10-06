@@ -156,6 +156,9 @@ export async function uploadClubAvatar(clubId: string, file: File): Promise<Club
   if (file.size > MAX_AVATAR_BYTES) throw new Error('AVATAR_SIZE')
   const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
   const path = `${clubId}/${Date.now()}.${ext}`
+  // File ảnh cũ: nhớ trước khi đổi để dọn sau (013200: máy chủ không còn tự xoá — Supabase cấm xoá thẳng bảng storage)
+  const old = await supabase.from('clubs').select('avatar_path').eq('id', clubId).maybeSingle<{ avatar_path: string | null }>()
+  const oldPath = old.data?.avatar_path ?? null
   const { error: upErr } = await supabase.storage.from(AVATAR_BUCKET)
     .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type })
   if (upErr) throw upErr
@@ -164,6 +167,10 @@ export async function uploadClubAvatar(clubId: string, file: File): Promise<Club
   if (error) {
     await supabase.storage.from(AVATAR_BUCKET).remove([path])
     throw error
+  }
+  // Dọn ảnh cũ qua Storage API (chính sách kho chỉ cho Ban quản trị CLB xoá); hỏng thì bỏ qua — ảnh mới đã đổi xong
+  if (oldPath && oldPath !== path && oldPath.startsWith(`${clubId}/`)) {
+    await supabase.storage.from(AVATAR_BUCKET).remove([oldPath]).catch(() => {})
   }
   return data as Club
 }

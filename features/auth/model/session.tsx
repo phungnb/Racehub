@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import type { Session } from '@supabase/supabase-js'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/shared/lib/supabase'
+import { errorKind } from '@/shared/lib/errors'
 import type { Profile } from '@/shared/types/profile'
 
 interface SessionState {
@@ -44,7 +45,10 @@ async function fetchOrCreateProfile(uid: string): Promise<Profile> {
   const read = async (): Promise<{ data: Profile | null; error: Error | null }> => {
     const r = await supabase.rpc('my_account')
     if (!r.error) return { data: (r.data as Profile | null) ?? null, error: null }
-    if (!/my_account|PGRST202|schema cache/i.test(`${r.error.message} ${r.error.code ?? ''}`)) return { data: null, error: r.error }
+    // Chỉ quay về đọc bảng khi máy chủ CHƯA CÓ hàm (PGRST202). "permission denied for function my_account" (yêu cầu đi bằng
+    // vai trò khách khi phiên đăng nhập chưa kịp nạp / làm mới) không phải thiếu hàm — đọc bảng lúc đó chỉ đẻ thêm lỗi
+    // "permission denied for table profiles" (bảng chỉ còn cột công khai từ 011900)
+    if (errorKind(r.error) !== 'NOT_DEPLOYED') return { data: null, error: r.error }
     const t = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle<Profile>()
     return { data: t.data, error: t.error }
   }
