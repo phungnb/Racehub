@@ -48,7 +48,7 @@ declare
   -- 013400: cảnh báo lưu kèm bài (risk.flags của bộ phân tích + cảnh báo máy chủ tự thêm: chạy máy, vận tốc tối đa một điểm)
   v_flags jsonb := case when jsonb_typeof(p_activity->'risk'->'flags') = 'array' then p_activity->'risk'->'flags' else '[]'::jsonb end;
   -- Quãng đường đã bỏ cú nhảy / đoạn trôi GPS (bộ phân tích, chỉ để kiểm pace TB — km của đối tác KHÔNG đổi)
-  v_clean numeric := case when jsonb_typeof(p_activity->'analysis') = 'object' then nullif((p_activity->'analysis'->>'clean_distance_m')::numeric, 0) end;
+  v_pace_dist numeric := case when jsonb_typeof(p_activity->'analysis') = 'object' then nullif((p_activity->'analysis'->>'clean_distance_m')::numeric, 0) end;
   v_check_pace integer;
   v_no_gps boolean;
 begin
@@ -82,8 +82,8 @@ begin
   -- 012600: km của đối tác (Strava…) giữ nguyên — cú nhảy GPS chỉ dùng để phân loại hợp lệ / nghi vấn (fraud.ts)
   v_pace := round(v_moving / (v_distance / 1000.0));
   -- 013400: pace TB "nhanh hơn kỷ lục" chỉ vì GPS nhảy cộng thêm km → kiểm theo quãng đường đã bỏ cú nhảy (nếu có phân tích)
-  v_check_pace := case when v_has_gps and v_clean is not null and v_clean < v_distance
-                       then round(v_moving / (v_clean / 1000.0)) else v_pace end;
+  v_check_pace := case when v_has_gps and v_pace_dist is not null and v_pace_dist < v_distance
+                       then round(v_moving / (v_pace_dist / 1000.0)) else v_pace end;
   v_no_gps := v_sport = 'VirtualRun' or not v_has_gps;
 
   -- Cùng một buổi chạy đã được ghi từ nguồn khác (vd GPS trong app) → không tính 2 lần.
