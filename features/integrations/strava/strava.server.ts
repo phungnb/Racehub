@@ -1,7 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { serverEnv } from '@/shared/config/env.server'
-import { analyzeRun, compactStreams, speedRulesFrom, stravaStreams, type FraudResult, type FraudStreams, type SpeedRules } from '@/features/activity/server'
+import { analyzeRun, compactStreams, isGpsJumpFlag, speedRulesFrom, stravaStreams, type FraudResult, type FraudStreams, type SpeedRules } from '@/features/activity/server'
 import { toOps } from '@/shared/lib/ops'
 import { mapStravaActivity, mapStravaDetail, summarize, syncWindowStart, tokenNeedsRefresh, type StravaSummaryActivity, type SyncSummary } from './mapping'
 
@@ -135,8 +135,9 @@ async function assessRisk(admin: SupabaseClient, userId: string, token: string, 
   const n = mapStravaActivity(a)
   if (!RUN_SPORTS.has(n.sport_type) || n.distance_m < 200) return null
   const rules = await speedRules(admin)
+  // Lần 7: hasGps = có tuyến (polyline); không có GPS hoàn toàn → chạy máy (ghi nhận + cảnh báo). Nhập tay → không ghi nhận.
   const summary = { sportType: n.sport_type, manual: n.manual, trainer: a.trainer === true, deviceName: n.device_name,
-    distanceM: n.distance_m, movingS: n.moving_s, maxSpeedMps: n.max_speed_mps }
+    distanceM: n.distance_m, movingS: n.moving_s, maxSpeedMps: n.max_speed_mps, hasGps: n.has_gps }
   if (n.manual || Date.now() - Date.parse(n.started_at) > FRAUD_RECENT_MS) return { result: analyzeRun(summary, null, [], rules), streams: null, rules, historyN: 0 }
   try {
     // Bài đã nhập (đồng bộ lại / webhook đổi tên) → không tải streams lần nữa
@@ -150,7 +151,9 @@ async function assessRisk(admin: SupabaseClient, userId: string, token: string, 
     const history = ((hist.data ?? []) as { moving_time_s: number; distance_m: number }[])
       .map((h) => h.moving_time_s / (h.distance_m / 1000))
     const streams = stravaStreams(raw)
-    return { result: analyzeRun(summary, streams, history, rules), streams, rules, historyN: history.length }
+    // Bản tóm tắt thiếu polyline (ẩn bản đồ) nhưng streams có latlng → vẫn là bài có GPS
+    const withGps = { ...summary, hasGps: n.has_gps || !!streams?.latlng?.some((p) => Array.isArray(p) && p.length === 2) }
+    return { result: analyzeRun(withGps, streams, history, rules), streams, rules, historyN: history.length }
   } catch (e) {
     console.warn('[strava] fraud streams', (e as Error).message)
     return { result: analyzeRun(summary, null, [], rules), streams: null, rules, historyN: 0 }
@@ -164,7 +167,9 @@ async function ingest(admin: SupabaseClient, userId: string, a: StravaSummaryAct
     p_user_id: userId, p_source: 'STRAVA', p_external_id: String(a.id),
     p_activity: { ...mapStravaActivity(a), ...(risk && assessed ? {
       risk: { verdict: risk.verdict, score: risk.score, level: risk.level, reason: risk.reason,
-        flags: risk.flags.map((f) => ({ code: f.code, severity: f.severity, tier: f.tier ?? null, message: f.message, atS: f.atS ?? null, durationS: f.durationS ?? null })) },
+        // gpsJump: dấu hiệu chỉ do GPS nhảy (lần 7) — danh sách "Bài có cảnh báo" của ban quản trị hiển thị riêng
+        flags: risk.flags.map((f) => ({ code: f.code, severity: f.severity, tier: f.tier ?? null, message: f.message, atS: f.atS ?? null, durationS: f.durationS ?? null,
+          gpsJump: isGpsJumpFlag(f) || null })) },
       // Lưu vết: kết quả đầy đủ + đầu vào; dữ liệu gốc (rút gọn) chỉ giữ khi bài có dấu hiệu, để xét lại / chỉnh luật sau này
       analysis: {
         engine: risk.engine, verdict: risk.verdict, basis: risk.basis, score: risk.score, level: risk.level,

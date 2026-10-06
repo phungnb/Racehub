@@ -5,8 +5,12 @@ import { toast } from 'sonner'
 import { SectionTitle } from '@/shared/ui'
 import { getFraudReviewStats, listRejectedRuns, restoreErrorMessage, restoreRun } from '../api/reviewApi'
 import { PendingRunCard } from './PendingRunCard'
+import { WarnedRuns } from './WarnedRuns'
 
-/** Bài bị loại 30 ngày gần đây + khôi phục bài loại nhầm (012500). clubId = null: toàn hệ thống (admin) */
+/**
+ * Bài bị loại 30 ngày gần đây + khôi phục bài loại nhầm (012500), kèm "Bài có cảnh báo" (013400 — đã ghi nhận nhưng GPS nhảy,
+ * chạy máy…) để mọi nơi xem lại bài (Quản trị → Duyệt bài, CLB → duyệt bài) đều có. clubId = null: toàn hệ thống (admin)
+ */
 export function RejectedRuns({ clubId }: { clubId: string | null }) {
   const qc = useQueryClient()
   const key = ['rejected-runs', clubId ?? 'all']
@@ -19,15 +23,19 @@ export function RejectedRuns({ clubId }: { clubId: string | null }) {
     },
     onError: (e) => toast.error(restoreErrorMessage(e)),
   })
-  if (!list.data?.length) return null
   return (
-    <section>
-      <SectionTitle>Bài đã loại (30 ngày)</SectionTitle>
-      <p className="-mt-1 mb-2 text-xs text-fg-muted">Loại nhầm? Ghi lý do rồi khôi phục — lịch sử quyết định được lưu lại để chỉnh luật.</p>
-      <ul className="space-y-2">
-        {list.data.map((r) => <PendingRunCard key={r.id} run={r} busy={restore.isPending} onRestore={(note) => restore.mutate({ id: r.id, note })} />)}
-      </ul>
-    </section>
+    <>
+      {!!list.data?.length && (
+        <section>
+          <SectionTitle>Bài đã loại (30 ngày)</SectionTitle>
+          <p className="-mt-1 mb-2 text-xs text-fg-muted">Loại nhầm? Ghi lý do rồi khôi phục — lịch sử quyết định được lưu lại để chỉnh luật. Bài nhập tay không được ghi nhận.</p>
+          <ul className="space-y-2">
+            {list.data.map((r) => <PendingRunCard key={r.id} run={r} busy={restore.isPending} onRestore={(note) => restore.mutate({ id: r.id, note })} />)}
+          </ul>
+        </section>
+      )}
+      <WarnedRuns clubId={clubId} />
+    </>
   )
 }
 

@@ -6,7 +6,10 @@
 //  - Thêm: điểm GPS "dịch chuyển tức thời", đoạn chạy ≥ 25 km/h kiểu xe máy / xe đạp
 //  - Cú nhảy GPS ngắn (≤ 10 s) bị bỏ khỏi quãng đường trước khi tính tốc độ — một điểm nhảy 70 km/h không làm cả bài thành "đi xe"
 //  - Đường cong pace theo thời gian: tốc độ TB tốt nhất trong mỗi cửa sổ 1 phút … 2 giờ so với kỷ lục thế giới cùng thời lượng
-// Kết luận chỉ là OK hoặc REVIEW (chờ ban quản trị duyệt) — không tự động từ chối người thật.
+// Kết luận: OK (ghi nhận), REVIEW (chờ ban quản trị duyệt) hoặc REJECT (chỉ bài nhập tay — không có dữ liệu thiết bị).
+// Chỉnh sửa lần 7 (Phụng chốt 06/10/2026): "GPS nhảy nếu Strava có GPS (mặc dù nhảy) thì RaceHub vẫn ghi nhận; chỉ không ghi nhận
+// trường hợp nhập tay; cảnh báo chạy máy (hoàn toàn không có GPS)". Dấu hiệu sinh ra từ lỗi GPS nhảy và chạy máy chỉ là CẢNH BÁO
+// (lưu để ban quản trị xem ở "Bài có cảnh báo"), không bao giờ tự giữ bài; km của đối tác không bị sửa.
 
 export interface FraudStreams {
   time: number[]                         // giây từ lúc bắt đầu
@@ -24,6 +27,8 @@ export interface FraudSummary {
   distanceM: number
   movingS: number
   maxSpeedMps?: number | null
+  /** Bài có tuyến GPS (polyline / latlng). false = hoàn toàn không có GPS → coi như chạy máy (chỉ cảnh báo) */
+  hasGps?: boolean | null
 }
 
 export type FraudCode = 'MANUAL' | 'TREADMILL' | 'SUSTAINED_SPEED' | 'VEHICLE_BURST' | 'GPS_TELEPORT' | 'STRIDE' | 'HR_PACE' | 'HISTORY' | 'PACE_CURVE' | 'GPS_DISTANCE_GAIN'
@@ -52,12 +57,18 @@ export interface FraudFlag {
   evidence?: Record<string, number | string | boolean | null>
   /** Trùng thời điểm với một lỗi GPS (nhảy điểm / mất tín hiệu) → có thể cùng một nguyên nhân, đã hạ mức */
   gpsError?: boolean
+  /** Lần 7: dấu hiệu tốc độ chỉ có vì GPS nhảy (bỏ các cú nhảy / đoạn trôi ngắn thì hết) → chỉ cảnh báo, không giữ bài */
+  gpsJump?: boolean
 }
+
+/** Dấu hiệu "do GPS nhảy": cú nhảy / dịch chuyển, hoặc dấu hiệu tốc độ trùng vùng lỗi GPS — chỉ cảnh báo, không giữ bài (lần 7) */
+export const isGpsJumpFlag = (f: Pick<FraudFlag, 'code' | 'gpsJump'>) => f.code === 'GPS_TELEPORT' || f.code === 'GPS_DISTANCE_GAIN' || !!f.gpsJump
 
 export interface FraudResult {
   score: number                          // 0–100 tổng hợp (chỉ để hiển thị / sắp xếp)
   level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
-  verdict: 'OK' | 'REVIEW'
+  /** REJECT chỉ dùng cho bài nhập tay (lần 7): không ghi nhận */
+  verdict: 'OK' | 'REVIEW' | 'REJECT'
   flags: FraudFlag[]
   reason: string | null                  // câu ngắn gửi lên máy chủ / hiện cho người chạy
   /** Mức cao nhất trong các bằng chứng độc lập; DISQUALIFY = đủ căn cứ loại */
@@ -70,7 +81,7 @@ export interface FraudResult {
 }
 
 /** Phiên bản bộ quy tắc — lưu kèm mỗi kết quả để biết bài được xét bằng luật nào */
-export const FRAUD_ENGINE_VERSION = 'ac-2026.10.4'
+export const FRAUD_ENGINE_VERSION = 'ac-2026.10.7'
 
 export const FRAUD_CONFIG = {
   windowS: 30,
@@ -84,8 +95,10 @@ export const FRAUD_CONFIG = {
     table: [{ pace: 5.0, minHr: 115 }, { pace: 4.5, minHr: 125 }, { pace: 4.0, minHr: 135 }, { pace: 3.5, minHr: 145 }],
   },
   history: { minSamples: 10, z: 3, zCritical: 5 },
-  // Lỗi GPS: khoảng không có điểm dài hơn gapS giây; dấu hiệu cách lỗi GPS ≤ padS giây coi như cùng nguyên nhân
-  gpsError: { gapS: 30, padS: 30 },
+  // Lỗi GPS: khoảng không có điểm dài hơn gapS giây; dấu hiệu cách lỗi GPS ≤ padS giây coi như cùng nguyên nhân.
+  // GPS nhảy "trải" (lần 7): đoạn nhanh hơn ngưỡng nhảy nhưng ngắn (≤ burstS giây), đứng riêng, xung quanh đang chạy bộ —
+  // đồng hồ làm mượt cú nhảy qua vài điểm. Dấu hiệu tốc độ biến mất khi bỏ các đoạn này = do GPS nhảy.
+  gpsError: { gapS: 30, padS: 30, burstS: 30 },
   // Cú nhảy GPS: chuỗi điểm liên tiếp nhanh hơn ngưỡng "nhảy" nhưng tổng thời gian ≤ maxS giây → bỏ quãng đó
   spike: { maxS: 10, contextS: 30, contextRatio: 0.5 },
   // Cú nhảy GPS: KHÔNG sửa km của đối tác (Strava…), chỉ dùng để phân loại. Nhảy nhỏ rồi quay về = bình thường (ghi chú).
@@ -122,22 +135,22 @@ export const FRAUD_RULES: Record<FraudCode, FraudRule> = {
     label: 'Nhanh hơn kỷ lục thế giới', source: 'GPS',
     reason: 'Tốc độ TB tốt nhất trong mỗi khoảng 1 phút … 2 giờ vượt kỷ lục thế giới nam cùng thời lượng (+5% sai số GPS) — không con người nào chạy được.',
     inputs: 'Streams time + distance (đã bỏ cú nhảy GPS ≤ 10 giây)',
-    warn: null, suspect: 'Khi đoạn vượt ngưỡng trùng thời điểm lỗi GPS (hạ một mức)',
+    warn: 'Khi đoạn vượt ngưỡng trùng vùng lỗi GPS (GPS nhảy) — chỉ cảnh báo, bài có GPS vẫn ghi nhận (lần 7)', suspect: null,
     disqualify: '1 phút > 8,6 m/s · 2 phút > 7,9 · 5 phút > 7,0 · 10 phút > 6,8 · 20 phút > 6,5 · 1 giờ > 6,1 · 2 giờ > 5,85 (×1,05)',
-    falsePositives: 'GPS trôi kéo dài > 10 giây (nhà cao tầng, hầm) — đã hạ mức khi trùng vùng lỗi GPS',
+    falsePositives: 'GPS trôi kéo dài > 10 giây (nhà cao tầng, hầm) — trùng vùng lỗi GPS thì chỉ là cảnh báo',
   },
   SUSTAINED_SPEED: {
     label: 'Giữ tốc độ cao lâu', source: 'GPS',
     reason: 'Giữ pace rất nhanh liên tục nhiều phút — hiếm ở người chạy phong trào, thường gặp khi đi xe đạp / xe điện chậm.',
     inputs: 'Tốc độ cửa sổ trượt 30 giây trên quãng đường đã bỏ cú nhảy GPS; ngưỡng do admin đặt (Chính sách vận hành)',
-    warn: '≥ 17 km/h (3:32/km) liên tục ≥ 3 phút', suspect: '≥ 20 km/h (3:00/km) liên tục ≥ 2 phút', disqualify: null,
-    falsePositives: 'VĐV phong trào mạnh chạy biến tốc / đổ dốc dài',
+    warn: '≥ 17 km/h (3:32/km) liên tục ≥ 3 phút; hoặc bất kỳ mức nào nếu trùng vùng lỗi GPS', suspect: '≥ 20 km/h (3:00/km) liên tục ≥ 2 phút (không trùng lỗi GPS)', disqualify: null,
+    falsePositives: 'VĐV phong trào mạnh chạy biến tốc / đổ dốc dài; GPS nhảy (trùng vùng lỗi GPS → chỉ cảnh báo)',
   },
   VEHICLE_BURST: {
     label: 'Giống đi xe', source: 'GPS',
     reason: 'Đoạn ngắn có tốc độ của xe máy / xe đạp.',
     inputs: 'Tốc độ cửa sổ trượt 30 giây; không có streams thì chỉ có "vận tốc tối đa" một điểm (chỉ ghi chú)',
-    warn: null, suspect: '≥ 25 km/h liên tục ≥ 30 giây', disqualify: null,
+    warn: 'Trùng vùng lỗi GPS (GPS nhảy / trôi ≤ 30 giây) — bài có GPS vẫn ghi nhận', suspect: '≥ 25 km/h liên tục ≥ 30 giây (không trùng lỗi GPS)', disqualify: null,
     falsePositives: 'Nước rút 200 m của người rất nhanh; GPS trôi kéo dài',
   },
   GPS_TELEPORT: {
@@ -145,11 +158,11 @@ export const FRAUD_RULES: Record<FraudCode, FraudRule> = {
     reason: 'Vị trí nhảy xa trong 1 lượt ghi — có thể do sóng yếu, cũng có thể do chỉnh sửa tuyến.',
     inputs: 'Streams latlng + time: đoạn > 50 m với tốc độ tức thời > ngưỡng "nhảy" (mặc định 43 km/h)',
     warn: '≥ 3 lần nhảy', suspect: null, disqualify: null,
-    falsePositives: 'Rất hay gặp ở đô thị — một mình không bao giờ giữ bài',
+    falsePositives: 'Rất hay gặp ở đô thị — không bao giờ giữ bài (lần 7: GPS nhảy chỉ là cảnh báo, bài có GPS vẫn ghi nhận)',
   },
   GPS_DISTANCE_GAIN: {
     label: 'Vị trí dịch chuyển', source: 'GPS',
-    reason: 'GPS lạc vài chục–vài trăm mét rồi quay về là BÌNH THƯỜNG (chỉ ghi chú). Một lần vị trí "dịch chuyển" ≥ 1 km trong vài giây (≥ 360 km/h) rồi chạy tiếp từ chỗ mới thì không thể do chạy hay sóng yếu thông thường — có thể do sửa / ghép file tuyến, app giả vị trí hoặc GPS lỗi nặng. Km của đối tác KHÔNG bị sửa; từ lần chỉnh sửa 6 chỉ là cảnh báo, bài có GPS vẫn được ghi nhận.',
+    reason: 'GPS lạc vài chục–vài trăm mét rồi quay về là BÌNH THƯỜNG (chỉ ghi chú). Một lần vị trí "dịch chuyển" ≥ 1 km trong vài giây (≥ 360 km/h) rồi chạy tiếp từ chỗ mới thì không thể do chạy hay sóng yếu thông thường — có thể do sửa / ghép file tuyến, app giả vị trí hoặc GPS lỗi nặng. Km của đối tác KHÔNG bị sửa; chỉ là cảnh báo, bài có GPS vẫn được ghi nhận (lần 6–7).',
     inputs: 'Streams time + distance: chuỗi điểm nhanh hơn ngưỡng "nhảy" kéo dài ≤ 10 giây, xung quanh 30 giây đang ở tốc độ chạy bộ; đo từng cú nhảy riêng',
     warn: 'Một cú dịch chuyển ≥ 1 km', suspect: null, disqualify: null,
     falsePositives: 'Đồng hồ bắt GPS sai lúc mới bật / ra khỏi hầm dài — người duyệt xem bản đồ để quyết định',
@@ -177,13 +190,15 @@ export const FRAUD_RULES: Record<FraudCode, FraudRule> = {
   },
   MANUAL: {
     label: 'Nhập tay', source: 'DEVICE',
-    reason: 'Không có dữ liệu thiết bị để xác minh.', inputs: 'Cờ manual của Strava',
-    warn: null, suspect: 'Luôn chuyển người duyệt', disqualify: null, falsePositives: 'Bài thật nhưng quên bật đồng hồ',
+    reason: 'Không có dữ liệu thiết bị để xác minh. Từ lần chỉnh sửa 7 (Phụng chốt 06/10/2026): bài nhập tay KHÔNG được ghi nhận.',
+    inputs: 'Cờ manual của Strava',
+    warn: null, suspect: null, disqualify: 'Luôn — bài bị loại ngay khi đồng bộ, không tính km / thử thách / Xu', falsePositives: 'Bài thật nhưng quên bật đồng hồ — chạy lại có ghi thiết bị',
   },
   TREADMILL: {
     label: 'Chạy máy', source: 'DEVICE',
-    reason: 'Không có tuyến GPS để đối chiếu quãng đường.', inputs: 'trainer / VirtualRun / tên thiết bị',
-    warn: null, suspect: 'Luôn chuyển người duyệt', disqualify: null, falsePositives: 'Chạy máy thật — người duyệt quyết định',
+    reason: 'Hoàn toàn không có tuyến GPS để đối chiếu quãng đường (máy chạy bộ, VirtualRun, bài không có polyline / latlng). Lần 7: vẫn ghi nhận, kèm cảnh báo.',
+    inputs: 'trainer / VirtualRun / tên thiết bị / không có polyline và latlng',
+    warn: 'Luôn cảnh báo — bài vẫn được ghi nhận, không chờ duyệt', suspect: null, disqualify: null, falsePositives: 'Chạy máy thật — cảnh báo chỉ để ban quản trị biết',
   },
 }
 
@@ -235,6 +250,26 @@ export function windowSpeeds(time: number[], distance: number[], windowS = FRAUD
  * ≤ `maxS` giây (điểm lạc rồi quay về). Đoạn nhanh kéo dài hơn (đi xe thật) được GIỮ NGUYÊN để các luật tốc độ bắt được.
  */
 export function despike(time: number[], distance: number[], maxMps: number, maxS = FRAUD_CONFIG.spike.maxS): number[] {
+  return dropSteps(distance.slice(0, Math.min(time.length, distance.length)), gpsBursts(time, distance, maxMps, maxS))
+}
+
+/** Quãng đường cộng dồn sau khi bỏ các bước [i, j] (bước k = từ điểm k-1 tới điểm k) */
+function dropSteps(distance: number[], runs: [number, number][]): number[] {
+  const n = distance.length
+  const drop = new Array<boolean>(n).fill(false)
+  for (const [i, j] of runs) for (let k = i; k <= j; k++) drop[k] = true
+  const out = new Array<number>(n)
+  let acc = 0
+  out[0] = distance[0] ?? 0
+  for (let i = 1; i < n; i++) { if (!drop[i]) acc += Math.max(0, distance[i] - distance[i - 1]); out[i] = (distance[0] ?? 0) + acc }
+  return out
+}
+
+/**
+ * Các đoạn "GPS nhảy": chuỗi bước liên tiếp nhanh hơn `maxMps`, tổng thời gian ≤ `maxS` giây, xung quanh đang ở tốc độ chạy bộ.
+ * Trả về chỉ số [bước đầu, bước cuối]. Xe chạy thật (kéo dài, hoặc xung quanh cũng nhanh) không bị coi là cú nhảy.
+ */
+export function gpsBursts(time: number[], distance: number[], maxMps: number, maxS: number, isolated = false): [number, number][] {
   const n = Math.min(time.length, distance.length)
   const fast = new Array<boolean>(n).fill(false)
   for (let i = 1; i < n; i++) {
@@ -249,18 +284,22 @@ export function despike(time: number[], distance: number[], maxMps: number, maxS
     for (let k = j + 1; k < n && time[k] - time[j] <= ctxS; k++) if (!fast[k]) { m += distance[k] - distance[k - 1]; s += time[k] - time[k - 1] }
     return s > 0 ? m / s : 0
   }
-  const drop = new Array<boolean>(n).fill(false)
+  const out: [number, number][] = []
   for (let i = 1; i < n; i++) {
     if (!fast[i] || fast[i - 1]) continue
     let j = i
     while (j + 1 < n && fast[j + 1]) j++
     // Chỉ là "cú nhảy" khi ngắn VÀ xung quanh đang ở tốc độ chạy bộ; xe chạy quanh ngưỡng (xung quanh cũng nhanh) thì giữ
-    if (time[j] - time[i - 1] <= maxS && around(i, j) < maxMps * FRAUD_CONFIG.spike.contextRatio) for (let k = i; k <= j; k++) drop[k] = true
+    if (time[j] - time[i - 1] > maxS || around(i, j) >= maxMps * FRAUD_CONFIG.spike.contextRatio) continue
+    // `isolated`: xung quanh gần như không có bước nhanh nào khác — xe chạy dao động quanh ngưỡng (lúc trên lúc dưới) không phải GPS trôi
+    if (isolated) {
+      let f = 0
+      for (let k = i - 1; k >= 1 && time[i - 1] - time[k - 1] <= ctxS; k--) if (fast[k]) f += time[k] - time[k - 1]
+      for (let k = j + 1; k < n && time[k] - time[j] <= ctxS; k++) if (fast[k]) f += time[k] - time[k - 1]
+      if (f > FRAUD_CONFIG.spike.maxS) continue
+    }
+    out.push([i, j])
   }
-  const out = new Array<number>(n)
-  let acc = 0
-  out[0] = distance[0] ?? 0
-  for (let i = 1; i < n; i++) { if (!drop[i]) acc += Math.max(0, distance[i] - distance[i - 1]); out[i] = (distance[0] ?? 0) + acc }
   return out
 }
 
@@ -294,10 +333,19 @@ export function longestRun(time: number[], speed: number[], minMps: number): [nu
 
 function ruleSummary(s: FraudSummary): FraudFlag[] {
   const out: FraudFlag[] = []
-  if (s.manual) out.push({ code: 'MANUAL', severity: 'SEVERE', score: 100, evidence: { manual: true }, message: 'Bài nhập tay, không có dữ liệu thiết bị' })
+  // Lần 7: bài nhập tay KHÔNG được ghi nhận (đủ căn cứ loại → kết luận REJECT)
+  if (s.manual) {
+    out.push({ code: 'MANUAL', severity: 'SEVERE', score: 100, tier: 'DISQUALIFY', evidence: { manual: true }, message: 'Bài nhập tay không được ghi nhận' })
+    return out
+  }
   const dev = (s.deviceName ?? '').toLowerCase()
-  if (s.trainer || s.sportType === 'VirtualRun' || /treadmill|zwift|virtual/.test(dev)) {
-    out.push({ code: 'TREADMILL', severity: 'SEVERE', score: 80, evidence: { trainer: !!s.trainer, sportType: s.sportType ?? null, device: s.deviceName ?? null }, message: 'Chạy máy / chạy ảo — không có tuyến GPS để đối chiếu' })
+  // Lần 7: chạy máy / hoàn toàn không có GPS → vẫn ghi nhận, chỉ CẢNH BÁO để ban quản trị biết
+  const machine = !!s.trainer || s.sportType === 'VirtualRun' || /treadmill|zwift|virtual/.test(dev)
+  if (machine || s.hasGps === false) {
+    out.push({ code: 'TREADMILL', severity: 'HIGH', score: 80, tier: 'WARN',
+      evidence: { trainer: !!s.trainer, sportType: s.sportType ?? null, device: s.deviceName ?? null, hasGps: s.hasGps ?? null },
+      message: machine ? 'Chạy máy / chạy ảo — không có tuyến GPS để đối chiếu; bài vẫn được ghi nhận'
+        : 'Bài hoàn toàn không có GPS — không đối chiếu được quãng đường; bài vẫn được ghi nhận' })
   }
   return out
 }
@@ -493,7 +541,16 @@ export function analyzeRun(summary: FraudSummary, streams: FraudStreams | null, 
         : { code: 'GPS_DISTANCE_GAIN', severity: 'INFO', score: 20, tier: 'NOTE', evidence: ev,
             message: `GPS nhảy cộng thêm khoảng ${Math.round(gain)} m (bình thường, km giữ nguyên)` })
     }
-    raw.push(...ruleCurve(t, d), ...ruleSpeed(t, v, rules), ...ruleTeleport(t, streams.latlng, rules), ...ruleStride(t, d, streams.cadence), ...ruleHr(t, d, streams.heartrate))
+    // Lần 7: dấu hiệu tốc độ do GPS nhảy = tính lại trên quãng đường bỏ thêm các đoạn GPS trôi ngắn đứng riêng (≤ 30 giây) mà
+    // dấu hiệu biến mất. Đi xe thật (đoạn nhanh kéo dài) vẫn còn dấu hiệu → giữ nguyên mức như trước.
+    const bursts = gpsBursts(t, streams.distance, rules.teleport.mps, FRAUD_CONFIG.gpsError.burstS, true)
+    const strict = bursts.length ? dropSteps(d, bursts) : d
+    // Quãng đường tham khảo (lịch sử, người duyệt, kiểm pace TB ở máy chủ) bỏ cả cú nhảy lẫn đoạn trôi ngắn
+    cleanDistanceM = strict[strict.length - 1] - strict[0]
+    const still = strict === d ? null : [...ruleCurve(t, strict), ...ruleSpeed(t, windowSpeeds(t, strict), rules)].map((f) => f.code)
+    const speed = [...ruleCurve(t, d), ...ruleSpeed(t, v, rules)].map((f) => (still && !still.includes(f.code)
+      ? { ...f, gpsJump: true, gpsError: true, evidence: { ...f.evidence, gpsJump: true } } : f))
+    raw.push(...speed, ...ruleTeleport(t, streams.latlng, rules), ...ruleStride(t, d, streams.cadence), ...ruleHr(t, d, streams.heartrate))
   } else if ((summary.maxSpeedMps ?? 0) > rules.teleport.mps) {
     // Không có streams: "vận tốc tối đa" là MỘT điểm (thường do GPS nhảy) → chỉ ghi chú, không tự chặn bài
     raw.push({ code: 'VEHICLE_BURST', severity: 'INFO', score: 40, tier: 'NOTE',
@@ -509,24 +566,31 @@ export function analyzeRun(summary: FraudSummary, streams: FraudStreams | null, 
     const a = f.atS - pad, b = f.atS + (f.durationS ?? 0) + pad
     const hit = regions.some(([x, y]) => x <= b && y >= a)
     return hit ? { ...f, gpsError: true, tier: DOWN[f.tier!], evidence: { ...f.evidence, gpsErrorOverlap: true } } : f
-  })
+  }).map((f) => (f.gpsJump && TIER_RANK[f.tier!] > TIER_RANK.WARN ? { ...f, tier: 'WARN' as const } : f))
+  // Lần 7: dấu hiệu do GPS nhảy tối đa là CẢNH BÁO (bài có GPS, dù nhảy, vẫn được ghi nhận)
 
-  // Nhóm bằng chứng độc lập: dấu hiệu GPS chồng thời gian nhau = 1 nhóm; mọi dấu hiệu trùng lỗi GPS + GPS_TELEPORT = nhóm "lỗi GPS"
+  // Nhóm bằng chứng độc lập: dấu hiệu GPS chồng thời gian nhau = 1 nhóm; mọi dấu hiệu trùng lỗi GPS = nhóm "lỗi GPS";
+  // GPS_TELEPORT, GPS_DISTANCE_GAIN, dấu hiệu tốc độ chỉ có vì GPS nhảy = nhóm "GPS nhảy" (lần 7: không góp vào kết luận)
   const groups: { key: string; a: number; b: number; tier: FraudTier }[] = []
   for (const f of flags) {
     if (f.tier === 'NOTE') continue
-    const gpsErr = f.gpsError || f.code === 'GPS_TELEPORT' || f.code === 'GPS_DISTANCE_GAIN'
-    const timed = f.source?.startsWith('GPS') && f.atS != null && !gpsErr
-    const key = gpsErr ? 'GPS_ERROR' : timed ? 'GPS_TIME' : f.source ?? f.code
+    const jump = isGpsJumpFlag(f)
+    const timed = f.source?.startsWith('GPS') && f.atS != null && !f.gpsError && !jump
+    const key = jump ? 'GPS_JUMP' : f.gpsError ? 'GPS_ERROR' : timed ? 'GPS_TIME' : f.source ?? f.code
     const a = f.atS ?? 0, b = (f.atS ?? 0) + (f.durationS ?? 0)
     const g = groups.find((x) => x.key === key && (key !== 'GPS_TIME' || (x.a <= b + pad && x.b >= a - pad)))
     if (g) { g.a = Math.min(g.a, a); g.b = Math.max(g.b, b); if (TIER_RANK[f.tier!] > TIER_RANK[g.tier]) g.tier = f.tier! }
     else groups.push({ key, a, b, tier: f.tier! })
   }
-  const top = groups.reduce<FraudTier | null>((m, g) => (!m || TIER_RANK[g.tier] > TIER_RANK[m] ? g.tier : m), null)
-  const warns = groups.filter((g) => g.tier === 'WARN').length
-  // Chờ duyệt khi: có nghi vấn / đủ căn cứ loại, hoặc ≥ 2 cảnh báo ĐỘC LẬP (không tính 2 dấu hiệu cùng một lỗi GPS)
-  const verdict = top === 'SUSPECT' || top === 'DISQUALIFY' || warns >= 2 ? 'REVIEW' : 'OK'
+  const topOf = (gs: typeof groups) => gs.reduce<FraudTier | null>((m, g) => (!m || TIER_RANK[g.tier] > TIER_RANK[m] ? g.tier : m), null)
+  // Lần 7: nhóm "lỗi GPS" (GPS nhảy) và cảnh báo chạy máy KHÔNG góp vào kết luận — chỉ lưu để ban quản trị xem
+  const holding = groups.filter((g) => g.key !== 'GPS_JUMP' && !(g.key === 'DEVICE' && g.tier === 'WARN'))
+  const warns = holding.filter((g) => g.tier === 'WARN').length
+  const manual = flags.some((f) => f.code === 'MANUAL')
+  const held = topOf(holding)
+  // Nhập tay → không ghi nhận. Chờ duyệt khi: có nghi vấn / đủ căn cứ loại, hoặc ≥ 2 cảnh báo ĐỘC LẬP — không tính dấu hiệu do GPS nhảy
+  const verdict = manual ? 'REJECT' : held === 'SUSPECT' || held === 'DISQUALIFY' || warns >= 2 ? 'REVIEW' : 'OK'
+  const top = manual ? 'DISQUALIFY' : held ?? topOf(groups)
 
   const w = FRAUD_CONFIG.weights
   const score = Math.min(100, Math.round(flags.reduce((s, f) => s + (f.tier === 'NOTE' ? 0 : (f.score / 100) * (w[f.code] ?? 0)), 0)))
@@ -535,7 +599,8 @@ export function analyzeRun(summary: FraudSummary, streams: FraudStreams | null, 
   const sorted = [...flags].sort((a, b) => TIER_RANK[b.tier!] - TIER_RANK[a.tier!] || b.score - a.score)
   return { score, level, verdict, flags, basis: top, independent: groups.length, engine: FRAUD_ENGINE_VERSION,
     cleanDistanceM: cleanDistanceM == null ? null : Math.round(cleanDistanceM),
-    reason: verdict === 'REVIEW' ? sorted.slice(0, 2).map((f) => f.message).join('; ') : null }
+    reason: verdict === 'REJECT' ? 'Bài nhập tay không được ghi nhận'
+      : verdict === 'REVIEW' ? sorted.filter((f) => !isGpsJumpFlag(f) && f.code !== 'TREADMILL').slice(0, 2).map((f) => f.message).join('; ') : null }
 }
 
 /** Dữ liệu gốc rút gọn để lưu (mỗi ~5 giây một điểm, tối đa ~1500 điểm; luôn giữ điểm nhảy / đầu / cuối) */

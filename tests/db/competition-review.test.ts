@@ -78,7 +78,8 @@ describe('chống gian lận cho mọi bài (008500 → 009800) + CLB Free 50 th
     expect(await row(r.activity_id)).toMatchObject({ review_skipped: false })
   })
 
-  it('bài Strava (009800): mọi bài nghi vấn đều chờ, có thi đấu hay không; bài nhập tay vẫn chờ duyệt', async () => {
+  // 013400 (lần 7, đổi có chủ đích): bài nhập tay không còn chờ duyệt mà bị loại ngay (không ghi nhận)
+  it('bài Strava (009800): mọi bài nghi vấn đều chờ, có thi đấu hay không; bài nhập tay không được ghi nhận', async () => {
     const base = { sport_type: 'Run', elapsed_s: 1800, moving_s: 1800, distance_m: 5000, max_speed_mps: 4 }
     const a = await ingest(FREE_RUNNER, 's-1', { ...base, started_at: new Date(Date.now() - 80 * 3600_000).toISOString(),
       risk: { verdict: 'REVIEW', level: 'LOW', score: 30, reason: 'Khác thường ngày' } })
@@ -88,7 +89,7 @@ describe('chống gian lận cho mọi bài (008500 → 009800) + CLB Free 50 th
       risk: { verdict: 'REVIEW', level: 'HIGH', score: 70, reason: 'Nhịp tim không khớp pace' } })
     expect(hi.validation_status).toBe('PENDING')
     const m = await ingest(FREE_RUNNER, 's-2', { ...base, manual: true, started_at: new Date(Date.now() - 90 * 3600_000).toISOString() })
-    expect(m.validation_status).toBe('PENDING')
+    expect(m.validation_status).toBe('REJECTED')
     const c = await ingest(RACER, 's-3', { ...base, started_at: new Date(Date.now() - 100 * 3600_000).toISOString(),
       risk: { verdict: 'REVIEW', level: 'HIGH', score: 70, reason: 'Nhịp tim không khớp pace' } })
     expect(c.validation_status).toBe('PENDING')
