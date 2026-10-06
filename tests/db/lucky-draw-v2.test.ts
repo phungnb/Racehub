@@ -44,7 +44,7 @@ describe('quay thưởng v2 (009300)', () => {
     expect(d).toMatchObject({ rule: 'PICKED', picked_count: 3, excluded_count: 1, eligible_now: 2 })
     expect(d.picked).toBeUndefined()
     const r = await rpc(db, OWN, `select public.run_lucky_draw($1) as r`, [d.id])
-    expect(r.status).toBe('DONE')
+    expect(r.status).toBe('PENDING')                                                          // 013500: chờ BTC chấp nhận
     expect([M[1], M[2]]).toContain(r.winners[0].user_id)
   })
 
@@ -74,7 +74,8 @@ describe('quay thưởng v2 (009300)', () => {
     expect(b.winners[1]).toMatchObject({ prize: 'Giải nhất', status: 'WON', position: 2 })
     expect(b.winners[1].user_id).not.toBe(first.user_id)
     await rpc(db, OWN, `select public.draw_next($1, 0) as r`, [d.id])
-    const done = await rpc(db, OWN, `select public.finish_lucky_draw($1) as r`, [d.id])
+    expect((await rpc(db, OWN, `select public.finish_lucky_draw($1) as r`, [d.id])).status).toBe('PENDING')
+    const done = await rpc(db, OWN, `select public.confirm_lucky_draw($1) as r`, [d.id])     // 013500: chấp nhận mới công bố
     expect(done.status).toBe('DONE')
     expect(md5(done.seed)).toBe(done.seed_hash)                                               // seed công bố khớp mã băm đã cam kết
     // thứ tự người mở ra đúng bằng sắp xếp md5(seed || user_id)
@@ -91,7 +92,7 @@ describe('quay thưởng v2 (009300)', () => {
     await rpc(db, OWN, `select public.start_lucky_draw($1) as r`, [d.id])
     await rpc(db, OWN, `select public.draw_next($1, 0) as r`, [d.id])
     const r = await rpc(db, OWN, `select public.run_lucky_draw($1) as r`, [d.id])
-    expect(r.status).toBe('DONE')
+    expect(r.status).toBe('PENDING')
     expect(r.winners.filter((w: Row) => w.status === 'WON')).toHaveLength(3)
   })
 })

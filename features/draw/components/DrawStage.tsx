@@ -3,12 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Expand, Gift, Lock, ShieldCheck, Trophy, UserX, Volume2, VolumeX, X } from 'lucide-react'
+import { Circle, Expand, Gift, Lock, ShieldCheck, Square, Trophy, UserX, Video, VideoOff, Volume2, VolumeX, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, ConfirmSheet, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { drawAbsent, drawErrorMessage, drawNext, finishDraw, listDraws, startDraw, type DrawScope, type DrawWinner, type LuckyDraw } from '../api/drawApi'
 import { latestWinner, nextPrize, prizeProgress, reelNames, spinDelays } from '../model/stage'
+import { formatElapsed } from '../model/recording'
+import { paintStage, type StageSnapshot } from './stagePaint'
+import { ReviewActions } from './ReviewActions'
+import { useStageRecorder } from './useStageRecorder'
 import { Confetti } from './Confetti'
 import { useStageSound } from './useStageSound'
 
@@ -17,7 +21,9 @@ type Phase = 'idle' | 'spinning' | 'landed'
 /**
  * Màn hình quay thưởng toàn màn hình (009300) — chiếu lên máy chiếu / TV ở buổi tất niên, lễ trao giải.
  * BTC: chọn giải → bấm QUAY (hoặc phím cách) → tên chạy chậm dần rồi dừng ở người trúng → pháo giấy.
- * Người trúng vắng mặt → "Vắng mặt · quay lại" (ghi công khai). Xong → "Kết thúc & công bố".
+ * Người trúng vắng mặt → "Vắng mặt · quay lại" (ghi công khai). Xong → "Kết thúc" → kết quả CHỜ XÁC NHẬN (013500):
+ * BTC bấm "Chấp nhận" (công bố) hoặc "Huỷ kết quả" (ghi nhật ký, quay lại) ở chân màn hình — ngoài vùng quay.
+ * Ghi hình (lần 7): chỉ vùng quay được vẽ lại lên canvas và ghi thành video (useStageRecorder + stagePaint).
  * Thành viên mở cùng màn này để xem trực tiếp: người trúng mới hiện ra cũng có hiệu ứng quay.
  */
 export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; scope: DrawScope; refId: string | null; onClose: () => void }) {
@@ -42,6 +48,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
   const sound = useStageSound(soundOn)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const seen = useRef<string | null>(latestWinner(draw.winners)?.key ?? null)
+  const landedAt = useRef(0)
 
   const put = (x: LuckyDraw) => { setLocal(x); qc.setQueryData<LuckyDraw[]>(key, (l) => l?.map((y) => (y.id === x.id ? x : y))) }
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
@@ -58,7 +65,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
       setReel({ name: names[i], n: i })
       sound.tick(i / names.length)
       if (i === names.length - 1) {
-        setPhase('landed'); setShown(w); setFire((f) => f + 1); sound.win()
+        setPhase('landed'); setShown(w); setFire((f) => f + 1); sound.win(); landedAt.current = Date.now()
         return
       }
       timer.current = setTimeout(() => { i++; step() }, delays[i])
@@ -110,8 +117,17 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
   }
   const finish = async () => {
     setBusy(true)
-    try { put(await finishDraw(d.id)); setConfirm(null); toast.success('Đã công bố kết quả và báo người trúng') }
+    try { put(await finishDraw(d.id)); setConfirm(null); toast('Đã kết thúc quay. Kiểm tra kết quả rồi bấm Chấp nhận để công bố, hoặc Huỷ kết quả để quay lại.', { duration: 8000 }) }
     catch (e) { toast.error(drawErrorMessage(e)) } finally { setBusy(false) }
+  }
+  /** Sau Chấp nhận / Huỷ kết quả: huỷ kết quả thì lượt quay về "Chờ quay" → dọn màn hình để quay lại từ đầu */
+  const reviewed = (x: LuckyDraw) => {
+    put(x)
+    if (x.status === 'READY') {
+      if (timer.current) clearTimeout(timer.current)
+      setPhase('idle'); setShown(null); setReel(null); seen.current = null; setPrize(nextPrize(prizeProgress(x)))
+    }
+    void qc.invalidateQueries({ queryKey: key })
   }
 
   // Phím cách / Enter = QUAY (điều khiển bằng bàn phím hoặc bút trình chiếu)
@@ -137,6 +153,14 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
   const totalSlots = progress.reduce((a, p) => a + p.qty, 0)
   const curName = cur != null ? progress[cur].name : null
   const done = d.status === 'DONE'
+  const pending = d.status === 'PENDING'
+
+  // Ghi hình: ảnh chụp trạng thái mới nhất cho bộ vẽ canvas (chạy 30 lần/giây ngoài vòng vẽ của React)
+  const snap = useRef<StageSnapshot | null>(null)
+  useEffect(() => { snap.current = { d, progress, phase, shown, reel, curName, landedAt: landedAt.current } })
+  const recorder = useStageRecorder(d.title, (ctx, w, h) => { if (snap.current) paintStage(ctx, w, h, snap.current) }, sound.recordStream)
+  // Trình duyệt không ghi được: thay nút ghi bằng biểu tượng gạch chéo, bấm xem lý do
+  const recordHint = recorder.support.ok ? null : recorder.support.reason
 
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label={`Quay thưởng: ${d.title}`}
@@ -160,6 +184,23 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
             {d.sponsor.logo_url ? <img src={d.sponsor.logo_url} alt={d.sponsor.name} className="h-7 max-w-28 object-contain" /> : <b>{d.sponsor.name}</b>}
           </span>
         )}
+        {recorder.recording && (
+          <span className="flex items-center gap-1.5 rounded-full bg-danger/20 px-2.5 py-1 font-mono text-xs font-bold text-danger" role="status">
+            <Circle className="size-2.5 animate-pulse fill-current" aria-hidden />REC {formatElapsed(recorder.elapsed)}
+          </span>
+        )}
+        {recorder.support.ok ? (
+          <button type="button" onClick={recorder.recording ? recorder.stop : recorder.start}
+            aria-label={recorder.recording ? 'Dừng ghi hình và lưu video' : 'Ghi hình vùng quay thưởng'} title={recorder.recording ? 'Dừng & lưu video' : 'Ghi hình vùng quay (video .webm)'}
+            className={cn('grid size-10 place-items-center rounded-full hover:bg-white/10', recorder.recording && 'text-danger')}>
+            {recorder.recording ? <Square className="size-4 fill-current" aria-hidden /> : <Video className="size-5" aria-hidden />}
+          </button>
+        ) : recordHint ? (
+          <button type="button" onClick={() => toast(recordHint, { duration: 8000 })} aria-label="Không ghi hình được trên trình duyệt này"
+            className="grid size-10 place-items-center rounded-full text-white/40 hover:bg-white/10">
+            <VideoOff className="size-5" aria-hidden />
+          </button>
+        ) : null}
         <button type="button" onClick={() => setSoundOn(!soundOn)} aria-label={soundOn ? 'Tắt âm thanh' : 'Bật âm thanh'} className="grid size-10 place-items-center rounded-full hover:bg-white/10">
           {soundOn ? <Volume2 className="size-5" aria-hidden /> : <VolumeX className="size-5" aria-hidden />}
         </button>
@@ -192,7 +233,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
         ) : (
           <>
             <p className="text-sm font-bold uppercase tracking-[0.35em] text-coin sm:text-lg">
-              {done && phase === 'idle' ? 'Kết quả' : shown ? shown.prize : curName ?? 'Đã trao hết giải'}
+              {(done || pending) && phase === 'idle' ? 'Kết quả' : shown ? shown.prize : curName ?? 'Đã trao hết giải'}
             </p>
             {/* Ô quay */}
             <div className={cn('relative grid w-full max-w-3xl place-items-center overflow-hidden rounded-[2rem] border-2 px-4 py-6 sm:py-10',
@@ -206,7 +247,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
               ) : reel ? (
                 <p key={reel.n} className="text-4xl font-extrabold text-white/90 animate-reel sm:text-7xl">{reel.name}</p>
               ) : (
-                <p className="text-2xl font-bold text-white/40 sm:text-5xl">{done ? 'Đã công bố' : manage ? 'Sẵn sàng' : 'Chờ BTC quay…'}</p>
+                <p className="text-2xl font-bold text-white/40 sm:text-5xl">{done ? 'Đã công bố' : pending ? 'Chờ ban tổ chức xác nhận' : manage ? 'Sẵn sàng' : 'Chờ BTC quay…'}</p>
               )}
             </div>
 
@@ -256,15 +297,23 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
             : <><ShieldCheck className="size-3.5 shrink-0" aria-hidden />Thứ tự trúng do máy chủ chốt khi bắt đầu, BTC không chọn được ai trúng</>}
         </p>
         {manage && d.status === 'LIVE' && (
-          <Button variant="secondary" disabled={busy || phase === 'spinning' || !won} onClick={() => setConfirm('finish')}>Kết thúc & công bố</Button>
+          <Button variant="secondary" disabled={busy || phase === 'spinning' || !won} onClick={() => setConfirm('finish')}>Kết thúc</Button>
+        )}
+        {pending && !manage && <p className="w-full text-center text-xs font-semibold text-coin">Ban tổ chức đang xác nhận kết quả — chưa phải kết quả chính thức.</p>}
+        {/* Ngoài vùng quay: không lọt vào video ghi hình */}
+        {pending && manage && (
+          <div className="w-full space-y-1.5">
+            <p className="text-center text-xs text-white/70">Kết quả chờ xác nhận: chưa báo người trúng, chưa đăng bảng tin.</p>
+            <ReviewActions d={d} onDone={reviewed} dark className="mx-auto max-w-md" />
+          </div>
         )}
       </footer>
 
       <ConfirmSheet open={confirm === 'start'} onClose={() => setConfirm(null)} danger={false} loading={busy} confirmLabel="Bắt đầu"
         title="Bắt đầu quay?" description="Danh sách người được quay sẽ được chốt. Sau khi đã quay ra người trúng thì không huỷ lượt này được nữa." onConfirm={() => void start()} />
-      <ConfirmSheet open={confirm === 'finish'} onClose={() => setConfirm(null)} danger={false} loading={busy} confirmLabel="Công bố"
-        title="Kết thúc & công bố kết quả?"
-        description={`${won}/${totalSlots} suất đã trao${won < totalSlots ? ' — các suất còn lại sẽ không trao' : ''}. Người trúng được báo ngay, kết quả lên bảng tin kèm mã kiểm chứng.`}
+      <ConfirmSheet open={confirm === 'finish'} onClose={() => setConfirm(null)} danger={false} loading={busy} confirmLabel="Kết thúc"
+        title="Kết thúc quay?"
+        description={`${won}/${totalSlots} suất đã trao${won < totalSlots ? ' — các suất còn lại sẽ không trao' : ''}. Kết quả chuyển sang chờ xác nhận: bấm Chấp nhận thì mới báo người trúng và đăng bảng tin; Huỷ kết quả thì quay lại.`}
         onConfirm={() => void finish()} />
     </div>,
     document.body,

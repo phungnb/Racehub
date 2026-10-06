@@ -31,12 +31,12 @@ function blobToBase64(blob: Blob): Promise<string> {
   })
 }
 
-async function saveNative(blob: Blob, fileName: string, title: string): Promise<SaveResult | null> {
+async function saveNative(blob: Blob, fileName: string, title: string, dialogTitle = 'Lưu hoặc gửi ảnh'): Promise<SaveResult | null> {
   if (!Capacitor.isPluginAvailable('Filesystem') || !Capacitor.isPluginAvailable('Share')) return null   // app bản cũ
   const [{ Filesystem, Directory }, { Share }] = await Promise.all([import('@capacitor/filesystem'), import('@capacitor/share')])
   const file = await Filesystem.writeFile({ path: fileName, data: await blobToBase64(blob), directory: Directory.Cache })
   try {
-    await Share.share({ title, files: [file.uri], dialogTitle: 'Lưu hoặc gửi ảnh' })
+    await Share.share({ title, files: [file.uri], dialogTitle })
     return 'shared'
   } catch (e) {
     if (/cancel/i.test((e as Error).message ?? '')) return 'cancelled'
@@ -45,7 +45,12 @@ async function saveNative(blob: Blob, fileName: string, title: string): Promise<
 }
 
 export async function saveImageBlob(blob: Blob, fileName: string, title = 'RaceHub'): Promise<SaveResult> {
-  if (Capacitor.isNativePlatform()) return (await saveNative(blob, fileName, title)) ?? 'preview'
+  return saveFileBlob(blob, fileName, title)
+}
+
+/** Như saveImageBlob nhưng cho mọi loại file (VD video ghi buổi quay thưởng) — cùng 3 cách lưu: app cài, iPhone, trình duyệt */
+export async function saveFileBlob(blob: Blob, fileName: string, title = 'RaceHub', dialogTitle?: string): Promise<SaveResult> {
+  if (Capacitor.isNativePlatform()) return (await saveNative(blob, fileName, title, dialogTitle)) ?? 'preview'
   const file = new File([blob], fileName, { type: blob.type || 'image/png' })
   if (isIOS() && navigator.canShare?.({ files: [file] })) {
     try {

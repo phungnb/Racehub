@@ -153,7 +153,8 @@ describe('Quản lý doanh nghiệp + quay thưởng (008400)', () => {
     const d1 = await rpc(db, OWN, `select public.create_lucky_draw('ORG_CAMPAIGN', $1, $2::jsonb) as r`, [camp, JSON.stringify({
       title: 'Quay thưởng người có chạy', rule: 'ACTIVE', prizes: [{ name: 'Giày', qty: 1 }] })])
     expect(d1).toMatchObject({ status: 'READY', eligible_now: 1 })              // A bị loại → chỉ còn B có chạy
-    const r1 = await rpc(db, OWN, `select public.run_lucky_draw($1) as r`, [d1.id])
+    expect(await rpc(db, OWN, `select public.run_lucky_draw($1) as r`, [d1.id])).toMatchObject({ status: 'PENDING' })
+    const r1 = await rpc(db, OWN, `select public.confirm_lucky_draw($1) as r`, [d1.id])     // 013500: chấp nhận mới công bố
     expect(r1).toMatchObject({ status: 'DONE', entrant_count: 1 })
     expect(r1.winners).toEqual([expect.objectContaining({ user_id: B, prize: 'Giày', position: 1 })])
     expect(r1.seed).toMatch(/^[0-9a-f]{32}$/)
@@ -166,7 +167,8 @@ describe('Quản lý doanh nghiệp + quay thưởng (008400)', () => {
 
     // dùng chung: CLB (ban quản trị quay, thành viên xem, kết quả lên bảng tin CLB) và toàn hệ thống (chỉ admin)
     const dc = await rpc(db, CAP, `select public.create_lucky_draw('CLUB', $1, '{"title":"Quà tháng","rule":"ALL","prizes":[{"name":"Bình nước","qty":5}]}'::jsonb) as r`, [CLUB])
-    const rc = await rpc(db, CAP, `select public.run_lucky_draw($1) as r`, [dc.id])
+    await rpc(db, CAP, `select public.run_lucky_draw($1) as r`, [dc.id])
+    const rc = await rpc(db, CAP, `select public.confirm_lucky_draw($1) as r`, [dc.id])
     expect(rc.winners).toHaveLength(2)                                          // CLB chỉ có 2 người
     expect((await rpc<Row[]>(db, A, `select public.lucky_draws_for('CLUB', $1) as r`, [CLUB]))[0].can_manage).toBe(false)
     expect((await db.query(`select 1 from public.club_posts where club_id = $1 and title like 'Quay thưởng%'`, [CLUB])).rows).toHaveLength(1)

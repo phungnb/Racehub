@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, Copy, Gift, ImagePlus, ListChecks, Minus, MonitorPlay, Plus, ShieldCheck, Trash2, UserMinus, Zap } from 'lucide-react'
+import { ArrowDown, ArrowUp, Copy, Gift, History, Hourglass, ImagePlus, ListChecks, Minus, MonitorPlay, Plus, ShieldCheck, Trash2, UserMinus, Zap } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, ConfirmSheet, Field, Input, SectionTitle, Sheet, Skeleton, SwitchRow, Textarea } from '@/shared/ui'
+import { Avatar, Button, Card, ConfirmSheet, ErrorState, Field, Input, SectionTitle, Sheet, Skeleton, SwitchRow, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { filterSearch } from '@/shared/lib/search'
 import {
@@ -13,6 +13,7 @@ import {
 } from '../api/drawApi'
 import { prizeProgress, resultText } from '../model/stage'
 import { DrawStage } from './DrawStage'
+import { ReviewActions } from './ReviewActions'
 
 const PASTE = 'Dán danh sách tên'
 const RULES: Record<DrawScope, Partial<Record<DrawRule, string>>> = {
@@ -28,17 +29,22 @@ const RULE_HINT: Partial<Record<DrawRule, string>> = {
   MANUAL: 'Khách mời, người chưa có tài khoản, danh sách từ Google Form… Mỗi dòng một người',
 }
 const STATUS: Record<LuckyDraw['status'], [string, string]> = {
-  READY: ['Chờ quay', 'bg-surface-2'], LIVE: ['Đang quay', 'bg-danger/20 text-danger'], DONE: ['Đã công bố', 'bg-coin/20 text-coin'], CANCELLED: ['Đã huỷ', 'bg-surface-2'],
+  READY: ['Chờ quay', 'bg-surface-2'], LIVE: ['Đang quay', 'bg-danger/20 text-danger'], PENDING: ['Chờ xác nhận', 'bg-warning/20 text-warning'],
+  DONE: ['Đã công bố', 'bg-coin/20 text-coin'], CANCELLED: ['Đã huỷ', 'bg-surface-2'],
 }
 
 /** Quay thưởng dùng chung: danh sách lượt quay; BTC tạo, mở màn hình quay trên sân khấu hoặc quay nhanh; thành viên xem trực tiếp + kết quả */
 export function DrawPanel({ scope, refId, canManage, className }: { scope: DrawScope; refId: string | null; canManage: boolean; className?: string }) {
-  const q = useQuery({ queryKey: ['draws', scope, refId], queryFn: () => listDraws(scope, refId), refetchInterval: (x) => (x.state.data?.some((d) => d.status === 'LIVE') ? 5000 : false) })
+  const q = useQuery({ queryKey: ['draws', scope, refId], queryFn: () => listDraws(scope, refId), refetchInterval: (x) => (x.state.data?.some((d) => d.status === 'LIVE') ? 5000 : x.state.data?.some((d) => d.status === 'PENDING') ? 15_000 : false) })
   const [creating, setCreating] = useState(false)
   const [stage, setStage] = useState<string | null>(null)
+  // Lượt vừa tạo: mở màn hình quay ngay bằng dữ liệu máy chủ trả về, không chờ danh sách tải lại
+  // (trước đây nếu danh sách chưa / không tải lại được thì bấm "Tạo & mở màn hình quay" không thấy gì mở ra)
+  const [created, setCreated] = useState<LuckyDraw | null>(null)
   const list = q.data ?? []
-  const staged = list.find((d) => d.id === stage)
-  if (!canManage && !list.some((d) => d.status === 'DONE' || d.status === 'LIVE')) return null
+  const staged = list.find((d) => d.id === stage) ?? (created?.id === stage ? created : undefined)
+  const shown = (d: LuckyDraw) => canManage || d.status === 'DONE' || d.status === 'LIVE' || d.status === 'PENDING'
+  if (!canManage && !list.some(shown)) return null
   return (
     <section className={cn('space-y-2', className)}>
       <SectionTitle action={canManage ? <Button size="sm" variant="secondary" onClick={() => setCreating(true)}><Plus className="size-4" aria-hidden />Tạo lượt quay</Button> : undefined}>
@@ -49,12 +55,13 @@ export function DrawPanel({ scope, refId, canManage, className }: { scope: DrawS
           Tạo lượt quay may mắn cho người đủ điều kiện hoặc danh sách BTC tự chọn. Quay trực tiếp trên máy chiếu từng giải một, người trúng vắng mặt thì quay lại; kết quả công khai kèm mã kiểm chứng.
         </p>
       )}
+      {canManage && q.isError && <ErrorState message={drawErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />}
       <ul className="space-y-2">
-        {list.filter((d) => canManage || d.status === 'DONE' || d.status === 'LIVE').map((d) => (
+        {list.filter(shown).map((d) => (
           <li key={d.id}><DrawCard d={d} scope={scope} refId={refId} onStage={() => setStage(d.id)} /></li>
         ))}
       </ul>
-      {creating && <CreateDrawSheet scope={scope} refId={refId} onClose={() => setCreating(false)} onCreated={(id) => setStage(id)} />}
+      {creating && <CreateDrawSheet scope={scope} refId={refId} onClose={() => setCreating(false)} onCreated={(d) => { setCreated(d); setStage(d.id) }} />}
       {staged && <DrawStage key={staged.id} draw={staged} scope={scope} refId={refId} onClose={() => setStage(null)} />}
     </section>
   )
@@ -121,28 +128,23 @@ function DrawCard({ d, scope, refId, onStage }: { d: LuckyDraw; scope: DrawScope
         </>
       )}
 
+      {d.status === 'PENDING' && (d.can_manage ? (
+        <>
+          <p className="flex items-start gap-2 rounded-xl bg-warning/10 p-2.5 text-sm text-fg-muted">
+            <Hourglass className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+            <span>Kết quả <b className="text-fg">chưa chính thức</b>: chưa báo người trúng, chưa đăng bảng tin. Kiểm tra rồi bấm Chấp nhận, hoặc Huỷ kết quả để quay lại (lần huỷ được ghi lại).</span>
+          </p>
+          <WinnerList d={d} progress={progress} />
+          <ReviewActions d={d} onDone={refresh} />
+          <Button size="sm" variant="ghost" block onClick={onStage}><MonitorPlay className="size-4" aria-hidden />Xem lại màn hình quay</Button>
+        </>
+      ) : (
+        <p className="flex items-center gap-2 text-sm text-fg-muted"><Hourglass className="size-4 shrink-0 text-warning" aria-hidden />Ban tổ chức đang xác nhận kết quả — kết quả chính thức sẽ công bố sau.</p>
+      ))}
+
       {d.status === 'DONE' && (
         <>
-          <div className="space-y-2">
-            {progress.map((p) => {
-              const ws = d.winners.filter((w) => w.prize_idx === p.idx || (w.prize_idx == null && w.prize === p.name))
-              if (!ws.length) return null
-              return (
-                <div key={p.idx}>
-                  <p className="mb-1 text-xs font-bold uppercase tracking-wide text-coin">{p.name}</p>
-                  <ol className="space-y-1">
-                    {ws.map((w) => (
-                      <li key={w.key} className={cn('flex items-center gap-3 rounded-xl px-2 py-1.5', w.me ? 'bg-brand/15' : 'bg-surface-2/60', w.status === 'ABSENT' && 'opacity-50')}>
-                        <Avatar src={w.avatar_url} name={w.name} size="sm" />
-                        <span className={cn('min-w-0 flex-1 truncate text-sm font-semibold', w.status === 'ABSENT' && 'line-through')}>{w.name}{w.me ? ' (bạn)' : ''}</span>
-                        {w.status === 'ABSENT' && <span className="shrink-0 text-[11px] text-fg-subtle">vắng mặt</span>}
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              )
-            })}
-          </div>
+          <WinnerList d={d} progress={progress} />
           <div className="flex gap-2">
             <Button size="sm" variant="secondary" onClick={copy}><Copy className="size-4" aria-hidden />Sao chép kết quả</Button>
             <Button size="sm" variant="ghost" onClick={onStage}><MonitorPlay className="size-4" aria-hidden />Trình chiếu</Button>
@@ -151,13 +153,16 @@ function DrawCard({ d, scope, refId, onStage }: { d: LuckyDraw; scope: DrawScope
             <summary className="flex cursor-pointer items-center gap-1"><ShieldCheck className="size-3.5" aria-hidden />Kiểm chứng</summary>
             <p className="mt-1 break-all">Quay lúc {d.run_at ? new Date(d.run_at).toLocaleString('vi-VN') : ''} trong {d.entrant_count} người đủ điều kiện (mã băm danh sách {d.entrants_hash}).
               {d.seed_hash ? ` Mã cam kết công bố lúc bắt đầu: ${d.seed_hash} = md5(seed).` : ''} Seed: {d.seed}.
-              Thứ tự trúng = sắp xếp md5(seed + mã người dùng) tăng dần, chốt từ lúc bắt đầu — BTC không chọn được ai trúng, người vắng mặt được ghi công khai.</p>
+              Thứ tự trúng = sắp xếp md5(seed + mã người dùng) tăng dần, chốt từ lúc bắt đầu — BTC không chọn được ai trúng, người vắng mặt được ghi công khai.
+              {d.confirmed_at ? ` Ban tổ chức chấp nhận kết quả lúc ${new Date(d.confirmed_at).toLocaleString('vi-VN')}${d.confirmed_by_name ? ` (${d.confirmed_by_name})` : ''}.` : ''}</p>
           </details>
         </>
       )}
 
+      <RejectLog d={d} />
+
       <ConfirmSheet open={confirm === 'run'} onClose={() => setConfirm(null)} danger={false} title="Quay nhanh tất cả?"
-        description="Quay một lần cho mọi suất quà, công bố ngay và báo người trúng. Muốn quay từng giải trước khán giả thì dùng Mở màn hình quay." confirmLabel="Quay"
+        description="Quay một lần cho mọi suất quà. Kết quả chờ ban tổ chức xác nhận: Chấp nhận thì mới báo người trúng và công bố; Huỷ kết quả thì quay lại. Muốn quay từng giải trước khán giả thì dùng Mở màn hình quay." confirmLabel="Quay"
         loading={run.isPending} onConfirm={() => run.mutate()} />
       <ConfirmSheet open={confirm === 'cancel'} onClose={() => setConfirm(null)} title="Huỷ lượt quay?" confirmLabel="Huỷ lượt quay"
         loading={cancel.isPending} onConfirm={() => cancel.mutate()} />
@@ -165,7 +170,57 @@ function DrawCard({ d, scope, refId, onStage }: { d: LuckyDraw; scope: DrawScope
   )
 }
 
-function CreateDrawSheet({ scope, refId, onClose, onCreated }: { scope: DrawScope; refId: string | null; onClose: () => void; onCreated: (id: string) => void }) {
+/** Người trúng theo từng giải (người vắng mặt gạch ngang) */
+function WinnerList({ d, progress }: { d: LuckyDraw; progress: ReturnType<typeof prizeProgress> }) {
+  return (
+    <div className="space-y-2">
+      {progress.map((p) => {
+        const ws = d.winners.filter((w) => w.prize_idx === p.idx || (w.prize_idx == null && w.prize === p.name))
+        if (!ws.length) return null
+        return (
+          <div key={p.idx}>
+            <p className="mb-1 text-xs font-bold uppercase tracking-wide text-coin">{p.name}</p>
+            <ol className="space-y-1">
+              {ws.map((w) => (
+                <li key={w.key} className={cn('flex items-center gap-3 rounded-xl px-2 py-1.5', w.me ? 'bg-brand/15' : 'bg-surface-2/60', w.status === 'ABSENT' && 'opacity-50')}>
+                  <Avatar src={w.avatar_url} name={w.name} size="sm" />
+                  <span className={cn('min-w-0 flex-1 truncate text-sm font-semibold', w.status === 'ABSENT' && 'line-through')}>{w.name}{w.me ? ' (bạn)' : ''}</span>
+                  {w.status === 'ABSENT' && <span className="shrink-0 text-[11px] text-fg-subtle">vắng mặt</span>}
+                </li>
+              ))}
+            </ol>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Số lần huỷ kết quả (mọi người thấy — minh bạch); chi tiết từng lần (ai, lúc nào, lý do, danh sách bị huỷ) chỉ ban tổ chức thấy */
+function RejectLog({ d }: { d: LuckyDraw }) {
+  const n = d.reject_count ?? 0
+  if (!n) return null
+  const log = d.rejections ?? []
+  return (
+    <details className="text-xs text-fg-muted">
+      <summary className="flex cursor-pointer items-center gap-1.5"><History className="size-3.5" aria-hidden />Kết quả đã bị ban tổ chức huỷ và quay lại {n} lần</summary>
+      {log.length > 0 && (
+        <ol className="mt-1.5 space-y-1.5">
+          {log.map((x, i) => (
+            <li key={x.id} className="rounded-lg bg-surface-2/60 p-2">
+              <p><b className="text-fg">Lần {i + 1}</b> · {new Date(x.at).toLocaleString('vi-VN')}{x.by_name ? ` · ${x.by_name}` : ''}</p>
+              {x.reason && <p>Lý do: {x.reason}</p>}
+              <p className="text-fg-subtle">Kết quả bị huỷ: {x.winners.filter((w) => w.status === 'WON').map((w) => `${w.name} (${w.prize})`).join(', ') || 'không có người trúng'}</p>
+              {x.seed && <p className="break-all font-mono text-[10px] text-fg-subtle">seed {x.seed}{x.seed_hash ? ` · md5 ${x.seed_hash}` : ''}</p>}
+            </li>
+          ))}
+        </ol>
+      )}
+    </details>
+  )
+}
+
+function CreateDrawSheet({ scope, refId, onClose, onCreated }: { scope: DrawScope; refId: string | null; onClose: () => void; onCreated: (d: LuckyDraw) => void }) {
   const qc = useQueryClient()
   const rules = Object.keys(RULES[scope]) as DrawRule[]
   const [title, setTitle] = useState('Quay thưởng may mắn')
@@ -199,7 +254,7 @@ function CreateDrawSheet({ scope, refId, onClose, onCreated }: { scope: DrawScop
     }),
     onSuccess: (d) => {
       void qc.invalidateQueries({ queryKey: ['draws', scope, refId] }); onClose()
-      if (d.eligible_now) { toast.success('Đã tạo lượt quay'); onCreated(d.id) }
+      if (d.eligible_now) { toast.success('Đã tạo lượt quay'); onCreated(d) }
       // Chưa ai đủ điều kiện thì không mở được màn hình quay — nói rõ thay vì im lặng
       else toast.info('Đã tạo lượt quay, nhưng hiện chưa có ai đủ điều kiện nên chưa mở được màn hình quay. Đổi "Ai được quay" hoặc chờ có người đạt điều kiện.', { duration: 8000 })
     },
