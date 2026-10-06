@@ -14,7 +14,8 @@ export interface DrawWinner {
 export interface DrawCandidate { user_id: string; name: string; avatar_url: string | null; completed: boolean }
 export interface LuckyDraw {
   id: string; scope: DrawScope; ref_id: string | null; title: string; rule: DrawRule
-  prizes: { name: string; qty: number }[]; exclude_winners: boolean; status: 'READY' | 'LIVE' | 'DONE' | 'CANCELLED'
+  /** 013500: PENDING = quay xong, chờ Ban tổ chức chấp nhận (DONE, công bố) hoặc huỷ kết quả (về READY để quay lại) */
+  prizes: { name: string; qty: number }[]; exclude_winners: boolean; status: 'READY' | 'LIVE' | 'PENDING' | 'DONE' | 'CANCELLED'
   seed: string | null; entrant_count: number | null; entrants_hash: string | null; created_at: string; run_at: string | null
   can_manage: boolean; creator_name: string | null; winners: DrawWinner[]; eligible_now: number | null
   /** 009300: mã băm seed công bố lúc bắt đầu quay; seed chỉ hiện sau khi công bố kết quả */
@@ -24,6 +25,14 @@ export interface LuckyDraw {
   /** 009500: buổi điểm danh (EVENT), số dòng dán (MANUAL), nhà tài trợ */
   event?: { id: string; title: string; starts_at: string } | null; manual_count?: number
   sponsor?: { name: string; logo_url: string | null } | null
+  /** 013500: ai / lúc nào chấp nhận (lượt DONE cũ: rỗng = coi như đã chấp nhận); số lần huỷ kết quả (mọi người thấy) */
+  confirmed_at?: string | null; confirmed_by_name?: string | null; reject_count?: number
+  /** 013500: nhật ký huỷ kết quả — chỉ người quản lý nhận được */
+  rejections?: DrawRejection[] | null
+}
+export interface DrawRejection {
+  id: string; at: string; by_name: string | null; reason: string | null; seed: string | null; seed_hash: string | null; entrant_count: number | null
+  winners: { key: string; name: string; prize: string; prize_idx: number | null; position: number; status: 'WON' | 'ABSENT' }[]
 }
 export interface DrawEvent { id: string; title: string; starts_at: string; checked_in: number }
 export interface DrawInput {
@@ -56,7 +65,12 @@ export async function uploadSponsorLogo(clubId: string, file: File): Promise<str
   if (error) throw error
   return supabase.storage.from('club-media').getPublicUrl(path).data.publicUrl
 }
+/** Kết thúc quay → chờ xác nhận (013500: chưa công bố) */
 export const finishDraw = (id: string) => call<LuckyDraw>('finish_lucky_draw', { p_id: id })
+/** Chấp nhận kết quả → chính thức: báo người trúng, đăng bảng tin */
+export const confirmDraw = (id: string) => call<LuckyDraw>('confirm_lucky_draw', { p_id: id })
+/** Huỷ kết quả → ghi nhật ký, xoá người trúng, lượt quay về "Chờ quay" để quay lại */
+export const rejectDraw = (id: string, reason: string | null) => call<LuckyDraw>('reject_lucky_draw', { p_id: id, p_reason: reason?.trim() || null })
 export const runDraw = (id: string) => call<LuckyDraw>('run_lucky_draw', { p_id: id })
 export const cancelDraw = (id: string) => call<void>('cancel_lucky_draw', { p_id: id })
 
@@ -72,8 +86,10 @@ const MESSAGES: Record<string, string> = {
   PRIZE_FULL: 'Giải này đã đủ người trúng. Chọn giải khác.',
   POOL_EXHAUSTED: 'Đã hết người trong danh sách để quay.',
   NOT_A_WINNER: 'Người này không còn trong danh sách trúng.',
-  NO_WINNERS: 'Chưa có ai trúng — quay ít nhất một giải trước khi công bố.',
-  DRAW_STARTED: 'Đã quay ra người trúng nên không huỷ được. Hãy quay tiếp hoặc công bố.',
+  NO_WINNERS: 'Chưa có ai trúng — quay ít nhất một giải trước khi kết thúc.',
+  DRAW_STARTED: 'Đã quay ra người trúng nên không huỷ được lượt này. Hãy quay tiếp rồi bấm Kết thúc — sau đó Chấp nhận hoặc Huỷ kết quả.',
+  DRAW_NOT_PENDING: 'Lượt quay này không còn chờ xác nhận (đã chấp nhận, đã huỷ kết quả hoặc chưa quay xong). Tải lại để xem trạng thái mới.',
+  REASON_TOO_LONG: 'Lý do huỷ tối đa 300 ký tự.',
   NAMES_REQUIRED: 'Dán ít nhất một tên (mỗi dòng một người).',
   EVENT_REQUIRED: 'Chọn một buổi của CLB.',
   INVALID_SPONSOR: 'Tên nhà tài trợ tối đa 80 ký tự; logo phải là ảnh https.',

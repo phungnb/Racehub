@@ -23,7 +23,8 @@ export function Sheet({ open, onClose, title, description, children, footer, cla
     document.addEventListener('keydown', onKey)
     const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    panel.current?.querySelector<HTMLElement>('input, textarea, button:not([data-close])')?.focus()
+    // Lần 7: chỉ đưa focus vào ô đầu khi focus chưa nằm trong bảng — không bao giờ kéo con trỏ khỏi ô đang gõ (VD Mô tả → Tên nhiệm vụ)
+    if (!panel.current?.contains(document.activeElement)) panel.current?.querySelector<HTMLElement>('input, textarea, button:not([data-close])')?.focus()
     return () => {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = overflow

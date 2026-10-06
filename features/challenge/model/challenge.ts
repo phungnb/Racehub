@@ -167,6 +167,26 @@ export function challengePhase(
   return 'SETTLING'
 }
 
+/** Nhóm thời gian của danh sách thử thách CLB: Sắp diễn ra · Đang diễn ra · Đã kết thúc (gồm đang tổng kết / đã hủy) */
+export type ChallengeBucket = 'UPCOMING' | 'LIVE' | 'ENDED'
+export const BUCKET_LABEL: Record<ChallengeBucket, string> = { UPCOMING: 'Sắp diễn ra', LIVE: 'Đang diễn ra', ENDED: 'Đã kết thúc' }
+export const challengeBucket = (c: { start_date: string; end_date: string; status?: string | null }, now = new Date()): ChallengeBucket => {
+  const p = challengePhase(c, now)
+  return p === 'UPCOMING' || p === 'LIVE' ? p : 'ENDED'
+}
+/** Chia danh sách theo nhóm thời gian: sắp diễn ra — gần giờ bắt đầu trước; đang diễn ra — sắp hết trước; đã kết thúc — mới nhất trước */
+export function bucketChallenges<T extends { start_date: string; end_date: string; status?: string | null }>(list: T[], now = new Date()) {
+  const out: Record<ChallengeBucket, T[]> = { UPCOMING: [], LIVE: [], ENDED: [] }
+  for (const c of list) out[challengeBucket(c, now)].push(c)
+  out.UPCOMING.sort((a, b) => Date.parse(a.start_date) - Date.parse(b.start_date))
+  out.LIVE.sort((a, b) => Date.parse(a.end_date) - Date.parse(b.end_date))
+  out.ENDED.sort((a, b) => Date.parse(b.end_date) - Date.parse(a.end_date))
+  return out
+}
+/** Nhóm mở sẵn: đang diễn ra nếu có, không thì sắp diễn ra, cuối cùng là đã kết thúc */
+export const defaultBucket = (b: Record<ChallengeBucket, unknown[]>): ChallengeBucket =>
+  b.LIVE.length ? 'LIVE' : b.UPCOMING.length ? 'UPCOMING' : b.ENDED.length ? 'ENDED' : 'LIVE'
+
 /** Đã qua thời gian chờ đồng bộ muộn → có thể tất toán */
 export const settlementDue = (c: { end_date: string; status?: string | null }, now = new Date()) =>
   (c.status ?? 'ACTIVE') === 'ACTIVE' && now.getTime() >= Date.parse(c.end_date) + SETTLE_GRACE_MS
@@ -302,6 +322,24 @@ export function vnMonday(date: Date, next = false): Date {
   const day = vn.getUTCDay() || 7
   const mondayVn = Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate() - (day - 1) + (next ? 7 : 0))
   return new Date(mondayVn - 7 * 3_600_000)
+}
+
+/**
+ * Tên kỳ kế tiếp của thử thách lặp lại (khớp private.recur_title, migration 013300):
+ * hằng tuần + tên có "tuần <số>" → số tuần của kỳ mới ("Thử thách tuần 41" → "Thử thách tuần 42"); còn lại "<tên> · Kỳ <n>".
+ */
+export function nextOccurrenceTitle(title: string, recurrence: Recurrence, occurrence: number, nextStart: Date): string {
+  const base = title.replace(/\s*·\s*Kỳ \d+$/, '').replace(/\s*[-–]\s*[Ll]ần\s*\d+$/, '')
+  const week = /([Tt]uần|TUẦN)(\s*)\d{1,2}(?!\d)/
+  if (recurrence === 'WEEKLY' && week.test(base)) return base.replace(week, (_, w: string, sp: string) => `${w}${sp}${isoWeek(nextStart)}`).slice(0, 120)
+  return `${base.slice(0, 108)} · Kỳ ${(occurrence || 1) + 1}`
+}
+/** Giờ bắt đầu kỳ kế tiếp (dời đúng một chu kỳ theo lịch) */
+export function nextOccurrenceStart(start: string, recurrence: Exclude<Recurrence, 'NONE'>): Date {
+  const d = new Date(start)
+  if (recurrence === 'WEEKLY') return new Date(d.getTime() + 7 * DAY)
+  const months = recurrence === 'MONTHLY' ? 1 : recurrence === 'QUARTERLY' ? 3 : 12
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes()))
 }
 
 /** Mẫu "Thử thách tuần" của CLB: tuần hiện tại (hoặc tuần sau nếu đã quá thứ Tư), các mốc 21/42/60/100 km */

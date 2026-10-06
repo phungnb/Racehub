@@ -43,6 +43,7 @@ const RESTORE_ERRORS: Record<string, string> = {
   NOTE_REQUIRED: 'Hãy ghi lý do khôi phục (ít nhất 5 ký tự).',
   OVERLAPS_COUNTED_RUN: 'Bài trùng giờ với một bài khác đang được tính — khôi phục sẽ tính 2 lần.',
   ACTIVITY_NOT_REJECTED: 'Bài này không còn ở trạng thái bị loại.',
+  MANUAL_NOT_COUNTED: 'Bài nhập tay không được ghi nhận — không khôi phục được.',
   FORBIDDEN: 'Bạn không có quyền xem lại bài này (không tự khôi phục bài của mình).',
 }
 export function restoreErrorMessage(e: unknown): string {
@@ -70,4 +71,31 @@ export async function getFraudReviewStats(days = 90): Promise<FraudReviewStats> 
   const { data, error } = await supabase.rpc('fraud_review_stats', { p_days: days })
   if (error) throw error
   return data as FraudReviewStats
+}
+
+// ---------------------------------------------------------------------
+// 013400 (lần 7): bài đã ghi nhận nhưng có cảnh báo (GPS nhảy, chạy máy…)
+// ---------------------------------------------------------------------
+export interface WarnedRun {
+  id: string
+  title: string | null
+  distance_m: number
+  moving_time_s: number | null
+  started_at: string | null
+  created_at: string
+  source: string | null
+  user_id: string
+  risk_score: number | null
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | null
+  /** Bài đã được người duyệt xác nhận (không phải hệ thống tự ghi nhận) */
+  reviewed: boolean
+  /** Chỉ các dấu hiệu từ mức cảnh báo trở lên; gpsJump = do GPS nhảy */
+  warnings: { code: string; tier: string; message: string | null; gpsJump: boolean }[]
+  profiles: { display_name: string | null; avatar_url?: string | null } | null
+}
+/** Bài có cảnh báo trong N ngày (clubId = null: toàn hệ thống, chỉ admin; có clubId: Ban quản trị CLB) */
+export async function listWarnedRuns(clubId: string | null, days = 30): Promise<WarnedRun[]> {
+  const { data, error } = await supabase.rpc('warned_activities', { p_club_id: clubId, p_days: days })
+  if (error) throw error
+  return ((data ?? []) as WarnedRun[]).map((r) => ({ ...r, distance_m: Number(r.distance_m ?? 0), warnings: r.warnings ?? [] }))
 }

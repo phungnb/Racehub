@@ -8,6 +8,8 @@ describe('phân loại lỗi', () => {
     expect(errorKind({ message: 'JWT expired', code: 'PGRST301' })).toBe('AUTH')
     expect(errorKind({ code: 'PGRST202', message: 'Could not find the function public.my_quests without parameters in the schema cache' })).toBe('NOT_DEPLOYED')
     expect(errorKind({ code: '42501', message: 'permission denied for function x' })).toBe('FORBIDDEN')
+    // Gọi bằng vai trò khách (phiên chưa nạp / làm mới): KHÔNG phải "chưa cập nhật máy chủ" — app không quay về đọc bảng profiles
+    expect(errorKind({ code: '42501', message: 'permission denied for function my_account' })).toBe('FORBIDDEN')
     expect(errorKind({ status: 503, message: 'Service Unavailable' })).toBe('SERVER')
     expect(errorKind({ code: '', message: 'upstream connect error' })).toBe('SERVER')
     expect(errorKind({ message: 'INVALID_AMOUNT 500' })).toBe('UNKNOWN')

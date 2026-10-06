@@ -3,11 +3,12 @@
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useState } from 'react'
-import { CalendarCheck, Check, ChevronRight, ChevronUp, Flame, Footprints, Gift, ShieldCheck, Trophy } from 'lucide-react'
+import { Check, ChevronRight, ChevronUp, Flame, Footprints, Gift, ShieldCheck, Trophy } from 'lucide-react'
 import { Avatar, Card, ErrorState, LevelBadge, ProgressBar, ProgressRing, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { levelProgress } from '@/features/progression'
+import { InviteFriendsCard } from '@/features/referral'
 import { shineTier } from '@/shared/lib/shine'
 import type { Profile } from '@/shared/types/profile'
 import { routes } from '@/shared/config/routes'
@@ -129,6 +130,7 @@ function TodayCard({ profile, s, onStreak }: { profile: Profile; s: GameState; o
           </button>
           <p className={cn('text-xs', st.done_this_week ? 'text-brand' : 'text-fg-muted')}>{status}</p>
           <p className="font-mono text-xs text-fg-subtle">{s.week.km.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km · {s.week.runs} bài tuần này</p>
+          {s.checked_in && <p className="flex items-center gap-1 text-xs text-brand"><Check className="size-3.5" aria-hidden />Đã điểm danh hôm nay</p>}
         </div>
       </div>
 
@@ -137,15 +139,8 @@ function TodayCard({ profile, s, onStreak }: { profile: Profile; s: GameState; o
         <span className="text-xs font-normal text-fg-muted">Chi tiết từng bài</span><ChevronRight className="size-4 text-fg-subtle" aria-hidden />
       </Link>
 
-      {s.checked_in ? (
-        <p className="flex h-11 items-center justify-center gap-2 rounded-xl bg-surface-2 text-sm font-semibold text-fg-muted">
-          <Check className="size-4 text-brand" aria-hidden />Đã điểm danh hôm nay bằng bài chạy
-        </p>
-      ) : (
-        <p className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-dashed border-border px-3 text-center text-sm text-fg-muted">
-          <CalendarCheck className="size-4 shrink-0 text-brand" aria-hidden />Chạy từ 1 km hôm nay để tự điểm danh, nhận thêm Xu
-        </p>
-      )}
+      {/* Chỉnh sửa lần 7: thay dòng "Chạy từ 1 km hôm nay để tự điểm danh…" bằng nút gửi link mời bạn bè (điểm danh vẫn tự động, báo ở trên) */}
+      <InviteFriendsCard />
     </Card>
   )
 }

@@ -153,7 +153,7 @@ function ManageBar({ h, d, participants, ctx }: { h: HonorState; d: ChallengeDet
         </Button>
         {h.status === 'PUBLISHED' && <Button variant="ghost" onClick={() => setSheet('unpublish')}><Undo2 className="size-4" aria-hidden />Gỡ công bố</Button>}
       </div>
-      {sheet === 'setup' && <HonorSetup challengeId={id} honor={h} participants={participants} onClose={() => setSheet(null)} />}
+      {sheet === 'setup' && <HonorSetup challenge={d.challenge} honor={h} participants={participants} onClose={() => setSheet(null)} />}
       {(sheet === 'poster' || sheet === 'card') && <HonorDesigner challengeId={id} honor={h} mode={sheet} ctx={ctx} onClose={() => setSheet(null)} />}
       <ConfirmSheet open={sheet === 'publish'} onClose={() => setSheet(null)} onConfirm={() => publish.mutate()} loading={publish.isPending} danger={false}
         title={h.status === 'PUBLISHED' ? 'Công bố lại vinh danh?' : 'Chốt & công bố vinh danh?'} confirmLabel="Công bố"

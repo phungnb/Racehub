@@ -57,7 +57,7 @@ export interface NormalizedActivity {
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 
 export function mapStravaActivity(a: StravaSummaryActivity): NormalizedActivity {
-  // Chạy máy (trainer) được coi như VirtualRun để đưa vào hàng chờ duyệt
+  // Chạy máy (trainer) được coi như VirtualRun (lần 7: ghi nhận kèm cảnh báo, không chờ duyệt)
   const sport = a.trainer && (a.sport_type ?? a.type) === 'Run' ? 'VirtualRun' : (a.sport_type ?? a.type ?? 'Unknown')
   return {
     title: (a.name ?? '').trim() || 'Buổi chạy',
@@ -125,6 +125,8 @@ export interface SyncSummary {
   skipped: number
   duplicates: number
   earned_xu: number
+  /** Lần 7: bài nhập tay — đã lưu nhưng KHÔNG được ghi nhận */
+  rejected?: number
   /** Lý do bỏ qua → số bài (NOT_RUN, TOO_SHORT, OVERLAPS_EXISTING_ACTIVITY, FUTURE_START…) */
   skip_reasons?: Record<string, number>
 }
@@ -143,6 +145,7 @@ export function summarize(results: Array<Record<string, unknown>>): SyncSummary 
     if (r.result === 'IMPORTED') {
       s.imported++
       if (r.validation_status === 'PENDING') s.pending++
+      if (r.validation_status === 'REJECTED') s.rejected = (s.rejected ?? 0) + 1
       s.earned_xu += Number(r.earned_xu ?? 0)
     } else if (r.result === 'SKIPPED') {
       s.skipped++

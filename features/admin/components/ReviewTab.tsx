@@ -7,7 +7,7 @@ import { FraudReviewStatsCard, PendingRunCard, RejectedRuns } from '@/features/a
 import { adminErrorMessage } from '../api/adminApi'
 import { usePendingActivities, useReviewActivity } from '../hooks/useAdmin'
 
-/** Duyệt bài chạy bị hệ thống chống gian lận gắn cờ (mọi CLB) */
+/** Duyệt bài chạy bị hệ thống chống gian lận gắn cờ (mọi CLB) + bài đã loại + bài có cảnh báo */
 export function ReviewTab() {
   const list = usePendingActivities()
   const review = useReviewActivity()
@@ -30,6 +30,7 @@ export function ReviewTab() {
           {list.data.map((a) => <PendingRunCard key={a.id} run={a} busy={review.isPending} onReview={(s) => act(a.id, s)} />)}
         </ul>
       ) : <EmptyState icon={CheckCircle2} title="Không có bài chờ duyệt" description="Chỉ bài nghi gian lận mới xuất hiện ở đây." />}
+      {/* Bài đã loại + "Bài có cảnh báo" (GPS nhảy, chạy máy… đã ghi nhận — 013400) */}
       <RejectedRuns clubId={null} />
     </div>
   )

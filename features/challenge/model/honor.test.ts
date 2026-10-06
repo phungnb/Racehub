@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn() } }))
-const { autoHonorCard, autoHonorPoster, freshHonor, honorData, honorPayload, honorValue, resolveHonor, HONOR_FORMATS } = await import('./honor')
+const { autoHonorCard, autoHonorPoster, freshHonor, goalHonors, honorData, honorPayload, honorValue, resolveHonor, HONOR_FORMATS } = await import('./honor')
 
 const ctx = { challenge: 'Tháng 9', org: 'Hồ Tây', date: '30/09/2026', objective: 'DISTANCE', challengeUrl: 'https://x/challenges/1' }
 
@@ -10,6 +10,15 @@ describe('vinh danh', () => {
     expect(honorValue('STREAK', 7, null)).toBe('7 ngày liên tiếp')
     expect(honorValue('BREAKTHROUGH', 40, null)).toBe('+40 km')
     expect(honorValue('CUSTOM1', null, null)).toBe('')
+    expect(honorValue('GOAL21000', 25.3, 'DISTANCE')).toBe('25,3 km')
+    expect(honorValue('CAT2', 330, 'BEST_PACE')).toBe('5:30/km')
+  })
+  it('vinh danh theo mục tiêu thành viên chọn: mỗi mốc km / mỗi hạng mục chinh phục một bảng', () => {
+    expect(goalHonors({ objective: 'DISTANCE', pledge_enabled: true, pledge_options: ['42', 21, 21] }))
+      .toEqual([{ key: 'GOAL21000', label: '21 km', title: 'Hoàn thành 21 km' }, { key: 'GOAL42000', label: '42 km', title: 'Hoàn thành 42 km' }])
+    expect(goalHonors({ objective: 'DISTANCE', pledge_enabled: false, pledge_options: [21] })).toEqual([])
+    expect(goalHonors({ objective: 'BEST_TIME' }, [{ label: '10K', position: 1 }, { label: 'Half', position: 2 }]))
+      .toEqual([{ key: 'CAT1', label: '10K', title: 'Chinh phục 10K' }, { key: 'CAT2', label: 'Half', title: 'Chinh phục Half' }])
   })
   it('ảnh nhóm tự động: bục top 3 có khung ảnh + tên + thành tích; hạng 4..n thành danh sách; mọi khổ đều nằm trong khung', () => {
     for (const f of Object.keys(HONOR_FORMATS) as (keyof typeof HONOR_FORMATS)[]) {

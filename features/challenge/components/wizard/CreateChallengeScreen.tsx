@@ -2,11 +2,11 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { ArrowLeft, CalendarRange, Check, CheckCircle2, ChevronRight, Coins, Flag, Info, Lock, Minus, Plus, Scale, Shield, Swords, Ticket, Trophy, User, Users, UsersRound, X } from 'lucide-react'
+import { ArrowLeft, CalendarRange, Check, CheckCircle2, ChevronRight, Coins, FileClock, Flag, Info, Lock, Minus, Plus, Scale, Shield, Swords, Ticket, Trophy, User, Users, UsersRound, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { useMyProfile } from '@/features/auth'
+import { useMyProfile, useSession } from '@/features/auth'
 import { isStaff, useClubInbox } from '@/features/club'
 import { Button, Card, ClockPicker, Field, Input, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -23,6 +23,7 @@ import {
 } from '../../model/challenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
 import { TemplatePicker } from './TemplatePicker'
+import { clearDraft, draftWorthSaving, loadDraft, saveDraft } from '../../model/draftStore'
 import { PurchaseOnly } from '@/features/system'
 
 const STEPS = ['Loại', 'Luật chơi', 'Thời gian & thưởng', 'Xem lại'] as const
@@ -34,6 +35,7 @@ const toLocalInput = (iso: string) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : '')
+const noopSubscribe = () => () => {}
 
 /** Ai trả bao nhiêu: phí (sau khi dùng vé) + treo thưởng, tách ví cá nhân / quỹ CLB — khớp create_challenge_v2 */
 function billFor(d: ChallengeDraft, q: ChallengeQuote) {
@@ -60,7 +62,22 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
   const [errors, setErrors] = useState<DraftErrors>({})
   const [busy, setBusy] = useState(false)
   const key = useRef(`web-${crypto.randomUUID()}`)
-  const set = (patch: Partial<ChallengeDraft>) => setD((prev) => ({ ...prev, ...patch }))
+  // Nháp trên máy (theo người dùng + CLB): tự lưu khi đang soạn, hỏi tiếp tục khi quay lại, xoá khi tạo xong
+  const uid = useSession().session?.user.id ?? null
+  const draftClub = clubId ?? null
+  const [dirty, setDirty] = useState(false)
+  const [dismissed, setDismissed] = useState(false)
+  // Chỉ đọc nháp sau khi hydrate (máy chủ không có localStorage) để HTML hai bên khớp nhau
+  const hydrated = useSyncExternalStore(noopSubscribe, () => true, () => false)
+  const saved = useMemo(() => (hydrated && uid && !dirty && !dismissed ? loadDraft(uid, draftClub) : null), [hydrated, uid, dirty, dismissed, draftClub])
+  useEffect(() => {
+    if (uid && dirty && draftWorthSaving(d, step)) saveDraft(uid, draftClub, d, step)
+  }, [uid, dirty, d, step, draftClub])
+  const discardDraft = () => {
+    if (uid) clearDraft(uid, draftClub)
+    setDismissed(true); setDirty(false); setD(defaultDraft(new Date(), draftClub)); setStep(0); setErrors({})
+  }
+  const set = (patch: Partial<ChallengeDraft>) => { setDirty(true); setD((prev) => ({ ...prev, ...patch })) }
   const balance = Number(profile?.xu ?? 0)
   const quote = useQuery({
     queryKey: ['challenge-quote', d.format, effectiveSlots(d), d.audience, d.clubId, d.personal],
@@ -112,6 +129,7 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
         await setChallengeRecurrence(r.challenge_id, d.recurrence)
           .catch((e) => toast.error(`Đã tạo thử thách nhưng chưa bật được tự lặp lại: ${challengeErrorMessage(e)}`))
       }
+      if (uid) clearDraft(uid, draftClub)
       toast.success(d.audience === 'CLUB_ONLY' && !(d.format === 'SOLO_GOAL' && d.personal) ? 'Đã tạo và báo cho cả CLB!' : 'Đã tạo thử thách!')
       router.replace(`/challenges/${r.challenge_id}${r.invite_code ? `?code=${r.invite_code}` : ''}`)
     } catch (e) {
@@ -127,8 +145,30 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
           ? <Link href="/challenges" aria-label="Đóng" className="-ml-2 grid size-11 place-items-center rounded-full text-fg-muted hover:bg-surface-2"><X className="size-5" aria-hidden /></Link>
           : <button onClick={() => setStep(step - 1)} aria-label="Quay lại" className="-ml-2 grid size-11 place-items-center rounded-full text-fg-muted hover:bg-surface-2"><ArrowLeft className="size-5" aria-hidden /></button>}
         <h1 className="text-xl font-bold">Tạo thử thách</h1>
-        <span className="ml-auto font-mono text-sm text-fg-muted">{step + 1}/4</span>
+        {dirty && draftWorthSaving(d, step) && (
+          <button type="button" onClick={discardDraft} className="ml-auto min-h-11 rounded-lg px-2 text-xs font-medium text-fg-muted hover:text-danger">
+            Đã lưu nháp · Bỏ nháp
+          </button>
+        )}
+        <span className={cn('font-mono text-sm text-fg-muted', !(dirty && draftWorthSaving(d, step)) && 'ml-auto')}>{step + 1}/4</span>
       </div>
+      {saved && (
+        <Card className="flex items-start gap-3 border-brand/40 bg-brand/5">
+          <FileClock className="mt-0.5 size-5 shrink-0 text-brand" aria-hidden />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div>
+              <p className="font-semibold">Bạn có thử thách đang tạo dở</p>
+              <p className="truncate text-xs text-fg-muted">
+                {saved.draft.title.trim() || 'Chưa đặt tên'} · bước {saved.step + 1}/4 · lưu lúc {fmtWhen(new Date(saved.savedAt).toISOString())}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => { setD(saved.draft); setStep(saved.step); setErrors({}); setDirty(true) }}>Làm tiếp</Button>
+              <Button size="sm" variant="ghost" onClick={discardDraft}>Bỏ nháp</Button>
+            </div>
+          </div>
+        </Card>
+      )}
       <ol className="grid grid-cols-4 gap-1.5" aria-label="Các bước">
         {STEPS.map((s, i) => (
           <li key={s} aria-current={i === step ? 'step' : undefined}>
@@ -141,6 +181,7 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
       {step === 0 && (
         <TemplatePicker onPick={(t) => {
           setD(draftFromTemplate(t, staffClubs.map((c) => c.club_id)))
+          setDirty(true)
           setErrors({})
           toast.success(`Đã chép luật từ "${t.title}" — kiểm tra lại rồi tạo`)
         }} />
@@ -482,7 +523,7 @@ function ScoringCard({ d }: { d: ChallengeDraft }) {
  * Lựa chọn 1: người tạo đặt mục tiêu từng hạng mục, người chơi đăng ký hạng mục.
  * Lựa chọn 2: người chơi tự đăng ký mục tiêu của mình.
  */
-function ConquestSection({ d, set, error }: { d: ChallengeDraft; set: (p: Partial<ChallengeDraft>) => void; error?: string }) {
+export function ConquestSection({ d, set, error }: { d: ChallengeDraft; set: (p: Partial<ChallengeDraft>) => void; error?: string }) {
   const c = d.conquest
   const pace = d.objective === 'BEST_PACE'
   const setC = (patch: Partial<ChallengeDraft['conquest']>) => set({ conquest: { ...c, ...patch } })
@@ -556,7 +597,7 @@ function ConquestSection({ d, set, error }: { d: ChallengeDraft; set: (p: Partia
 }
 
 /** Mục tiêu tự đăng ký: các mốc cho chọn hoặc khoảng tự do, % được tính vượt */
-function PledgeSection({ d, set, error }: { d: ChallengeDraft; set: (p: Partial<ChallengeDraft>) => void; error?: string }) {
+export function PledgeSection({ d, set, error }: { d: ChallengeDraft; set: (p: Partial<ChallengeDraft>) => void; error?: string }) {
   const p = d.pledge
   const setP = (patch: Partial<ChallengeDraft['pledge']>) => set({ pledge: { ...p, ...patch } })
   const [newOpt, setNewOpt] = useState('')

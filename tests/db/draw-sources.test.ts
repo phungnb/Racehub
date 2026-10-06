@@ -65,7 +65,8 @@ describe('quay thưởng: buổi điểm danh, danh sách dán, nhà tài trợ 
     await rpc(db, OWN, `select public.draw_absent_key($1, $2) as r`, [d.id, first.key])
     await rpc(db, OWN, `select public.draw_next($1, 1) as r`, [d.id])
     await rpc(db, OWN, `select public.draw_next($1, 0) as r`, [d.id])
-    const done = await rpc(db, OWN, `select public.finish_lucky_draw($1) as r`, [d.id])
+    await rpc(db, OWN, `select public.finish_lucky_draw($1) as r`, [d.id])
+    const done = await rpc(db, OWN, `select public.confirm_lucky_draw($1) as r`, [d.id])     // 013500: chấp nhận mới công bố
     const keys = names.filter(Boolean).map((n, i) => `${String(i + 1).padStart(4, '0')}|${n}`)
     const order = [...keys].sort((x, y) => md5(done.seed + x).localeCompare(md5(done.seed + y)))
     expect(done.winners.map((w: Row) => w.key)).toEqual(order.slice(0, 3))

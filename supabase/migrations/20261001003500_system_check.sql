@@ -233,7 +233,7 @@ begin
         and not exists (select 1 from pg_policies where schemaname = 'public'
                          and (coalesce(qual, '') || ' ' || coalesce(with_check, '')) ~ '(?<!SELECT )(public\.)?is_system_admin\(\)')),
     jsonb_build_object('file', '20261001012400', 'label', 'Chống gian lận Strava: một điểm GPS nhảy không còn làm bài bị chặn',
-      'ok', pg_get_functiondef('public.ingest_provider_activity(uuid,text,text,jsonb)'::regprocedure) ~ 'v_risk is null and v_max_speed'),
+      'ok', pg_get_functiondef('public.ingest_provider_activity(uuid,text,text,jsonb)'::regprocedure) ~ 'v_risk is null and (not v_no_gps and )?v_max_speed'),
     jsonb_build_object('file', '20261001012500', 'label', 'Chống gian lận: lưu phân tích + lịch sử quyết định, khôi phục bài loại nhầm',
       'ok', to_regclass('public.activity_analyses') is not null and to_regclass('public.activity_decisions') is not null
         and to_regprocedure('public.restore_activity(uuid,text)') is not null and to_regprocedure('public.fraud_review_stats(integer)') is not null),
@@ -253,7 +253,17 @@ begin
         and to_regclass('ops.attention') is not null and exists (select 1 from pg_roles where rolname = 'ops_reader')),
     jsonb_build_object('file', '20261001013100', 'label', 'Chỉnh sửa lần 6: tương tác ở bảng tin Đang theo dõi, báo bài chờ duyệt + giải trình, vinh danh theo cự ly, sửa thử thách trước khi bắt đầu',
       'ok', to_regprocedure('private.can_engage_post(public.club_posts)') is not null and private.sc_col('activities', 'owner_note')
-        and to_regprocedure('public.explain_pending_run(uuid,text)') is not null and to_regprocedure('public.update_challenge(uuid,jsonb)') is not null));
+        and to_regprocedure('public.explain_pending_run(uuid,text)') is not null and to_regprocedure('public.update_challenge(uuid,jsonb)') is not null),
+    jsonb_build_object('file', '20261001013200', 'label', 'Sửa đổi ảnh đại diện CLB',
+      'ok', pg_get_functiondef('public.update_club(uuid,text,text,text,text)'::regprocedure) !~ 'storage\.objects'),
+    jsonb_build_object('file', '20261001013300', 'label', 'Chỉnh sửa lần 7: thử thách sửa toàn bộ trước giờ bắt đầu, tên tuần khi lặp, vinh danh theo mục tiêu, khoá đăng ký chinh phục đã có kết quả',
+      'ok', to_regprocedure('private.recur_title(text,text,integer,timestamptz)') is not null
+        and pg_get_functiondef('public.set_my_conquest'::regproc) ~ 'CONQUEST_RESULT_LOCKED'),
+    jsonb_build_object('file', '20261001013400', 'label', 'Chỉnh sửa lần 7: luật Strava mới (GPS nhảy vẫn ghi nhận, nhập tay không ghi nhận, chạy máy cảnh báo) + danh sách bài có cảnh báo',
+      'ok', to_regprocedure('public.warned_activities(uuid,integer)') is not null),
+    jsonb_build_object('file', '20261001013500', 'label', 'Chỉnh sửa lần 7: Ban tổ chức chấp nhận / huỷ kết quả quay thưởng',
+      'ok', to_regclass('public.lucky_draw_rejections') is not null and to_regprocedure('public.confirm_lucky_draw(uuid)') is not null
+        and to_regprocedure('public.reject_lucky_draw(uuid,text)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

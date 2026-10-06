@@ -76,6 +76,7 @@ export function StravaSyncButton() {
           `Đã nhập ${s.imported} bài chạy` +
             (s.earned_xu > 0 ? ` · +${formatCoin(s.earned_xu)} Xu` : '') +
             (s.pending > 0 ? ` · ${s.pending} bài chờ xác minh` : '') +
+            (s.rejected ? ` · ${s.rejected} bài nhập tay không được ghi nhận` : '') +
             (skipped.length ? ` · bỏ qua ${skipped.join('; ')}` : ''),
         )
       }

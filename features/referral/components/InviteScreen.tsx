@@ -7,7 +7,10 @@ import { Check, Copy, Download, Gift, Share2, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, ErrorState, Input, Skeleton, useImageSaver, BackLink } from '@/shared/ui'
 import { routes } from '@/shared/config/routes'
+import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { applyReferral, myReferral, referralErrorMessage, referralLink, type MyReferral } from '../api/referralApi'
+import { inviteMessage, inviteRewardText } from '../model/invite'
+import { shareInvite } from './shareInvite'
 
 /** Tôi → Mời bạn bè: mã ngắn, link, QR, bạn đã mời, Xu đã nhận; nhập mã của người mời mình (14 ngày đầu) */
 export function InviteScreen() {
@@ -17,7 +20,7 @@ export function InviteScreen() {
       <BackLink fallback={routes.me} />
       <header>
         <h1 className="text-2xl font-bold">Mời bạn bè</h1>
-        <p className="text-sm text-fg-muted">Rủ bạn chạy cùng — cả hai cùng nhận Xu khi bạn mới hoàn thành những km đầu tiên.</p>
+        <p className="text-sm text-fg-muted">{inviteRewardText(q.data?.rules)}</p>
       </header>
       {q.isPending ? <Skeleton className="h-72" /> : q.isError || !q.data?.code ? <ErrorState message={q.error ? referralErrorMessage(q.error) : 'Chưa lấy được mã giới thiệu. Thử lại sau.'} error={q.error} onRetry={() => void q.refetch()} />
         : <InviteBody r={q.data} />}
@@ -37,10 +40,12 @@ function InviteBody({ r }: { r: MyReferral }) {
   const copy = async (text: string, what: string) => {
     try { await navigator.clipboard.writeText(text); toast.success(`Đã sao chép ${what}`) } catch { toast.error('Không sao chép được, hãy chọn và sao chép thủ công.') }
   }
-  const message = `Chạy cùng mình trên RaceHub nhé! Mã giới thiệu ${r.code}${r.rules.referee_xu > 0 ? ` — nhận ${r.rules.referee_xu} Xu chào mừng` : ''}: ${link}`
+  const message = inviteMessage(r.code, link, r.rules.referee_xu)
+  // Lần 7: app cài dùng bảng Chia sẻ của hệ điều hành (WebView Android không có navigator.share)
   const share = async () => {
-    if (navigator.share) { try { await navigator.share({ title: 'Chạy cùng mình trên RaceHub', text: message, url: link }) } catch { /* hủy */ } }
-    else void copy(message, 'lời mời')
+    const res = await shareInvite(message)
+    if (res === 'copied') toast.success('Đã sao chép lời mời')
+    else if (res === 'failed') void copy(message, 'lời mời')
   }
   const saveQr = async () => { if (qr) void saver.saveBlob(await (await fetch(qr)).blob(), `racehub-moi-${r.code}.png`, 'Mã mời RaceHub') }
   return (
@@ -69,7 +74,7 @@ function InviteBody({ r }: { r: MyReferral }) {
         <h2 className="font-semibold">Thể lệ</h2>
         <ul className="list-disc space-y-1 pl-5 text-sm text-fg-muted">
           <li>Bạn mới đăng ký bằng link / mã của bạn (hoặc nhập mã trong 14 ngày đầu).</li>
-          <li>Khi bạn mới chạy đủ <b>{r.rules.min_km} km</b> hợp lệ: bạn nhận <b className="text-coin">{r.rules.inviter_xu} Xu</b>, bạn mới nhận <b className="text-coin">{r.rules.referee_xu} Xu</b>.</li>
+          <li>Khi bạn mới chạy đủ <b>{formatNumber(r.rules.min_km)} km</b> hợp lệ: bạn nhận <b className="text-coin">{formatCoin(r.rules.inviter_xu)} Xu</b>, bạn mới nhận <b className="text-coin">{formatCoin(r.rules.referee_xu)} Xu</b>.</li>
           <li>Tối đa {r.rules.monthly_cap} lượt thưởng giới thiệu mỗi tháng. Tài khoản ảo / gian lận không được tính.</li>
         </ul>
       </Card>
