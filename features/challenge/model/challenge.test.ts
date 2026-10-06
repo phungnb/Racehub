@@ -166,3 +166,35 @@ describe('chinh phục thời gian / pace (010700)', () => {
     expect(m.scoringLines({ format: 'RANKED', objective: 'DISTANCE' }).join(' ')).toContain('số ngày chạy')
   })
 })
+
+describe('chỉnh sửa lần 7', () => {
+  it('thử thách CLB chia 3 nhóm: sắp diễn ra · đang diễn ra · đã kết thúc (đang tổng kết, đã hủy vào nhóm kết thúc)', () => {
+    const list = [
+      { id: 'a', ...c('2026-10-15T00:00:00Z', '2026-10-20T00:00:00Z') },
+      { id: 'b', ...c('2026-10-12T00:00:00Z', '2026-10-20T00:00:00Z') },
+      { id: 'c', ...c('2026-10-01T00:00:00Z', '2026-10-20T00:00:00Z') },
+      { id: 'd', ...c('2026-10-01T00:00:00Z', '2026-10-11T00:00:00Z') },
+      { id: 'e', ...c('2026-09-01T00:00:00Z', '2026-09-20T00:00:00Z') },
+      { id: 'f', ...c('2026-09-01T00:00:00Z', '2026-10-05T00:00:00Z', 'FINISHED') },
+      { id: 'g', ...c('2026-10-12T00:00:00Z', '2026-10-20T00:00:00Z', 'CANCELLED') },
+    ]
+    const b = m.bucketChallenges(list, now)
+    expect(b.UPCOMING.map((x) => x.id)).toEqual(['b', 'a'])          // gần giờ bắt đầu trước
+    expect(b.LIVE.map((x) => x.id)).toEqual(['d', 'c'])              // sắp hết trước
+    expect(b.ENDED.map((x) => x.id)).toEqual(['g', 'f', 'e'])        // mới nhất trước
+    expect(m.defaultBucket(b)).toBe('LIVE')
+    expect(m.defaultBucket({ UPCOMING: [1], LIVE: [], ENDED: [1] })).toBe('UPCOMING')
+    expect(m.defaultBucket({ UPCOMING: [], LIVE: [], ENDED: [1] })).toBe('ENDED')
+    expect(m.BUCKET_LABEL).toEqual({ UPCOMING: 'Sắp diễn ra', LIVE: 'Đang diễn ra', ENDED: 'Đã kết thúc' })
+  })
+  it('lặp hằng tuần: tên lấy số tuần tiếp theo, không thêm "Kỳ 2"; chu kỳ khác giữ "· Kỳ n"', () => {
+    const next = m.nextOccurrenceStart('2026-10-04T17:00:00Z', 'WEEKLY')      // thứ Hai 05/10 giờ VN (tuần 41) → 12/10
+    expect(m.nextOccurrenceTitle('Thử thách tuần 41', 'WEEKLY', 1, next)).toBe('Thử thách tuần 42')
+    expect(m.nextOccurrenceTitle('Thử thách tuần 41 · Kỳ 2', 'WEEKLY', 2, next)).toBe('Thử thách tuần 42')
+    expect(m.nextOccurrenceTitle('Tuần 41 - lần 2', 'WEEKLY', 2, next)).toBe('Tuần 42')
+    expect(m.nextOccurrenceTitle('Thử thách tuần 52', 'WEEKLY', 1, new Date('2027-01-04T03:00:00Z'))).toBe('Thử thách tuần 1')
+    expect(m.nextOccurrenceTitle('Chạy đều mỗi tuần', 'WEEKLY', 1, next)).toBe('Chạy đều mỗi tuần · Kỳ 2')
+    expect(m.nextOccurrenceTitle('Tháng 10 · Kỳ 2', 'MONTHLY', 2, next)).toBe('Tháng 10 · Kỳ 3')
+    expect(m.nextOccurrenceStart('2026-01-31T17:00:00Z', 'QUARTERLY').toISOString()).toBe('2026-05-01T17:00:00.000Z')
+  })
+})

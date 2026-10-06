@@ -108,7 +108,7 @@ describe('chỉnh sửa lần 6 (013100)', () => {
     expect(await fails(db.query(`select private.honor_categories('[{"key":"DIST100"}]'::jsonb)`))).toContain('INVALID_HONOR_CATEGORIES')
   })
 
-  it('sửa thử thách: chỉ BTC, chỉ trước khi bắt đầu, không kéo dài thời lượng; báo người tham gia', async () => {
+  it('sửa thử thách: chỉ BTC, chỉ trước khi bắt đầu, tối đa 1 năm; báo người tham gia', async () => {
     await db.exec(`
       insert into public.challenges (id, title, start_date, end_date, target_value, target_km, min_km, status, created_by, target_audience, reg_deadline)
         values ('${CH2}', 'Sắp chạy', now() + interval '2 days', now() + interval '9 days', 50, 50, 1, 'ACTIVE', '${A}', 'PUBLIC', now() + interval '9 days');
@@ -116,7 +116,8 @@ describe('chỉnh sửa lần 6 (013100)', () => {
     `)
     const upd = (uid: string, p: object) => rpc(db, uid, `select public.update_challenge($1, $2::jsonb) as r`, [CH2, JSON.stringify(p)])
     expect(await fails(upd(B, { title: 'Đổi tên' }))).toContain('FORBIDDEN')
-    expect(await fails(upd(A, { end_date: new Date(Date.now() + 20 * 86400_000).toISOString() }))).toContain('DURATION_TOO_LONG')
+    // 013300: được kéo dài (phí chỉ tính theo quy mô), tối đa 1 năm như lúc tạo
+    expect(await fails(upd(A, { end_date: new Date(Date.now() + 400 * 86400_000).toISOString() }))).toContain('INVALID_TIME_RANGE')
     expect(await fails(upd(A, { min_pace: 9, max_pace: 5 }))).toContain('INVALID_PACE')
     const start = new Date(Date.now() + 3 * 86400_000).toISOString(), end = new Date(Date.now() + 8 * 86400_000).toISOString()
     await upd(A, { title: 'Chạy 40 km', description: 'Mới', target_value: 40, start_date: start, end_date: end })

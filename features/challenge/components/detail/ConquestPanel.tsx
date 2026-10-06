@@ -24,8 +24,10 @@ export function ConquestPanel({ d, onPick }: { d: ChallengeDetail; onPick: (user
   if (q.isPending) return <Skeleton className="h-60" />
   if (q.isError) return <ErrorState message={challengeErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />
   const b = q.data
-  const active = cat ?? b.categories[0]?.id ?? null
   const joined = !!d.me && d.me.status !== 'LEFT'
+  // Mở sẵn hạng mục mình đã đăng ký (không phải luôn hạng mục đầu tiên — người chọn 21K mở ra phải thấy 21K)
+  const mineFirst = joined ? b.categories.find((x) => b.mine.some((m) => m.category_id === x.id))?.id : undefined
+  const active = cat ?? mineFirst ?? b.categories[0]?.id ?? null
   return (
     <div className="space-y-4">
       {joined && <MyCategories d={d} b={b} />}
@@ -52,6 +54,8 @@ function MyCategories({ d, b }: { d: ChallengeDetail; b: ConquestBoard }) {
   const [now] = useState(() => Date.now())
   const started = now >= Date.parse(c.start_date)
   const mine = new Map(b.mine.map((m) => [m.category_id, m]))
+  // Đã đăng ký rồi mà có kết quả ở cự ly nào thì không sửa đăng ký cự ly đó (máy chủ chặn CONQUEST_RESULT_LOCKED)
+  const resultLocked = new Set(b.mine.length ? b.my_results ?? [] : [])
   const [picked, setPicked] = useState<Record<string, string>>(() =>
     Object.fromEntries(b.mine.map((m) => [m.category_id, m.target_s ? formatClock(m.target_s) : ''])))
   const [editing, setEditing] = useState(b.mine.length === 0)
@@ -93,11 +97,13 @@ function MyCategories({ d, b }: { d: ChallengeDetail; b: ConquestBoard }) {
       <p className="text-xs text-fg-muted">
         {b.mode === 'SELF' ? `Cuộn chọn ${pace ? 'pace (phút · giây mỗi km)' : 'thời gian (giờ · phút · giây)'} mục tiêu của bạn cho từng hạng mục. ` : ''}
         {started ? 'Thử thách đã bắt đầu: bạn thêm được hạng mục mới, nhưng không bỏ hay đổi mục tiêu đã đăng ký.' : 'Đổi được tới giờ xuất phát.'}
+        {resultLocked.size > 0 && ' Hạng mục đã có kết quả thì không sửa đăng ký được nữa.'}
       </p>
       <ul className="space-y-2">
         {b.categories.map((x) => {
           const on = x.id in picked
-          const locked = started && mine.has(x.id)
+          const hasResult = resultLocked.has(x.id)
+          const locked = (started && mine.has(x.id)) || hasResult
           return (
             <li key={x.id} className={cn('rounded-xl border p-2.5', on ? 'border-brand/60 bg-brand/5' : 'border-border')}>
               <label className="flex items-center gap-3">
@@ -110,7 +116,8 @@ function MyCategories({ d, b }: { d: ChallengeDetail; b: ConquestBoard }) {
                     return n
                   })} />
                 <span className="flex-1"><span className="block font-semibold">{x.label}</span>
-                  <span className="block text-xs text-fg-muted">{kmLabel(x.distance_m / 1000)}{x.target_s ? ` · mục tiêu ${targetText(b, x.target_s)}` : ''}</span></span>
+                  <span className="block text-xs text-fg-muted">{kmLabel(x.distance_m / 1000)}{x.target_s ? ` · mục tiêu ${targetText(b, x.target_s)}` : ''}</span>
+                  {hasResult && <span className="block text-xs text-warning">Bạn đã có kết quả ở cự ly này — không sửa đăng ký được</span>}</span>
                 {locked && <Lock className="size-4 text-fg-subtle" aria-label="Đã khóa" />}
               </label>
               {on && b.mode === 'SELF' && (

@@ -1,22 +1,28 @@
 'use client'
 
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, Input, Sheet } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
-import { challengeErrorMessage, saveHonor, type HonorState, type LeaderboardEntry } from '../../api/challengeApi'
-import { HONOR_DISTANCES, HONOR_KINDS, MAX_CATEGORIES, type HonorCategory, type HonorKind } from '../../model/honor'
+import { challengeErrorMessage, getConquestBoard, saveHonor, type Challenge, type HonorState, type LeaderboardEntry } from '../../api/challengeApi'
+import { challengeKeys } from '../../hooks/useChallenge'
+import { isConquest } from '../../model/challenge'
+import { goalHonors, HONOR_DISTANCES, HONOR_KINDS, MAX_CATEGORIES, type HonorCategory, type HonorKind } from '../../model/honor'
 
 type BaseKind = keyof typeof HONOR_KINDS
 const COUNTS = [1, 3, 5, 10]
 
 /** BTC chọn hạng mục vinh danh: hạng mục tính tự động + giải tự đặt (chọn tay người nhận) */
-export function HonorSetup({ challengeId, honor, participants, onClose }: {
-  challengeId: string; honor: HonorState; participants: LeaderboardEntry[]; onClose: () => void
+export function HonorSetup({ challenge, honor, participants, onClose }: {
+  challenge: Challenge; honor: HonorState; participants: LeaderboardEntry[]; onClose: () => void
 }) {
+  const challengeId = challenge.id
   const qc = useQueryClient()
+  // 013300: vinh danh theo từng mục tiêu BTC đặt (mốc km tự đăng ký / hạng mục chinh phục)
+  const conquest = useQuery({ queryKey: challengeKeys.conquest(challengeId), queryFn: () => getConquestBoard(challengeId), enabled: isConquest(challenge.objective) })
+  const goals = goalHonors(challenge, conquest.data?.categories ?? [])
   const [enabled, setEnabled] = useState(honor.categories.length ? honor.enabled : true)
   const [cats, setCats] = useState<HonorCategory[]>(() => honor.categories.length ? honor.categories
     : [{ key: 'TOP', title: HONOR_KINDS.TOP.title, count: 3 }, { key: 'DAYS', title: HONOR_KINDS.DAYS.title, count: 1 }])
@@ -66,6 +72,27 @@ export function HonorSetup({ challengeId, honor, participants, onClose }: {
             )
           })}
         </div>
+        {goals.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold">Theo mục tiêu thành viên chọn</p>
+            <p className="text-[11px] text-fg-muted">
+              {isConquest(challenge.objective) ? 'Mỗi hạng mục một bảng riêng: người đạt mục tiêu hạng mục, kết quả nhanh nhất trước.'
+                : 'Mỗi mục tiêu một bảng riêng: chỉ người chọn mục tiêu đó và đã hoàn thành, nhiều km được tính hơn đứng trước.'}
+            </p>
+            {goals.map((x) => {
+              const c = cats.find((y) => y.key === x.key)
+              return (
+                <div key={x.key} className={cn('space-y-2 rounded-xl border p-3', c ? 'border-brand/60 bg-brand/5' : 'border-border')}>
+                  <label className="flex items-center gap-3">
+                    <input type="checkbox" checked={!!c} onChange={() => toggleDist(x.key, x.title)} className="size-5 accent-[var(--color-brand)]" />
+                    <span className="text-sm font-semibold">{x.label}</span>
+                  </label>
+                  {c && <CategoryFields c={c} onChange={(p) => patch(x.key, p)} />}
+                </div>
+              )
+            })}
+          </div>
+        )}
         <div className="space-y-2">
           <p className="text-sm font-semibold">Theo cự ly</p>
           <p className="text-[11px] text-fg-muted">Bài chạy nhanh nhất có cự ly ≥ hạng mục trong thời gian thử thách; thời gian quy đổi theo pace trung bình (VD bài 21,3 km trong 1:52:00 tính cho 21 km là 1:50:56).</p>

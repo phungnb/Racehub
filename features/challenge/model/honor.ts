@@ -6,9 +6,9 @@ import {
 } from '@/shared/design/engine'
 import { paintBackdrop } from '@/shared/design/backdrops'
 import { formatDuration } from '@/shared/lib/format'
-import { formatScore } from './challenge'
+import { formatClock, formatScore } from './challenge'
 
-export type HonorKind = 'TOP' | 'KM' | 'DAYS' | 'STREAK' | 'BREAKTHROUGH' | 'SUPPORTED' | 'CUSTOM1' | 'CUSTOM2' | 'CUSTOM3' | 'CUSTOM4' | 'CUSTOM5' | `DIST${number}`
+export type HonorKind = 'TOP' | 'KM' | 'DAYS' | 'STREAK' | 'BREAKTHROUGH' | 'SUPPORTED' | 'CUSTOM1' | 'CUSTOM2' | 'CUSTOM3' | 'CUSTOM4' | 'CUSTOM5' | `DIST${number}` | `GOAL${number}` | `CAT${number}`
 export const HONOR_KINDS: Record<'TOP' | 'KM' | 'DAYS' | 'STREAK' | 'BREAKTHROUGH' | 'SUPPORTED', { title: string; hint: string }> = {
   TOP: { title: 'Top thành tích', hint: 'Theo bảng xếp hạng của thử thách' },
   KM: { title: 'Nhiều km nhất', hint: 'Tổng km hợp lệ trong thử thách' },
@@ -25,6 +25,24 @@ export const HONOR_DISTANCES: { key: HonorKind; km: string; title: string }[] = 
   { key: 'DIST42195', km: '42 km', title: 'Top Full Marathon (42 km)' },
 ]
 export const isDistanceHonor = (key: string) => /^DIST\d{3,6}$/.test(key)
+/** 013300: vinh danh theo mục tiêu BTC đặt — GOAL<mét>: người chọn mục tiêu đó và đã hoàn thành (thử thách tự đăng ký mục tiêu) */
+export const goalHonorKey = (km: number) => `GOAL${Math.round(km * 1000)}` as HonorKind
+export const isGoalHonor = (key: string) => /^GOAL\d{3,7}$/.test(key)
+/** CAT<thứ tự>: hạng mục chinh phục thứ N (1–8) — người đạt mục tiêu hạng mục, kết quả nhanh nhất trước */
+export const catHonorKey = (position: number) => `CAT${position}` as HonorKind
+export const isCatHonor = (key: string) => /^CAT[1-8]$/.test(key)
+/** Hạng mục vinh danh theo từng mục tiêu của thử thách (mốc km tự đăng ký, hoặc hạng mục chinh phục) */
+export function goalHonors(c: { objective?: string | null; pledge_enabled?: boolean | null; pledge_options?: (number | string)[] | null },
+  categories: { label: string; position?: number }[] = []): { key: HonorKind; label: string; title: string }[] {
+  if (c.objective === 'BEST_TIME' || c.objective === 'BEST_PACE') {
+    return categories.map((x, i) => ({ key: catHonorKey(x.position ?? i + 1), label: x.label, title: `Chinh phục ${x.label}` }))
+  }
+  if (!c.pledge_enabled) return []
+  return [...new Set((c.pledge_options ?? []).map(Number))].filter((v) => v > 0).sort((a, b) => a - b).map((km) => {
+    const label = `${km.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km`
+    return { key: goalHonorKey(km), label, title: `Hoàn thành ${label}` }
+  })
+}
 export interface HonorCategory { key: HonorKind; title: string; count: number; users?: string[] | null }
 export const MAX_CATEGORIES = 8
 
@@ -38,7 +56,11 @@ export function honorValue(key: string, value: number | null | undefined, object
     case 'STREAK': return `${v} ngày liên tiếp`
     case 'BREAKTHROUGH': return `+${v.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km`
     case 'SUPPORTED': return `${v.toLocaleString('vi-VN')} Tỏa sáng`
-    default: return isDistanceHonor(key) ? formatDuration(v) : ''
+    default:
+      if (isDistanceHonor(key)) return formatDuration(v)
+      if (isGoalHonor(key)) return `${v.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km`
+      if (isCatHonor(key)) return objective === 'BEST_PACE' ? `${formatClock(v)}/km` : formatDuration(v)
+      return ''
   }
 }
 

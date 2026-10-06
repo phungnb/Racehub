@@ -1,7 +1,7 @@
 // Thử thách: mọi thao tác ghi đi qua RPC (migration 000600). Client chỉ đọc và hiển thị.
 import { supabase } from '@/shared/lib/supabase'
 import type { Audience, ChallengeDraft, ChallengeFormat, Objective, RewardSource, RewardSplit, TeamMode } from '../model/challenge'
-import { draftToPayload, effectiveSlots, type pledgePayload } from '../model/challenge'
+import { draftToPayload, effectiveSlots, type conquestPayload, type pledgePayload } from '../model/challenge'
 import { toPolicy, type EconomyPolicy } from '@/shared/lib/economy'
 import { systemErrorMessage } from '@/shared/lib/errors'
 import { prepareImage } from '@/shared/lib/image'
@@ -129,6 +129,8 @@ export interface ChallengeParticipant {
 
 export interface TeamStanding {
   rank?: number
+  /** Thứ tự đội lúc tạo (get_challenge trả kèm) */
+  position?: number
   team_id: string
   name: string
   color: string
@@ -260,16 +262,27 @@ export async function quoteChallenge(d: ChallengeDraft): Promise<ChallengeQuote>
   }
 }
 
-/** Bật / tắt tự lặp lại (migration 007600) */
-/** 013100: người tạo / BTC sửa thử thách trước khi bắt đầu (không đổi thể thức, số người, đối tượng, giải thưởng) */
+/**
+ * Người tạo / BTC sửa thử thách trước khi bắt đầu (013100, mở rộng 013300): mọi hạng mục trừ thể thức và CLB tổ chức.
+ * Tăng quy mô / thưởng: phần chênh trừ qua sổ cái (ví hoặc quỹ CLB); giảm thưởng: hoàn quỹ CLB. Sau giờ bắt đầu: không sửa được.
+ */
 export interface ChallengeEdit {
   title: string; description: string | null; target_value: number; min_km: number; min_pace: number; max_pace: number
   daily_cap_km: number | null; start_date: string; end_date: string
+  objective?: Objective; game_mode?: string | null; max_slots?: number; audience?: Audience; reward_xu?: number; require_hr?: boolean
+  team_names?: string[]
+  /** Mục tiêu tự đăng ký: đối tượng = bật / đổi mốc; null = tắt */
+  pledge?: ReturnType<typeof pledgePayload> | null
+  /** Hạng mục chinh phục (thay toàn bộ) */
+  conquest?: ReturnType<typeof conquestPayload>
 }
 export async function updateChallenge(id: string, p: ChallengeEdit) {
-  const { error } = await supabase.rpc('update_challenge', { p_challenge_id: id, p })
+  const { data, error } = await supabase.rpc('update_challenge', { p_challenge_id: id, p })
   if (error) throw error
+  return data as { fee_extra: number; reward_diff: number }
 }
+
+/** Bật / tắt tự lặp lại (migration 007600) */
 
 export async function setChallengeRecurrence(id: string, recurrence: string) {
   const { error } = await supabase.rpc('set_challenge_recurrence', { p_challenge_id: id, p_recurrence: recurrence })
@@ -413,6 +426,12 @@ const MESSAGES: Record<string, string> = {
   CANNOT_CANCEL_STARTED: 'Không hủy được khi thử thách đã bắt đầu và có người tham gia.',
   INVALID_TITLE: 'Tên thử thách cần từ 3 đến 120 ký tự.',
   CHALLENGE_STARTED: 'Thử thách đã bắt đầu nên không sửa được nữa.',
+  SLOTS_BELOW_JOINED: 'Số người tối đa không được ít hơn số người đã tham gia.',
+  AUDIENCE_LOCKED: 'Chỉ đổi được giữa Công khai và Có mã mời (thử thách CLB, thách đấu 1-1 giữ nguyên đối tượng).',
+  TEAM_MODE_LOCKED: 'Không chuyển giữa đua đội thường và đua đội theo mục tiêu được — hãy tạo thử thách mới.',
+  INVALID_OBJECTIVE: 'Cách tính điểm này không dùng được cho thể thức thử thách.',
+  INVALID_GAME_MODE: 'Cách tính điểm đội không hợp lệ.',
+  CONQUEST_RESULT_LOCKED: 'Bạn đã có kết quả ở cự ly này nên không sửa đăng ký cự ly đó được nữa (không thêm, đổi mục tiêu hay bỏ).',
   DURATION_TOO_LONG: 'Không kéo dài thời gian thử thách so với lúc tạo (phí khởi tạo tính theo thời lượng). Có thể dời ngày hoặc rút ngắn.',
   DESC_TOO_LONG: 'Mô tả quá dài.',
   INVALID_TIME_RANGE: 'Thời gian không hợp lệ (kết thúc phải sau bắt đầu, tối thiểu 1 giờ, tối đa 1 năm).',
@@ -508,7 +527,7 @@ export function challengeErrorMessage(e: unknown): string {
 
 /* ---------------- Chinh phục thời gian / pace nhiều hạng mục (migration 010700) ---------------- */
 
-export interface ConquestCategory { id: string; label: string; distance_m: number; target_s: number | null; entrants: number; achieved: number }
+export interface ConquestCategory { id: string; label: string; distance_m: number; target_s: number | null; entrants: number; achieved: number; position?: number }
 export interface ConquestRow {
   category_id: string; user_id: string; display_name: string | null; avatar_url: string | null; level: number
   target_s: number | null; best_time_s: number | null; best_pace_s: number | null; best_activity_id: string | null
@@ -520,6 +539,8 @@ export interface ConquestBoard {
   categories: ConquestCategory[]
   rows: ConquestRow[]
   mine: { category_id: string; target_s: number | null; best_time_s: number | null; best_pace_s: number | null; achieved: boolean }[]
+  /** 013300: hạng mục người xem đã có kết quả (bài ≥ cự ly) — đã đăng ký rồi thì không sửa đăng ký hạng mục này được nữa */
+  my_results?: string[]
 }
 
 const rpcData = async <T,>(fn: string, args: Record<string, unknown>) => {

@@ -35,7 +35,8 @@ export function PledgePanel({ d, onPick }: { d: ChallengeDetail; onPick?: (userI
           {team && !c.teams_assigned_at && <TeamPlan board={q.data} teamSize={c.pledge_team_size ?? null} />}
           {team && c.teams_assigned_at && q.data.teams && <TeamPledges board={q.data} capPct={c.pledge_cap_pct ?? null} />}
           {team && q.data.can_manage && !started && <TeamTools id={c.id} board={q.data} teamSize={c.pledge_team_size ?? null} assigned={!!c.teams_assigned_at} />}
-          <PledgeRanking board={q.data} team={team} onPick={onPick} options={(c.pledge_options ?? []).map(Number)} teamsById={c.teams_assigned_at ? Object.fromEntries((q.data.teams ?? []).map((t) => [t.team_id, t])) : {}} />
+          <PledgeRanking board={q.data} team={team} onPick={onPick} options={(c.pledge_options ?? []).map(Number)}
+            mine={!team && d.me && d.me.status !== 'LEFT' && d.me.pledge_km != null ? Number(d.me.pledge_km) : null} teamsById={c.teams_assigned_at ? Object.fromEntries((q.data.teams ?? []).map((t) => [t.team_id, t])) : {}} />
         </>
       ) : null}
     </div>
@@ -281,26 +282,30 @@ function MoveSheet({ member, board, onClose, onPick, loading }: {
 }
 
 /** Bảng xếp hạng theo % mục tiêu tự đăng ký */
-function PledgeRanking({ board, team, teamsById, onPick, options }: {
+function PledgeRanking({ board, team, teamsById, onPick, options, mine }: {
   board: PledgeBoard; team: boolean; teamsById: Record<string, { color: string; name: string }>; onPick?: (userId: string) => void; options: number[]
+  /** Mục tiêu người xem đã đăng ký: mở sẵn bảng của mục tiêu đó */
+  mine: number | null
 }) {
   const [q, setQ] = useState('')
   const [doneMode, setDoneMode] = useDoneFilter()
-  // Lọc + xếp hạng riêng theo từng mốc mục tiêu (21 km, 42 km…)
-  const [target, setTarget] = useState<number | null>(null)
+  // Lọc + xếp hạng riêng theo từng mốc mục tiêu (21 km, 42 km…); mặc định là mục tiêu của chính mình
+  const [target, setTarget] = useState<number | null>(mine)
   if (!board.members.length) return <p className="py-6 text-center text-sm text-fg-muted">Chưa có ai tham gia.</p>
   const levels = options.length ? options : [...new Set(board.members.map((m) => m.pledge_km).filter((v): v is number => v != null))].sort((a, b) => a - b)
-  const all = board.members.filter((m) => target === null || m.pledge_km === target).map((m, i) => ({ m, rank: i + 1 }))
+  const showLevels = !team && levels.length > 1 && levels.length <= 12
+  const level = showLevels && target !== null && levels.includes(target) ? target : null
+  const all = board.members.filter((m) => level === null || m.pledge_km === level).map((m, i) => ({ m, rank: i + 1 }))
   const ranked = doneMode === 'ALL' ? all : all.filter((x) => (doneMode === 'DONE') === !!x.m.completed)
   const list = filterSearch(ranked, q, (x) => [x.m.display_name])
   return (
     <section className="space-y-2">
       <SectionTitle>Theo % mục tiêu</SectionTitle>
-      {!team && levels.length > 1 && levels.length <= 12 && (
+      {showLevels && (
         <ScrollRow innerClassName="gap-2 pb-1" role="radiogroup" aria-label="Lọc theo mục tiêu">
           {[null, ...levels].map((v) => (
-            <button key={String(v)} type="button" role="radio" aria-checked={target === v} onClick={() => setTarget(v)}
-              className={cn('min-h-9 shrink-0 rounded-full border px-3 text-sm font-medium', target === v ? 'border-fg bg-surface-2' : 'border-border text-fg-muted')}>
+            <button key={String(v)} type="button" role="radio" aria-checked={level === v} onClick={() => setTarget(v)}
+              className={cn('min-h-9 shrink-0 rounded-full border px-3 text-sm font-medium', level === v ? 'border-fg bg-surface-2' : 'border-border text-fg-muted')}>
               {v === null ? 'Tất cả mục tiêu' : `${formatNumber(v)} km · ${board.members.filter((m) => m.pledge_km === v).length}`}
             </button>
           ))}
