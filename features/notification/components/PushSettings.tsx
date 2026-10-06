@@ -15,7 +15,7 @@ const CATEGORIES: { key: 'club' | 'challenge' | 'social' | 'game'; label: string
   { key: 'club', label: 'CLB', desc: 'Buổi chạy, thu quỹ, bình chọn, thông báo, nhắc tên', icon: Users },
   { key: 'challenge', label: 'Thử thách', desc: 'Thử thách mới, kết quả, sắp hết hạn', icon: Swords },
   { key: 'social', label: 'Cổ vũ & bình luận', desc: 'Khi có người cổ vũ hoặc bình luận bài của bạn', icon: Heart },
-  { key: 'game', label: 'Thành tích', desc: 'Huy hiệu mới, lên cấp, league', icon: Trophy },
+  { key: 'game', label: 'Thành tích', desc: 'Huy hiệu mới, lên cấp, league, nhắc khi vài ngày chưa chạy', icon: Trophy },
 ]
 
 /** Cài đặt "Thông báo & ứng dụng": cài app, bật push trên thiết bị này, chọn loại thông báo, giờ yên lặng */

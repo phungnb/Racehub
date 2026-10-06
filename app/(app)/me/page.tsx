@@ -33,7 +33,8 @@ function StravaResultNotice() {
     if (handled.current === key) return
     handled.current = key
     if (ok) {
-      toast.success('Kết nối Strava thành công!')
+      const who = params.get('strava_athlete')
+      toast.success(who ? `Đã kết nối Strava của ${who}. Không phải tài khoản của bạn? Ngắt kết nối rồi nối lại.` : 'Kết nối Strava thành công!')
       invalidateProfile()
     } else if (err) {
       toast.error(STRAVA_ERRORS[err] ?? 'Không kết nối được Strava.')

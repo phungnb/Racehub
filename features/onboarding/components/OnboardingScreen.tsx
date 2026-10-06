@@ -39,7 +39,10 @@ export function OnboardingScreen() {
   useEffect(() => {
     const err = params.get('strava_error')
     if (err) toast.error(STRAVA_ERRORS[err] ?? STRAVA_ERRORS.server_error)
-    if (params.get('strava_success')) toast.success('Đã kết nối Strava! Bài chạy 30 ngày gần nhất đang được đồng bộ.')
+    if (params.get('strava_success')) {
+      const who = params.get('strava_athlete')
+      toast.success(`Đã kết nối Strava${who ? ` của ${who}` : ''}! Bài chạy 30 ngày gần nhất đang được đồng bộ.`)
+    }
   }, [params])
 
   return (

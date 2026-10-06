@@ -75,7 +75,9 @@ export async function GET(request: Request) {
         console.error('[strava/callback] backfill', err instanceof Error ? err.message : err)
       }
     })
-    return back(origin, to, { strava_success: 'true' })
+    // Tên VĐV Strava vừa nối: để người dùng nhận ra nếu nối nhầm tài khoản Strava cũ
+    const athleteName = [token.athlete?.firstname, token.athlete?.lastname].filter(Boolean).join(' ').slice(0, 60)
+    return back(origin, to, athleteName ? { strava_success: 'true', strava_athlete: athleteName } : { strava_success: 'true' })
   } catch (err) {
     console.error('[strava/callback]', err instanceof Error ? err.message : err)
     return back(origin, to, { strava_error: 'server_error' })
