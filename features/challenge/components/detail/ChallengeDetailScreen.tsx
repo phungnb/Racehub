@@ -16,7 +16,8 @@ import { cn } from '@/shared/lib/cn'
 import { formatNumber, formatPace } from '@/shared/lib/format'
 import { challengeErrorMessage, setChallengeRecurrence, type ChallengeDetail, type LeaderboardEntry, type TeamStanding } from '../../api/challengeApi'
 import {
-  AUDIENCE_LABEL, challengePhase, FORMAT_META, formatScore, isCommunity, isConquest, OBJECTIVE_META, planStatus, RECURRENCE_LABEL, rewardSummary, scoringLines, TEAM_MODE_META, timeLabel,
+  AUDIENCE_LABEL, challengePhase, FORMAT_META, formatScore, isCommunity, isConquest, nextOccurrenceStart, nextOccurrenceTitle, OBJECTIVE_META, planStatus,
+  RECURRENCE_LABEL, rewardSummary, scoringLines, TEAM_MODE_META, timeLabel,
   type Recurrence, type TeamMode,
 } from '../../model/challenge'
 import { ConquestPanel } from './ConquestPanel'
@@ -628,6 +629,9 @@ function RecurrenceBar({ d }: { d: ChallengeDetail }) {
           <Button size="sm" variant="secondary" onClick={() => setPicking((v) => !v)}>{rec === 'NONE' ? 'Bật lặp lại' : 'Đổi'}</Button>
         )}
       </div>
+      {rec !== 'NONE' && !c.recur_next_id && !closed && (
+        <p className="text-xs text-fg-muted">Kỳ sau: <span className="font-medium text-fg">{nextOccurrenceTitle(c.title, rec, c.occurrence ?? 1, nextOccurrenceStart(c.start_date, rec))}</span></p>
+      )}
       {c.recur_error && d.can_manage && !c.recur_next_id && (
         <p className="rounded-lg bg-warning/15 p-2 text-xs text-warning">Chưa tạo được kỳ mới: {challengeErrorMessage({ message: c.recur_error })} Hệ thống thử lại mỗi ngày.</p>
       )}
