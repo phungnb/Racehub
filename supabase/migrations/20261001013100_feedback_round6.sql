@@ -1,11 +1,3 @@
--- RaceHub — PHẦN 22/23 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 013100
--- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
--- Xong thì chạy phần tiếp theo.
-begin;
--- ===================================================================
--- 20261001013100_feedback_round6.sql
--- ===================================================================
 -- 013100: Chỉnh sửa lần 6.
 -- 1. Bảng tin "Đang theo dõi" thích / bình luận / tặng quà ngay tại chỗ như "Cộng đồng":
 --    following_feed trả kèm bài AUTO_RUN của buổi chạy (ưu tiên bài ở CLB mình tham gia). Người theo dõi runner được tương tác
@@ -604,5 +596,3 @@ revoke all on function public.explain_pending_run(uuid, text), public.update_cha
 grant execute on function public.explain_pending_run(uuid, text), public.update_challenge(uuid, jsonb) to authenticated;
 
 notify pgrst, 'reload schema';
-
-commit;

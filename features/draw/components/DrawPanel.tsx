@@ -101,6 +101,7 @@ function DrawCard({ d, scope, refId, onStage }: { d: LuckyDraw; scope: DrawScope
         <>
           <p className="text-sm text-fg-muted">Đủ điều kiện hiện tại: <b className="text-fg">{d.eligible_now ?? 0}</b> người{d.exclude_winners ? ' (đã loại người trúng lượt trước)' : ''} · {total} suất quà</p>
           <Button block variant="coin" disabled={!d.eligible_now} onClick={onStage}><MonitorPlay className="size-4" aria-hidden />Mở màn hình quay</Button>
+          {!d.eligible_now && <p className="text-center text-xs text-warning">Chưa có ai đủ điều kiện quay ({who.toLowerCase()}). Huỷ lượt này và tạo lại với cách chọn người khác, hoặc chờ có người đạt điều kiện.</p>}
           <div className="grid grid-cols-[auto_1fr] gap-2">
             <Button variant="ghost" onClick={() => setConfirm('cancel')} aria-label="Huỷ lượt quay"><Trash2 className="size-4" aria-hidden /></Button>
             <Button variant="secondary" loading={run.isPending} disabled={!d.eligible_now} onClick={() => setConfirm('run')}><Zap className="size-4" aria-hidden />Quay nhanh tất cả</Button>
@@ -196,12 +197,23 @@ function CreateDrawSheet({ scope, refId, onClose, onCreated }: { scope: DrawScop
       names: rule === 'MANUAL' ? names : [], event_id: rule === 'EVENT' ? eventId : null,
       sponsor: sponsorName.trim() ? { name: sponsorName.trim(), logo_url: sponsorLogo } : null,
     }),
-    onSuccess: (d) => { toast.success('Đã tạo lượt quay'); void qc.invalidateQueries({ queryKey: ['draws', scope, refId] }); onClose(); if (d.eligible_now) onCreated(d.id) },
+    onSuccess: (d) => {
+      void qc.invalidateQueries({ queryKey: ['draws', scope, refId] }); onClose()
+      if (d.eligible_now) { toast.success('Đã tạo lượt quay'); onCreated(d.id) }
+      // Chưa ai đủ điều kiện thì không mở được màn hình quay — nói rõ thay vì im lặng
+      else toast.info('Đã tạo lượt quay, nhưng hiện chưa có ai đủ điều kiện nên chưa mở được màn hình quay. Đổi "Ai được quay" hoặc chờ có người đạt điều kiện.', { duration: 8000 })
+    },
     onError: (e) => toast.error(drawErrorMessage(e)),
   })
   const move = (i: number, dir: -1 | 1) => setPrizes((ps) => { const a = [...ps]; const j = i + dir; if (j < 0 || j >= a.length) return ps; [a[i], a[j]] = [a[j], a[i]]; return a })
-  const valid = title.trim().length >= 3 && prizes.some((p) => p.name.trim()) && (rule !== 'PICKED' || picked.size > 0)
-    && (rule !== 'MANUAL' || (names.length > 0 && names.length <= 2000)) && (rule !== 'EVENT' || !!eventId)
+  // Lý do nút Tạo bị khoá — hiện ngay dưới nút để không tưởng là nút hỏng
+  const missing = title.trim().length < 3 ? 'Nhập tên lượt quay (ít nhất 3 ký tự).'
+    : !prizes.some((p) => p.name.trim()) ? 'Nhập tên ít nhất một giải thưởng.'
+    : rule === 'PICKED' && picked.size === 0 ? 'Chọn ít nhất một người được quay.'
+    : rule === 'MANUAL' && names.length === 0 ? 'Dán danh sách tên (mỗi dòng một người).'
+    : rule === 'MANUAL' && names.length > 2000 ? 'Danh sách tối đa 2.000 người.'
+    : rule === 'EVENT' && !eventId ? 'Chọn một buổi của CLB.' : null
+  const valid = !missing
 
   if (picker) {
     const set = picker === 'picked' ? picked : excluded
@@ -214,7 +226,10 @@ function CreateDrawSheet({ scope, refId, onClose, onCreated }: { scope: DrawScop
   }
   return (
     <Sheet open onClose={onClose} title="Tạo lượt quay thưởng" description="Quà do ban tổ chức tự trao — RaceHub chọn người trúng minh bạch, có mã kiểm chứng."
-      footer={<Button block loading={create.isPending} disabled={!valid} onClick={() => create.mutate()}>Tạo & mở màn hình quay</Button>}>
+      footer={<div className="space-y-1.5">
+        <Button block loading={create.isPending} disabled={!valid} onClick={() => create.mutate()}>Tạo & mở màn hình quay</Button>
+        {missing && <p className="text-center text-xs text-fg-muted">{missing}</p>}
+      </div>}>
       <div className="space-y-4">
         <Field label="Tên lượt quay" htmlFor="d-title"><Input id="d-title" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} /></Field>
         <div className="space-y-2">

@@ -25,7 +25,7 @@ export default function FeedPage() {
       <KnowledgeHomeSection />
       {profile && (profile.strava_connected ? <StravaAutoSync /> : <ConnectDeviceCard />)}
 
-      {meId && <HomeFeeds community={<CommunityFeed meId={meId} />} />}
+      {meId && <HomeFeeds meId={meId} community={<CommunityFeed meId={meId} />} />}
     </div>
   )
 }

@@ -135,7 +135,7 @@ const RECIPES: Recipe[] = [
     gen: { segs: [{ s: 300, mps: pace(6), hr: 140, spm: 165 }, { s: 1200, mps: between(r, 5.7, 6.6), hr: 95 }, { s: 300, mps: pace(6), hr: 140, spm: 165 }] } }),
   (r) => ({ label: 'CHEAT', kind: 'Xe máy 3 đoạn × 1 phút 45 km/h', history: hist(r, 360),
     gen: { segs: [{ s: 600, mps: pace(6) }, { s: 60, mps: 12.5 }, { s: 600, mps: pace(6) }, { s: 60, mps: 12.5 }, { s: 600, mps: pace(6) }, { s: 60, mps: 12.5 }, { s: 300, mps: pace(6) }] } }),
-  (r) => ({ label: 'CHEAT', kind: 'Đi tắt: tuyến "nhảy" thêm 2 km', history: hist(r, 360),
+  (r) => ({ label: 'CHEAT_HARD', kind: 'Đi tắt: tuyến "nhảy" thêm 2 km (từ lần 6: GPS nhảy không giữ bài)', history: hist(r, 360),
     gen: { teleportM: 2000, segs: [{ s: 2400, mps: pace(6), hr: 145, spm: 166 }] } }),
   (r) => ({ label: 'CHEAT_HARD', kind: 'Ngồi xe kẹt đường 13–15 km/h (khó phát hiện)', history: hist(r, 400),
     gen: { segs: [{ s: 600, mps: pace(6.5), hr: 140, spm: 165 }, { s: 900, mps: between(r, 3.6, 4.1) }, { s: 600, mps: pace(6.5), hr: 140, spm: 165 }] } }),

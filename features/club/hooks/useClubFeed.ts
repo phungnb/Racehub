@@ -45,12 +45,15 @@ function patchPost(qc: ReturnType<typeof useQueryClient>, clubId: string, postId
     d && { ...d, pages: d.pages.map((pg) => pg.map((p) => (p.id === postId ? patch(p) : p))) })
   qc.setQueryData<ClubPost[]>(clubKeys.pinned(clubId), (d) => d?.map((p) => (p.id === postId ? patch(p) : p)))
   qc.setQueryData<ClubPost[]>(clubKeys.news(clubId), (d) => d?.map((p) => (p.id === postId ? patch(p) : p)))
+  qc.setQueryData<InfiniteData<{ post?: ClubPost | null }[]>>(clubKeys.following, (d) =>
+    d && { ...d, pages: d.pages.map((pg) => pg.map((a) => (a.post?.id === postId ? { ...a, post: patch(a.post) } : a))) })
 }
 
 export function usePostActions(clubId: string) {
   const qc = useQueryClient()
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: clubKeys.community })
+    void qc.invalidateQueries({ queryKey: clubKeys.following })
     void qc.invalidateQueries({ queryKey: clubKeys.posts(clubId) })
     void qc.invalidateQueries({ queryKey: clubKeys.pinned(clubId) })
     void qc.invalidateQueries({ queryKey: clubKeys.news(clubId) })

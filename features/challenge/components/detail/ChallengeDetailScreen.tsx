@@ -22,6 +22,7 @@ import {
 import { ConquestPanel } from './ConquestPanel'
 import { MemberDaysSheet } from './MemberDaysSheet'
 import { ChallengeBoostDays, RegDeadlineCard } from './ChallengeExtras'
+import { EditChallengeCard } from './EditChallenge'
 import { useChallenge, useChallengeActions } from '../../hooks/useChallenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
 import { PledgeChooser, PledgePanel } from './PledgePanel'
@@ -91,6 +92,7 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
         {c.description && <p className="whitespace-pre-line text-[15px] leading-relaxed text-fg-muted">{c.description}</p>}
       </header>
 
+      {d.can_manage && phase === 'UPCOMING' && c.status === 'ACTIVE' && <EditChallengeCard d={d} />}
       <RecurrenceBar d={d} />
       <StatusBanner d={d} phase={phase} />
       <ProgressHero d={d} phase={phase} standings={standings} />

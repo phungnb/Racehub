@@ -1,7 +1,11 @@
 // Bài chạy chờ xác minh (009700): lựa chọn của người chạy + "chỉ tính phần có GPS"
 import { supabase } from '@/shared/lib/supabase'
 
-export interface ReviewInfo { status: string; reason: string | null; can_accept_verified: boolean; gap_distance_m: number; verified_distance_m: number }
+export interface ReviewInfo {
+  status: string; reason: string | null; can_accept_verified: boolean; gap_distance_m: number; verified_distance_m: number
+  /** 013100: giải trình của người chạy gửi ban quản trị */
+  owner_note?: string | null; owner_note_at?: string | null
+}
 export interface AcceptResult { status: 'APPROVED' | 'REJECTED' | 'PENDING'; reason: string | null; distance_m: number; earned_xu: number; earned_xp: number }
 
 export async function getReviewInfo(activityId: string): Promise<ReviewInfo> {
@@ -15,6 +19,19 @@ export async function acceptVerifiedDistance(activityId: string): Promise<Accept
   if (error) throw error
   const r = data as AcceptResult
   return { ...r, distance_m: Number(r.distance_m ?? 0), earned_xu: Number(r.earned_xu ?? 0), earned_xp: Number(r.earned_xp ?? 0) }
+}
+
+/** 013100: người chạy giải trình cho bài đang chờ xác minh (5–500 ký tự) */
+export async function explainPendingRun(activityId: string, note: string): Promise<void> {
+  const { error } = await supabase.rpc('explain_pending_run', { p_activity_id: activityId, p_note: note })
+  if (error) throw error
+}
+export function explainErrorMessage(e: unknown): string {
+  const raw = (e as { message?: string } | null)?.message ?? ''
+  if (raw.includes('INVALID_NOTE')) return 'Giải trình cần 5–500 ký tự.'
+  if (raw.includes('ACTIVITY_NOT_PENDING')) return 'Bài đã được xử lý, không cần giải trình nữa.'
+  if (raw.includes('RATE_LIMITED')) return 'Bạn vừa gửi xong. Đợi vài giây rồi sửa lại.'
+  return 'Không gửi được. Hãy thử lại.'
 }
 
 // ---------------------------------------------------------------------

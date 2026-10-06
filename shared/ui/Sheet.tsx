@@ -12,11 +12,14 @@ export function Sheet({ open, onClose, title, description, children, footer, cla
 }) {
   const titleId = useId()
   const panel = useRef<HTMLDivElement>(null)
+  // onClose thường là hàm viết tại chỗ (đổi mỗi lần cha vẽ lại): giữ trong ref để không chạy lại effect → không nhảy focus về ô đầu khi đang gõ
+  const closeRef = useRef(onClose)
+  useEffect(() => { closeRef.current = onClose })
 
   useEffect(() => {
     if (!open) return
     const prev = document.activeElement as HTMLElement | null
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeRef.current() }
     document.addEventListener('keydown', onKey)
     const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -26,7 +29,7 @@ export function Sheet({ open, onClose, title, description, children, footer, cla
       document.body.style.overflow = overflow
       prev?.focus?.()
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
   // Portal ra body: tránh bị kẹt dưới thanh điều hướng khi cha có transform/animation (tạo stacking context)
