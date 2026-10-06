@@ -40,6 +40,8 @@ describe('tiện ích đồng bộ', () => {
       { result: 'IMPORTED', validation_status: 'PENDING', earned_xu: 0 },
       { result: 'SKIPPED', reason: 'NOT_RUN' }, { result: 'DUPLICATE' }, { result: 'UPDATED' },
     ])).toEqual({ imported: 2, pending: 1, skipped: 1, duplicates: 2, earned_xu: 5, skip_reasons: { NOT_RUN: 1 } })
+    // Lần 7: bài nhập tay được lưu nhưng không ghi nhận
+    expect(summarize([{ result: 'IMPORTED', validation_status: 'REJECTED', earned_xu: 0 }])).toMatchObject({ imported: 1, rejected: 1, pending: 0 })
   })
 })
 

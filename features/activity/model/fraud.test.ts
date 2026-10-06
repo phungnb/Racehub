@@ -66,9 +66,12 @@ describe('phát hiện gian lận bài chạy', () => {
     expect(codes(analyzeRun(sum(s), s))).not.toContain('HR_PACE')
   })
 
-  it('bài nhập tay / chạy máy → chờ duyệt dù không có streams', () => {
-    expect(analyzeRun({ manual: true, distanceM: 5000, movingS: 1500 }, null).verdict).toBe('REVIEW')
-    expect(analyzeRun({ trainer: true, distanceM: 5000, movingS: 1500 }, null).flags[0].code).toBe('TREADMILL')
+  // Lần 7 (đổi có chủ đích): nhập tay → không ghi nhận (REJECT); chạy máy → ghi nhận kèm cảnh báo (trước đây cả hai chờ duyệt)
+  it('bài nhập tay → không ghi nhận; chạy máy → ghi nhận kèm cảnh báo (không cần streams)', () => {
+    expect(analyzeRun({ manual: true, distanceM: 5000, movingS: 1500 }, null)).toMatchObject({ verdict: 'REJECT', reason: 'Bài nhập tay không được ghi nhận' })
+    const tm = analyzeRun({ trainer: true, distanceM: 5000, movingS: 1500 }, null)
+    expect(tm.flags[0]).toMatchObject({ code: 'TREADMILL', tier: 'WARN' })
+    expect(tm.verdict).toBe('OK')
   })
 
   it('nhanh bất thường so với lịch sử chỉ là tham khảo (một mình không chặn)', () => {
@@ -78,13 +81,14 @@ describe('phát hiện gian lận bài chạy', () => {
     expect(r.verdict).toBe('OK')
   })
 
-  it('vị trí nhảy xa + nhanh bất thường so với lịch sử → đủ 2 bằng chứng → chờ duyệt', () => {
+  // Lần 7 (đổi có chủ đích): GPS nhảy không còn được tính là một bằng chứng để cộng với cảnh báo khác (trước đây → REVIEW)
+  it('vị trí nhảy xa + nhanh bất thường so với lịch sử → GPS nhảy không tính là bằng chứng giữ bài → ghi nhận', () => {
     const s = build([[1500, 3.5]])
     for (const i of [300, 700, 1100]) s.latlng![i] = [21.01, 105.81]
     const history = Array.from({ length: 12 }, (_, i) => 420 + (i % 3) * 5)
     const r = analyzeRun(sum(s), s, history)
     expect(codes(r)).toEqual(expect.arrayContaining(['GPS_TELEPORT', 'HISTORY']))
-    expect(r.verdict).toBe('REVIEW')
+    expect(r.verdict).toBe('OK')
   })
 
   it('hàm phụ: tốc độ cửa sổ, đoạn dài nhất, đọc streams Strava', () => {
@@ -156,7 +160,7 @@ describe('cú nhảy GPS và đường cong pace theo thời gian', () => {
   })
 })
 
-import { FRAUD_RULES, gpsErrorRegions } from './fraud'
+import { FRAUD_ENGINE_VERSION, FRAUD_RULES, gpsErrorRegions, isGpsJumpFlag } from './fraud'
 
 describe('cú nhảy GPS: không sửa km đối tác, chỉ phân loại', () => {
   const jump = (s: FraudStreams, at: number, m: number, back = 0) => {
@@ -232,5 +236,91 @@ describe('mức kết luận và độc lập của bằng chứng', () => {
     const t = [0, 1, 2, 60, 61], raw = [0, 3, 6, 9, 12], clean = [0, 3, 6, 9, 12]
     expect(gpsErrorRegions(t, raw, clean, null, { sustained: { normal: { kmh: 17, s: 180 }, severe: { kmh: 20, s: 120 } }, vehicle: { kmh: 25, s: 30 }, teleport: { mps: 12, minCount: 3 } }))
       .toEqual([[2, 60]])
+  })
+})
+
+describe('luật Strava lần 7 (Phụng chốt 06/10/2026): GPS nhảy vẫn ghi nhận, nhập tay không ghi nhận, chạy máy cảnh báo', () => {
+  // Dịch chuyển m mét bắt đầu từ điểm i, trải trên `over` điểm (cả distance và latlng); back > 0: quay về sau `back` điểm
+  const shift = (s: FraudStreams, i: number, m: number, over = 1, back = 0) => {
+    const move = (from: number, sign: number) => {
+      for (let k = from; k < s.time.length; k++) {
+        const f = Math.min(1, (k - from + 1) / over)
+        s.distance[k] += m * f
+        s.latlng![k] = [s.latlng![k][0] + (sign * m * f) / 111_000, s.latlng![k][1]]
+      }
+    }
+    move(i, 1)
+    if (back) move(i + back, -1)
+    return s
+  }
+  const history = Array.from({ length: 15 }, (_, i) => 330 + (i % 5) * 6)
+  const gpsOnly = (r: ReturnType<typeof analyzeRun>) => r.flags.filter((f) => f.tier !== 'NOTE').every((f) => isGpsJumpFlag(f))
+
+  it('nhiều kiểu GPS nhảy (nhảy tức thời, trôi trải nhiều điểm, nhiều cú) → ghi nhận ngay (OK), cảnh báo vẫn lưu, km của Strava không đổi', () => {
+    const cases: [string, FraudStreams][] = [
+      ['3 cú 1,2 km trong 1 giây', shift(shift(shift(build([[2400, 3]]), 500, 1200), 1200, 1200), 1900, 1200)],
+      ['3 cú 300 m rồi quay về', shift(shift(shift(build([[2400, 3]]), 500, 300, 1, 2), 1200, 300, 1, 2), 1900, 300, 1, 2)],
+      ['dịch chuyển 600 m trải 15 giây', shift(build([[2400, 3]]), 1200, 600, 15)],
+      ['dịch chuyển 1 km trải 20 giây', shift(build([[2400, 3]]), 1200, 1000, 20)],
+      ['trôi 300 m ra rồi về, mỗi chiều 15 giây', shift(build([[2400, 3]]), 1200, 300, 15, 15)],
+      ['10 cú 200 m', [200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000].reduce((s, i) => shift(s, i, 200), build([[2400, 3]]))],
+    ]
+    for (const [name, s] of cases) {
+      const km = s.distance.at(-1)!
+      const r = analyzeRun({ ...sum(s), sportType: 'Run', hasGps: true }, s, history)
+      expect(r.verdict, name).toBe('OK')
+      expect(r.flags.some((f) => f.tier === 'WARN'), name).toBe(true)       // vẫn có cảnh báo cho ban quản trị
+      expect(gpsOnly(r), name).toBe(true)
+      expect(r.flags.every((f) => f.tier !== 'SUSPECT' && f.tier !== 'DISQUALIFY'), name).toBe(true)
+      expect(s.distance.at(-1), name).toBe(km)
+    }
+    // Tốc độ "nhanh hơn kỷ lục" chỉ vì GPS trôi → đánh dấu GPS nhảy, chỉ là cảnh báo
+    const drift = analyzeRun(sum(shift(build([[2400, 3]]), 1200, 1000, 20)), shift(build([[2400, 3]]), 1200, 1000, 20))
+    expect(drift.flags.find((f) => f.code === 'PACE_CURVE')).toMatchObject({ gpsJump: true, tier: 'WARN' })
+  })
+
+  it('đi xe thật (đoạn nhanh kéo dài) vẫn chờ duyệt dù đầu đoạn có "cú nhảy" ngắn', () => {
+    const s = build([[900, 3], [300, 13], [900, 3]])
+    const r = analyzeRun(sum(s), s)
+    expect(r.verdict).toBe('REVIEW')
+    expect(r.flags.filter((f) => f.code === 'VEHICLE_BURST' || f.code === 'PACE_CURVE').every((f) => !f.gpsJump)).toBe(true)
+  })
+
+  it('dấu hiệu không do GPS nhảy giữ nguyên hành vi: tim thấp + tốc độ cao ở hai thời điểm vẫn chờ duyệt', () => {
+    const s = build([[600, 3], [240, 4.9], [600, 3], [330, 3.6], [600, 3]],
+      { hr: (t) => (t > 1440 && t <= 1770 ? 95 + (t % 3) : 150 + (t % 5)) })
+    const r = analyzeRun({ ...sum(s), hasGps: true }, s)
+    expect(r.verdict).toBe('REVIEW')
+    expect(r.reason).toBeTruthy()
+  })
+
+  it('bài nhập tay → không ghi nhận (REJECT) kể cả khi có streams', () => {
+    const s = build([[1800, 3]])
+    const r = analyzeRun({ ...sum(s), manual: true, hasGps: false }, s)
+    expect(r).toMatchObject({ verdict: 'REJECT', basis: 'DISQUALIFY', reason: 'Bài nhập tay không được ghi nhận' })
+    expect(codes(r)).toEqual(['MANUAL'])
+  })
+
+  it('chạy máy / hoàn toàn không có GPS → ghi nhận kèm cảnh báo TREADMILL, không chờ duyệt', () => {
+    for (const summary of [
+      { distanceM: 8000, movingS: 2700, sportType: 'VirtualRun' },
+      { distanceM: 8000, movingS: 2700, trainer: true, deviceName: 'Treadmill' },
+      { distanceM: 8000, movingS: 2700, sportType: 'Run', hasGps: false },
+    ]) {
+      const r = analyzeRun(summary, null)
+      expect(r.verdict).toBe('OK')
+      expect(r.flags.find((f) => f.code === 'TREADMILL')).toMatchObject({ tier: 'WARN', source: 'DEVICE' })
+    }
+    // Chạy máy + một cảnh báo khác (khác thường ngày) vẫn không đủ 2 cảnh báo để giữ bài
+    const history = Array.from({ length: 12 }, (_, i) => 360 + (i % 3) * 10)
+    expect(analyzeRun({ distanceM: 10000, movingS: 2700, trainer: true }, null, history).verdict).toBe('OK')
+  })
+
+  it('phiên bản luật và danh mục quy tắc cập nhật theo lần 7', () => {
+    expect(FRAUD_ENGINE_VERSION).toBe('ac-2026.10.7')
+    expect(FRAUD_RULES.MANUAL.disqualify).toBeTruthy()
+    expect(FRAUD_RULES.MANUAL.suspect).toBeNull()
+    expect(FRAUD_RULES.TREADMILL.warn).toBeTruthy()
+    expect(FRAUD_RULES.TREADMILL.suspect).toBeNull()
   })
 })

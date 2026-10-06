@@ -85,13 +85,14 @@ describe('chính sách GPS V1 (010000)', () => {
     expect((await submit([[600, 3], [120, 12], [600, 3]])).validation_status).toBe('PENDING')
   })
 
-  it('bài nhập tay từ Strava → chờ xác minh, chưa cộng Xu', async () => {
+  // 013400 (lần 7, đổi có chủ đích): bài nhập tay không còn chờ xác minh mà không được ghi nhận
+  it('bài nhập tay từ Strava → không ghi nhận, không cộng Xu', async () => {
     await db.exec('set role service_role')
     try {
       const r = (await db.query<{ r: { validation_status: string; earned_xu: number } }>(`select public.ingest_provider_activity($1, 'STRAVA', 'man-1', $2::jsonb) as r`, [U, JSON.stringify({
         title: 'Run', sport_type: 'Run', manual: true, has_gps: false, started_at: new Date(Date.now() - 20 * 3600_000).toISOString(),
         elapsed_s: 3000, moving_s: 3000, distance_m: 10000 })])).rows[0].r
-      expect(r).toMatchObject({ validation_status: 'PENDING', earned_xu: 0 })
+      expect(r).toMatchObject({ validation_status: 'REJECTED', earned_xu: 0 })
     } finally { await db.exec('reset role') }
   })
 })

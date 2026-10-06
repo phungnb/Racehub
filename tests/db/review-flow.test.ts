@@ -45,10 +45,10 @@ describe('duyệt bài chuyên nghiệp + nhịp tim (002400)', () => {
     expect(r.validation_status).toBe('APPROVED')
   })
 
-  it('bài nhập tay → chờ duyệt, lý do có mức nghi vấn; báo người chạy và chủ nhiệm CLB', async () => {
-    const r = await ingest(db, 'manual', { manual: true, has_gps: false })
+  // 013400 (lần 7, đổi có chủ đích): bài nhập tay không còn chờ duyệt mà bị loại ngay → dùng bài bộ phân tích kết luận REVIEW
+  it('bài nghi vấn (bộ phân tích REVIEW) → chờ duyệt, lưu mức nghi vấn; báo người chạy và chủ nhiệm CLB', async () => {
+    const r = await ingest(db, 'suspect', { risk: { verdict: 'REVIEW', level: 'HIGH', score: 70, reason: 'Nhịp tim không khớp pace', flags: [] } })
     expect(r.validation_status).toBe('PENDING')
-    expect(r.reason).toMatch(/^Mức nghi vấn: Cao\. Bài nhập tay/)
     const row = (await db.query<{ risk_level: string; risk_score: number }>(`select risk_level, risk_score from public.activities where id = $1`, [r.activity_id])).rows[0]
     expect(row).toEqual({ risk_level: 'HIGH', risk_score: 70 })
     const notes = (await db.query<{ user_id: string; kind: string }>(

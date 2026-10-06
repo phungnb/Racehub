@@ -38,8 +38,12 @@ describe('Strava: một điểm GPS nhảy không làm bài bị chặn (012400)
   it('đã phân tích chi tiết và bình thường → hợp lệ dù vận tốc tối đa 73 km/h', async () => {
     expect((await ingest('12401', run({ started_at: hoursAgo(5), risk: OK_RISK }))).validation_status).toBe('APPROVED')
   })
-  it('không có phân tích chi tiết → vẫn chờ duyệt như cũ', async () => {
-    expect((await ingest('12402', run({ started_at: hoursAgo(8) }))).validation_status).toBe('PENDING')
+  // 013400 (lần 7, đổi có chủ đích): bài có GPS, vận tốc tối đa một điểm (GPS nhảy) → ghi nhận ngay, chỉ cảnh báo
+  it('không có phân tích chi tiết → vẫn ghi nhận (bài có GPS), lưu cảnh báo vận tốc tối đa', async () => {
+    expect((await ingest('12402', run({ started_at: hoursAgo(8) }))).validation_status).toBe('APPROVED')
+    const flags = (await db.query<{ risk_flags: { code: string; tier: string }[] }>(
+      `select risk_flags from public.activities where source_activity_id = '12402'`)).rows[0].risk_flags
+    expect(flags).toEqual([expect.objectContaining({ code: 'VEHICLE_BURST', tier: 'WARN' })])
   })
   it('bộ phân tích kết luận REVIEW → chờ duyệt, lưu mức nghi vấn của bộ phân tích', async () => {
     const r = await ingest('12403', run({ started_at: hoursAgo(11), max_speed_mps: 4,

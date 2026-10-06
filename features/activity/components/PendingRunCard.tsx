@@ -22,18 +22,20 @@ export interface PendingRun {
   can_review?: boolean
   /** Bài bị loại vì trùng giờ với bài khác đang được tính — không khôi phục được */
   overlap?: boolean
+  /** 013400: bài nhập tay từ đối tác — không bao giờ được ghi nhận, không khôi phục được */
+  manual?: boolean
   /** 013100: giải trình của người chạy */
   owner_note?: string | null
   profiles: { display_name: string | null; avatar_url?: string | null } | null
 }
 
-const FLAG_LABEL: Record<string, string> = {
+export const FLAG_LABEL: Record<string, string> = {
   MANUAL: 'Nhập tay', TREADMILL: 'Chạy máy', SUSTAINED_SPEED: 'Tốc độ duy trì', VEHICLE_BURST: 'Giống đi xe',
   GPS_TELEPORT: 'GPS nhảy', GPS_GAP: 'Mất tín hiệu GPS', STRIDE: 'Sải chân', HR_PACE: 'Tim thấp / pace nhanh', HISTORY: 'Khác thường ngày', PACE_CURVE: 'Nhanh hơn kỷ lục',
   GPS_DISTANCE_GAIN: 'Vị trí dịch chuyển', DISTANCE_MISMATCH: 'Lệch km',
 }
 /** Mức của dấu hiệu (012500): cảnh báo ≠ đủ căn cứ loại */
-const TIER: Record<string, { label: string; tone: string }> = {
+export const TIER: Record<string, { label: string; tone: string }> = {
   DISQUALIFY: { label: 'Đủ căn cứ loại', tone: 'border-danger bg-danger/15 text-danger' },
   SUSPECT: { label: 'Nghi vấn', tone: 'border-danger/50 text-danger' },
   WARN: { label: 'Cảnh báo', tone: 'border-warning/60 text-warning' },
@@ -42,7 +44,7 @@ const TIER: Record<string, { label: string; tone: string }> = {
 const tierOf = (f: { severity: string; tier?: string | null }) => f.tier ?? (f.severity === 'SEVERE' ? 'SUSPECT' : f.severity === 'HIGH' ? 'WARN' : 'NOTE')
 export const RISK_LABEL = { LOW: 'Thấp', MEDIUM: 'Trung bình', HIGH: 'Cao', CRITICAL: 'Rất cao' } as const
 const RISK_TONE = { LOW: 'bg-surface-2 text-fg-muted', MEDIUM: 'bg-warning/15 text-warning', HIGH: 'bg-danger/15 text-danger', CRITICAL: 'bg-danger text-bg' } as const
-const SOURCE_LABEL: Record<string, string> = { STRAVA: 'Strava', DIRECT_GPS: 'GPS trong app', GARMIN: 'Garmin', COROS: 'Coros' }
+export const SOURCE_LABEL: Record<string, string> = { STRAVA: 'Strava', DIRECT_GPS: 'GPS trong app', GARMIN: 'Garmin', COROS: 'Coros' }
 const pace = (s: number, m: number) => { const p = Math.round(s / (m / 1000)); return `${Math.floor(p / 60)}:${String(p % 60).padStart(2, '0')}` }
 
 export function PendingRunCard({ run: a, onReview, onRestore, busy }: {
@@ -90,6 +92,8 @@ export function PendingRunCard({ run: a, onReview, onRestore, busy }: {
       {onRestore ? (
         a.overlap ? (
           <p className="text-center text-xs text-fg-subtle">Bị loại vì trùng giờ với bài khác đang được tính — không khôi phục</p>
+        ) : a.manual ? (
+          <p className="text-center text-xs text-fg-subtle">Bài nhập tay không được ghi nhận — không khôi phục</p>
         ) : a.can_review === false ? (
           <p className="text-center text-xs text-fg-subtle">Bài của bạn — người khác trong ban quản trị sẽ xem lại</p>
         ) : (
