@@ -171,11 +171,11 @@ describe('cú nhảy GPS: không sửa km đối tác, chỉ phân loại', () =
     expect(r.verdict).toBe('OK')
     expect(r.flags.find((f) => f.code === 'GPS_DISTANCE_GAIN')).toMatchObject({ tier: 'NOTE' })
   })
-  it('một lần vị trí dịch chuyển 2 km trong 1 giây rồi chạy tiếp → nghi vấn, chờ duyệt; km gốc không đổi', () => {
+  it('một lần vị trí dịch chuyển 2 km trong 1 giây rồi chạy tiếp → chỉ cảnh báo, bài có GPS vẫn ghi nhận; km gốc không đổi', () => {
     const s = jump(build([[2400, 3.0]]), 1200, 2000)
     const r = analyzeRun(sum(s), s)
-    expect(r.verdict).toBe('REVIEW')
-    expect(r.flags.find((f) => f.code === 'GPS_DISTANCE_GAIN')).toMatchObject({ tier: 'SUSPECT' })
+    expect(r.verdict).toBe('OK')
+    expect(r.flags.find((f) => f.code === 'GPS_DISTANCE_GAIN')).toMatchObject({ tier: 'WARN' })
     expect(r.flags.find((f) => f.code === 'GPS_DISTANCE_GAIN')!.evidence!.maxJumpM).toBeGreaterThanOrEqual(2000)
     expect(s.distance.at(-1)).toBeCloseTo(9200)
   })

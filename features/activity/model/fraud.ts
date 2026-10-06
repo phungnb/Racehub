@@ -149,9 +149,9 @@ export const FRAUD_RULES: Record<FraudCode, FraudRule> = {
   },
   GPS_DISTANCE_GAIN: {
     label: 'Vị trí dịch chuyển', source: 'GPS',
-    reason: 'GPS lạc vài chục–vài trăm mét rồi quay về là BÌNH THƯỜNG (chỉ ghi chú). Một lần vị trí "dịch chuyển" ≥ 1 km trong vài giây (≥ 360 km/h) rồi chạy tiếp từ chỗ mới thì không thể do chạy hay sóng yếu thông thường — thường do sửa / ghép file tuyến hoặc app giả vị trí. Km của đối tác KHÔNG bị sửa; bài chờ người duyệt xác minh.',
+    reason: 'GPS lạc vài chục–vài trăm mét rồi quay về là BÌNH THƯỜNG (chỉ ghi chú). Một lần vị trí "dịch chuyển" ≥ 1 km trong vài giây (≥ 360 km/h) rồi chạy tiếp từ chỗ mới thì không thể do chạy hay sóng yếu thông thường — có thể do sửa / ghép file tuyến, app giả vị trí hoặc GPS lỗi nặng. Km của đối tác KHÔNG bị sửa; từ lần chỉnh sửa 6 chỉ là cảnh báo, bài có GPS vẫn được ghi nhận.',
     inputs: 'Streams time + distance: chuỗi điểm nhanh hơn ngưỡng "nhảy" kéo dài ≤ 10 giây, xung quanh 30 giây đang ở tốc độ chạy bộ; đo từng cú nhảy riêng',
-    warn: null, suspect: 'Một cú dịch chuyển ≥ 1 km', disqualify: null,
+    warn: 'Một cú dịch chuyển ≥ 1 km', suspect: null, disqualify: null,
     falsePositives: 'Đồng hồ bắt GPS sai lúc mới bật / ra khỏi hầm dài — người duyệt xem bản đồ để quyết định',
   },
   STRIDE: {
@@ -485,9 +485,11 @@ export function analyzeRun(summary: FraudSummary, streams: FraudStreams | null, 
     if (gain >= 50) {
       const jump = maxJumpM >= FRAUD_CONFIG.gain.jumpM
       const ev = { addedM: Math.round(gain), maxJumpM: Math.round(maxJumpM), reportedStreamM: Math.round(rawM), withoutJumpsM: Math.round(cleanDistanceM) }
+      // Chỉnh sửa lần 6 (Phụng quyết 06/10/2026): bài có GPS được ghi nhận dù GPS nhảy — cú dịch chuyển chỉ là CẢNH BÁO
+      // (một mình không giữ bài); bằng chứng vẫn lưu để ban quản trị xem lại.
       raw.push(jump
-        ? { code: 'GPS_DISTANCE_GAIN', severity: 'SEVERE', score: 80, tier: 'SUSPECT', atS: maxJumpAtS, evidence: ev,
-            message: `Vị trí dịch chuyển ${Math.round(maxJumpM)} m trong vài giây — không thể do chạy bộ (có thể đi tắt / sửa tuyến); km giữ nguyên, cần người duyệt xác minh` }
+        ? { code: 'GPS_DISTANCE_GAIN', severity: 'HIGH', score: 60, tier: 'WARN', atS: maxJumpAtS, evidence: ev,
+            message: `Vị trí dịch chuyển ${Math.round(maxJumpM)} m trong vài giây (GPS nhảy hoặc đi tắt); km giữ nguyên, bài vẫn được ghi nhận` }
         : { code: 'GPS_DISTANCE_GAIN', severity: 'INFO', score: 20, tier: 'NOTE', evidence: ev,
             message: `GPS nhảy cộng thêm khoảng ${Math.round(gain)} m (bình thường, km giữ nguyên)` })
     }

@@ -28,7 +28,7 @@ Danh mục quy tắc đầy đủ (lý do, dữ liệu đầu vào, ngưỡng, n
 | `SUSTAINED_SPEED` — giữ tốc độ cao lâu | GPS | ≥ 17 km/h ≥ 3′ | ≥ 20 km/h ≥ 2′ | — |
 | `VEHICLE_BURST` — giống đi xe | GPS | — | ≥ 25 km/h ≥ 30″ | — |
 | `GPS_TELEPORT` — GPS nhảy | GPS | ≥ 3 lần | — | — |
-| `GPS_DISTANCE_GAIN` — vị trí dịch chuyển | GPS | — (GPS lạc rồi quay về: chỉ ghi chú) | một cú dịch chuyển ≥ 1 km trong ≤ 10 giây | — |
+| `GPS_DISTANCE_GAIN` — vị trí dịch chuyển | GPS | một cú dịch chuyển ≥ 1 km trong ≤ 10 giây (GPS lạc rồi quay về: chỉ ghi chú) | — | — |
 | `STRIDE` — sải chân | GPS+CADENCE | > 1,8 m ≥ 90″ | > 2,1 m ≥ 90″ | — |
 | `HR_PACE` — tim thấp / pace nhanh | GPS+HR | 3–5′ | ≥ 5′ | — |
 | `HISTORY` — khác thường ngày | HISTORY | ≥ 5 độ lệch chuẩn | — | — |
@@ -45,7 +45,7 @@ Ngưỡng tốc độ (`SUSTAINED_SPEED`, `VEHICLE_BURST`, nhảy GPS) do admin 
   - tắt rồi bật đồng hồ ở chỗ khác mà thiết bị vẫn nối thẳng hai điểm.
 
   Dấu hiệu là vị trí **dịch chuyển một lần ≥ 1 km trong vài giây** (≥ 360 km/h), không quay về, rồi chạy tiếp bình thường từ chỗ mới. Trước và sau đó đều là tốc độ chạy bộ, nên các luật tốc độ theo đoạn 30 giây không thấy được.
-- **Cách xử lý:** bài bị đánh dấu **Nghi vấn**, km giữ nguyên và bài chờ người duyệt. Người duyệt xem bản đồ và bằng chứng (`maxJumpM`: cú nhảy lớn nhất; `addedM`: tổng km do nhảy; `withoutJumpsM`: km nếu bỏ các cú nhảy, chỉ để tham khảo), rồi quyết định **duyệt** hoặc **loại**. Nếu loại nhầm thì có thể khôi phục.
+- **Cách xử lý (từ chỉnh sửa lần 6, 06/10/2026):** bài có GPS được **ghi nhận ngay** dù GPS nhảy; cú dịch chuyển chỉ là **Cảnh báo** (một mình không giữ bài), km giữ nguyên. Đánh đổi đã chấp nhận: kiểu gian lận đi tắt không còn bị giữ tự động. Người duyệt xem bản đồ và bằng chứng (`maxJumpM`: cú nhảy lớn nhất; `addedM`: tổng km do nhảy; `withoutJumpsM`: km nếu bỏ các cú nhảy, chỉ để tham khảo), rồi quyết định **duyệt** hoặc **loại**. Nếu loại nhầm thì có thể khôi phục.
 - **Trường hợp dễ báo nhầm:** đồng hồ bắt GPS sai lúc mới bật, hoặc ra khỏi hầm dài. Chính vì vậy dấu hiệu này chỉ ở mức Nghi vấn, không phải "Đủ căn cứ loại".
 
 ## 3. Quy trình quyết định
@@ -64,7 +64,8 @@ Ngưỡng tốc độ (`SUSTAINED_SPEED`, `VEHICLE_BURST`, nhảy GPS) do admin 
 |---|---|---|---|
 | Bài thật phong trào (7 kiểu: đèn đỏ, tempo, 8×400 m, 5×1 km pace 3:15, 10 km pace 3:05, trail, không cảm biến) | 84 | **0%** | |
 | Bài thật có lỗi GPS (nhảy điểm, trôi nhà cao tầng, mất tín hiệu, kết hợp biến tốc) | 48 | **0%** | chỉ ghi chú, km giữ nguyên |
-| Gian lận rõ (ô tô 5′, đạp xe, xe điện, xe máy từng đoạn, đi tắt 2 km) | 60 | **100%** chuyển duyệt | đi tắt: Nghi vấn, km giữ nguyên |
+| Gian lận rõ (ô tô 5′, đạp xe, xe điện, xe máy từng đoạn) | 48 | **100%** chuyển duyệt | |
+| Đi tắt 2 km (tuyến nhảy) | 12 | 0% | **Chấp nhận từ lần 6**: chỉ Cảnh báo, bài được ghi nhận |
 | VĐV đỉnh cao 5 km pace 2:50 | 12 | 100% chuyển duyệt | Chấp nhận: hiếm, người duyệt xác nhận |
 | Ngồi xe kẹt đường 13–15 km/h | 12 | 0% | **Giới hạn đã biết**: tốc độ như người chạy |
 
