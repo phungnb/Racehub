@@ -155,5 +155,5 @@ Trong Xcode:
 | 3 | Thông báo đẩy trong app native chưa có. Web Push không chạy trong WebView iOS. | Không bắt buộc, nhưng là tính năng cốt lõi | Thêm `@capacitor/push-notifications` (APNs + FCM) và bảng token thiết bị. Máy chủ gửi song song với Web Push. |
 | 4 | App tải giao diện từ web (`server.url`). | Apple 4.2 / 2.5.2 | Được phép, vì có tính năng native thật. Ghi rõ trong Review Notes và gửi kèm tài khoản thử. Rủi ro còn lại ở mức trung bình. |
 | 5 | Chưa có `PrivacyInfo.xcprivacy` cấp app. | Apple (từ 05/2024) | Thêm file khai báo lý do dùng API (UserDefaults, thời gian khởi động…). |
-| 6 | Android đang để `targetSdkVersion = 35`. | Google Play nâng mức tối thiểu hằng năm (tháng 8) | Kiểm tra mức yêu cầu hiện tại trên Play Console. Nếu đã là 36 thì nâng lên và thử lại GPS nền. |
+| 6 | Android đã nâng `targetSdkVersion = 36` (Google Play bắt buộc từ 31/8/2026). | Google Play nâng mức tối thiểu hằng năm (tháng 8) | Kiểm tra mức yêu cầu hiện tại trên Play Console. Nếu đã là 36 thì nâng lên và thử lại GPS nền. |
 | 7 | Logo nguồn đang là 512 px phóng to. | App Store cần 1024×1024 | Thay bằng logo gốc 1024×1024. |
