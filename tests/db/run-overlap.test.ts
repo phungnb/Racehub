@@ -71,10 +71,10 @@ describe('bài chạy trùng giờ trên nhiều thiết bị (009900)', () => {
     expect(Number((await db.query<{ n: string }>(`select count(*) n from public.activities where user_id = $1 and started_at = $2`, [U, start.toISOString()])).rows[0].n)).toBe(1)
   })
 
-  it('bài dài hơn nhưng nghi vấn (tốc độ đi xe) không được thay bài đã tính', async () => {
+  it('bài dài hơn nhưng nghi vấn (tốc độ đi xe) không được thay bài đã tính — chờ duyệt (013700)', async () => {
     const ok = await submit(at(80, 10), 1800)
     const fast = await submit(at(80), 3600, 9)                           // 32 km/h suốt 1 giờ
-    expect(fast.validation_status).toBe('REJECTED')
+    expect(fast.validation_status).toBe('PENDING')                      // 013700: chờ duyệt, không bị loại ngay
     expect((await row(ok.activity_id)).validation_status).toBe('APPROVED')
   })
 
