@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronRight } from 'lucide-react'
-import { Avatar, SectionTitle } from '@/shared/ui'
+import { ChevronDown, ChevronRight } from 'lucide-react'
+import { Avatar } from '@/shared/ui'
 import { formatKm } from '@/shared/lib/format'
 import { cn } from '@/shared/lib/cn'
 import { listWarnedRuns, type WarnedRun } from '../api/reviewApi'
@@ -27,13 +27,19 @@ const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('vi-
  */
 export function WarnedRuns({ clubId }: { clubId: string | null }) {
   const [filter, setFilter] = useState<Filter>('ALL')
+  const [open, setOpen] = useState(false) // gập sẵn: danh sách có thể dài tới 300 bài
   const q = useQuery({ queryKey: ['warned-runs', clubId ?? 'all'], queryFn: () => listWarnedRuns(clubId) })
   if (!q.data?.length) return null
   const rows = filter === 'ALL' ? q.data : q.data.filter((r) => kindOf(r).includes(filter))
   return (
     <section>
-      <SectionTitle>Bài có cảnh báo (30 ngày)</SectionTitle>
-      <p className="-mt-1 mb-2 text-xs text-fg-muted">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-surface px-3 py-2.5 text-left">
+        <span className="text-sm font-semibold">Bài có cảnh báo (30 ngày) · {q.data.length} bài</span>
+        <ChevronDown className={cn('size-4 shrink-0 text-fg-subtle transition-transform', open && 'rotate-180')} aria-hidden />
+      </button>
+      {open && (<div className="mt-2">
+      <p className="mb-2 text-xs text-fg-muted">
         Đã ghi nhận, không cần duyệt — GPS nhảy vẫn ghi nhận nếu bài có GPS; chạy máy / không có GPS ghi nhận kèm cảnh báo. Km giữ nguyên theo Strava.
       </p>
       <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="Lọc cảnh báo">
@@ -72,6 +78,7 @@ export function WarnedRuns({ clubId }: { clubId: string | null }) {
           ))}
         </ul>
       ) : <p className="text-xs text-fg-subtle">Không có bài nào trong nhóm này.</p>}
+      </div>)}
     </section>
   )
 }

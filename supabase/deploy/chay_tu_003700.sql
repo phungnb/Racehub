@@ -1,7 +1,7 @@
--- RaceHub: gộp 100 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 101 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -27145,6 +27145,60 @@ grant execute on function public.finish_lucky_draw(uuid), public.confirm_lucky_d
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001013600_run_reminder.sql
+-- ===================================================================
+-- Nhắc runner 3 ngày chưa có bài chạy (Phụng yêu cầu 2026-10-06).
+-- Luật cố định, không AI (ADR-018): runner có bài hợp lệ gần nhất cách đây 3–30 ngày, chưa bị khóa,
+-- và chưa được nhắc trong 7 ngày qua thì nhận 1 thông báo (chuông + push theo cài đặt "Thành tích").
+-- Giờ gửi do cron quyết định (10:30 UTC = 17:30 giờ VN). Idempotent: chạy lại trong ngày không nhắc thêm.
+
+-- Loại thông báo mới thuộc nhóm "game" để dùng chung công tắc "Thành tích", không đổi bảng cài đặt push
+create or replace function private.push_category(p_kind text) returns text
+language sql immutable as $$
+  select case
+    when p_kind like 'CLUB\_%' or p_kind = 'CHAT_MENTION' then 'club'
+    when p_kind like 'POST\_%' or p_kind = 'CHEER' then 'social'
+    when p_kind like 'CHALLENGE\_%' then 'challenge'
+    when p_kind in ('BADGE', 'LEVEL_UP', 'LEAGUE', 'RUN_REMINDER') then 'game'
+    else 'system'
+  end
+$$;
+
+create or replace function public.send_run_reminders() returns integer
+language plpgsql security definer set search_path = public as $$
+declare r record; n integer := 0;
+begin
+  for r in
+    select u.user_id, u.last_run
+      from (select a.user_id, max(a.started_at) as last_run
+              from public.activities a
+             where a.validation_status = 'APPROVED' and coalesce(a.status, '') <> 'DELETED'
+             group by a.user_id) u
+      join public.profiles p on p.id = u.user_id
+     where p.banned_at is null
+       and u.last_run <= now() - interval '3 days'
+       and u.last_run >  now() - interval '30 days'
+       and not exists (select 1 from public.notifications x
+                        where x.user_id = u.user_id and x.kind = 'RUN_REMINDER' and x.created_at > now() - interval '7 days')
+     order by u.last_run desc
+     limit 500
+  loop
+    perform private.notify(r.user_id, null, 'RUN_REMINDER',
+      'Đã vài ngày chưa thấy bạn chạy',
+      'Một buổi nhẹ 20–30 phút cũng đủ giữ nhịp. Mở RaceHub để xem thử thách đang chờ bạn.',
+      '/me');
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+
+revoke all on function public.send_run_reminders() from public, anon, authenticated;
+grant execute on function public.send_run_reminders() to service_role;
+revoke all on function private.push_category(text) from public, anon, authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -27412,7 +27466,9 @@ begin
       'ok', to_regprocedure('public.warned_activities(uuid,integer)') is not null),
     jsonb_build_object('file', '20261001013500', 'label', 'Chỉnh sửa lần 7: Ban tổ chức chấp nhận / huỷ kết quả quay thưởng',
       'ok', to_regclass('public.lucky_draw_rejections') is not null and to_regprocedure('public.confirm_lucky_draw(uuid)') is not null
-        and to_regprocedure('public.reject_lucky_draw(uuid,text)') is not null));
+        and to_regprocedure('public.reject_lucky_draw(uuid,text)') is not null),
+    jsonb_build_object('file', '20261001013600', 'label', 'Nhắc runner 3 ngày chưa chạy',
+      'ok', to_regprocedure('public.send_run_reminders()') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
