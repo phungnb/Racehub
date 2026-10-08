@@ -28,5 +28,5 @@ Không nhớ đã chạy tới đâu: xem **Quản trị → Hệ thống → Ki
 | [phan_21.sql](phan_21.sql) | 012800, 012900, 013000 | 76 KB |
 | [phan_22.sql](phan_22.sql) | 013100, 013200 | 43 KB |
 | [phan_23.sql](phan_23.sql) | 013300, 013400 | 79 KB |
-| [phan_24.sql](phan_24.sql) | 013500, 013600, 013700, 013800, 013900 | 37 KB |
-| [phan_25.sql](phan_25.sql) | 003500 | 38 KB |
+| [phan_24.sql](phan_24.sql) | 013500, 013600, 013700, 013800, 013900, 014000 | 39 KB |
+| [phan_25.sql](phan_25.sql) | 003500 | 39 KB |
