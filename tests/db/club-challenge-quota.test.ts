@@ -82,6 +82,24 @@ describe('hạn mức thử thách CLB (008200)', () => {
     expect((await quote(db, OWN, 20, CLUB)).club_quota).toMatchObject({ eligible: true, open: 1 })
   })
 
+  it('Chinh phục cá nhân nhiều người trong CLB: báo giá theo số chỗ thật, khớp với lúc tạo (013900)', async () => {
+    const q = (slots: number) => rpc(db, OWN, `select public.quote_challenge($1, 'SOLO_GOAL', $2) as r`, [slots, CLUB])
+    expect(await q(50)).toMatchObject({ fee: 0, club_quota: { plan: 'FREE', eligible: true } })
+    const over = await q(51)
+    expect(over.club_quota).toMatchObject({ eligible: false, reason: 'SLOTS_LIMIT' })
+    expect(Number(over.fee)).toBeGreaterThan(0)
+    // "Cá nhân tôi": app gửi 1 chỗ → vẫn miễn phí
+    expect(await q(1)).toMatchObject({ fee: 0 })
+    // tạo thật 51 chỗ: bị tính phí đúng như báo giá (không được miễn theo gói Free), 50 chỗ thì miễn
+    const mk = async (slots: number) => rpc<{ fee: number; club_free: string | null }>(db, OWN, `select public.create_challenge_v2($1::jsonb, $2) as r`, [JSON.stringify({
+      title: `Chinh phục ${++n}`, format: 'SOLO_GOAL', objective: 'DISTANCE', target_value: 1, audience: 'CLUB_ONLY', club_id: CLUB,
+      max_slots: slots, start_date: iso(1), end_date: iso(24 * 7) }), `quota-solo-${n}-xxxxxxxx`])
+    const paid = await mk(51)
+    expect(paid!.fee).toBeGreaterThan(0)
+    expect(paid!.club_free).toBeNull()
+    await db.query(`update public.challenges set status = 'CANCELLED' where id = (select id from public.challenges where target_club_id = $1 and status = 'ACTIVE' order by created_at desc limit 1)`, [CLUB])
+  })
+
   it('CLB Pro: không cần điều kiện thành viên, tới 20 thử thách cùng lúc, mỗi thử thách tới 1.000 người', async () => {
     await rpc(db, ADM, `select public.admin_set_club_plan($1, 'PRO', null, 'Test Pro') as r`, [SOLO_CLUB])
     const q = await quote(db, SOLO, 1000, SOLO_CLUB)
