@@ -162,6 +162,12 @@ describe('chinh phục thời gian / pace (010700)', () => {
     expect(validateDraft({ ...defaultDraft(now), format: 'COLLECTIVE', targetValue: 0 }, 2, now).targetValue).toBeDefined()
     expect(validateDraft({ ...defaultDraft(now), format: 'RANKED', targetValue: 0 }, 2, now).targetValue).toBeUndefined()
     expect(draftToPayload({ ...defaultDraft(now), format: 'RANKED', title: 'Đua tháng 10' }).format).toBe('RANKED')
+    // 014100: Công khai do CLB tổ chức giữ club_id; Có mã mời / "Cá nhân tôi" / 1-1 thì không
+    const C = '00000000-0000-0000-0000-0000000000c1'
+    expect(draftToPayload({ ...defaultDraft(now, C), audience: 'PUBLIC', title: 'Mở rộng CLB' })).toMatchObject({ audience: 'PUBLIC', club_id: C })
+    expect(draftToPayload({ ...defaultDraft(now, C), audience: 'INVITE_ONLY', title: 'Có mã' }).club_id).toBeNull()
+    expect(draftToPayload({ ...defaultDraft(now, C), format: 'SOLO_GOAL', personal: true, audience: 'PUBLIC', targetValue: 10, title: 'Của tôi' }).club_id).toBeNull()
+    expect(m.clubOrganizes({ ...defaultDraft(now, C), format: 'DUEL', audience: 'PUBLIC' })).toBe(false)
   })
   it('mỗi loại thử thách có mô tả cách tính điểm riêng', () => {
     expect(m.scoringLines({ format: 'SOLO_GOAL', objective: 'BEST_TIME', conquest_mode: 'SELF' }).join(' ')).toContain('tự đăng ký')

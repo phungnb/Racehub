@@ -273,7 +273,10 @@ begin
     jsonb_build_object('file', '20261001013900', 'label', 'Báo giá thử thách chinh phục nhiều người tính theo số chỗ thật (khớp hạn mức gói CLB)',
       'ok', pg_get_functiondef('public.quote_challenge(integer,text,uuid)'::regprocedure) !~ 'SOLO_GOAL'),
     jsonb_build_object('file', '20261001014000', 'label', 'Sửa lỗi lưu gói ở trang admin (UNK-FSZ)',
-      'ok', pg_get_functiondef('public.admin_save_plan(jsonb)'::regprocedure) !~ 'jsonb_array_elements\(p->''credits''\) e'));
+      'ok', pg_get_functiondef('public.admin_save_plan(jsonb)'::regprocedure) !~ 'jsonb_array_elements\(p->''credits''\) e'),
+    jsonb_build_object('file', '20261001014100', 'label', 'Thử thách Công khai do CLB tổ chức (quỹ / lượt gói CLB trả phí)',
+      'ok', to_regprocedure('public.quote_challenge(integer,text,uuid,text)') is not null
+            and pg_get_functiondef('public.create_challenge_v2(jsonb,text)'::regprocedure) ~ 'v_audience = ''PUBLIC'' and v_club is not null'));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

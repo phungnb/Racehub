@@ -1,7 +1,7 @@
 // Thử thách: mọi thao tác ghi đi qua RPC (migration 000600). Client chỉ đọc và hiển thị.
 import { supabase } from '@/shared/lib/supabase'
 import type { Audience, ChallengeDraft, ChallengeFormat, Objective, RewardSource, RewardSplit, TeamMode } from '../model/challenge'
-import { draftToPayload, effectiveSlots, type conquestPayload, type pledgePayload } from '../model/challenge'
+import { clubOrganizes, draftToPayload, effectiveSlots, type conquestPayload, type pledgePayload } from '../model/challenge'
 import { toPolicy, type EconomyPolicy } from '@/shared/lib/economy'
 import { systemErrorMessage } from '@/shared/lib/errors'
 import { prepareImage } from '@/shared/lib/image'
@@ -245,7 +245,9 @@ export interface ClubChallengeQuota {
 /** Báo giá tạo thử thách: phí, ai trả, vé miễn phí đang có (quote_challenge, migration 000700) */
 export async function quoteChallenge(d: ChallengeDraft): Promise<ChallengeQuote> {
   const { data, error } = await supabase.rpc('quote_challenge', {
-    p_max_slots: effectiveSlots(d), p_format: d.format, p_club_id: d.audience === 'CLUB_ONLY' && !(d.format === 'SOLO_GOAL' && d.personal) ? d.clubId : null,
+    p_max_slots: effectiveSlots(d), p_format: d.format, p_club_id: clubOrganizes(d) ? d.clubId : null,
+    // Công khai do CLB tổ chức: quỹ / lượt CLB trả, không hưởng hạn mức nội bộ (bản 4 tham số, 014100)
+    ...(clubOrganizes(d) && d.audience === 'PUBLIC' ? { p_audience: 'PUBLIC' } : {}),
   })
   if (error) throw error
   const q = data as {

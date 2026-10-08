@@ -432,6 +432,10 @@ export const pledgePayload = (p: PledgeDraft, team = false) => ({
 export const cappedKm = (km: number, pledge: number | null, capPct: number | null) =>
   pledge && capPct !== null ? Math.min(km, Math.round(pledge * (1 + capPct / 100) * 100) / 100) : km
 
+/** CLB đứng tên tổ chức, quỹ / lượt gói CLB trả phí: nội bộ CLB, hoặc Công khai do ban quản trị chọn CLB tổ chức (014100) */
+export const clubOrganizes = (d: Pick<ChallengeDraft, 'format' | 'audience' | 'clubId' | 'personal'>) =>
+  !!d.clubId && !(d.format === 'SOLO_GOAL' && d.personal) && (d.audience === 'CLUB_ONLY' || (d.audience === 'PUBLIC' && d.format !== 'DUEL'))
+
 export function defaultDraft(now = new Date(), clubId: string | null = null): ChallengeDraft {
   const start = new Date(now.getTime() + 3_600_000)
   start.setMinutes(0, 0, 0)
@@ -533,7 +537,7 @@ export function draftToPayload(d: ChallengeDraft) {
     max_slots: effectiveSlots(d),
     // "Cá nhân tôi": ẩn khỏi Khám phá, chỉ mình mình
     audience: d.format === 'SOLO_GOAL' && d.personal ? 'INVITE_ONLY' : d.format === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience,
-    club_id: d.audience === 'CLUB_ONLY' && !(d.format === 'SOLO_GOAL' && d.personal) ? d.clubId : null,
+    club_id: clubOrganizes(d) ? d.clubId : null,
     // Đua đội theo mục tiêu: 2 đội tạm, máy chủ tạo lại đúng số đội khi ban quản trị chia đội
     team_names: d.format === 'TEAM' ? (pledge ? ['Đội 1', 'Đội 2'] : d.teamNames.map((n) => n.trim()).filter(Boolean)) : [],
     team_size: d.format === 'TEAM' && !pledge ? d.teamSize : 0,
