@@ -284,7 +284,10 @@ begin
       'ok', pg_get_functiondef('public.admin_save_plan(jsonb)'::regprocedure) !~ 'jsonb_array_elements\(p->''credits''\) e'),
     jsonb_build_object('file', '20261001014100', 'label', 'Thử thách Công khai do CLB tổ chức (quỹ / lượt gói CLB trả phí)',
       'ok', to_regprocedure('public.quote_challenge(integer,text,uuid,text)') is not null
-            and pg_get_functiondef('public.create_challenge_v2(jsonb,text)'::regprocedure) ~ 'v_audience = ''PUBLIC'' and v_club is not null'));
+            and pg_get_functiondef('public.create_challenge_v2(jsonb,text)'::regprocedure) ~ 'v_audience = ''PUBLIC'' and v_club is not null'),
+    jsonb_build_object('file', '20261001014200', 'label', 'Sai số cự ly chinh phục do người tạo đặt',
+      'ok', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'challenges' and column_name = 'conquest_tolerance_pct')
+            and pg_get_functiondef('private.conquest_has_result(uuid,uuid)'::regprocedure) ~ 'conquest_tolerance_pct'));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

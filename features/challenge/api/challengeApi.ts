@@ -81,6 +81,8 @@ export interface Challenge {
   recur_error?: string | null
   /** Chinh phục thời gian / pace: người tạo đặt mục tiêu (FIXED) hay người chơi tự đặt (SELF) — migration 010700 */
   conquest_mode?: 'FIXED' | 'SELF' | 'ANY' | null
+  /** Sai số cự ly chinh phục (%) do người tạo đặt — migration 014200 */
+  conquest_tolerance_pct?: number | null
   /** Hạn đăng ký (null = tới khi kết thúc) */
   reg_deadline?: string | null
 }
@@ -539,6 +541,8 @@ export interface ConquestRow {
 export interface ConquestBoard {
   objective: 'BEST_TIME' | 'BEST_PACE'
   mode: 'FIXED' | 'SELF' | 'ANY'
+  /** Sai số cự ly (%) — migration 014200; máy chủ cũ không trả về */
+  tolerance_pct?: number
   categories: ConquestCategory[]
   rows: ConquestRow[]
   mine: { category_id: string; target_s: number | null; best_time_s: number | null; best_pace_s: number | null; achieved: boolean }[]

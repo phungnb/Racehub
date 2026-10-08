@@ -16,7 +16,7 @@ import { routes } from '@/shared/config/routes'
 import { challengeErrorMessage, createChallenge, hasRulesInfo, quoteChallenge, setChallengeConquest, setChallengeOptions, setChallengePledge, setChallengeRecurrence, setChallengeRules, setRegDeadline, type ChallengeQuote, type ClubChallengeQuota } from '../../api/challengeApi'
 import { RulesInfoForm } from '../detail/RulesInfo'
 import {
-  AUDIENCE_LABEL, clubOrganizes, COMMUNITY_KINDS, CONQUEST_PRESETS, conquestPayload, defaultDraft, draftFromTemplate, effectiveSlots, FORMAT_META, formatClock, formatScore, isCommunity,
+  AUDIENCE_LABEL, clubOrganizes, pctLabel, COMMUNITY_KINDS, CONQUEST_PRESETS, conquestPayload, defaultDraft, draftFromTemplate, effectiveSlots, FORMAT_META, formatClock, formatScore, isCommunity,
   isConquest, kmLabel, objectiveChoices, objectiveMeta, OBJECTIVE_META, parseClock, pledgePayload, pledgeSupported, rewardSummary, scoringLines,
   isTeamPledge, RECURRENCE_LABEL, recurrenceAllowed, TEAM_MODE_META, validateDraft, weeklyPreset,
   type Audience, type ChallengeDraft, type ChallengeFormat, type DraftErrors, type Objective, type Recurrence, type TeamMode,
@@ -531,6 +531,7 @@ function ScoringCard({ d }: { d: ChallengeDraft }) {
     format: d.format === 'COLLECTIVE' && !(d.targetValue > 0) ? 'RANKED' : d.format, objective: d.objective,
     game_mode: isTeamPledge(d) ? 'TEAM_SUM' : d.gameMode, pledge_enabled: d.pledge.enabled && pledgeSupported(d),
     target_value: d.targetValue, conquest_mode: d.conquest.mode, pledge_cap_pct: d.pledge.capPct, min_km: d.minKm,
+    conquest_tolerance_pct: d.conquest.tolerancePct,
   })
   return (
     <section className="rounded-xl border border-border bg-surface-2/50 p-3">
@@ -549,6 +550,7 @@ export function ConquestSection({ d, set, error }: { d: ChallengeDraft; set: (p:
   const c = d.conquest
   const pace = d.objective === 'BEST_PACE'
   const setC = (patch: Partial<ChallengeDraft['conquest']>) => set({ conquest: { ...c, ...patch } })
+  const minKm = c.categories.length ? Math.min(...c.categories.map((x) => x.km)) : 10
   const setCat = (i: number, patch: Partial<ChallengeDraft['conquest']['categories'][number]>) =>
     setC({ categories: c.categories.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
   const add = (label: string, km: number, target: string) => {
@@ -608,11 +610,38 @@ export function ConquestSection({ d, set, error }: { d: ChallengeDraft; set: (p:
           <Button type="button" size="sm" variant="secondary" onClick={() => add('Tự đặt', 15, pace ? '6:00' : '1:30:00')}><Plus className="size-4" aria-hidden />Tự đặt</Button>
         </div>
       )}
+      <PctInput label="Sai số cự ly cho phép" value={c.tolerancePct} onChange={(v) => setC({ tolerancePct: v })}
+        hint={`Bài từ ${kmLabel(Math.round(minKm * (100 - c.tolerancePct) * 10) / 1000)} trở lên được tính cho hạng mục ${kmLabel(minKm)} · 0 = phải đủ cự ly`} />
       <p className="text-xs text-fg-muted">
-        {c.mode === 'ANY' ? 'Một bài chạy có cự ly ≥ hạng mục (sai số tối đa 1%) là đạt hạng mục đó, không giới hạn thời gian.' : <>Kết quả = bài chạy tốt nhất có cự ly ≥ hạng mục ({pace ? 'pace trung bình của bài' : 'thời gian quy đổi theo pace trung bình'}). VD bài {kmLabel(10.2)} trong 54:24 tính cho 10K là 53:20.</>}
+        {c.mode === 'ANY' ? `Một bài chạy có cự ly ≥ hạng mục${c.tolerancePct > 0 ? ` (sai số tối đa ${pctLabel(c.tolerancePct)})` : ''} là đạt hạng mục đó, không giới hạn thời gian.` : <>Kết quả = bài chạy tốt nhất có cự ly ≥ hạng mục ({pace ? 'pace trung bình của bài' : 'thời gian quy đổi theo pace trung bình'}). VD bài {kmLabel(10.2)} trong 54:24 tính cho 10K là 53:20.</>}
       </p>
       {error && <p role="alert" className="text-xs text-danger">{error}</p>}
     </section>
+  )
+}
+
+/** Ô nhập sai số (%), 0–10, gõ được "1,5" */
+function PctInput({ label, value, onChange, hint }: { label: string; value: number; onChange: (v: number) => void; hint?: string }) {
+  const [text, setText] = useState(String(value).replace('.', ','))
+  const [seen, setSeen] = useState(value)
+  if (seen !== value) {
+    setSeen(value)
+    if (Number(text.replace(',', '.') || 0) !== value) setText(String(value).replace('.', ','))
+  }
+  return (
+    <Field label={label} htmlFor="c-tol" hint={hint}>
+      <div className="flex items-center gap-2">
+        <Input id="c-tol" inputMode="decimal" className="w-24 font-mono" value={text}
+          onChange={(e) => {
+            const t = e.target.value
+            if (!/^\d{0,2}[.,]?\d?$/.test(t)) return
+            setText(t)
+            const v = t === '' ? 0 : Number(t.replace(',', '.'))
+            if (Number.isFinite(v)) onChange(Math.min(v, 10))
+          }} />
+        <span className="text-sm text-fg-muted">%</span>
+      </div>
+    </Field>
   )
 }
 
