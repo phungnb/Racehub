@@ -714,10 +714,14 @@ function StepTime({ d, set, errors, balance, quote }: StepProps & { balance: num
   const tiers = policy.capacityTiers
   const maxTier = tiers.at(-1)?.max ?? 1000
   const slots = effectiveSlots(d)
-  const fee = creationFee(slots, tiers)
-  // Gói VIP / CLB Pro còn lượt: mức quy mô nằm trong lượt thì không nhắc tới giá
-  const covered = (max: number) => !!quote && quote.bestPassSlots >= max
-  const planName = quote?.plan?.name
+  // Hạn mức thử thách nội bộ theo gói CLB (008200): Free ≤ 50 người, Pro ≤ 1.000 người — miễn phí nếu CLB còn đủ điều kiện khác
+  const cq = clubPays ? quote?.clubQuota : null
+  const clubFreeUpTo = cq && (cq.eligible || cq.reason === 'SLOTS_LIMIT') ? cq.max_slots : 0
+  const freeUpTo = Math.max(quote?.bestPassSlots ?? 0, clubFreeUpTo)
+  const fee = slots <= clubFreeUpTo ? 0 : creationFee(slots, tiers)
+  // Gói VIP / CLB Pro còn lượt, hoặc trong hạn mức gói CLB: mức quy mô nằm trong đó thì không nhắc tới giá
+  const covered = (max: number) => freeUpTo >= max
+  const planName = clubFreeUpTo > (quote?.bestPassSlots ?? 0) ? (cq?.plan === 'PRO' ? 'CLB Pro' : 'CLB miễn phí') : quote?.plan?.name
   return (
     <div className="space-y-5">
       <section className="space-y-3">
@@ -759,7 +763,7 @@ function StepTime({ d, set, errors, balance, quote }: StepProps & { balance: num
 
       {d.format !== 'DUEL' && (d.format !== 'SOLO_GOAL' || !d.personal) && (
         <section className="space-y-2">
-          <p className="text-sm font-medium text-fg-muted">{quote?.bestPassSlots ? `Quy mô · ${planName ?? 'gói của bạn'} miễn phí tới ${formatNumber(quote.bestPassSlots)} người` : 'Quy mô (phí thu một lần, không phụ thuộc thời gian)'}</p>
+          <p className="text-sm font-medium text-fg-muted">{freeUpTo ? `Quy mô · ${planName ?? 'gói của bạn'} miễn phí tới ${formatNumber(freeUpTo)} người` : 'Quy mô (phí thu một lần, không phụ thuộc thời gian)'}</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Chọn quy mô">
             {tiers.filter((t) => t.max >= 2).map((t) => {
               const on = slots <= t.max && (capacityTier(slots, tiers)?.max === t.max)
