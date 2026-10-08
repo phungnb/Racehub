@@ -121,4 +121,35 @@ describe('hạn mức thử thách CLB (008200)', () => {
     expect(q).toMatchObject({ payer: 'USER', club_quota: null })
     expect(Number(q.fee)).toBeGreaterThan(0)
   })
+
+  it('Công khai do CLB tổ chức: quỹ CLB trả phí, không hưởng hạn mức nội bộ, ai cũng vào được, hiện ở tab CLB (014100)', async () => {
+    const q = await rpc(db, OWN, `select public.quote_challenge($1, 'RANKED', $2, 'PUBLIC') as r`, [20, CLUB])
+    expect(q).toMatchObject({ payer: 'CLUB', club_quota: null })
+    expect(Number(q.fee)).toBeGreaterThan(0)
+    // thành viên thường không đứng tên CLB được → tính cho cá nhân
+    expect(await rpc(db, M[0], `select public.quote_challenge($1, 'RANKED', $2, 'PUBLIC') as r`, [20, CLUB])).toMatchObject({ payer: 'USER' })
+    // bản 3 tham số (app cũ) vẫn coi là nội bộ
+    expect((await quote(db, OWN, 20, CLUB)).club_quota).not.toBeNull()
+
+    await treasury(db, CLUB, 1000)
+    const before = Number((await db.query<{ b: string }>(`select private.balance($1) as b`, [CLUB])).rows[0].b)
+    const c = await rpc<{ challenge_id: string; fee: number; club_free: string | null }>(db, OWN, `select public.create_challenge_v2($1::jsonb, $2) as r`, [JSON.stringify({
+      title: 'Mở rộng CLB', format: 'RANKED', objective: 'DISTANCE', audience: 'PUBLIC', club_id: CLUB,
+      max_slots: 20, start_date: iso(1), end_date: iso(24 * 7) }), `public-club-${++n}-xxxxxxxx`])
+    expect(c!.fee).toBe(Number(q.fee))
+    expect(c!.club_free).toBeNull()
+    expect(Number((await db.query<{ b: string }>(`select private.balance($1) as b`, [CLUB])).rows[0].b)).toBe(before - c!.fee)
+    const row = (await db.query<Row>(`select target_audience, target_club_id, creator_role from public.challenges where id = $1`, [c!.challenge_id])).rows[0]
+    expect(row).toMatchObject({ target_audience: 'PUBLIC', target_club_id: CLUB, creator_role: 'CLUB' })
+    // không chiếm chỗ hạn mức nội bộ
+    expect(Number((await db.query<{ n: number }>(`select private.club_open_challenges($1) as n`, [CLUB])).rows[0].n)).toBe(1)
+    // người ngoài CLB tham gia được; tab CLB liệt kê cho cả người ngoài khi xem trang CLB
+    expect(await fails(rpc(db, SOLO, `select public.join_challenge($1) as r`, [c!.challenge_id]))).toBe('OK')
+    const tab = await asUser<Row>(db, SOLO, '/rpc', `select id, club_name from public.list_challenges('CLUB', $1)`, [CLUB])
+    expect(tab.rows.map((r) => r.id)).toContain(c!.challenge_id)
+    // thành viên thường không tạo được thử thách công khai mang tên CLB
+    expect(await fails(rpc(db, M[0], `select public.create_challenge_v2($1::jsonb, $2) as r`, [JSON.stringify({
+      title: 'Giả danh CLB', format: 'RANKED', objective: 'DISTANCE', audience: 'PUBLIC', club_id: CLUB,
+      max_slots: 5, start_date: iso(1), end_date: iso(24 * 7) }), `public-club-${++n}-xxxxxxxx`]))).toContain('FORBIDDEN')
+  })
 })

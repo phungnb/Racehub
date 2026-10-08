@@ -16,7 +16,7 @@ import { routes } from '@/shared/config/routes'
 import { challengeErrorMessage, createChallenge, hasRulesInfo, quoteChallenge, setChallengeConquest, setChallengeOptions, setChallengePledge, setChallengeRecurrence, setChallengeRules, setRegDeadline, type ChallengeQuote, type ClubChallengeQuota } from '../../api/challengeApi'
 import { RulesInfoForm } from '../detail/RulesInfo'
 import {
-  AUDIENCE_LABEL, COMMUNITY_KINDS, CONQUEST_PRESETS, conquestPayload, defaultDraft, draftFromTemplate, effectiveSlots, FORMAT_META, formatClock, formatScore, isCommunity,
+  AUDIENCE_LABEL, clubOrganizes, COMMUNITY_KINDS, CONQUEST_PRESETS, conquestPayload, defaultDraft, draftFromTemplate, effectiveSlots, FORMAT_META, formatClock, formatScore, isCommunity,
   isConquest, kmLabel, objectiveChoices, objectiveMeta, OBJECTIVE_META, parseClock, pledgePayload, pledgeSupported, rewardSummary, scoringLines,
   isTeamPledge, RECURRENCE_LABEL, recurrenceAllowed, TEAM_MODE_META, validateDraft, weeklyPreset,
   type Audience, type ChallengeDraft, type ChallengeFormat, type DraftErrors, type Objective, type Recurrence, type TeamMode,
@@ -40,7 +40,7 @@ const noopSubscribe = () => () => {}
 /** Ai trả bao nhiêu: phí (sau khi dùng vé) + treo thưởng, tách ví cá nhân / quỹ CLB — khớp create_challenge_v2 */
 function billFor(d: ChallengeDraft, q: ChallengeQuote) {
   const feeDue = q.pass ? 0 : q.fee
-  const reward = d.rewardXu > 0 && d.audience === 'CLUB_ONLY' && !(d.format === 'SOLO_GOAL' && d.personal) ? d.rewardXu : 0
+  const reward = d.rewardXu > 0 && clubOrganizes(d) ? d.rewardXu : 0
   const fromWallet = q.payer === 'USER' ? feeDue : 0
   const fromClub = (q.payer === 'CLUB' ? feeDue : 0) + reward
   return {
@@ -130,7 +130,7 @@ export function CreateChallengeScreen({ clubId }: { clubId?: string | null }) {
           .catch((e) => toast.error(`Đã tạo thử thách nhưng chưa bật được tự lặp lại: ${challengeErrorMessage(e)}`))
       }
       if (uid) clearDraft(uid, draftClub)
-      toast.success(d.audience === 'CLUB_ONLY' && !(d.format === 'SOLO_GOAL' && d.personal) ? 'Đã tạo và báo cho cả CLB!' : 'Đã tạo thử thách!')
+      toast.success(clubOrganizes(d) ? 'Đã tạo và báo cho cả CLB!' : 'Đã tạo thử thách!')
       router.replace(`/challenges/${r.challenge_id}${r.invite_code ? `?code=${r.invite_code}` : ''}`)
     } catch (e) {
       toast.error(challengeErrorMessage(e))
@@ -330,9 +330,14 @@ function StepType({ d, set, errors, staffClubs }: StepProps & { staffClubs: { cl
             <AudienceOption key={a} on={(!solo || !d.personal) && d.audience === a} icon={a === 'PUBLIC' ? Users : a === 'INVITE_ONLY' ? Lock : Shield}
               label={AUDIENCE_LABEL[a]}
               text={a === 'PUBLIC' ? 'Hiện ở mục Khám phá, ai cũng vào được' : a === 'INVITE_ONLY' ? 'Ẩn khỏi Khám phá, chỉ vào được bằng link có mã' : 'Chỉ thành viên CLB; ban quản trị tạo, phí và thưởng trích quỹ CLB'}
-              onClick={() => set({ audience: a, personal: false, clubId: a === 'CLUB_ONLY' ? d.clubId ?? staffClubs[0]?.club_id ?? null : null,
-                pledge: solo && d.personal && d.objective === 'DISTANCE' ? { ...d.pledge, enabled: true } : d.pledge,
-                rewardSource: a === 'CLUB_ONLY' ? 'CLUB' : 'NONE', rewardXu: a === 'CLUB_ONLY' ? d.rewardXu : 0 })} />
+              onClick={() => {
+                // Công khai: giữ CLB đang chọn (mở từ tab CLB) → CLB đứng tên tổ chức; đổi được sang cá nhân ở dưới
+                const clubId = a === 'CLUB_ONLY' ? d.clubId ?? staffClubs[0]?.club_id ?? null : a === 'PUBLIC' ? d.clubId : null
+                const byClub = !!clubId && a !== 'INVITE_ONLY'
+                set({ audience: a, personal: false, clubId,
+                  pledge: solo && d.personal && d.objective === 'DISTANCE' ? { ...d.pledge, enabled: true } : d.pledge,
+                  rewardSource: byClub ? 'CLUB' : 'NONE', rewardXu: byClub ? d.rewardXu : 0 })
+              }} />
           ))}
         </div>
         {d.audience === 'CLUB_ONLY' && !(solo && d.personal) && (
@@ -348,6 +353,22 @@ function StepType({ d, set, errors, staffClubs }: StepProps & { staffClubs: { cl
               ))}
             </div>
             {errors.clubId && <p role="alert" className="text-xs text-danger">{errors.clubId}</p>}
+          </div>
+        )}
+        {d.audience === 'PUBLIC' && d.format !== 'DUEL' && !(solo && d.personal) && staffClubs.length > 0 && (
+          <div className="mt-3 space-y-1.5">
+            <p className="text-sm font-medium text-fg-muted">Đơn vị tổ chức</p>
+            <div className="flex flex-wrap gap-2">
+              {[{ club_id: null, name: 'Tôi (cá nhân)', accent_color: null }, ...staffClubs].map((c) => (
+                <button key={c.club_id ?? 'me'} aria-pressed={d.clubId === c.club_id}
+                  onClick={() => set({ clubId: c.club_id, rewardSource: c.club_id ? 'CLUB' : 'NONE', rewardXu: c.club_id ? d.rewardXu : 0 })}
+                  className={cn('flex min-h-10 items-center gap-2 rounded-full border px-3 text-sm font-medium',
+                    d.clubId === c.club_id ? 'border-fg bg-surface-2' : 'border-border text-fg-muted')}>
+                  {c.club_id ? <Shield className="size-4" style={{ color: c.accent_color ?? undefined }} aria-hidden /> : <User className="size-4" aria-hidden />}{c.name}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-fg-subtle">{d.clubId ? 'Mang tên CLB, ai cũng tham gia được. Phí trừ quỹ hoặc dùng lượt gói CLB; hạn mức miễn phí nội bộ không áp dụng.' : 'Phí trừ ví hoặc dùng lượt gói của bạn.'}</p>
           </div>
         )}
       </section>
@@ -708,14 +729,14 @@ export function PledgeSection({ d, set, error }: { d: ChallengeDraft; set: (p: P
 
 function StepTime({ d, set, errors, balance, quote }: StepProps & { balance: number; quote?: ChallengeQuote }) {
   const quick = [{ label: '1 tuần', days: 7 }, { label: '2 tuần', days: 14 }, { label: '1 tháng', days: 30 }]
-  const clubPays = d.audience === 'CLUB_ONLY' && !(d.format === 'SOLO_GOAL' && d.personal)
+  const clubPays = clubOrganizes(d)
   const fund = clubPays ? (quote?.payer === 'CLUB' ? quote.payerBalance : 0) : (quote?.walletBalance ?? balance)
   const policy = quote?.policy ?? DEFAULT_POLICY
   const tiers = policy.capacityTiers
   const maxTier = tiers.at(-1)?.max ?? 1000
   const slots = effectiveSlots(d)
   // Hạn mức thử thách nội bộ theo gói CLB (008200): Free ≤ 50 người, Pro ≤ 1.000 người — miễn phí nếu CLB còn đủ điều kiện khác
-  const cq = clubPays ? quote?.clubQuota : null
+  const cq = clubPays && d.audience === 'CLUB_ONLY' ? quote?.clubQuota : null
   const clubFreeUpTo = cq && (cq.eligible || cq.reason === 'SLOTS_LIMIT') ? cq.max_slots : 0
   const freeUpTo = Math.max(quote?.bestPassSlots ?? 0, clubFreeUpTo)
   const fee = slots <= clubFreeUpTo ? 0 : creationFee(slots, tiers)
@@ -751,7 +772,7 @@ function StepTime({ d, set, errors, balance, quote }: StepProps & { balance: num
         {d.format !== 'DUEL' && (
           <Field label="Tự lặp lại" htmlFor="c-recur"
             hint={d.recurrence === 'NONE' ? 'Hết kỳ, hệ thống tự mở kỳ mới cùng luật — không phải tạo lại mỗi tuần'
-              : `Mỗi kỳ tự tạo trước khi kỳ cũ kết thúc 1 ngày; phí / lượt tính như tạo mới${d.audience === 'CLUB_ONLY' ? ' (trừ quỹ CLB)' : ''}. Tắt được bất cứ lúc nào.`}
+              : `Mỗi kỳ tự tạo trước khi kỳ cũ kết thúc 1 ngày; phí / lượt tính như tạo mới${clubOrganizes(d) ? ' (trừ quỹ CLB)' : ''}. Tắt được bất cứ lúc nào.`}
             error={!recurrenceAllowed(d, d.recurrence) ? 'Mỗi kỳ dài hơn chu kỳ lặp — rút ngắn thời gian hoặc chọn chu kỳ dài hơn' : undefined}>
             <select id="c-recur" value={d.recurrence} onChange={(e) => set({ recurrence: e.target.value as Recurrence })}
               className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm">
@@ -866,7 +887,7 @@ function StepReview({ d, quote, bill, loading, failed, quoteError, onRetry, club
           {d.regDeadline && <li><span className="text-fg-subtle">Hạn đăng ký: </span>{fmtWhen(d.regDeadline)}</li>}
           {d.recurrence !== 'NONE' && <li><span className="text-fg-subtle">Lặp lại: </span>{RECURRENCE_LABEL[d.recurrence].toLowerCase()} · kỳ mới tự mở cùng luật</li>}
           {perDay > 0 && !conquest && <li><span className="text-fg-subtle">Trung bình cần: </span>{formatScore(d.objective, perDay)}/ngày</li>}
-          <li><span className="text-fg-subtle">Phạm vi: </span>{d.format === 'SOLO_GOAL' && d.personal ? 'Cá nhân tôi' : d.audience === 'CLUB_ONLY' ? `Nội bộ ${clubName ?? 'CLB'}` : AUDIENCE_LABEL[d.format === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience]}</li>
+          <li><span className="text-fg-subtle">Phạm vi: </span>{d.format === 'SOLO_GOAL' && d.personal ? 'Cá nhân tôi' : d.audience === 'CLUB_ONLY' ? `Nội bộ ${clubName ?? 'CLB'}` : clubOrganizes(d) ? `Công khai · ${clubName ?? 'CLB'} tổ chức` : AUDIENCE_LABEL[d.format === 'DUEL' && d.audience === 'PUBLIC' ? 'INVITE_ONLY' : d.audience]}</li>
           {d.requireHr && <li><span className="text-fg-subtle">Nhịp tim: </span>Bắt buộc — bài không có nhịp tim không được tính</li>}
           {d.format === 'TEAM' && <li><span className="text-fg-subtle">Đội: </span>{isTeamPledge(d) ? `Tự chia theo số người đăng ký · ${d.pledge.teamSize} người/đội` : d.teamNames.filter((n) => n.trim()).join(' · ')}</li>}
           <li><span className="text-fg-subtle">Luật: </span>{conquest ? '' : `≥ ${formatNumber(d.minKm)} km/${d.objective === 'STREAK_DAYS' ? 'ngày' : 'bài'} · `}pace {d.minPace}–{d.maxPace} ph/km{d.dailyCapKm > 0 ? ` · tối đa ${d.dailyCapKm} km/ngày` : ''}</li>
@@ -930,7 +951,7 @@ function StepReview({ d, quote, bill, loading, failed, quoteError, onRetry, club
 /** Bảng chi phí: phí theo số người, vé miễn phí, phần trừ ví cá nhân và quỹ CLB */
 function CostCard({ d, q, bill, clubName }: { d: ChallengeDraft; q: ChallengeQuote; bill: Bill; clubName?: string }) {
   const slots = effectiveSlots(d)
-  const clubReward = d.rewardXu > 0 && d.audience === 'CLUB_ONLY' ? d.rewardXu : 0
+  const clubReward = d.rewardXu > 0 && clubOrganizes(d) ? d.rewardXu : 0
   const cq = q.clubQuota
   // Được gói bao / nhóm nhỏ / mục tiêu cá nhân, không treo thưởng: không bày bảng phí, ví, quỹ
   if (bill.fromWallet === 0 && bill.fromClub === 0) {

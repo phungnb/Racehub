@@ -76,7 +76,7 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
           </span>
           <span className="flex items-center gap-1 rounded-full bg-surface-2 px-2.5 py-1 text-fg-muted">
             {c.target_audience === 'INVITE_ONLY' ? <Lock className="size-3.5" aria-hidden /> : c.target_audience === 'CLUB_ONLY' ? <Shield className="size-3.5" aria-hidden /> : <Users className="size-3.5" aria-hidden />}
-            {c.target_audience === 'CLUB_ONLY' && d.club ? d.club.name : AUDIENCE_LABEL[c.target_audience]}
+            {c.target_audience === 'CLUB_ONLY' && d.club ? d.club.name : c.target_audience === 'PUBLIC' && d.club ? `${AUDIENCE_LABEL.PUBLIC} · ${d.club.name}` : AUDIENCE_LABEL[c.target_audience]}
           </span>
           <span className={cn('ml-auto rounded-full px-2.5 py-1 font-bold',
             phase === 'LIVE' ? 'bg-brand text-brand-fg' : phase === 'UPCOMING' ? 'bg-warning/15 text-warning' : 'bg-surface-2 text-fg-subtle')}>
