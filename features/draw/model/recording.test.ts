@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { formatElapsed, pickVideoType, recordSupport, recordingFileName, videoExt } from './recording'
 
 describe('ghi hình buổi quay thưởng', () => {
-  it('chọn định dạng: WebM trước, Safari chỉ có MP4; không có gì → null', () => {
+  it('chọn định dạng: MP4 trước (mở được mọi máy), chỉ dùng WebM khi trình duyệt chưa ghi được MP4; không có gì → null', () => {
+    expect(pickVideoType(() => true)).toBe('video/mp4;codecs=avc1.42E01E,mp4a.40.2')
+    // Chrome / Edge ≥ 126: H.264 + Opus
+    expect(pickVideoType((t) => t === 'video/mp4;codecs=avc1,opus' || t.startsWith('video/webm'))).toBe('video/mp4;codecs=avc1,opus')
     expect(pickVideoType((t) => t.startsWith('video/webm'))).toBe('video/webm;codecs=vp9')
     expect(pickVideoType((t) => t === 'video/mp4')).toBe('video/mp4')
     expect(pickVideoType(() => false)).toBeNull()

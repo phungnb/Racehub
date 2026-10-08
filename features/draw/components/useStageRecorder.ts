@@ -21,7 +21,7 @@ async function saveVideo(blob: Blob, name: string, title: string): Promise<void>
 
 /**
  * Ghi video vùng quay thưởng: mỗi 1/30 giây gọi `paint` vẽ vùng quay lên canvas 1280×720 (không hiện ra màn hình),
- * canvas.captureStream() + tiếng quay (nếu bật) → MediaRecorder. Dừng thì lưu file .webm (Safari: .mp4) về máy:
+ * canvas.captureStream() + tiếng quay (nếu bật) → MediaRecorder. Dừng thì lưu file .mp4 (trình duyệt chưa ghi được MP4: .webm) về máy:
  * trình duyệt tải file; app cài (Android / iOS) ghi bằng @capacitor/filesystem rồi mở bảng Chia sẻ (shared/lib/saveImage).
  */
 export function useStageRecorder(title: string, paint: (ctx: CanvasRenderingContext2D, w: number, h: number) => void, audio: () => MediaStream | null) {

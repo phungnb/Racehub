@@ -34,7 +34,7 @@ quay (Web Audio → `MediaStreamAudioDestinationNode`, chỉ khi đang bật ti�
 
 - Chỉ vùng quay vào video: không có thanh công cụ, nút Chấp nhận / Huỷ, thông báo, thanh điều hướng.
 - Không vẽ ảnh đại diện: ảnh từ nguồn khác làm canvas "bẩn" → trình duyệt chặn ghi.
-- Định dạng: WebM (VP9 → VP8) trên Chrome / Edge / Firefox / Android WebView; Safari chỉ có MP4 → file `.mp4`.
+- Định dạng: MP4 (H.264 + AAC/Opus) → file `.mp4`, mở được trên iPhone, Windows, Zalo, Facebook. Trình duyệt chưa ghi được MP4 (Firefox, Chrome / Edge < 126, WebView cũ) mới lưu WebM (`.webm`).
 - Lưu file (`shared/lib/saveImage.ts → saveFileBlob`): máy tính / Android Chrome tải file; iPhone mở bảng Chia sẻ;
   **app cài** ghi file vào bộ nhớ tạm bằng `@capacitor/filesystem` rồi mở bảng Chia sẻ (`@capacitor/share`) để lưu / gửi Zalo.
 - Trình duyệt không hỗ trợ (`MediaRecorder` hoặc `canvas.captureStream` không có, không có định dạng nào): nút đổi thành biểu
@@ -43,9 +43,9 @@ quay (Web Audio → `MediaStreamAudioDestinationNode`, chỉ khi đang bật ti�
 
 | Nền tảng | Ghi được | Ghi chú |
 | --- | --- | --- |
-| Chrome / Edge máy tính (≥ 94) | Có (WebM) | Dùng tốt nhất cho máy chiếu |
+| Chrome / Edge máy tính (≥ 126) | Có (MP4; bản 94–125: WebM) | Dùng tốt nhất cho máy chiếu |
 | Firefox (≥ 90) | Có (WebM) | |
-| Android Chrome, app cài Android (WebView ≥ 94) | Có (WebM) | Lưu qua bảng Chia sẻ trong app |
+| Android Chrome, app cài Android (WebView ≥ 126) | Có (MP4; WebView cũ hơn: WebM) | Lưu qua bảng Chia sẻ trong app |
 | Safari macOS / iOS ≥ 14.5 | Có (MP4) | Nên thử thực tế trước buổi lễ; iOS < 14.5 không có MediaRecorder |
 | WebView rất cũ / trình duyệt trong Zalo, Facebook | Thường không | Hiện lý do, dùng chức năng quay màn hình của điện thoại |
 
@@ -54,7 +54,7 @@ quay (Web Audio → `MediaStreamAudioDestinationNode`, chỉ khi đang bật ti�
   Mục đích là bằng chứng buổi quay: tên chạy, người trúng, mã cam kết, giờ ghi đều có trong khung hình.
 - File lớn trên điện thoại: app cài phải đổi video sang base64 để ghi file → buổi quay rất dài (> 20–30 phút) có thể hết bộ nhớ.
   Đã giới hạn 30 phút/lần; buổi dài nên ghi nhiều đoạn hoặc ghi trên máy tính.
-- WebM không mở được trên một số máy iPhone cũ / Windows Media Player cũ → mở bằng Chrome hoặc VLC, hoặc ghi bằng Safari (MP4).
+- Ra file `.webm` (Firefox, trình duyệt cũ) thì một số iPhone / Windows Media Player không mở được → cập nhật Chrome / Edge rồi ghi lại để ra `.mp4`, hoặc mở bằng VLC.
 - Tab bị che / máy khoá màn hình: trình duyệt có thể giảm nhịp `setInterval` → video giật trong lúc đó.
 
 **Phương án khác đã xem, không chọn**

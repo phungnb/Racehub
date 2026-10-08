@@ -9,7 +9,7 @@ import { Avatar, Button, ConfirmSheet, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { drawAbsent, drawErrorMessage, drawNext, finishDraw, listDraws, startDraw, type DrawScope, type DrawWinner, type LuckyDraw } from '../api/drawApi'
 import { latestWinner, nextPrize, prizeProgress, reelNames, spinDelays } from '../model/stage'
-import { formatElapsed } from '../model/recording'
+import { formatElapsed, videoExt } from '../model/recording'
 import { paintStage, type StageSnapshot } from './stagePaint'
 import { ReviewActions } from './ReviewActions'
 import { useStageRecorder } from './useStageRecorder'
@@ -191,7 +191,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
         )}
         {recorder.support.ok ? (
           <button type="button" onClick={recorder.recording ? recorder.stop : recorder.start}
-            aria-label={recorder.recording ? 'Dừng ghi hình và lưu video' : 'Ghi hình vùng quay thưởng'} title={recorder.recording ? 'Dừng & lưu video' : 'Ghi hình vùng quay (video .webm)'}
+            aria-label={recorder.recording ? 'Dừng ghi hình và lưu video' : 'Ghi hình vùng quay thưởng'} title={recorder.recording ? 'Dừng & lưu video' : `Ghi hình vùng quay (video .${recorder.support.ok ? videoExt(recorder.support.type) : 'mp4'})`}
             className={cn('grid size-10 place-items-center rounded-full hover:bg-white/10', recorder.recording && 'text-danger')}>
             {recorder.recording ? <Square className="size-4 fill-current" aria-hidden /> : <Video className="size-5" aria-hidden />}
           </button>

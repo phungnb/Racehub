@@ -4,8 +4,16 @@
 // Xem docs/QUAY_THUONG_VIDEO.md.
 import { searchKey } from '@/shared/lib/search'
 
-/** Ưu tiên WebM (Chrome, Android WebView, Firefox); Safari chỉ có MP4 */
-export const VIDEO_TYPES = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4;codecs=avc1', 'video/mp4'] as const
+/**
+ * Ưu tiên MP4 H.264 — mở được trên mọi máy (iPhone, Windows, Zalo, Facebook): Chrome / Edge ≥ 126, Android WebView mới, Safari.
+ * Âm thanh AAC trước, Opus sau; chuỗi chỉ ghi mã hình thì trình duyệt tự thêm mã tiếng. Hỏi H.264 trước "video/mp4" trơn
+ * vì Chromium không có H.264 sẽ ghi VP9 trong MP4 (iPhone không mở được). Chưa ghi được MP4 (Firefox, Chrome cũ) mới dùng WebM.
+ */
+export const VIDEO_TYPES = [
+  'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4;codecs=avc1,opus',
+  'video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=avc1', 'video/mp4',
+  'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm',
+] as const
 
 export function pickVideoType(isSupported: (type: string) => boolean): string | null {
   for (const t of VIDEO_TYPES) {
@@ -26,12 +34,12 @@ export type RecordSupport = { ok: true; type: string } | { ok: false; reason: st
 export function recordSupport(env: RecordEnv): RecordSupport {
   if (!env.MediaRecorder) return { ok: false, reason: 'Trình duyệt này chưa hỗ trợ ghi video (MediaRecorder). Dùng Chrome / Edge bản mới, hoặc quay màn hình bằng điện thoại.' }
   if (!env.canvasCaptureStream) return { ok: false, reason: 'Trình duyệt này chưa hỗ trợ ghi hình vùng quay. Dùng Chrome / Edge bản mới, hoặc quay màn hình bằng điện thoại.' }
-  const type = env.MediaRecorder.isTypeSupported ? pickVideoType(env.MediaRecorder.isTypeSupported) : 'video/webm'
+  const type = env.MediaRecorder.isTypeSupported ? pickVideoType(env.MediaRecorder.isTypeSupported) : 'video/webm'   // rất cũ: thử WebM
   if (!type) return { ok: false, reason: 'Trình duyệt này không ghi được định dạng video WebM / MP4.' }
   return { ok: true, type }
 }
 
-/** "quay-thuong-tat-nien-2026-20261006-1930.webm" — không dấu, không ký tự lạ (lưu được trên mọi máy) */
+/** "quay-thuong-tat-nien-2026-20261006-1930.mp4" — không dấu, không ký tự lạ (lưu được trên mọi máy) */
 export function recordingFileName(title: string, at: Date, ext: string): string {
   const slug = searchKey(title).replace(/ /g, '-').slice(0, 40).replace(/-+$/, '')
   const p = (n: number) => String(n).padStart(2, '0')
