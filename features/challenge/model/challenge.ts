@@ -36,7 +36,8 @@ export const OBJECTIVE_META: Record<Objective, { label: string; unit: string; hi
 
 /* ------------------- Chinh phục thời gian / pace (migration 010700) ------------------- */
 
-export type ConquestMode = 'FIXED' | 'SELF'
+/** ANY = Chinh phục cự ly: chạy một bài đủ cự ly là đạt, không đặt thời gian/pace (migration 013800) */
+export type ConquestMode = 'FIXED' | 'SELF' | 'ANY'
 export interface ConquestCategoryDraft { label: string; km: number; target: string }
 export interface ConquestDraft { mode: ConquestMode; categories: ConquestCategoryDraft[] }
 /** Cự ly có sẵn — "Tự đặt" cho phép nhập cự ly bất kỳ */
@@ -100,9 +101,14 @@ export function scoringLines(c: {
   const unit = OBJECTIVE_META[o]?.unit ?? 'km'
   if (isConquest(o)) {
     return [
+      ...(c.conquest_mode === 'ANY' ? [
+        'Chinh phục cự ly: chạy một bài có cự ly đạt hạng mục (sai số tối đa 1%) là đạt, không cần thời gian hay pace.',
+        'Đạt mọi hạng mục đã đăng ký = hoàn thành. Không giới hạn thời gian của bài.',
+      ] : [
       `Mỗi hạng mục (5K, 10K…) lấy bài chạy tốt nhất có cự ly ≥ hạng mục; ${o === 'BEST_PACE' ? 'pace = pace trung bình của bài' : 'thời gian quy đổi theo pace trung bình của bài'}.`,
       c.conquest_mode === 'SELF' ? 'Mỗi người tự đăng ký mục tiêu cho hạng mục mình chọn.' : 'Người tạo đặt mục tiêu cho từng hạng mục; người chơi chọn hạng mục để đăng ký.',
       'Đạt mọi hạng mục đã đăng ký = hoàn thành. BXH từng hạng mục xếp theo kết quả nhanh nhất.',
+      ]),
     ]
   }
   if (c.format === 'TEAM') {

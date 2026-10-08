@@ -79,7 +79,7 @@ export interface Challenge {
   recur_next_id?: string | null
   recur_error?: string | null
   /** Chinh phục thời gian / pace: người tạo đặt mục tiêu (FIXED) hay người chơi tự đặt (SELF) — migration 010700 */
-  conquest_mode?: 'FIXED' | 'SELF' | null
+  conquest_mode?: 'FIXED' | 'SELF' | 'ANY' | null
   /** Hạn đăng ký (null = tới khi kết thúc) */
   reg_deadline?: string | null
 }
@@ -535,7 +535,7 @@ export interface ConquestRow {
 }
 export interface ConquestBoard {
   objective: 'BEST_TIME' | 'BEST_PACE'
-  mode: 'FIXED' | 'SELF'
+  mode: 'FIXED' | 'SELF' | 'ANY'
   categories: ConquestCategory[]
   rows: ConquestRow[]
   mine: { category_id: string; target_s: number | null; best_time_s: number | null; best_pace_s: number | null; achieved: boolean }[]
@@ -553,7 +553,7 @@ const toConquest = (b: ConquestBoard): ConquestBoard => ({
 })
 
 export const getConquestBoard = async (id: string) => toConquest(await rpcData<ConquestBoard>('challenge_conquest_board', { p_challenge_id: id }))
-export const setChallengeConquest = async (id: string, p: { objective: 'BEST_TIME' | 'BEST_PACE'; mode: 'FIXED' | 'SELF'; categories: { label: string; distance_km: number; target_s: number | null }[] }) =>
+export const setChallengeConquest = async (id: string, p: { objective: 'BEST_TIME' | 'BEST_PACE'; mode: 'FIXED' | 'SELF' | 'ANY'; categories: { label: string; distance_km: number; target_s: number | null }[] }) =>
   toConquest(await rpcData<ConquestBoard>('set_challenge_conquest', { p_challenge_id: id, p }))
 export const setMyConquest = async (id: string, items: { category_id: string; target_s: number | null }[]) =>
   toConquest(await rpcData<ConquestBoard>('set_my_conquest', { p_challenge_id: id, p: items }))

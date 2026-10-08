@@ -81,7 +81,7 @@ function MyCategories({ d, b }: { d: ChallengeDetail; b: ConquestBoard }) {
             const m = mine.get(x.id)!
             return (
               <li key={x.id} className={cn('flex items-center gap-2 rounded-xl px-3 py-2 text-sm', m.achieved ? 'bg-coin/10' : 'bg-surface-2/60')}>
-                <span className="flex-1"><b>{x.label}</b> <span className="text-fg-muted">· mục tiêu {targetText(b, m.target_s ?? x.target_s)}</span></span>
+                <span className="flex-1"><b>{x.label}</b> <span className="text-fg-muted">· {b.mode === 'ANY' ? 'đạt cự ly' : `mục tiêu ${targetText(b, m.target_s ?? x.target_s)}`}</span></span>
                 <span className="font-mono font-bold">{resultText(b, m.best_time_s, m.best_pace_s)}</span>
                 {m.achieved ? <Trophy className="size-4 text-coin" aria-label="Đã đạt" /> : null}
               </li>
@@ -159,7 +159,7 @@ function CategoryBoard({ b, cat, onPick }: { b: ConquestBoard; cat: ConquestCate
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-1.5 truncate text-sm font-semibold">{r.me ? 'Bạn' : r.display_name ?? 'Runner'}
                   {r.achieved && <Check className="size-4 shrink-0 text-coin" aria-label="Đã đạt mục tiêu" />}</span>
-                <span className="block text-xs text-fg-subtle">Mục tiêu {targetText(b, r.target_s)}{r.best_at ? ` · ${new Date(r.best_at).toLocaleDateString('vi-VN')}` : ''}</span>
+                <span className="block text-xs text-fg-subtle">{b.mode === 'ANY' ? 'Đạt cự ly' : `Mục tiêu ${targetText(b, r.target_s)}`}{r.best_at ? ` · ${new Date(r.best_at).toLocaleDateString('vi-VN')}` : ''}</span>
               </span>
               <span className={cn('font-mono text-sm font-bold', r.achieved ? 'text-coin' : 'text-fg')}>{resultText(b, r.best_time_s, r.best_pace_s)}</span>
             </button>
