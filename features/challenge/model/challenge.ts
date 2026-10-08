@@ -68,7 +68,8 @@ export function objectiveChoices(objectives: Objective[], cur: { objective: Obje
 /** ANY = Chinh phục cự ly: chạy một bài đủ cự ly là đạt, không đặt thời gian/pace (migration 013800) */
 export type ConquestMode = 'FIXED' | 'SELF' | 'ANY'
 export interface ConquestCategoryDraft { label: string; km: number; target: string }
-export interface ConquestDraft { mode: ConquestMode; categories: ConquestCategoryDraft[] }
+/** tolerancePct: sai số cự ly cho phép (%) — bài ≥ (100 − sai số)% cự ly hạng mục được tính (014200) */
+export interface ConquestDraft { mode: ConquestMode; categories: ConquestCategoryDraft[]; tolerancePct: number }
 /** Cự ly có sẵn — "Tự đặt" cho phép nhập cự ly bất kỳ */
 export const CONQUEST_PRESETS: { label: string; km: number; time: string; pace: string }[] = [
   { label: '5K', km: 5, time: '30:00', pace: '6:00' },
@@ -76,7 +77,9 @@ export const CONQUEST_PRESETS: { label: string; km: number; time: string; pace: 
   { label: 'Half', km: 21.0975, time: '2:15:00', pace: '6:24' },
   { label: 'Full', km: 42.195, time: '4:45:00', pace: '6:45' },
 ]
-export const DEFAULT_CONQUEST: ConquestDraft = { mode: 'FIXED', categories: [{ label: '5K', km: 5, target: '30:00' }, { label: '10K', km: 10, target: '1:00:00' }] }
+export const DEFAULT_CONQUEST: ConquestDraft = { mode: 'FIXED', categories: [{ label: '5K', km: 5, target: '30:00' }, { label: '10K', km: 10, target: '1:00:00' }], tolerancePct: 1 }
+/** "1,5%" */
+export const pctLabel = (x: number) => `${String(Math.round(x * 10) / 10).replace('.', ',')}%`
 
 /** "1:05:30" → 3930 · "25:00" → 1500 · "6:15" (pace) → 375; sai → null */
 export function parseClock(t: string): number | null {
@@ -99,6 +102,7 @@ export const kmLabel = (km: number) => `${new Intl.NumberFormat('vi-VN', { maxim
 /** Kiểm tra hạng mục (khớp set_challenge_conquest) */
 export function validateConquest(c: ConquestDraft, objective: Objective): string | null {
   if (!c.categories.length || c.categories.length > 8) return 'Cần 1 đến 8 hạng mục'
+  if (!(c.tolerancePct >= 0 && c.tolerancePct <= 10)) return 'Sai số cự ly từ 0 đến 10%'
   for (const [i, x] of c.categories.entries()) {
     const at = `Hạng mục ${i + 1}`
     if (!x.label.trim() || x.label.trim().length > 40) return `${at}: đặt tên (tối đa 40 ký tự)`
@@ -116,6 +120,7 @@ export function validateConquest(c: ConquestDraft, objective: Objective): string
 export const conquestPayload = (d: Pick<ChallengeDraft, 'objective' | 'conquest'>) => ({
   objective: d.objective as 'BEST_TIME' | 'BEST_PACE',
   mode: d.conquest.mode,
+  tolerance_pct: Math.round(d.conquest.tolerancePct * 10) / 10,
   categories: d.conquest.categories.map((x) => ({ label: x.label.trim(), distance_km: x.km, target_s: d.conquest.mode === 'FIXED' ? parseClock(x.target) : null })),
 })
 
@@ -125,16 +130,18 @@ export const conquestPayload = (d: Pick<ChallengeDraft, 'objective' | 'conquest'
 export function scoringLines(c: {
   format: ChallengeFormat | string; objective: Objective | string | null; game_mode?: string | null; pledge_enabled?: boolean
   target_value?: number | null; conquest_mode?: string | null; pledge_cap_pct?: number | null; min_km?: number | null
+  conquest_tolerance_pct?: number | null
 }): string[] {
   const o = (c.objective ?? 'DISTANCE') as Objective
   const unit = OBJECTIVE_META[o]?.unit ?? 'km'
   if (isConquest(o)) {
+    const tol = Number(c.conquest_tolerance_pct ?? 1)
     return [
       ...(c.conquest_mode === 'ANY' ? [
-        'Chinh phục cự ly: chạy một bài có cự ly đạt hạng mục (sai số tối đa 1%) là đạt, không cần thời gian hay pace.',
+        `Chinh phục cự ly: chạy một bài có cự ly đạt hạng mục${tol > 0 ? ` (sai số tối đa ${pctLabel(tol)})` : ''} là đạt, không cần thời gian hay pace.`,
         'Đạt mọi hạng mục đã đăng ký = hoàn thành. Không giới hạn thời gian của bài.',
       ] : [
-      `Mỗi hạng mục (5K, 10K…) lấy bài chạy tốt nhất có cự ly ≥ hạng mục; ${o === 'BEST_PACE' ? 'pace = pace trung bình của bài' : 'thời gian quy đổi theo pace trung bình của bài'}.`,
+      `Mỗi hạng mục (5K, 10K…) lấy bài chạy tốt nhất có cự ly ≥ hạng mục${tol > 0 ? ` (sai số ${pctLabel(tol)})` : ''}; ${o === 'BEST_PACE' ? 'pace = pace trung bình của bài' : 'thời gian quy đổi theo pace trung bình của bài'}.`,
       c.conquest_mode === 'SELF' ? 'Mỗi người tự đăng ký mục tiêu cho hạng mục mình chọn.' : 'Người tạo đặt mục tiêu cho từng hạng mục; người chơi chọn hạng mục để đăng ký.',
       'Đạt mọi hạng mục đã đăng ký = hoàn thành. BXH từng hạng mục xếp theo kết quả nhanh nhất.',
       ]),

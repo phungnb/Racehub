@@ -88,6 +88,7 @@ function EditForm({ d, board, onClose }: { d: ChallengeDetail; board: ConquestBo
     } : { ...DEFAULT_PLEDGE },
     conquest: board?.categories.length ? {
       mode: board.mode ?? 'FIXED',
+      tolerancePct: Number(board.tolerance_pct ?? c.conquest_tolerance_pct ?? 1),
       categories: board.categories.map((x) => ({ label: x.label, km: x.distance_m / 1000, target: x.target_s ? formatClock(x.target_s) : '' })),
     } : { ...DEFAULT_CONQUEST, categories: DEFAULT_CONQUEST.categories.map((x) => ({ ...x })) },
   }))

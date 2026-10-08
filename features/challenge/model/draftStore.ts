@@ -32,7 +32,7 @@ export function loadDraft(userId: string, clubId: string | null | undefined, now
     // Ghép lên nháp mặc định: trường thêm về sau vẫn có giá trị
     const base = defaultDraft(new Date(now), clubId ?? null)
     return {
-      draft: { ...base, ...d, pledge: { ...base.pledge, ...d.pledge }, conquest: d.conquest ?? base.conquest, rules: d.rules ?? {} },
+      draft: { ...base, ...d, pledge: { ...base.pledge, ...d.pledge }, conquest: d.conquest ? { ...base.conquest, ...d.conquest } : base.conquest, rules: d.rules ?? {} },
       step: Math.min(3, Math.max(0, Math.trunc(Number(v.step) || 0))),
       savedAt: v.savedAt,
     }

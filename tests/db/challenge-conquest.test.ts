@@ -110,6 +110,22 @@ describe('chinh phục thời gian / pace (010700)', () => {
     expect(board.rows.find((r: Row) => r.display_name === 'Runner 3')?.achieved ?? false).toBe(false)
   })
 
+  it('sai số cự ly do người tạo đặt (014200): 0–10%, bài 9,2 km đạt hạng mục 10,1 km khi sai số 10%', async () => {
+    const cid = await create(db, { title: 'Mừng sự kiện sai số 10%', format: 'SOLO_GOAL', objective: 'DISTANCE', target_value: 1,
+      audience: 'PUBLIC', start_date: iso(-48), end_date: iso(24 * 6), max_slots: 20 })
+    const set = (tol: unknown) => rpc(db, A, `select public.set_challenge_conquest($1, $2::jsonb) as r`, [cid, JSON.stringify({
+      objective: 'BEST_TIME', mode: 'ANY', tolerance_pct: tol, categories: [{ label: '10,1K', distance_km: 10.1 }] })])
+    expect(await fails(set(11))).toContain('INVALID_CONQUEST')
+    expect(await fails(set(-1))).toContain('INVALID_CONQUEST')
+    const b = await set(10)
+    expect(Number(b.tolerance_pct)).toBe(10)
+    expect(Number((await db.query<Row>(`select min_km from public.challenges where id = $1`, [cid])).rows[0].min_km)).toBe(9.09)
+    await run(db, OUT, 9.2, 600)
+    await rpc(db, OUT, `select public.join_challenge($1) as r`, [cid])
+    await rpc(db, OUT, `select public.set_my_conquest($1, $2::jsonb) as r`, [cid, JSON.stringify([{ category_id: b.categories[0].id }])])
+    expect((await db.query<Row>(`select status from public.challenge_participants where challenge_id = $1 and profile_id = $2`, [cid, OUT])).rows[0].status).toBe('COMPLETED')
+  })
+
   it('hạn đăng ký: người tạo sửa được; sau hạn không ai vào được (trừ người tạo)', async () => {
     const cid = await create(db, { title: 'Chạy tháng', format: 'RANKED', objective: 'DISTANCE', target_value: 0,
       audience: 'PUBLIC', start_date: iso(-24), end_date: iso(24 * 6), max_slots: 20 })
