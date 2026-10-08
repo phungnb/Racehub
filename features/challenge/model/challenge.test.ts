@@ -165,6 +165,13 @@ describe('chinh phục thời gian / pace (010700)', () => {
   })
   it('mỗi loại thử thách có mô tả cách tính điểm riêng', () => {
     expect(m.scoringLines({ format: 'SOLO_GOAL', objective: 'BEST_TIME', conquest_mode: 'SELF' }).join(' ')).toContain('tự đăng ký')
+    const ch = m.objectiveChoices(['DISTANCE', 'BEST_TIME', 'BEST_PACE', 'STREAK_DAYS'], { objective: 'BEST_TIME', mode: 'ANY' })
+    expect(ch.map((x) => x.id)).toEqual(['DISTANCE', 'BEST_TIME', 'BEST_PACE', 'BEST_DISTANCE', 'STREAK_DAYS'])
+    expect(ch.filter((x) => x.active).map((x) => x.id)).toEqual(['BEST_DISTANCE'])
+    expect(ch.find((x) => x.id === 'BEST_TIME')).toMatchObject({ objective: 'BEST_TIME', mode: 'FIXED' })
+    expect(ch.find((x) => x.id === 'BEST_DISTANCE')).toMatchObject({ objective: 'BEST_TIME', mode: 'ANY' })
+    expect(m.objectiveMeta('BEST_TIME', 'ANY').label).toBe('Chinh phục cự ly')
+    expect(m.objectiveMeta('BEST_TIME', 'FIXED').label).toBe('Chinh phục thời gian')
     expect(m.scoringLines({ format: 'SOLO_GOAL', objective: 'BEST_TIME', conquest_mode: 'ANY' }).join(' ')).toContain('không cần thời gian')
     expect(m.scoringLines({ format: 'TEAM', objective: 'DISTANCE', game_mode: 'LAST_MEMBER' }).join(' ')).toContain('Chốt đoàn')
     expect(m.scoringLines({ format: 'RANKED', objective: 'DISTANCE' }).join(' ')).toContain('số ngày chạy')

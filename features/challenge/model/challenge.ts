@@ -34,6 +34,35 @@ export const OBJECTIVE_META: Record<Objective, { label: string; unit: string; hi
   BEST_PACE: { label: 'Chinh phục pace', unit: 'hạng mục', hint: '5K, 10K, Half, Full… chạy đạt pace mục tiêu' },
 }
 
+/**
+ * Các kiểu "Tính điểm theo" hiển thị ngang hàng. "Chinh phục cự ly" lưu ở DB là BEST_TIME + chế độ ANY (migration 013800),
+ * nên lựa chọn ở giao diện gồm cả cặp (objective, mode) chứ không chỉ objective.
+ */
+export type ObjectiveChoiceId = Objective | 'BEST_DISTANCE'
+export const DISTANCE_CONQUEST_META = { label: 'Chinh phục cự ly', unit: 'hạng mục', hint: '5K, 10K, 10,1 km… chạy một bài đủ cự ly là đạt, không cần thời gian' }
+export const isDistanceConquest = (objective: Objective | string | null | undefined, mode: string | null | undefined) =>
+  objective === 'BEST_TIME' && mode === 'ANY'
+/** Nhãn / đơn vị / gợi ý của kiểu tính điểm, tính cả chế độ ANY */
+export const objectiveMeta = (objective: Objective, mode?: string | null) =>
+  isDistanceConquest(objective, mode) ? DISTANCE_CONQUEST_META : OBJECTIVE_META[objective]
+/**
+ * Mở rộng danh sách objective thành các lựa chọn, chèn "Chinh phục cự ly" ngay sau "Chinh phục pace".
+ * `patch` là phần cần ghi vào bản nháp khi chọn: objective và chế độ chinh phục (ANY chỉ cho "Chinh phục cự ly").
+ */
+export function objectiveChoices(objectives: Objective[], cur: { objective: Objective; mode: ConquestMode }) {
+  const distance = isDistanceConquest(cur.objective, cur.mode)
+  const out: { id: ObjectiveChoiceId; meta: { label: string; unit: string; hint: string }; active: boolean; objective: Objective; mode: ConquestMode | null }[] = []
+  for (const o of objectives) {
+    const conq = isConquest(o)
+    out.push({ id: o, meta: OBJECTIVE_META[o], objective: o, mode: conq ? (cur.mode === 'ANY' ? 'FIXED' : cur.mode) : null,
+      active: cur.objective === o && !distance })
+    if (o === 'BEST_PACE' && objectives.includes('BEST_TIME')) {
+      out.push({ id: 'BEST_DISTANCE', meta: DISTANCE_CONQUEST_META, objective: 'BEST_TIME', mode: 'ANY', active: distance })
+    }
+  }
+  return out
+}
+
 /* ------------------- Chinh phục thời gian / pace (migration 010700) ------------------- */
 
 /** ANY = Chinh phục cự ly: chạy một bài đủ cự ly là đạt, không đặt thời gian/pace (migration 013800) */

@@ -16,7 +16,7 @@ import { cn } from '@/shared/lib/cn'
 import { formatNumber, formatPace } from '@/shared/lib/format'
 import { challengeErrorMessage, setChallengeRecurrence, type ChallengeDetail, type LeaderboardEntry, type TeamStanding } from '../../api/challengeApi'
 import {
-  AUDIENCE_LABEL, challengePhase, FORMAT_META, formatScore, isCommunity, isConquest, nextOccurrenceStart, nextOccurrenceTitle, OBJECTIVE_META, planStatus,
+  AUDIENCE_LABEL, challengePhase, FORMAT_META, formatScore, isCommunity, isConquest, nextOccurrenceStart, nextOccurrenceTitle, OBJECTIVE_META, objectiveMeta, planStatus,
   RECURRENCE_LABEL, rewardSummary, scoringLines, TEAM_MODE_META, timeLabel,
   type Recurrence, type TeamMode,
 } from '../../model/challenge'
@@ -423,7 +423,7 @@ function Rules({ d }: { d: ChallengeDetail }) {
   const reward = rewardSummary(c)
   const conquest = isConquest(c.objective)
   const rows: { icon: typeof Route; label: string; value: string }[] = [
-    { icon: Trophy, label: 'Tính điểm theo', value: `${OBJECTIVE_META[c.objective]?.label} — ${OBJECTIVE_META[c.objective]?.hint.toLowerCase()}` },
+    { icon: Trophy, label: 'Tính điểm theo', value: `${objectiveMeta(c.objective, c.conquest_mode)?.label} — ${objectiveMeta(c.objective, c.conquest_mode)?.hint.toLowerCase()}` },
     ...(c.target_value > 0 && !conquest && !c.pledge_enabled ? [{ icon: Crown, label: 'Mục tiêu', value: formatScore(c.objective, c.target_value) }] : []),
     ...(conquest ? [] : [{ icon: Route, label: c.objective === 'STREAK_DAYS' ? 'Tối thiểu mỗi ngày' : 'Tối thiểu mỗi bài', value: `${formatNumber(c.min_km)} km` }]),
     { icon: Gauge, label: 'Pace hợp lệ', value: `${formatPace(c.min_pace * 60)} – ${formatPace(c.max_pace * 60)} /km` },

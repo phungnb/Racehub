@@ -15,6 +15,7 @@ export interface ChallengeListItem {
   description: string | null
   format: ChallengeFormat
   objective: Objective
+  conquest_mode?: 'FIXED' | 'SELF' | 'ANY' | null
   game_mode: string | null
   target_value: number
   start_date: string

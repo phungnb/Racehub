@@ -6,7 +6,7 @@ import { cn } from '@/shared/lib/cn'
 import { formatNumber } from '@/shared/lib/format'
 import { ProgressBar } from '@/shared/ui'
 import type { ChallengeListItem } from '../../api/challengeApi'
-import { challengePhase, FORMAT_META, formatScore, OBJECTIVE_META, TEAM_MODE_META, timeLabel, type ChallengeFormat, type TeamMode } from '../../model/challenge'
+import { challengePhase, FORMAT_META, formatScore, objectiveMeta, TEAM_MODE_META, timeLabel, type ChallengeFormat, type TeamMode } from '../../model/challenge'
 
 export const FORMAT_ICON: Record<ChallengeFormat, LucideIcon> = {
   SOLO_GOAL: Target, RANKED: Trophy, DUEL: Swords, TEAM: UsersRound, COLLECTIVE: Users,
@@ -51,7 +51,7 @@ export function ChallengeCard({ c }: { c: ChallengeListItem }) {
             <span className="flex items-center gap-1"><Users className="size-3.5" aria-hidden />
               {formatNumber(c.participant_count)}{c.max_slots && c.format !== 'COLLECTIVE' ? `/${formatNumber(c.max_slots)}` : ''} người</span>
             {target > 0 && <span className="flex items-center gap-1"><Target className="size-3.5" aria-hidden />{formatScore(c.objective, target)}</span>}
-            {!target && <span>{OBJECTIVE_META[c.objective]?.label}</span>}
+            {!target && <span>{objectiveMeta(c.objective, c.conquest_mode)?.label}</span>}
             {Number(c.reward_xu) > 0 && <span className="flex items-center gap-1 font-semibold text-coin"><Coins className="size-3.5" aria-hidden />{formatNumber(c.reward_xu)} Xu</span>}
           </div>
         </div>
