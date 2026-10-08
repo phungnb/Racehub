@@ -40,6 +40,12 @@ describe('Gói, lượt tạo, đơn hàng (003800)', () => {
     expect(await fails(rpc(db, U, `select public.admin_save_plan($1::jsonb)`, [JSON.stringify({ code: 'VIP1', prices: [{ months: 1, price_vnd: 1 }] })]))).toMatch(/FORBIDDEN/)
     await rpc(db, ADMIN, `select public.admin_save_plan($1::jsonb)`, [JSON.stringify({ code: 'VIP1', prices: [{ months: 1, price_vnd: 25000 }] })])
     expect((await rpc<Row>(db, U, `select public.pricing_catalog() as r`)).plans.find((p: Row) => p.code === 'VIP1').prices[0].price_vnd).toBe(25000)
+    // 014000: lưu kèm lượt tạo như trang admin (trước đây lỗi "column reference e is ambiguous"); trùng quy mô lấy dòng sau
+    await rpc(db, ADMIN, `select public.admin_save_plan($1::jsonb)`, [JSON.stringify({ code: 'CLUB_PRO', name: 'CLB Pro', active: true, perks: ['A'],
+      prices: [{ months: 6, price_vnd: 649000, active: true }], credits: [{ capacity: 100, per_month: 5 }, { capacity: 200, per_month: 1 }, { capacity: 200, per_month: 2 }] })])
+    expect((await rpc<Row>(db, U, `select public.pricing_catalog() as r`)).plans.find((p: Row) => p.code === 'CLUB_PRO').credits)
+      .toEqual([{ capacity: 100, per_month: 5 }, { capacity: 200, per_month: 2 }])
+    await rpc(db, ADMIN, `select public.admin_save_plan($1::jsonb)`, [JSON.stringify({ code: 'CLUB_PRO', credits: [{ capacity: 100, per_month: 2 }] })])
   })
 
   it('mua VIP2 qua đơn hàng: tạo đơn (mã RH…), admin đặt tài khoản nhận tiền + xác nhận → kích hoạt, cấp lượt tạo tháng này', async () => {

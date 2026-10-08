@@ -279,7 +279,9 @@ begin
     jsonb_build_object('file', '20261001013800', 'label', 'Chinh phục cự ly: chạy một bài đủ cự ly là đạt, không cần thời gian / pace',
       'ok', pg_get_constraintdef((select oid from pg_constraint where conname = 'challenges_conquest_mode_chk')) like '%ANY%'),
     jsonb_build_object('file', '20261001013900', 'label', 'Báo giá thử thách chinh phục nhiều người tính theo số chỗ thật (khớp hạn mức gói CLB)',
-      'ok', pg_get_functiondef('public.quote_challenge(integer,text,uuid)'::regprocedure) !~ 'SOLO_GOAL'));
+      'ok', pg_get_functiondef('public.quote_challenge(integer,text,uuid)'::regprocedure) !~ 'SOLO_GOAL'),
+    jsonb_build_object('file', '20261001014000', 'label', 'Sửa lỗi lưu gói ở trang admin (UNK-FSZ)',
+      'ok', pg_get_functiondef('public.admin_save_plan(jsonb)'::regprocedure) !~ 'jsonb_array_elements\(p->''credits''\) e'));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
