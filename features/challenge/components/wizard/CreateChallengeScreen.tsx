@@ -540,13 +540,14 @@ export function ConquestSection({ d, set, error }: { d: ChallengeDraft; set: (p:
         <p className="flex items-center gap-1.5 font-semibold"><Flag className="size-4 text-brand" aria-hidden />{pace ? 'Chinh phục pace' : 'Chinh phục thời gian'} — các hạng mục</p>
         <p className="text-xs text-fg-muted">Tạo một lần nhiều hạng mục. Người chơi chọn hạng mục muốn chinh phục (một hay nhiều).</p>
       </div>
-      <div role="radiogroup" aria-label="Ai đặt mục tiêu" className="grid grid-cols-2 gap-2">
-        {(['FIXED', 'SELF'] as const).map((m) => (
+      <div role="radiogroup" aria-label="Ai đặt mục tiêu" className="grid gap-2 sm:grid-cols-3">
+        {(['FIXED', 'SELF', 'ANY'] as const).map((m) => (
           <button key={m} type="button" role="radio" aria-checked={c.mode === m} onClick={() => setC({ mode: m })}
             className={cn('rounded-xl border p-2.5 text-left', c.mode === m ? 'border-brand/60 bg-brand/10' : 'border-border bg-surface')}>
-            <span className="block text-sm font-semibold">{m === 'FIXED' ? 'Người tạo đặt mục tiêu' : 'Người chơi tự đăng ký'}</span>
+            <span className="block text-sm font-semibold">{m === 'FIXED' ? 'Người tạo đặt mục tiêu' : m === 'SELF' ? 'Người chơi tự đăng ký' : 'Chỉ cần đạt cự ly'}</span>
             <span className="block text-xs text-fg-muted">{m === 'FIXED' ? `Bạn đặt ${pace ? 'pace' : 'thời gian'} cho từng hạng mục; người tham gia đăng ký hạng mục`
-              : `Mỗi người tự nhập ${pace ? 'pace' : 'thời gian'} mục tiêu của mình`}</span>
+              : m === 'SELF' ? `Mỗi người tự nhập ${pace ? 'pace' : 'thời gian'} mục tiêu của mình`
+              : 'Chạy một bài đủ cự ly là đạt, không cần thời gian hay pace'}</span>
           </button>
         ))}
       </div>
@@ -589,7 +590,7 @@ export function ConquestSection({ d, set, error }: { d: ChallengeDraft; set: (p:
         </div>
       )}
       <p className="text-xs text-fg-muted">
-        Kết quả = bài chạy tốt nhất có cự ly ≥ hạng mục ({pace ? 'pace trung bình của bài' : 'thời gian quy đổi theo pace trung bình'}). VD bài {kmLabel(10.2)} trong 54:24 tính cho 10K là 53:20.
+        {c.mode === 'ANY' ? 'Một bài chạy có cự ly ≥ hạng mục (sai số tối đa 1%) là đạt hạng mục đó, không giới hạn thời gian.' : <>Kết quả = bài chạy tốt nhất có cự ly ≥ hạng mục ({pace ? 'pace trung bình của bài' : 'thời gian quy đổi theo pace trung bình'}). VD bài {kmLabel(10.2)} trong 54:24 tính cho 10K là 53:20.</>}
       </p>
       {error && <p role="alert" className="text-xs text-danger">{error}</p>}
     </section>
@@ -826,7 +827,7 @@ function StepReview({ d, quote, bill, loading, failed, quoteError, onRetry, club
           {conquest ? (
             <li><span className="text-fg-subtle">{OBJECTIVE_META[d.objective].label}: </span>
               {d.conquest.categories.map((x) => `${x.label} (${kmLabel(x.km)})${d.conquest.mode === 'FIXED' ? ` ≤ ${x.target}${d.objective === 'BEST_PACE' ? '/km' : ''}` : ''}`).join(' · ')}
-              {d.conquest.mode === 'SELF' ? ' · người chơi tự đặt mục tiêu' : ''}</li>
+              {d.conquest.mode === 'SELF' ? ' · người chơi tự đặt mục tiêu' : d.conquest.mode === 'ANY' ? ' · chỉ cần đạt cự ly' : ''}</li>
           ) : d.pledge.enabled && pledgeSupported(d) ? (
             <li><span className="text-fg-subtle">Mục tiêu tự đăng ký: </span>
               {d.pledge.options.length ? d.pledge.options.map((o) => `${o}`).join(' · ') + ' km' : `${d.pledge.minKm}–${d.pledge.maxKm} km`}

@@ -145,6 +145,9 @@ describe('chinh phục thời gian / pace (010700)', () => {
     expect(m.validateConquest({ mode: 'FIXED', categories: [{ label: '5K', km: 5, target: '' }] }, 'BEST_TIME')).toContain('mục tiêu')
     expect(m.validateConquest({ mode: 'SELF', categories: [{ label: '5K', km: 5, target: '' }] }, 'BEST_TIME')).toBeNull()
     expect(m.validateConquest({ mode: 'FIXED', categories: [{ label: '10K', km: 10, target: '1:00' }] }, 'BEST_PACE')).toContain('pace')
+    expect(m.validateConquest({ mode: 'ANY', categories: [{ label: '10,1K', km: 10.1, target: '' }] }, 'BEST_TIME')).toBeNull()
+    expect(m.conquestPayload({ objective: 'BEST_TIME', conquest: { mode: 'ANY', categories: [{ label: '10,1K', km: 10.1, target: '' }] } }))
+      .toEqual({ objective: 'BEST_TIME', mode: 'ANY', categories: [{ label: '10,1K', distance_km: 10.1, target_s: null }] })
     expect(m.validateConquest({ mode: 'FIXED', categories: [{ label: '5K', km: 5, target: '25:00' }, { label: '5k', km: 5, target: '26:00' }] }, 'BEST_TIME')).toContain('trùng')
     expect(m.conquestPayload({ objective: 'BEST_TIME', conquest: { mode: 'FIXED', categories: [{ label: ' 10K ', km: 10, target: '55:00' }] } }))
       .toEqual({ objective: 'BEST_TIME', mode: 'FIXED', categories: [{ label: '10K', distance_km: 10, target_s: 3300 }] })
@@ -162,6 +165,7 @@ describe('chinh phục thời gian / pace (010700)', () => {
   })
   it('mỗi loại thử thách có mô tả cách tính điểm riêng', () => {
     expect(m.scoringLines({ format: 'SOLO_GOAL', objective: 'BEST_TIME', conquest_mode: 'SELF' }).join(' ')).toContain('tự đăng ký')
+    expect(m.scoringLines({ format: 'SOLO_GOAL', objective: 'BEST_TIME', conquest_mode: 'ANY' }).join(' ')).toContain('không cần thời gian')
     expect(m.scoringLines({ format: 'TEAM', objective: 'DISTANCE', game_mode: 'LAST_MEMBER' }).join(' ')).toContain('Chốt đoàn')
     expect(m.scoringLines({ format: 'RANKED', objective: 'DISTANCE' }).join(' ')).toContain('số ngày chạy')
   })

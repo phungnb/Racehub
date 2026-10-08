@@ -86,6 +86,30 @@ describe('chinh phục thời gian / pace (010700)', () => {
     expect(await fails(rpc(db, C, `select public.set_my_conquest($1, $2::jsonb) as r`, [cid, JSON.stringify([{ category_id: k10, target_s: 600 }])]))).toContain('CONQUEST_TARGET_LOCKED')
   })
 
+  it('ANY (013800): chỉ cần một bài đủ cự ly, không cần thời gian; bài ngắn hơn 99% thì chưa đạt', async () => {
+    const cid = await create(db, { title: 'Mừng sự kiện 10,1 km', format: 'SOLO_GOAL', objective: 'DISTANCE', target_value: 1,
+      audience: 'PUBLIC', start_date: iso(-48), end_date: iso(24 * 6), max_slots: 20 })
+    const b = await rpc(db, A, `select public.set_challenge_conquest($1, $2::jsonb) as r`, [cid, JSON.stringify({
+      objective: 'BEST_TIME', mode: 'ANY', categories: [{ label: '10,1K', distance_km: 10.1 }] })])
+    expect(b).toMatchObject({ objective: 'BEST_TIME', mode: 'ANY' })
+    expect(b.categories[0].target_s).toBeNull()
+    const k = b.categories[0].id
+    // OUT: hai bài ngắn (cộng dồn 12 km nhưng không bài nào đủ) → chưa đạt; C: một bài 10,1 km rất chậm → đạt
+    await run(db, OUT, 6, 600)
+    await run(db, OUT, 6, 600)
+    await run(db, C, 10.1, 900)
+    for (const u of [OUT, C]) {
+      await rpc(db, u, `select public.join_challenge($1) as r`, [cid])
+      await rpc(db, u, `select public.set_my_conquest($1, $2::jsonb) as r`, [cid, JSON.stringify([{ category_id: k }])])
+    }
+    const st = async (u: string) => (await db.query<Row>(`select status from public.challenge_participants where challenge_id = $1 and profile_id = $2`, [cid, u])).rows[0].status
+    expect(await st(C)).toBe('COMPLETED')
+    expect(await st(OUT)).not.toBe('COMPLETED')
+    const board = await rpc(db, A, `select public.challenge_conquest_board($1) as r`, [cid])
+    expect(board.rows.map((r: Row) => [r.display_name, r.achieved])).toEqual(expect.arrayContaining([['Runner 2', true]]))
+    expect(board.rows.find((r: Row) => r.display_name === 'Runner 3')?.achieved ?? false).toBe(false)
+  })
+
   it('hạn đăng ký: người tạo sửa được; sau hạn không ai vào được (trừ người tạo)', async () => {
     const cid = await create(db, { title: 'Chạy tháng', format: 'RANKED', objective: 'DISTANCE', target_value: 0,
       audience: 'PUBLIC', start_date: iso(-24), end_date: iso(24 * 6), max_slots: 20 })
