@@ -17,7 +17,7 @@ import { challengeErrorMessage, createChallenge, hasRulesInfo, quoteChallenge, s
 import { RulesInfoForm } from '../detail/RulesInfo'
 import {
   AUDIENCE_LABEL, COMMUNITY_KINDS, CONQUEST_PRESETS, conquestPayload, defaultDraft, draftFromTemplate, effectiveSlots, FORMAT_META, formatClock, formatScore, isCommunity,
-  isConquest, kmLabel, OBJECTIVE_META, parseClock, pledgePayload, pledgeSupported, rewardSummary, scoringLines,
+  isConquest, kmLabel, objectiveChoices, objectiveMeta, OBJECTIVE_META, parseClock, pledgePayload, pledgeSupported, rewardSummary, scoringLines,
   isTeamPledge, RECURRENCE_LABEL, recurrenceAllowed, TEAM_MODE_META, validateDraft, weeklyPreset,
   type Audience, type ChallengeDraft, type ChallengeFormat, type DraftErrors, type Objective, type Recurrence, type TeamMode,
 } from '../../model/challenge'
@@ -388,7 +388,7 @@ function NumberField({ label, value, onChange, unit, step = 1, min = 0, max, err
 
 function StepRules({ d, set, errors }: StepProps) {
   const objectives = objectivesFor(d)
-  const unit = OBJECTIVE_META[d.objective].unit
+  const unit = objectiveMeta(d.objective, d.conquest.mode).unit
   const conquest = isConquest(d.objective)
   const community = isCommunity(d.format)
   const needTarget = d.format === 'SOLO_GOAL'
@@ -398,13 +398,14 @@ function StepRules({ d, set, errors }: StepProps) {
       {!isTeamPledge(d) && objectives.length > 1 && <section>
         <p className="mb-2 text-sm font-medium text-fg-muted">Tính điểm theo</p>
         <div role="radiogroup" aria-label="Tính điểm theo" className="grid grid-cols-2 gap-2">
-          {objectives.map((o) => (
-            <button key={o} role="radio" aria-checked={d.objective === o}
-              onClick={() => set({ objective: o, minKm: o === 'STREAK_DAYS' ? Math.max(d.minKm, 2) : d.minKm,
-                pledge: isConquest(o) ? { ...d.pledge, enabled: false } : d.pledge })}
-              className={cn('rounded-xl border p-3 text-left', d.objective === o ? 'border-brand/60 bg-brand/10' : 'border-border bg-surface')}>
-              <span className="block text-sm font-semibold">{OBJECTIVE_META[o].label}</span>
-              <span className="block text-xs text-fg-muted">{OBJECTIVE_META[o].hint}</span>
+          {objectiveChoices(objectives, { objective: d.objective, mode: d.conquest.mode }).map((x) => (
+            <button key={x.id} role="radio" aria-checked={x.active}
+              onClick={() => set({ objective: x.objective, minKm: x.objective === 'STREAK_DAYS' ? Math.max(d.minKm, 2) : d.minKm,
+                ...(x.mode ? { conquest: { ...d.conquest, mode: x.mode } } : {}),
+                pledge: isConquest(x.objective) ? { ...d.pledge, enabled: false } : d.pledge })}
+              className={cn('rounded-xl border p-3 text-left', x.active ? 'border-brand/60 bg-brand/10' : 'border-border bg-surface')}>
+              <span className="block text-sm font-semibold">{x.meta.label}</span>
+              <span className="block text-xs text-fg-muted">{x.meta.hint}</span>
             </button>
           ))}
         </div>
@@ -537,20 +538,19 @@ export function ConquestSection({ d, set, error }: { d: ChallengeDraft; set: (p:
   return (
     <section className="space-y-4 rounded-[var(--radius-card)] border border-brand/50 bg-brand/5 p-4">
       <div>
-        <p className="flex items-center gap-1.5 font-semibold"><Flag className="size-4 text-brand" aria-hidden />{pace ? 'Chinh phục pace' : 'Chinh phục thời gian'} — các hạng mục</p>
+        <p className="flex items-center gap-1.5 font-semibold"><Flag className="size-4 text-brand" aria-hidden />{c.mode === 'ANY' ? 'Chinh phục cự ly' : pace ? 'Chinh phục pace' : 'Chinh phục thời gian'} — các hạng mục</p>
         <p className="text-xs text-fg-muted">Tạo một lần nhiều hạng mục. Người chơi chọn hạng mục muốn chinh phục (một hay nhiều).</p>
       </div>
-      <div role="radiogroup" aria-label="Ai đặt mục tiêu" className="grid gap-2 sm:grid-cols-3">
-        {(['FIXED', 'SELF', 'ANY'] as const).map((m) => (
+      {c.mode !== 'ANY' && <div role="radiogroup" aria-label="Ai đặt mục tiêu" className="grid grid-cols-2 gap-2">
+        {(['FIXED', 'SELF'] as const).map((m) => (
           <button key={m} type="button" role="radio" aria-checked={c.mode === m} onClick={() => setC({ mode: m })}
             className={cn('rounded-xl border p-2.5 text-left', c.mode === m ? 'border-brand/60 bg-brand/10' : 'border-border bg-surface')}>
-            <span className="block text-sm font-semibold">{m === 'FIXED' ? 'Người tạo đặt mục tiêu' : m === 'SELF' ? 'Người chơi tự đăng ký' : 'Chỉ cần đạt cự ly'}</span>
+            <span className="block text-sm font-semibold">{m === 'FIXED' ? 'Người tạo đặt mục tiêu' : 'Người chơi tự đăng ký'}</span>
             <span className="block text-xs text-fg-muted">{m === 'FIXED' ? `Bạn đặt ${pace ? 'pace' : 'thời gian'} cho từng hạng mục; người tham gia đăng ký hạng mục`
-              : m === 'SELF' ? `Mỗi người tự nhập ${pace ? 'pace' : 'thời gian'} mục tiêu của mình`
-              : 'Chạy một bài đủ cự ly là đạt, không cần thời gian hay pace'}</span>
+              : `Mỗi người tự nhập ${pace ? 'pace' : 'thời gian'} mục tiêu của mình`}</span>
           </button>
         ))}
-      </div>
+      </div>}
       <ul className="space-y-2">
         {c.categories.map((x, i) => (
           <li key={i} className="space-y-2 rounded-xl border border-border bg-surface p-2.5">
@@ -825,9 +825,9 @@ function StepReview({ d, quote, bill, loading, failed, quoteError, onRetry, club
         </div>
         <ul className="space-y-1.5 text-sm">
           {conquest ? (
-            <li><span className="text-fg-subtle">{OBJECTIVE_META[d.objective].label}: </span>
+            <li><span className="text-fg-subtle">{objectiveMeta(d.objective, d.conquest.mode).label}: </span>
               {d.conquest.categories.map((x) => `${x.label} (${kmLabel(x.km)})${d.conquest.mode === 'FIXED' ? ` ≤ ${x.target}${d.objective === 'BEST_PACE' ? '/km' : ''}` : ''}`).join(' · ')}
-              {d.conquest.mode === 'SELF' ? ' · người chơi tự đặt mục tiêu' : d.conquest.mode === 'ANY' ? ' · chỉ cần đạt cự ly' : ''}</li>
+              {d.conquest.mode === 'SELF' ? ' · người chơi tự đặt mục tiêu' : ''}</li>
           ) : d.pledge.enabled && pledgeSupported(d) ? (
             <li><span className="text-fg-subtle">Mục tiêu tự đăng ký: </span>
               {d.pledge.options.length ? d.pledge.options.map((o) => `${o}`).join(' · ') + ' km' : `${d.pledge.minKm}–${d.pledge.maxKm} km`}

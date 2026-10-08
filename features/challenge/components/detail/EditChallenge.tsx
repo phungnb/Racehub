@@ -9,7 +9,7 @@ import { cn } from '@/shared/lib/cn'
 import { formatNumber } from '@/shared/lib/format'
 import { challengeErrorMessage, getConquestBoard, updateChallenge, type ChallengeDetail, type ChallengeEdit, type ConquestBoard } from '../../api/challengeApi'
 import {
-  conquestPayload, DEFAULT_CONQUEST, DEFAULT_PLEDGE, defaultDraft, formatClock, isConquest, OBJECTIVE_META, pledgePayload, TEAM_MODE_META,
+  conquestPayload, DEFAULT_CONQUEST, DEFAULT_PLEDGE, defaultDraft, formatClock, isConquest, objectiveChoices, OBJECTIVE_META, pledgePayload, TEAM_MODE_META,
   validateConquest, validatePledge, validateTeamSize, type ChallengeDraft, type Objective, type TeamMode,
 } from '../../model/challenge'
 import { challengeKeys } from '../../hooks/useChallenge'
@@ -149,10 +149,11 @@ function EditForm({ d, board, onClose }: { d: ChallengeDetail; board: ConquestBo
         {objectives.length > 1 && (
           <Field label="Tính điểm theo">
             <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Tính điểm theo">
-              {objectives.map((o) => (
-                <button key={o} type="button" role="radio" aria-checked={rules.objective === o} onClick={() => setR({ objective: o })}
-                  className={cn('min-h-9 rounded-full border px-3 text-sm font-medium', rules.objective === o ? 'border-brand bg-brand/15' : 'border-border text-fg-muted')}>
-                  {OBJECTIVE_META[o].label}
+              {objectiveChoices(objectives, { objective: rules.objective, mode: rules.conquest.mode }).map((x) => (
+                <button key={x.id} type="button" role="radio" aria-checked={x.active}
+                  onClick={() => setR({ objective: x.objective, ...(x.mode ? { conquest: { ...rules.conquest, mode: x.mode } } : {}) })}
+                  className={cn('min-h-9 rounded-full border px-3 text-sm font-medium', x.active ? 'border-brand bg-brand/15' : 'border-border text-fg-muted')}>
+                  {x.meta.label}
                 </button>
               ))}
             </div>
