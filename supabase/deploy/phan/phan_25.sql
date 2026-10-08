@@ -275,7 +275,9 @@ begin
     jsonb_build_object('file', '20261001013600', 'label', 'Nhắc runner 3 ngày chưa chạy',
       'ok', to_regprocedure('public.send_run_reminders()') is not null),
     jsonb_build_object('file', '20261001013700', 'label', 'Bài trùng giờ dài hơn nghi vấn: chờ duyệt, duyệt xong loại bài trùng',
-      'ok', pg_get_functiondef('public.review_activity(uuid,text)'::regprocedure) ~ 'rejected_overlaps'));
+      'ok', pg_get_functiondef('public.review_activity(uuid,text)'::regprocedure) ~ 'rejected_overlaps'),
+    jsonb_build_object('file', '20261001013800', 'label', 'Chinh phục cự ly: chạy một bài đủ cự ly là đạt, không cần thời gian / pace',
+      'ok', pg_get_constraintdef((select oid from pg_constraint where conname = 'challenges_conquest_mode_chk')) like '%ANY%'));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
