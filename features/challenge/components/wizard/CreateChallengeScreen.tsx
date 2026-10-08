@@ -557,9 +557,7 @@ export function ConquestSection({ d, set, error }: { d: ChallengeDraft; set: (p:
             <div className="flex items-center gap-2">
               <Input aria-label={`Tên hạng mục ${i + 1}`} value={x.label} maxLength={40} className="font-semibold" onChange={(e) => setCat(i, { label: e.target.value })} />
               <div className="relative w-28 shrink-0">
-                <Input aria-label={`Cự ly hạng mục ${i + 1}`} inputMode="decimal" className="pr-9 font-mono" value={String(x.km).replace('.', ',')}
-                  onChange={(e) => { const v = Number(e.target.value.replace(',', '.')); if (!Number.isNaN(v)) setCat(i, { km: v }) }} />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-fg-subtle">km</span>
+                <KmInput label={`Cự ly hạng mục ${i + 1}`} value={x.km} onChange={(km) => setCat(i, { km })} />
               </div>
               {c.categories.length > 1 && (
                 <button type="button" aria-label={`Bỏ hạng mục ${x.label}`} onClick={() => setC({ categories: c.categories.filter((_, j) => j !== i) })}
@@ -594,6 +592,31 @@ export function ConquestSection({ d, set, error }: { d: ChallengeDraft; set: (p:
       </p>
       {error && <p role="alert" className="text-xs text-danger">{error}</p>}
     </section>
+  )
+}
+
+/** Ô nhập cự ly (km): giữ chữ đang gõ để gõ được "10," / "10,1" — nếu hiển thị lại từ số thì dấu phẩy cuối bị mất */
+function KmInput({ label, value, onChange }: { label: string; value: number; onChange: (km: number) => void }) {
+  const [text, setText] = useState(String(value).replace('.', ','))
+  const parse = (t: string) => (t === '' ? 0 : Number(t.replace(',', '.')))
+  // Bản nháp đổi từ nơi khác (nạp mẫu, chọn lại hạng mục) thì ô theo số mới
+  const [seen, setSeen] = useState(value)
+  if (seen !== value) {
+    setSeen(value)
+    if (parse(text) !== value) setText(String(value).replace('.', ','))
+  }
+  return (
+    <>
+      <Input aria-label={label} inputMode="decimal" className="pr-9 font-mono" value={text}
+        onChange={(e) => {
+          const t = e.target.value
+          if (!/^\d*[.,]?\d*$/.test(t)) return
+          setText(t)
+          const v = parse(t)
+          if (!Number.isNaN(v)) onChange(v)
+        }} />
+      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-fg-subtle">km</span>
+    </>
   )
 }
 
