@@ -1,6 +1,6 @@
 # App RaceHub trên App Store / Google Play
 
-App cài được dựng bằng **Capacitor**. Nó là một "vỏ" native mở chính trang web RaceHub (`https://racehubrun.com`), rồi thêm những việc web không làm được:
+App cài được dựng bằng **Capacitor**. Nó là một "vỏ" native mở chính trang web RaceHub (`https://www.racehubrun.com`), rồi thêm những việc web không làm được:
 
 | Tính năng | Web (PWA) | App cài |
 |---|---|---|
