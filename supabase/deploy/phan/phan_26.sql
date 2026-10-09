@@ -296,6 +296,8 @@ begin
       'ok', to_regprocedure('public.admin_delete_rejected_activities(uuid[])') is not null),
     jsonb_build_object('file', '20261001014600', 'label', 'Admin xem danh sách tài khoản đang khóa',
       'ok', to_regprocedure('public.admin_banned_users()') is not null),
+    jsonb_build_object('file', '20261001014700', 'label', 'Xóa tin nhắn kiểu Zalo (thu hồi, xóa phía tôi, xóa cuộc trò chuyện)',
+      'ok', to_regprocedure('public.hide_direct_message(uuid)') is not null and to_regprocedure('public.clear_direct_thread(uuid)') is not null),
     jsonb_build_object('file', '20261001014800', 'label', 'Điểm danh sự kiện chỉ trong khung giờ + điểm danh GPS',
       'ok', to_regprocedure('public.gps_checkin_club_event(uuid,double precision,double precision,double precision)') is not null));
 
