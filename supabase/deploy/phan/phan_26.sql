@@ -292,6 +292,8 @@ begin
       'ok', to_regprocedure('private.club_event_to_post()') is not null),
     jsonb_build_object('file', '20261001014400', 'label', 'Admin nhắc người mua thanh toán đơn chờ',
       'ok', to_regprocedure('public.admin_remind_order(uuid)') is not null),
+    jsonb_build_object('file', '20261001014500', 'label', 'Admin xóa hàng loạt bài chạy bị loại',
+      'ok', to_regprocedure('public.admin_delete_rejected_activities(uuid[])') is not null),
     jsonb_build_object('file', '20261001014600', 'label', 'Admin xem danh sách tài khoản đang khóa',
       'ok', to_regprocedure('public.admin_banned_users()') is not null));
 
