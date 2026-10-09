@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Receipt } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, ConfirmSheet, EmptyState, ErrorState, Input, SegmentedControl, Skeleton } from '@/shared/ui'
+import { Button, ConfirmSheet, EmptyState, ErrorState, Input, SegmentedControl, Skeleton, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatVnd } from '@/shared/lib/economy'
 import { orderTitle, STATUS_META, type Order, type OrderStatus } from '@/features/billing'
@@ -33,11 +33,19 @@ export function OrdersTab() {
     onError: (e) => toast.error(adminErrorMessage(e)),
   })
 
+  const [remindSel, setRemindSel] = useState<Order | null>(null)
+  const [remindMsg, setRemindMsg] = useState('')
   const remind = useMutation({
-    mutationFn: (o: Order) => remindOrder(o.id),
-    onSuccess: (o) => toast.success(`Đã gửi nhắc thanh toán đơn ${o.code} cho ${o.buyer_name ?? 'người mua'}`),
+    mutationFn: ({ order, message }: { order: Order; message: string }) => remindOrder(order.id, message),
+    onSuccess: (o) => { toast.success(`Đã gửi nhắc thanh toán đơn ${o.code} cho ${o.buyer_name ?? 'người mua'}`); setRemindSel(null) },
     onError: (e) => toast.error(adminErrorMessage(e)),
   })
+
+  const openRemind = (o: Order) => {
+    const what = o.kind === 'PLAN' ? `kích hoạt ${orderTitle(o)}` : `nhận ${o.xu + o.bonus_xu} Xu`
+    setRemindMsg(`Hãy liên hệ với RaceHub và hoàn thành thủ tục thanh toán để ${what}. Chuyển khoản đúng nội dung ${o.code}.`)
+    setRemindSel(o)
+  }
 
   return (
     <div className="space-y-3">
@@ -67,7 +75,7 @@ export function OrdersTab() {
                   {o.status === 'PENDING' && (
                     <div className="flex gap-2">
                       <Button size="sm" variant="ghost" onClick={() => setSel({ order: o, action: 'cancel' })}>Hủy</Button>
-                      {!expired && <Button size="sm" variant="secondary" loading={remind.isPending && remind.variables?.id === o.id} onClick={() => remind.mutate(o)}>Nhắc thanh toán</Button>}
+                      {!expired && <Button size="sm" variant="secondary" onClick={() => openRemind(o)}>Nhắc thanh toán</Button>}
                       <Button size="sm" className="flex-1" onClick={() => setSel({ order: o, action: 'confirm' })}>Xác nhận đã nhận tiền</Button>
                     </div>
                   )}
@@ -77,6 +85,14 @@ export function OrdersTab() {
             })}
           </ul>
         )}
+      <ConfirmSheet open={!!remindSel} onClose={() => setRemindSel(null)} loading={remind.isPending}
+        onConfirm={() => remindSel && remind.mutate({ order: remindSel, message: remindMsg })}
+        title={`Nhắc thanh toán đơn ${remindSel?.code}`} confirmLabel="Gửi nhắc"
+        description={remindSel ? `Gửi thông báo cho ${remindSel.buyer_name ?? 'người mua'} · ${formatVnd(remindSel.amount_vnd)}` : ''}>
+        <Textarea value={remindMsg} onChange={(e) => setRemindMsg(e.target.value)} maxLength={300} rows={5} aria-label="Nội dung nhắc"
+          placeholder="Nội dung gửi người mua (có thể ghi số tài khoản). Để trống: dùng câu mặc định." />
+        <p className="mt-1 text-right text-xs text-fg-subtle">{remindMsg.length}/300</p>
+      </ConfirmSheet>
       <ConfirmSheet open={!!sel} onClose={() => setSel(null)} loading={act.isPending} danger={sel?.action === 'cancel'}
         onConfirm={() => sel && act.mutate(sel)}
         title={sel?.action === 'confirm' ? `Xác nhận đơn ${sel?.order.code}?` : `Hủy đơn ${sel?.order.code}?`}

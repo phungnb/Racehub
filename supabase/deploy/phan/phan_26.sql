@@ -291,7 +291,7 @@ begin
     jsonb_build_object('file', '20261001014300', 'label', 'Lịch sự kiện CLB tự đăng bài lên bảng tin',
       'ok', to_regprocedure('private.club_event_to_post()') is not null),
     jsonb_build_object('file', '20261001014400', 'label', 'Admin nhắc người mua thanh toán đơn chờ',
-      'ok', to_regprocedure('public.admin_remind_order(uuid)') is not null),
+      'ok', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders' and column_name = 'reminded_at')),
     jsonb_build_object('file', '20261001014500', 'label', 'Admin xóa hàng loạt bài chạy bị loại',
       'ok', to_regprocedure('public.admin_delete_rejected_activities(uuid[])') is not null),
     jsonb_build_object('file', '20261001014600', 'label', 'Admin xem danh sách tài khoản đang khóa',
@@ -301,7 +301,9 @@ begin
     jsonb_build_object('file', '20261001014800', 'label', 'Điểm danh sự kiện chỉ trong khung giờ + điểm danh GPS',
       'ok', to_regprocedure('public.gps_checkin_club_event(uuid,double precision,double precision,double precision)') is not null),
     jsonb_build_object('file', '20261001014900', 'label', 'Chinh phục: tham gia bắt buộc có hạng mục (một bước)',
-      'ok', to_regprocedure('public.join_challenge_conquest(uuid,jsonb,text)') is not null));
+      'ok', to_regprocedure('public.join_challenge_conquest(uuid,jsonb,text)') is not null),
+    jsonb_build_object('file', '20261001015000', 'label', 'Admin tự nhập nội dung nhắc thanh toán',
+      'ok', to_regprocedure('public.admin_remind_order(uuid,text)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

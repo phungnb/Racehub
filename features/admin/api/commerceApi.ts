@@ -13,7 +13,8 @@ async function call<T>(fn: string, args: Record<string, unknown> = {}): Promise<
 export const listOrders = async (status: OrderStatus | 'ALL') =>
   ((await call<Order[]>('admin_list_orders', { p_status: status })) ?? []).map(toOrder)
 export const confirmOrder = async (id: string, note: string) => toOrder(await call<Order>('admin_confirm_order', { p_order_id: id, p_note: note || null }))
-export const remindOrder = async (id: string) => toOrder(await call<Order>('admin_remind_order', { p_order_id: id }))
+export const remindOrder = async (id: string, message: string) =>
+  toOrder(await call<Order>('admin_remind_order', { p_order_id: id, p_message: message.trim() || null }))
 export const cancelOrderAdmin = async (id: string) => toOrder(await call<Order>('cancel_order', { p_order_id: id }))
 
 export const grantPlan = (input: { kind: AccountKind; id: string; plan: string; months: number; reason: string }) =>
