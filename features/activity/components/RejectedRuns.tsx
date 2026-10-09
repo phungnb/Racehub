@@ -1,9 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ChevronDown, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { SectionTitle } from '@/shared/ui'
-import { getFraudReviewStats, listRejectedRuns, restoreErrorMessage, restoreRun } from '../api/reviewApi'
+import { Button } from '@/shared/ui'
+import { cn } from '@/shared/lib/cn'
+import { deleteRejectedRuns, getFraudReviewStats, listRejectedRuns, restoreErrorMessage, restoreRun } from '../api/reviewApi'
 import { PendingRunCard } from './PendingRunCard'
 import { WarnedRuns } from './WarnedRuns'
 
@@ -23,15 +26,64 @@ export function RejectedRuns({ clubId }: { clubId: string | null }) {
     },
     onError: (e) => toast.error(restoreErrorMessage(e)),
   })
+  const del = useMutation({
+    mutationFn: (ids: string[]) => deleteRejectedRuns(ids),
+    onSuccess: (r) => {
+      toast.success(`Đã xóa ${r.deleted} bài bị loại`)
+      setSelected(new Set())
+      void qc.invalidateQueries({ queryKey: key })
+    },
+    onError: () => toast.error('Không xóa được. Chỉ admin xóa được bài đang ở trạng thái bị loại — tải lại danh sách rồi thử lại.'),
+  })
+  const [open, setOpen] = useState(false) // gập sẵn như "Bài có cảnh báo"
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const canDelete = clubId === null // chỉ admin hệ thống (RPC cũng kiểm tra lại)
+  const rows = list.data ?? []
+  const picked = rows.filter((r) => selected.has(r.id)).map((r) => r.id)
+  const toggle = (id: string) => setSelected((prev) => { const n = new Set(prev); if (!n.delete(id)) n.add(id); return n })
+  const onDelete = () => {
+    if (!picked.length) return
+    if (window.confirm(`Xóa ${picked.length} bài chạy bị loại đã chọn? Bài biến khỏi danh sách; không ảnh hưởng Xu, XP hay thử thách (bài bị loại chưa được tính). Không khôi phục từ app được nữa.`)) del.mutate(picked)
+  }
   return (
     <>
-      {!!list.data?.length && (
+      {!!rows.length && (
         <section>
-          <SectionTitle>Bài đã loại (30 ngày)</SectionTitle>
-          <p className="-mt-1 mb-2 text-xs text-fg-muted">Loại nhầm? Ghi lý do rồi khôi phục — lịch sử quyết định được lưu lại để chỉnh luật. Bài nhập tay không được ghi nhận.</p>
-          <ul className="space-y-2">
-            {list.data.map((r) => <PendingRunCard key={r.id} run={r} busy={restore.isPending} onRestore={(note) => restore.mutate({ id: r.id, note })} />)}
-          </ul>
+          <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
+            className="flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-surface px-3 py-2.5 text-left">
+            <span className="text-sm font-semibold">Bài đã loại (30 ngày) · {rows.length} bài</span>
+            <ChevronDown className={cn('size-4 shrink-0 text-fg-subtle transition-transform', open && 'rotate-180')} aria-hidden />
+          </button>
+          {open && (
+            <div className="mt-2">
+              <p className="mb-2 text-xs text-fg-muted">Loại nhầm? Ghi lý do rồi khôi phục — lịch sử quyết định được lưu lại để chỉnh luật. Bài nhập tay không được ghi nhận.</p>
+              {canDelete && (
+                <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-border bg-surface px-3 py-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" className="size-4" checked={picked.length === rows.length} aria-label="Chọn tất cả bài bị loại"
+                      onChange={(e) => setSelected(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set())} />
+                    Chọn tất cả{picked.length ? ` (${picked.length})` : ''}
+                  </label>
+                  <Button size="sm" variant="danger" disabled={!picked.length || del.isPending} onClick={onDelete}>
+                    <Trash2 className="size-4" aria-hidden />Xóa các bài đã chọn
+                  </Button>
+                </div>
+              )}
+              <ul className="space-y-2">
+                {rows.map((r) => (
+                  <li key={r.id} className="flex items-start gap-2">
+                    {canDelete && (
+                      <input type="checkbox" className="mt-4 size-4 shrink-0" checked={selected.has(r.id)} onChange={() => toggle(r.id)}
+                        aria-label={`Chọn bài của ${r.profiles?.display_name ?? 'Runner'}`} />
+                    )}
+                    <ul className="min-w-0 flex-1">
+                      <PendingRunCard run={r} busy={restore.isPending} onRestore={(note) => restore.mutate({ id: r.id, note })} />
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
       )}
       <WarnedRuns clubId={clubId} />
