@@ -37,7 +37,21 @@ export function useStageSound(on: boolean) {
       recordStream: (): MediaStream | null => {
         const c = ctx()
         if (!c || typeof c.createMediaStreamDestination !== 'function') return null
-        if (recRef.current?.context !== c) recRef.current = c.createMediaStreamDestination()
+        if (recRef.current?.context !== c) {
+          const dest = c.createMediaStreamDestination()
+          // Luôn có một nguồn im lặng nối vào: không có tiếng nào phát thì luồng âm thanh không ra dữ liệu, MediaRecorder
+          // đứng chờ → video chỉ ghi được đoạn có tiếng quay (lượt đầu), lần ghi sau ra file rỗng
+          try {
+            const silent = c.createConstantSource()
+            silent.offset.value = 0
+            silent.connect(dest); silent.start()
+          } catch {
+            const o = c.createOscillator(), g = c.createGain()
+            g.gain.value = 0
+            o.connect(g).connect(dest); o.start()
+          }
+          recRef.current = dest
+        }
         return recRef.current.stream
       },
     }
