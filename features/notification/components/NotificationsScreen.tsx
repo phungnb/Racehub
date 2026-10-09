@@ -21,6 +21,7 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   CLUB_APPROVED: { icon: UserCheck, tone: 'text-brand' },
   CHALLENGE_NEW: { icon: Trophy, tone: 'text-coin' },
   ADMIN_XU: { icon: Coins, tone: 'text-coin' },
+  ORDER_REMINDER: { icon: Coins, tone: 'text-coin' },
   ADMIN_PASS: { icon: Ticket, tone: 'text-brand' },
   BADGE: { icon: Award, tone: 'text-medal-gold' },
   LEVEL_UP: { icon: TrendingUp, tone: 'text-brand' },

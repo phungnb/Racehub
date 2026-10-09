@@ -1,7 +1,7 @@
--- RaceHub: gộp 107 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 109 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -28348,6 +28348,89 @@ end $$;
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001014300_club_event_feed_post.sql
+-- ===================================================================
+-- Lịch CLB mới tạo → tự lên bảng tin CLB (club_posts.kind = 'NEWS', chuyên mục EVENT, meta.event_id).
+-- Trước đây create_club_event chỉ gửi thông báo, không có bài trên bảng tin nên lịch vừa tạo không hiện ở đó.
+-- Dùng trigger để không phải sao lại các RPC tạo/sửa/hủy: sửa lịch thì cập nhật bài, hủy lịch thì gỡ bài.
+
+create or replace function private.club_event_post_body(e public.club_events) returns text
+language sql immutable set search_path = public as $$
+  select to_char(e.starts_at at time zone 'Asia/Ho_Chi_Minh', 'HH24:MI DD/MM/YYYY')
+      || coalesce(E'\n' || e.location_name, '')
+      || coalesce(E'\n' || nullif(trim(e.description), ''), '')
+$$;
+
+create or replace function private.club_event_to_post() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.status = 'SCHEDULED' then
+      insert into public.club_posts (club_id, author_id, kind, title, body, meta)
+      values (new.club_id, new.created_by, 'NEWS', 'Lịch chạy: ' || new.title, private.club_event_post_body(new),
+              jsonb_build_object('category', 'EVENT', 'event_id', new.id));
+    end if;
+  elsif new.status = 'CANCELLED' then
+    delete from public.club_posts where kind = 'NEWS' and meta->>'event_id' = new.id::text;
+  else
+    update public.club_posts set title = 'Lịch chạy: ' || new.title, body = private.club_event_post_body(new)
+     where kind = 'NEWS' and meta->>'event_id' = new.id::text;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists club_event_post_trg on public.club_events;
+create trigger club_event_post_trg after insert or update of title, description, starts_at, location_name, status
+  on public.club_events for each row execute function private.club_event_to_post();
+
+revoke all on function private.club_event_to_post() from public, anon, authenticated;
+
+-- Lịch sắp tới đã tạo trước đây
+insert into public.club_posts (club_id, author_id, kind, title, body, meta, created_at)
+select e.club_id, e.created_by, 'NEWS', 'Lịch chạy: ' || e.title, private.club_event_post_body(e),
+       jsonb_build_object('category', 'EVENT', 'event_id', e.id), e.created_at
+  from public.club_events e
+ where e.status = 'SCHEDULED' and e.starts_at > now()
+   and not exists (select 1 from public.club_posts p where p.kind = 'NEWS' and p.meta->>'event_id' = e.id::text);
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001014400_order_payment_reminder.sql
+-- ===================================================================
+-- Admin nhắc người mua hoàn tất thanh toán đơn đang chờ: gửi thông báo trong app (không tự động hàng loạt).
+alter table public.orders add column if not exists reminded_at timestamptz;
+
+create or replace function public.admin_remind_order(p_order_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_admin();
+  o public.orders := (select x from public.orders x where x.id = p_order_id for update);
+  v_plan text; v_what text; v_body text;
+begin
+  if o.id is null then raise exception 'ORDER_NOT_FOUND'; end if;
+  if o.status <> 'PENDING' or o.expires_at <= now() then raise exception 'ORDER_NOT_PENDING'; end if;
+  if o.reminded_at is not null and o.reminded_at > now() - interval '6 hours' then raise exception 'ORDER_REMIND_TOO_SOON'; end if;
+  if o.kind = 'PLAN' then
+    v_plan := coalesce((select name from public.plans where code = o.plan_code), 'gói');
+    v_what := 'kích hoạt ' || v_plan || coalesce(' ' || o.months || ' tháng', '');
+  else
+    v_what := 'nhận ' || (o.xu + o.bonus_xu) || ' Xu';
+  end if;
+  v_body := 'Hãy liên hệ với RaceHub và hoàn thành thủ tục thanh toán để ' || v_what
+         || '. Chuyển khoản đúng nội dung ' || o.code || ' hoặc nhắn admin qua mục Liên hệ trong trang Gói.';
+  perform private.notify(o.buyer_id, null, 'ORDER_REMINDER', 'Đơn ' || o.code || ' đang chờ thanh toán', v_body, '/goi', v_uid, true);
+  update public.orders set reminded_at = now() where id = o.id;
+  insert into public.admin_audit_log (actor_id, action, target, new_value)
+  values (v_uid, 'REMIND_ORDER', o.code, jsonb_build_object('kind', o.kind, 'amount_vnd', o.amount_vnd));
+  return private.order_json((select x from public.orders x where x.id = o.id));
+end $$;
+
+revoke all on function public.admin_remind_order(uuid) from public, anon;
+grant execute on function public.admin_remind_order(uuid) to authenticated;
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -28631,7 +28714,11 @@ begin
             and pg_get_functiondef('public.create_challenge_v2(jsonb,text)'::regprocedure) ~ 'v_audience = ''PUBLIC'' and v_club is not null'),
     jsonb_build_object('file', '20261001014200', 'label', 'Sai số cự ly chinh phục do người tạo đặt',
       'ok', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'challenges' and column_name = 'conquest_tolerance_pct')
-            and pg_get_functiondef('private.conquest_has_result(uuid,uuid)'::regprocedure) ~ 'conquest_tolerance_pct'));
+            and pg_get_functiondef('private.conquest_has_result(uuid,uuid)'::regprocedure) ~ 'conquest_tolerance_pct'),
+    jsonb_build_object('file', '20261001014300', 'label', 'Lịch sự kiện CLB tự đăng bài lên bảng tin',
+      'ok', to_regprocedure('private.club_event_to_post()') is not null),
+    jsonb_build_object('file', '20261001014400', 'label', 'Admin nhắc người mua thanh toán đơn chờ',
+      'ok', to_regprocedure('public.admin_remind_order(uuid)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
