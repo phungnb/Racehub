@@ -1,7 +1,7 @@
--- RaceHub: gộp 115 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 116 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015100, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -28816,6 +28816,44 @@ end $$;
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001015000_order_reminder_message.sql
+-- ===================================================================
+-- Admin tự nhập nội dung nhắc thanh toán (ví dụ kèm số tài khoản); bỏ trống thì dùng câu mặc định.
+drop function if exists public.admin_remind_order(uuid);
+
+create or replace function public.admin_remind_order(p_order_id uuid, p_message text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_admin();
+  o public.orders := (select x from public.orders x where x.id = p_order_id for update);
+  v_plan text; v_what text; v_body text := nullif(trim(coalesce(p_message, '')), '');
+begin
+  if o.id is null then raise exception 'ORDER_NOT_FOUND'; end if;
+  if o.status <> 'PENDING' or o.expires_at <= now() then raise exception 'ORDER_NOT_PENDING'; end if;
+  if o.reminded_at is not null and o.reminded_at > now() - interval '6 hours' then raise exception 'ORDER_REMIND_TOO_SOON'; end if;
+  if v_body is not null and char_length(v_body) > 300 then raise exception 'MESSAGE_TOO_LONG'; end if;
+  if v_body is null then
+    if o.kind = 'PLAN' then
+      v_plan := coalesce((select name from public.plans where code = o.plan_code), 'gói');
+      v_what := 'kích hoạt ' || v_plan || coalesce(' ' || o.months || ' tháng', '');
+    else
+      v_what := 'nhận ' || (o.xu + o.bonus_xu) || ' Xu';
+    end if;
+    v_body := 'Hãy liên hệ với RaceHub và hoàn thành thủ tục thanh toán để ' || v_what
+           || '. Chuyển khoản đúng nội dung ' || o.code || ' hoặc nhắn admin qua mục Liên hệ trong trang Gói.';
+  end if;
+  perform private.notify(o.buyer_id, null, 'ORDER_REMINDER', 'Đơn ' || o.code || ' đang chờ thanh toán', v_body, '/goi', v_uid, true);
+  update public.orders set reminded_at = now() where id = o.id;
+  insert into public.admin_audit_log (actor_id, action, target, new_value)
+  values (v_uid, 'REMIND_ORDER', o.code, jsonb_build_object('kind', o.kind, 'amount_vnd', o.amount_vnd, 'custom_message', p_message is not null and trim(p_message) <> ''));
+  return private.order_json((select x from public.orders x where x.id = o.id));
+end $$;
+
+revoke all on function public.admin_remind_order(uuid, text) from public, anon;
+grant execute on function public.admin_remind_order(uuid, text) to authenticated;
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001015100_feedback_bubble.sql
 -- ===================================================================
 -- 015100: HỘP THƯ GÓP Ý (bong bóng nổi trong app)
@@ -29188,7 +29226,7 @@ begin
     jsonb_build_object('file', '20261001014300', 'label', 'Lịch sự kiện CLB tự đăng bài lên bảng tin',
       'ok', to_regprocedure('private.club_event_to_post()') is not null),
     jsonb_build_object('file', '20261001014400', 'label', 'Admin nhắc người mua thanh toán đơn chờ',
-      'ok', to_regprocedure('public.admin_remind_order(uuid)') is not null),
+      'ok', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders' and column_name = 'reminded_at')),
     jsonb_build_object('file', '20261001014500', 'label', 'Admin xóa hàng loạt bài chạy bị loại',
       'ok', to_regprocedure('public.admin_delete_rejected_activities(uuid[])') is not null),
     jsonb_build_object('file', '20261001014600', 'label', 'Admin xem danh sách tài khoản đang khóa',
@@ -29199,6 +29237,8 @@ begin
       'ok', to_regprocedure('public.gps_checkin_club_event(uuid,double precision,double precision,double precision)') is not null),
     jsonb_build_object('file', '20261001014900', 'label', 'Chinh phục: tham gia bắt buộc có hạng mục (một bước)',
       'ok', to_regprocedure('public.join_challenge_conquest(uuid,jsonb,text)') is not null),
+    jsonb_build_object('file', '20261001015000', 'label', 'Admin tự nhập nội dung nhắc thanh toán',
+      'ok', to_regprocedure('public.admin_remind_order(uuid,text)') is not null),
     jsonb_build_object('file', '20261001015100', 'label', 'Hộp thư góp ý (bong bóng nổi trong app)',
       'ok', to_regprocedure('public.submit_feedback(text,integer,text,text,text)') is not null));
 
