@@ -33,8 +33,10 @@ export async function signInWithProvider(provider: OAuthProvider, next: string) 
       const { Browser } = await import('@capacitor/browser')
       await Browser.open({ url: data.url, presentationStyle: 'popover' })
     } catch (e) {
-      const names = ((Capacitor as unknown as { PluginHeaders?: { name: string }[] }).PluginHeaders ?? []).map((h) => h.name).join(',')
-      throw new Error(`APP_UPDATE_REQUIRED|${(e as Error)?.message ?? 'lỗi'}|plugins=${names || 'none'}`)
+      const w = window as unknown as { Capacitor?: { PluginHeaders?: { name: string }[] }; androidBridge?: unknown }
+      const names = (w.Capacitor?.PluginHeaders ?? (Capacitor as unknown as { PluginHeaders?: { name: string }[] }).PluginHeaders ?? []).map((h) => h.name).join(',')
+      const diag = `plat=${Capacitor.getPlatform()} bridge=${w.androidBridge ? 'co' : 'khong'} winCap=${w.Capacitor ? 'co' : 'khong'} same=${w.Capacitor === (Capacitor as unknown) ? 'y' : 'n'} origin=${location.origin}`
+      throw new Error(`APP_UPDATE_REQUIRED|${(e as Error)?.message ?? 'lỗi'}|plugins=${names || 'none'}|${diag}`)
     }
   }
 }
