@@ -3,13 +3,13 @@
 import Link from 'next/link'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Ban, Copy, Flag, Heart, MoreHorizontal, MoreVertical, SendHorizontal, Trash2 } from 'lucide-react'
+import { ArrowLeft, Ban, Copy, Flag, Heart, MoreHorizontal, MoreVertical, SendHorizontal, Trash2, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, BackLink, Button, ConfirmSheet, ErrorState, ExpressionPanel, ExpressionToggle, ExpressiveBody, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import {
-  blockRunner, deleteDirectMessage, DM_REACTIONS, getDirectThread, reactDirectMessage, sendDirectMessage, socialErrorMessage, unblockRunner, type DirectMessage, type DirectThread,
+  blockRunner, canRecall, deleteDirectMessage, hideDirectMessage, DM_REACTIONS, getDirectThread, reactDirectMessage, sendDirectMessage, socialErrorMessage, unblockRunner, type DirectMessage, type DirectThread,
 } from '../api/socialApi'
 import { socialKeys } from '../hooks/keys'
 import { ReportRunnerSheet } from './ReportRunnerSheet'
@@ -17,7 +17,7 @@ import { ReportRunnerSheet } from './ReportRunnerSheet'
 const time = (iso: string) => new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
 const day = (iso: string) => new Date(iso).toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric' })
 
-/** Trò chuyện 1-1 với một runner: tự làm mới 5 giây / lần, thu hồi tin của mình, chặn / báo cáo */
+/** Trò chuyện 1-1 với một runner: tự làm mới 5 giây / lần, nhấn giữ một tin để thu hồi / xóa ở phía mình, chặn / báo cáo */
 export function DirectChatScreen({ userId }: { userId: string }) {
   const qc = useQueryClient()
   const key = socialKeys.thread(userId)
@@ -48,6 +48,11 @@ export function DirectChatScreen({ userId }: { userId: string }) {
   const recall = useMutation({
     mutationFn: deleteDirectMessage,
     onSuccess: () => { void qc.invalidateQueries({ queryKey: key }); refreshAround() },
+    onError: (e) => toast.error(socialErrorMessage(e)),
+  })
+  const hide = useMutation({
+    mutationFn: hideDirectMessage,
+    onSuccess: () => { toast('Đã xóa ở phía bạn'); void qc.invalidateQueries({ queryKey: key }); refreshAround() },
     onError: (e) => toast.error(socialErrorMessage(e)),
   })
   const react = useMutation({
@@ -121,21 +126,32 @@ export function DirectChatScreen({ userId }: { userId: string }) {
       ))}
 
       <Sheet open={!!action} onClose={() => setAction(null)} title="Tin nhắn">
-        {action && !action.deleted && (
+        {action && (
           <div className="grid gap-2">
-            <Button variant="secondary" block onClick={() => { void navigator.clipboard?.writeText(action.body ?? '').then(() => toast('Đã sao chép')); setAction(null) }}>
-              <Copy className="size-4" aria-hidden />Sao chép
-            </Button>
-            {action.mine && (
-              <Button variant="danger" block onClick={() => { recall.mutate(action.id); setAction(null) }}>
-                <Trash2 className="size-4" aria-hidden />Thu hồi
+            {!action.deleted && (
+              <Button variant="secondary" block onClick={() => { void navigator.clipboard?.writeText(action.body ?? '').then(() => toast('Đã sao chép')); setAction(null) }}>
+                <Copy className="size-4" aria-hidden />Sao chép
               </Button>
             )}
-            {!action.mine && (
+            {canRecall(action) && (
+              <Button variant="danger" block onClick={() => { recall.mutate(action.id); setAction(null) }}>
+                <Undo2 className="size-4" aria-hidden />Thu hồi (với mọi người)
+              </Button>
+            )}
+            <Button variant="danger" block onClick={() => { hide.mutate(action.id); setAction(null) }}>
+              <Trash2 className="size-4" aria-hidden />Xóa ở phía tôi
+            </Button>
+            {!action.mine && !action.deleted && (
               <Button variant="secondary" block onClick={() => { setReportNote(`Tin nhắn lúc ${time(action.created_at)}: "${action.body ?? ''}"`); setAction(null); setSheet('report') }}>
                 <Flag className="size-4" aria-hidden />Báo cáo tin nhắn này
               </Button>
             )}
+            <p className="px-1 text-xs text-fg-subtle">
+              {action.mine && !action.deleted && !canRecall(action)
+                ? 'Đã quá 24 giờ nên không thu hồi được. '
+                : 'Thu hồi chỉ dùng được cho tin của bạn trong 24 giờ sau khi gửi. '}
+              Xóa ở phía tôi không ảnh hưởng người kia.
+            </p>
           </div>
         )}
       </Sheet>
@@ -166,7 +182,7 @@ function toggleReaction(list: NonNullable<DirectMessage['reactions']>, emoji: st
 
 /**
  * Bong bóng tin nhắn kiểu Zalo: nút ♡ nhỏ ở góc để thả tim ngay (1 chạm), chạm đúp = ❤️,
- * chạm / nhấn giữ → thanh cảm xúc hiện ngay trên tin (không phải mở bảng), "⋯" cho sao chép / thu hồi / báo cáo.
+ * chạm → thanh cảm xúc hiện ngay trên tin, nhấn giữ (hoặc "⋯") → menu sao chép / thu hồi / xóa ở phía tôi / báo cáo.
  */
 function Bubble({ m, picker, onPicker, onMore, onReact }: {
   m: DirectMessage; picker: boolean; onPicker: (open: boolean) => void; onMore: () => void; onReact: (emoji: string) => void
@@ -185,8 +201,7 @@ function Bubble({ m, picker, onPicker, onMore, onReact }: {
     onPicker(!picker)
   }
   const startPress = () => {
-    if (m.deleted) return
-    press.current = setTimeout(() => { longPressed.current = true; onPicker(true); navigator.vibrate?.(15) }, 450)
+    press.current = setTimeout(() => { longPressed.current = true; onMore(); navigator.vibrate?.(15) }, 450)
   }
   const endPress = () => { if (press.current) clearTimeout(press.current); press.current = null }
   return (
@@ -210,9 +225,9 @@ function Bubble({ m, picker, onPicker, onMore, onReact }: {
           </>
         )}
         <div className={cn('flex items-end gap-1', m.mine ? 'flex-row-reverse' : 'flex-row', picker && 'relative z-50')}>
-          <button type="button" onClick={tap} onContextMenu={(e) => { e.preventDefault(); if (!m.deleted) onPicker(true) }}
+          <button type="button" onClick={tap} onContextMenu={(e) => { e.preventDefault(); onMore() }}
             onTouchStart={startPress} onTouchEnd={endPress} onTouchMove={endPress}
-            aria-label={`${m.mine ? 'Tin của bạn' : 'Tin nhắn'}, ${time(m.created_at)}. Chạm để thả cảm xúc, chạm đúp để thả tim`}
+            aria-label={`${m.mine ? 'Tin của bạn' : 'Tin nhắn'}, ${time(m.created_at)}. Chạm để thả cảm xúc, chạm đúp để thả tim, nhấn giữ để xóa / thu hồi`}
             className={cn('select-text rounded-2xl px-3.5 py-2 text-left text-[15px] leading-snug [-webkit-touch-callout:none]',
               m.deleted ? 'border border-dashed border-border bg-transparent italic text-fg-subtle'
                 : expressive ? 'bg-transparent px-0 py-0' : m.mine ? 'rounded-br-md bg-brand text-brand-fg' : 'rounded-bl-md bg-surface-2 text-fg')}>
