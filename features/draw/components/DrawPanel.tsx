@@ -45,6 +45,7 @@ export function DrawPanel({ scope, refId, canManage, className }: { scope: DrawS
   const staged = list.find((d) => d.id === stage) ?? (created?.id === stage ? created : undefined)
   const shown = (d: LuckyDraw) => canManage || d.status === 'DONE' || d.status === 'LIVE' || d.status === 'PENDING'
   if (!canManage && !list.some(shown)) return null
+  const cancelled = list.filter((d) => shown(d) && d.status === 'CANCELLED')
   return (
     <section className={cn('space-y-2', className)}>
       <SectionTitle action={canManage ? <Button size="sm" variant="secondary" onClick={() => setCreating(true)}><Plus className="size-4" aria-hidden />Tạo lượt quay</Button> : undefined}>
@@ -57,10 +58,21 @@ export function DrawPanel({ scope, refId, canManage, className }: { scope: DrawS
       )}
       {canManage && q.isError && <ErrorState message={drawErrorMessage(q.error)} error={q.error} onRetry={() => void q.refetch()} />}
       <ul className="space-y-2">
-        {list.filter(shown).map((d) => (
+        {list.filter((d) => shown(d) && d.status !== 'CANCELLED').map((d) => (
           <li key={d.id}><DrawCard d={d} scope={scope} refId={refId} onStage={() => setStage(d.id)} /></li>
         ))}
       </ul>
+      {/* Lượt đã huỷ: gom lại, mặc định đóng — không xoá hẳn để giữ dấu vết (minh bạch) */}
+      {cancelled.length > 0 && (
+        <details className="rounded-xl border border-border px-3 py-2 text-sm">
+          <summary className="cursor-pointer text-fg-muted">{cancelled.length} lượt đã huỷ</summary>
+          <ul className="mt-2 space-y-2">
+            {cancelled.map((d) => (
+              <li key={d.id}><DrawCard d={d} scope={scope} refId={refId} onStage={() => setStage(d.id)} /></li>
+            ))}
+          </ul>
+        </details>
+      )}
       {creating && <CreateDrawSheet scope={scope} refId={refId} onClose={() => setCreating(false)} onCreated={(d) => { setCreated(d); setStage(d.id) }} />}
       {staged && <DrawStage key={staged.id} draw={staged} scope={scope} refId={refId} onClose={() => setStage(null)} />}
     </section>

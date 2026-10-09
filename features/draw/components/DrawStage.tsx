@@ -158,6 +158,11 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
   const hideKey = pendingKey ?? (!manage && newest && newest.key !== seenKey ? newest.key : null)
   const winners = hideKey ? d.winners.filter((w) => w.key !== hideKey) : d.winners
   const won = winners.filter((w) => w.status === 'WON').length
+  // Người trúng mới nhất lên đầu bảng (cả nhóm giải của họ)
+  const lastPos = (idx: number) => Math.max(...winners.filter((w) => w.prize_idx === idx).map((w) => w.position))
+  // Bản "đã công bố" của lượt quay: dùng cho mọi thứ hiện ra (thanh giải, bảng người trúng, video ghi hình)
+  const view = hideKey ? { ...d, winners } : d
+  const viewProgress = hideKey ? prizeProgress(view) : progress
   const totalSlots = progress.reduce((a, p) => a + p.qty, 0)
   const curName = cur != null ? progress[cur].name : null
   const done = d.status === 'DONE'
@@ -165,7 +170,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
 
   // Ghi hình: ảnh chụp trạng thái mới nhất cho bộ vẽ canvas (chạy 30 lần/giây ngoài vòng vẽ của React)
   const snap = useRef<StageSnapshot | null>(null)
-  useEffect(() => { snap.current = { d, progress, phase, shown, reel, curName, landedAt: landedAt.current } })
+  useEffect(() => { snap.current = { d: view, progress: viewProgress, phase, shown, reel, curName, landedAt: landedAt.current } })
   const recorder = useStageRecorder(d.title, (ctx, w, h) => { if (snap.current) paintStage(ctx, w, h, snap.current) }, sound.recordStream)
   // Trình duyệt không ghi được: thay nút ghi bằng biểu tượng gạch chéo, bấm xem lý do
   const recordHint = recorder.support.ok ? null : recorder.support.reason
@@ -225,7 +230,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
       {/* Chọn giải */}
       {d.status !== 'READY' && (
         <nav aria-label="Chọn giải"><ScrollRow innerClassName="gap-2 px-4 pb-2">
-          {progress.map((p) => (
+          {viewProgress.map((p) => (
             <button key={p.idx} type="button" disabled={!manage || p.left === 0 || phase === 'spinning'} onClick={() => setPrize(p.idx)} aria-pressed={cur === p.idx}
               className={cn('shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold transition',
                 cur === p.idx ? 'border-coin bg-coin text-black' : p.left ? 'border-white/20 text-white/80' : 'border-white/10 text-white/35 line-through')}>
@@ -287,13 +292,13 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
 
       {/* Bảng người trúng */}
       {winners.length > 0 && (
-        <section aria-label="Người trúng" className="h-[16dvh] shrink-0 overflow-y-auto overscroll-contain sm:h-[28dvh] border-t border-white/10 bg-black/30 px-4 py-3">
+        <section aria-label="Người trúng" className="max-h-[6.5rem] shrink-0 overflow-y-auto overscroll-contain sm:max-h-[28dvh] border-t border-white/10 bg-black/30 px-4 py-3">
           <div className="mx-auto grid max-w-5xl gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {progress.filter((p) => winners.some((w) => w.prize_idx === p.idx)).map((p) => (
+            {progress.filter((p) => winners.some((w) => w.prize_idx === p.idx)).sort((a, b) => lastPos(b.idx) - lastPos(a.idx)).map((p) => (
               <div key={p.idx}>
                 <p className="mb-1 text-xs font-bold uppercase tracking-wider text-coin">{p.name}</p>
                 <ul className="space-y-1">
-                  {winners.filter((w) => w.prize_idx === p.idx).map((w) => (
+                  {winners.filter((w) => w.prize_idx === p.idx).sort((a, b) => b.position - a.position).map((w) => (
                     <li key={w.key} className={cn('flex items-center gap-2 text-sm', w.status === 'ABSENT' && 'text-white/40')}>
                       <Avatar src={w.avatar_url} name={w.name} size="xs" />
                       <span className={cn('min-w-0 flex-1 truncate', w.status === 'ABSENT' && 'line-through')}>{w.name}</span>
