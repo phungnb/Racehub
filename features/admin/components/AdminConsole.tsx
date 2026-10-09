@@ -2,7 +2,7 @@
 
 import { useSearchParams } from 'next/navigation'
 import { useState } from 'react'
-import { Activity, Fingerprint, BookOpen, Link2, LifeBuoy, ShieldAlert, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, Building2, FlaskConical, SlidersHorizontal, ShieldCheck, Lock, type LucideIcon } from 'lucide-react'
+import { Activity, Fingerprint, BookOpen, Link2, LifeBuoy, ShieldAlert, BarChart3, Megaphone, Target, CheckCircle2, Flag, Gift, History, Swords, Coins, Crown, LayoutDashboard, Receipt, ScrollText, Shirt, Store, Tags, Ticket, Trophy, Users, Building2, FlaskConical, SlidersHorizontal, ShieldCheck, Lock, MessageSquareHeart, type LucideIcon } from 'lucide-react'
 import { ErrorState, ScrollRow, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { adminErrorMessage } from '../api/adminApi'
@@ -32,6 +32,7 @@ import type { AdminScope } from '../api/consoleApi'
 import { ChallengesTab } from './console/ChallengesTab'
 import { AuditTab } from './console/AuditTab'
 import { ReportsTab } from './console/ReportsTab'
+import { FeedbackTab } from './console/FeedbackTab'
 import { BibTab } from './console/BibTab'
 import { StravaTab } from './console/StravaTab'
 import { GpsQaTab } from './console/GpsQaTab'
@@ -42,7 +43,7 @@ import { EnterpriseAdminTab } from '@/features/org'
 import { DrawPanel } from '@/features/draw'
 
 type Tab = 'overview' | 'metrics' | 'users' | 'team' | 'risk' | 'review' | 'reports' | 'challenges' | 'clubs' | 'cups' | 'partners' | 'organizers' | 'content' | 'help' | 'bib'
-  | 'enterprise' | 'draws' | 'orders' | 'plans' | 'promos' | 'quests' | 'gifts' | 'items' | 'grant' | 'passes' | 'policy' | 'system' | 'audit' | 'strava' | 'gps' | 'ops'
+  | 'enterprise' | 'draws' | 'orders' | 'plans' | 'promos' | 'quests' | 'gifts' | 'items' | 'grant' | 'passes' | 'policy' | 'system' | 'audit' | 'strava' | 'gps' | 'ops' | 'feedback'
 type Badge = keyof AdminInbox
 const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; label: string; icon: LucideIcon; badge?: Badge }[] }[] = [
   { id: 'home', label: 'Tổng quan', icon: LayoutDashboard, tabs: [
@@ -53,7 +54,7 @@ const GROUPS: { id: string; label: string; icon: LucideIcon; tabs: { id: Tab; la
   { id: 'community', label: 'Cộng đồng', icon: Trophy, tabs: [
     { id: 'challenges', label: 'Thử thách', icon: Trophy }, { id: 'clubs', label: 'CLB (Pro, xóa)', icon: Crown }, { id: 'cups', label: 'Thách đấu CLB', icon: Swords, badge: 'cups' },
     { id: 'partners', label: 'Đối tác', icon: Store, badge: 'partners' }, { id: 'bib', label: 'Chợ BIB', icon: Ticket }, { id: 'organizers', label: 'Tổ chức giải', icon: Flag },
-    { id: 'content', label: 'Nội dung', icon: BookOpen, badge: 'content' }, { id: 'help', label: 'Hướng dẫn & chính sách', icon: LifeBuoy }] },
+    { id: 'content', label: 'Nội dung', icon: BookOpen, badge: 'content' }, { id: 'feedback', label: 'Góp ý', icon: MessageSquareHeart }, { id: 'help', label: 'Hướng dẫn & chính sách', icon: LifeBuoy }] },
   { id: 'sales', label: 'Kinh doanh', icon: Receipt, tabs: [
     { id: 'orders', label: 'Đơn hàng', icon: Receipt, badge: 'orders' }, { id: 'enterprise', label: 'Doanh nghiệp', icon: Building2 }, { id: 'plans', label: 'Gói & giá', icon: Tags }, { id: 'promos', label: 'Khuyến mãi', icon: Megaphone }, { id: 'draws', label: 'Quay thưởng', icon: Gift },
     { id: 'quests', label: 'Nhiệm vụ', icon: Target }, { id: 'gifts', label: 'Quà tặng', icon: Gift }, { id: 'items', label: 'Vật phẩm', icon: Shirt }] },
@@ -68,7 +69,7 @@ const TAB_SCOPE: Partial<Record<Tab, AdminScope>> = {
   challenges: 'CHALLENGES', cups: 'CHALLENGES', bib: 'CHALLENGES', organizers: 'CHALLENGES', passes: 'CHALLENGES',
   clubs: 'CLUBS', enterprise: 'CLUBS', partners: 'SHOP', promos: 'SHOP', draws: 'SHOP', quests: 'SHOP', gifts: 'SHOP', items: 'SHOP',
   content: 'CONTENT', help: 'CONTENT', orders: 'ORDERS', plans: 'ORDERS', grant: 'ECONOMY', policy: 'ECONOMY',
-  system: 'SYSTEM', ops: 'SYSTEM', strava: 'SYSTEM', audit: 'AUDIT',
+  system: 'SYSTEM', feedback: 'SYSTEM', ops: 'SYSTEM', strava: 'SYSTEM', audit: 'AUDIT',
 }
 const ALL_TABS = GROUPS.flatMap((g) => g.tabs.map((t) => t.id))
 const groupOf = (t: Tab) => GROUPS.find((g) => g.tabs.some((x) => x.id === t)) ?? GROUPS[0]
@@ -144,6 +145,7 @@ export function AdminConsole() {
         : tab === 'gps' ? <GpsQaTab />
         : tab === 'ops' ? <OpsPolicyTab onGo={setTab} />
         : tab === 'reports' ? <ReportsTab />
+        : tab === 'feedback' ? <FeedbackTab />
         : tab === 'content' ? <CmsScreen />
         : tab === 'help' ? <HelpAdminTab initialEdit={editSlug} />
         : tab === 'bib' ? <BibTab />

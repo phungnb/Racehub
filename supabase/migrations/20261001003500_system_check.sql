@@ -295,7 +295,9 @@ begin
     jsonb_build_object('file', '20261001014900', 'label', 'Chinh phục: tham gia bắt buộc có hạng mục (một bước)',
       'ok', to_regprocedure('public.join_challenge_conquest(uuid,jsonb,text)') is not null),
     jsonb_build_object('file', '20261001015000', 'label', 'Admin tự nhập nội dung nhắc thanh toán',
-      'ok', to_regprocedure('public.admin_remind_order(uuid,text)') is not null));
+      'ok', to_regprocedure('public.admin_remind_order(uuid,text)') is not null),
+    jsonb_build_object('file', '20261001015100', 'label', 'Hộp thư góp ý (bong bóng nổi trong app)',
+      'ok', to_regprocedure('public.submit_feedback(text,integer,text,text,text)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

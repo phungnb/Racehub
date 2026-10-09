@@ -73,6 +73,16 @@ export interface AdminReport {
 export const adminListReports = (status: 'OPEN' | 'ALL') => call<AdminReport[]>('admin_list_reports', { p_status: status }).then((x) => x ?? [])
 export const adminResolveReport = (id: string, action: 'DISMISS' | 'SUSPEND', note: string | null) =>
   call<void>('admin_resolve_report', { p_id: id, p_action: action, p_note: note })
+/** Hộp thư góp ý (migration 015100) */
+export interface AdminFeedback {
+  id: string; user_id: string; name: string | null; email: string | null; kind: 'IDEA' | 'BUG' | 'LOVE' | 'OTHER'; rating: number | null
+  body: string; platform: string | null; page: string | null; status: 'NEW' | 'DONE'; admin_note: string | null
+  handled_by: string | null; handled_at: string | null; created_at: string
+}
+export interface AdminFeedbackList { new_count: number; avg_rating: number | null; rating_count: number; items: AdminFeedback[] }
+export const adminFeedbackList = (status: 'NEW' | 'DONE' | 'ALL') => call<AdminFeedbackList>('admin_feedback_list', { p_status: status })
+export const adminFeedbackSetStatus = (id: string, status: 'NEW' | 'DONE', note: string | null) =>
+  call<void>('admin_feedback_set_status', { p_id: id, p_status: status, p_note: note })
 export const adminAuditList = (action: string | null, before: number | null) =>
   call<AdminAuditRow[]>('admin_audit_list', { p_action: action || null, p_actor: null, p_before: before }).then((x) => x ?? [])
 
@@ -91,6 +101,8 @@ const MESSAGES: Record<string, string> = {
   INVALID_EXPIRY: 'Ngày hết hạn phải ở tương lai.',
   NOT_ADMIN: 'Người này chưa là admin.',
   FORBIDDEN: 'Bạn chưa được giao quyền cho việc này.',
+  FEEDBACK_NOT_FOUND: 'Không tìm thấy góp ý.',
+  INVALID_FEEDBACK_STATUS: 'Trạng thái góp ý không hợp lệ.',
 }
 export function consoleErrorMessage(e: unknown, fallback = 'Không thực hiện được. Hãy thử lại.'): string {
   const raw = (e as { message?: string } | null)?.message ?? ''
