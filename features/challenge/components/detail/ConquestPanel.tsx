@@ -28,6 +28,9 @@ export function ConquestPanel({ d, onPick }: { d: ChallengeDetail; onPick: (user
   // Mở sẵn hạng mục mình đã đăng ký (không phải luôn hạng mục đầu tiên — người chọn 21K mở ra phải thấy 21K)
   const mineFirst = joined ? b.categories.find((x) => b.mine.some((m) => m.category_id === x.id))?.id : undefined
   const active = cat ?? mineFirst ?? b.categories[0]?.id ?? null
+  // "Tham gia" đếm mọi người đã vào thử thách; BXH chỉ liệt kê người đã chọn ít nhất 1 hạng mục → phần chênh là người chưa chọn
+  const picked = new Set(b.rows.map((r) => r.user_id)).size
+  const unpicked = Math.max(0, d.stats.participants - picked)
   return (
     <div className="space-y-4">
       {joined && <MyCategories d={d} b={b} />}
@@ -42,6 +45,11 @@ export function ConquestPanel({ d, onPick }: { d: ChallengeDetail; onPick: (user
             </button>
           ))}
         </ScrollRow>
+      )}
+      {unpicked > 0 && (
+        <p className="text-xs text-fg-muted">
+          {picked} / {d.stats.participants} người tham gia đã chọn hạng mục; {unpicked} người chưa chọn nên chưa có trên bảng xếp hạng.
+        </p>
       )}
       {active && <CategoryBoard b={b} cat={b.categories.find((x) => x.id === active)!} onPick={onPick} />}
     </div>
