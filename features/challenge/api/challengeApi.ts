@@ -320,6 +320,12 @@ export async function joinChallengePledge(id: string, km: number, code?: string 
   if (error) throw error
 }
 
+/** Chinh phục: vào + đăng ký hạng mục trong một bước (014900). items trống = tự gán khi chỉ có 1 hạng mục không cần mục tiêu riêng */
+export async function joinChallengeConquest(id: string, items: { category_id: string; target_s: number | null }[], code?: string | null) {
+  const { error } = await supabase.rpc('join_challenge_conquest', { p_challenge_id: id, p_items: items, p_code: code ?? null })
+  if (error) throw error
+}
+
 export async function leaveChallenge(id: string) {
   const { error } = await supabase.rpc('leave_challenge', { p_challenge_id: id })
   if (error) throw error
@@ -422,6 +428,7 @@ const MESSAGES: Record<string, string> = {
   CHALLENGE_FULL: 'Thử thách đã đủ người.',
   ALREADY_JOINED: 'Bạn đã tham gia thử thách này.',
   NOT_JOINED: 'Bạn chưa tham gia thử thách này.',
+  CONQUEST_REQUIRED: 'Hãy chọn ít nhất một hạng mục để tham gia.',
   INVALID_INVITE: 'Thử thách riêng tư — cần đúng mã mời.',
   CLUB_MEMBERS_ONLY: 'Chỉ thành viên CLB tổ chức mới tham gia được.',
   TEAM_ROSTER_LOCKED: 'Thử thách đội đã bắt đầu, không đổi đội hay vào thêm được.',

@@ -1,7 +1,7 @@
--- RaceHub: gộp 113 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 114 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -28755,6 +28755,67 @@ revoke all on function private.event_checkin_open(public.club_events) from publi
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001014900_join_conquest.sql
+-- ===================================================================
+-- 014900: Thử thách chinh phục: tham gia BẮT BUỘC có hạng mục (như thử thách theo mục tiêu, 012000).
+--   join_challenge_conquest(id, items, code): vào thử thách + đăng ký hạng mục trong CÙNG một giao dịch.
+--   - Nhiều hạng mục: phải chọn ít nhất 1, không chọn thì không vào (CONQUEST_REQUIRED).
+--   - Chỉ 1 hạng mục và không cần đặt mục tiêu riêng (FIXED / ANY): tự đăng ký hạng mục đó, items để trống.
+--   - Chế độ SELF: luôn phải nhập mục tiêu của mình, kể cả khi chỉ có 1 hạng mục.
+--   Dọn dữ liệu cũ: người đã tham gia nhưng chưa có hạng mục, ở thử thách chỉ có 1 hạng mục (FIXED / ANY) → tự đăng ký.
+-- Chạy được trong SQL Editor, chạy lại an toàn.
+
+create or replace function public.join_challenge_conquest(p_challenge_id uuid, p_items jsonb default null, p_code text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  c public.challenges;
+  v_items jsonb := case when jsonb_typeof(p_items) = 'array' then p_items else '[]'::jsonb end;
+  v_cats uuid[];
+  v_join jsonb;
+begin
+  perform private.require_uid();
+  c := (select x from public.challenges x where x.id = p_challenge_id);
+  if c.id is null then raise exception 'CHALLENGE_NOT_FOUND'; end if;
+  if c.objective not in ('BEST_TIME', 'BEST_PACE') then raise exception 'CONQUEST_NOT_SUPPORTED'; end if;
+  if jsonb_array_length(v_items) = 0 then
+    v_cats := array(select id from public.challenge_categories where challenge_id = c.id);
+    if coalesce(array_length(v_cats, 1), 0) = 1 and c.conquest_mode in ('FIXED', 'ANY') then
+      v_items := jsonb_build_array(jsonb_build_object('category_id', v_cats[1]));
+    else
+      raise exception 'CONQUEST_REQUIRED';
+    end if;
+  end if;
+  v_join := public.join_challenge(p_challenge_id, p_code, null);
+  perform public.set_my_conquest(p_challenge_id, v_items);   -- sai hạng mục / mục tiêu → cả giao dịch hoàn tác, không vào
+  return coalesce(v_join, '{}'::jsonb) || jsonb_build_object('categories', jsonb_array_length(v_items));
+end $$;
+
+revoke all on function public.join_challenge_conquest(uuid, jsonb, text) from public, anon;
+grant execute on function public.join_challenge_conquest(uuid, jsonb, text) to authenticated;
+
+-- Dọn dữ liệu cũ: thử thách chỉ có 1 hạng mục, không cần mục tiêu riêng → người đã tham gia mà chưa chọn được gán hạng mục đó
+do $$
+declare
+  r record;
+begin
+  for r in
+    select p.id as pid, p.profile_id, p.challenge_id, cat.id as cat_id
+      from public.challenges c
+      join public.challenge_categories cat on cat.challenge_id = c.id
+      join public.challenge_participants p on p.challenge_id = c.id and p.status <> 'LEFT'
+     where c.objective in ('BEST_TIME', 'BEST_PACE') and c.conquest_mode in ('FIXED', 'ANY')
+       and (select count(*) from public.challenge_categories x where x.challenge_id = c.id) = 1
+       and not exists (select 1 from public.challenge_category_entries e where e.participant_id = p.id)
+  loop
+    insert into public.challenge_category_entries (participant_id, category_id, challenge_id, user_id)
+    values (r.pid, r.cat_id, r.challenge_id, r.profile_id) on conflict do nothing;
+    perform private.challenge_recompute_participant(r.pid);
+  end loop;
+end $$;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -29050,7 +29111,9 @@ begin
     jsonb_build_object('file', '20261001014700', 'label', 'Xóa tin nhắn kiểu Zalo (thu hồi, xóa phía tôi, xóa cuộc trò chuyện)',
       'ok', to_regprocedure('public.hide_direct_message(uuid)') is not null and to_regprocedure('public.clear_direct_thread(uuid)') is not null),
     jsonb_build_object('file', '20261001014800', 'label', 'Điểm danh sự kiện chỉ trong khung giờ + điểm danh GPS',
-      'ok', to_regprocedure('public.gps_checkin_club_event(uuid,double precision,double precision,double precision)') is not null));
+      'ok', to_regprocedure('public.gps_checkin_club_event(uuid,double precision,double precision,double precision)') is not null),
+    jsonb_build_object('file', '20261001014900', 'label', 'Chinh phục: tham gia bắt buộc có hạng mục (một bước)',
+      'ok', to_regprocedure('public.join_challenge_conquest(uuid,jsonb,text)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Flag, Lock, Trophy } from 'lucide-react'
 import { toast } from 'sonner'
@@ -28,6 +28,9 @@ export function ConquestPanel({ d, onPick }: { d: ChallengeDetail; onPick: (user
   // Mở sẵn hạng mục mình đã đăng ký (không phải luôn hạng mục đầu tiên — người chọn 21K mở ra phải thấy 21K)
   const mineFirst = joined ? b.categories.find((x) => b.mine.some((m) => m.category_id === x.id))?.id : undefined
   const active = cat ?? mineFirst ?? b.categories[0]?.id ?? null
+  // "Tham gia" đếm mọi người đã vào thử thách; BXH chỉ liệt kê người đã chọn ít nhất 1 hạng mục → phần chênh là người chưa chọn
+  const picked = new Set(b.rows.map((r) => r.user_id)).size
+  const unpicked = Math.max(0, d.stats.participants - picked)
   return (
     <div className="space-y-4">
       {joined && <MyCategories d={d} b={b} />}
@@ -42,6 +45,11 @@ export function ConquestPanel({ d, onPick }: { d: ChallengeDetail; onPick: (user
             </button>
           ))}
         </ScrollRow>
+      )}
+      {unpicked > 0 && (
+        <p className="text-xs text-fg-muted">
+          {picked} / {d.stats.participants} người tham gia đã chọn hạng mục; {unpicked} người chưa chọn nên chưa có trên bảng xếp hạng.
+        </p>
       )}
       {active && <CategoryBoard b={b} cat={b.categories.find((x) => x.id === active)!} onPick={onPick} />}
     </div>
@@ -99,7 +107,26 @@ function MyCategories({ d, b }: { d: ChallengeDetail; b: ConquestBoard }) {
         {started ? 'Thử thách đã bắt đầu: bạn thêm được hạng mục mới, nhưng không bỏ hay đổi mục tiêu đã đăng ký.' : 'Đổi được tới giờ xuất phát.'}
         {resultLocked.size > 0 && ' Hạng mục đã có kết quả thì không sửa đăng ký được nữa.'}
       </p>
-      <ul className="space-y-2">
+      <CategoryPicker b={b} picked={picked} setPicked={setPicked} mine={mine} resultLocked={resultLocked} started={started} />
+      <div className="flex gap-2">
+        {b.mine.length > 0 && <Button variant="secondary" onClick={() => setEditing(false)}>Hủy</Button>}
+        <Button block loading={save.isPending}
+          disabled={!Object.keys(picked).length || (b.mode === 'SELF' && Object.values(picked).some((t) => parseClock(t) === null))}
+          onClick={() => save.mutate()}>Lưu hạng mục</Button>
+      </div>
+    </Card>
+  )
+}
+
+type Picked = Record<string, string>
+/** Danh sách chọn hạng mục (+ mục tiêu ở chế độ SELF) — dùng cho cả "Hạng mục của bạn" và lúc bấm Tham gia */
+export function CategoryPicker({ b, picked, setPicked, mine = new Map(), resultLocked = new Set(), started = false }: {
+  b: ConquestBoard; picked: Picked; setPicked: Dispatch<SetStateAction<Picked>>
+  mine?: Map<string, unknown>; resultLocked?: Set<string>; started?: boolean
+}) {
+  const pace = b.objective === 'BEST_PACE'
+  return (
+    <ul className="space-y-2">
         {b.categories.map((x) => {
           const on = x.id in picked
           const hasResult = resultLocked.has(x.id)
@@ -128,14 +155,7 @@ function MyCategories({ d, b }: { d: ChallengeDetail; b: ConquestBoard }) {
             </li>
           )
         })}
-      </ul>
-      <div className="flex gap-2">
-        {b.mine.length > 0 && <Button variant="secondary" onClick={() => setEditing(false)}>Hủy</Button>}
-        <Button block loading={save.isPending}
-          disabled={!Object.keys(picked).length || (b.mode === 'SELF' && Object.values(picked).some((t) => parseClock(t) === null))}
-          onClick={() => save.mutate()}>Lưu hạng mục</Button>
-      </div>
-    </Card>
+    </ul>
   )
 }
 
