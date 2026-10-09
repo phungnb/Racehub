@@ -152,6 +152,10 @@ export function MeScreen({ profile }: { profile: Profile }) {
 
       {tab === 'overview' && (
         <div className="space-y-3">
+          <Card className="space-y-1">
+            <Row icon={Watch}>Thiết bị & nguồn dữ liệu</Row>
+            <Devices profile={profile} />
+          </Card>
           <Card className="divide-y divide-border p-0">
             <Link href={routes.insights} className="flex items-center gap-3 p-4">
               <span className="grid size-10 place-items-center rounded-xl bg-xp/15 text-xp"><BarChart3 className="size-5" aria-hidden /></span>
@@ -200,10 +204,6 @@ export function MeScreen({ profile }: { profile: Profile }) {
             </Link></PurchaseOnly>
           </Card>
           <Card><Invite /></Card>
-          <Card className="space-y-1">
-            <Row icon={Watch}>Thiết bị & nguồn dữ liệu</Row>
-            <Devices profile={profile} />
-          </Card>
         </div>
       )}
 
