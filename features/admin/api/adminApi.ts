@@ -317,6 +317,7 @@ const MESSAGES: Record<string, string> = {
   promotions_code_check: 'Mã chỉ gồm chữ in hoa, số, - và _ (4–24 ký tự).',
   ORDER_NOT_FOUND: 'Không tìm thấy đơn hàng.',
   ORDER_NOT_PENDING: 'Đơn đã được xử lý hoặc đã hủy.',
+  ORDER_REMIND_TOO_SOON: 'Đã nhắc đơn này trong 6 giờ qua. Thử lại sau.',
   SELF_CONFIRM_FORBIDDEN: 'Đây là đơn của chính bạn — cần một admin khác xác nhận sau khi kiểm tra tiền đã về.',
   INVALID_PLAN: 'Gói không hợp lệ cho loại tài khoản này (VIP cho cá nhân, CLB Pro cho CLB).',
   INVALID_MONTHS: 'Kỳ hạn chỉ 1, 3, 6 hoặc 12 tháng.',

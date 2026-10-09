@@ -9,7 +9,7 @@ import { cn } from '@/shared/lib/cn'
 import { formatVnd } from '@/shared/lib/economy'
 import { orderTitle, STATUS_META, type Order, type OrderStatus } from '@/features/billing'
 import { adminErrorMessage } from '../../api/adminApi'
-import { cancelOrderAdmin, confirmOrder, listOrders } from '../../api/commerceApi'
+import { cancelOrderAdmin, confirmOrder, listOrders, remindOrder } from '../../api/commerceApi'
 
 type Filter = OrderStatus | 'ALL'
 const fmt = (iso: string) => new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
@@ -30,6 +30,12 @@ export function OrdersTab() {
       setSel(null); setNote('')
       void qc.invalidateQueries({ queryKey: ['admin'] })
     },
+    onError: (e) => toast.error(adminErrorMessage(e)),
+  })
+
+  const remind = useMutation({
+    mutationFn: (o: Order) => remindOrder(o.id),
+    onSuccess: (o) => toast.success(`Đã gửi nhắc thanh toán đơn ${o.code} cho ${o.buyer_name ?? 'người mua'}`),
     onError: (e) => toast.error(adminErrorMessage(e)),
   })
 
@@ -61,6 +67,7 @@ export function OrdersTab() {
                   {o.status === 'PENDING' && (
                     <div className="flex gap-2">
                       <Button size="sm" variant="ghost" onClick={() => setSel({ order: o, action: 'cancel' })}>Hủy</Button>
+                      {!expired && <Button size="sm" variant="secondary" loading={remind.isPending && remind.variables?.id === o.id} onClick={() => remind.mutate(o)}>Nhắc thanh toán</Button>}
                       <Button size="sm" className="flex-1" onClick={() => setSel({ order: o, action: 'confirm' })}>Xác nhận đã nhận tiền</Button>
                     </div>
                   )}
