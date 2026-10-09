@@ -53,7 +53,15 @@ export const sendDirectMessage = (to: string, body: string) => call<DirectMessag
 export const getDirectThread = (user: string) => call<DirectThread>('direct_thread', { p_user: user })
 export const getInbox = () => call<InboxItem[]>('direct_inbox').then((x) => x ?? [])
 export const getUnreadMessages = () => call<number>('direct_unread_count').then((x) => x ?? 0)
+/** Thu hồi (xóa với mọi người): chỉ tin của mình, trong DM_RECALL_WINDOW_MS kể từ lúc gửi (máy chủ kiểm tra lại, migration 014700) */
 export const deleteDirectMessage = (id: string) => call<void>('delete_direct_message', { p_id: id })
+/** Xóa ở phía tôi: ẩn một tin với riêng mình */
+export const hideDirectMessage = (id: string) => call<void>('hide_direct_message', { p_id: id })
+/** Xóa cả cuộc trò chuyện ở phía tôi (người kia vẫn giữ nguyên) */
+export const clearDirectThread = (user: string) => call<void>('clear_direct_thread', { p_user: user })
+export const DM_RECALL_WINDOW_MS = 24 * 60 * 60 * 1000
+export const canRecall = (m: Pick<DirectMessage, 'mine' | 'deleted' | 'created_at'>) =>
+  m.mine && !m.deleted && Date.now() - new Date(m.created_at).getTime() < DM_RECALL_WINDOW_MS
 /** Thả / đổi / bỏ cảm xúc cho một tin nhắn (chạm lại cùng emoji để bỏ) */
 export const reactDirectMessage = (id: string, emoji: string) => call<unknown>('react_direct_message', { p_id: id, p_emoji: emoji })
 export const DM_REACTIONS = ['❤️', '👍', '😂', '😮', '😢', '🔥', '👏', '🏃'] as const
@@ -76,6 +84,7 @@ const MESSAGES: Record<string, string> = {
   EMPTY_MESSAGE: 'Tin nhắn đang trống (tối đa 2000 ký tự).',
   NOT_AUTHOR: 'Chỉ người gửi mới thu hồi được tin này.',
   NOT_FOUND: 'Tin nhắn không còn nữa.',
+  RECALL_EXPIRED: 'Chỉ thu hồi được tin trong vòng 24 giờ sau khi gửi. Bạn vẫn có thể xóa ở phía mình.',
   INVALID_REASON: 'Hãy chọn lý do báo cáo.',
   INVALID_EMOJI: 'Cảm xúc này chưa được hỗ trợ.',
 }
