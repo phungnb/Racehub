@@ -14,7 +14,7 @@ on:
         default: '1.0.0'
 
 env:
-  CAP_SERVER_URL: ${{ vars.CAP_SERVER_URL || 'https://racehubrun.com' }}
+  CAP_SERVER_URL: ${{ vars.CAP_SERVER_URL || 'https://www.racehubrun.com' }}
   # Địa chỉ dự án Supabase (công khai, không phải bí mật): app chỉ cho mở trang đăng nhập của đúng dự án này.
   # Để trống thì app cho mọi *.supabase.co — đặt biến NEXT_PUBLIC_SUPABASE_URL ở Actions → Variables.
   NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
