@@ -11,6 +11,7 @@ import { BottomTabBar } from './_components/BottomTabBar'
 import { FullScreenMessage } from './_components/FullScreenMessage'
 import { OfflineBanner } from '@/features/pwa'
 import { usePushSync } from '@/features/notification'
+import { FeedbackBubble } from '@/features/feedback'
 import { PendingRunSync, useRunActive } from '@/features/run'
 
 // Khung chung cho mọi màn hình cần đăng nhập
@@ -49,6 +50,7 @@ export default function AppLayout({ children }: LayoutProps<'/'>) {
         {isError ? <ErrorState message="Không tải được hồ sơ của bạn." error={error} onRetry={() => refetch()} /> : children}
       </main>
       {!running && <BottomTabBar />}
+      {!running && <FeedbackBubble />}
     </div>
   )
 }
