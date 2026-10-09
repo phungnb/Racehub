@@ -63,6 +63,13 @@ export async function restoreRun(activityId: string, note: string) {
   if (error) throw error
 }
 
+/** Admin xóa mềm các bài đang bị loại (RPC kiểm tra quyền + trạng thái, ghi admin_audit_log) */
+export async function deleteRejectedRuns(ids: string[]): Promise<{ requested: number; deleted: number }> {
+  const { data, error } = await supabase.rpc('admin_delete_rejected_activities', { p_ids: ids })
+  if (error) throw error
+  return data as { requested: number; deleted: number }
+}
+
 export interface FraudReviewStats {
   days: number; held: number; still_pending: number; approved_after_review: number; rejected: number; restored: number
   false_positive_rate: number | null; by_rule: { code: string; held: number; approved: number }[]

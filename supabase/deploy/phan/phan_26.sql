@@ -291,7 +291,9 @@ begin
     jsonb_build_object('file', '20261001014300', 'label', 'Lịch sự kiện CLB tự đăng bài lên bảng tin',
       'ok', to_regprocedure('private.club_event_to_post()') is not null),
     jsonb_build_object('file', '20261001014400', 'label', 'Admin nhắc người mua thanh toán đơn chờ',
-      'ok', to_regprocedure('public.admin_remind_order(uuid)') is not null));
+      'ok', to_regprocedure('public.admin_remind_order(uuid)') is not null),
+    jsonb_build_object('file', '20261001014500', 'label', 'Admin xóa hàng loạt bài chạy bị loại',
+      'ok', to_regprocedure('public.admin_delete_rejected_activities(uuid[])') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
