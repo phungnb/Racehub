@@ -64,7 +64,9 @@ export function useStageRecorder(title: string, paint: (ctx: CanvasRenderingCont
         stream.getVideoTracks().forEach((t) => t.stop())     // track âm thanh thuộc Web Audio của màn quay, không tắt
         const blob = new Blob(chunks, { type: support.type.split(';')[0] })
         if (blob.size) void saveVideo(blob, recordingFileName(title, at, videoExt(support.type)), title)
+        else toast.error('Video ghi ra bị rỗng, chưa lưu được. Thử bấm ghi lại; nếu vẫn lỗi, tắt âm thanh rồi ghi.', { duration: 10_000 })
       }
+      rec.onerror = () => { toast.error('Ghi hình bị lỗi giữa chừng.'); stop() }
       rec.start(1000)
       const t0 = Date.now()
       // setInterval thay cho requestAnimationFrame: rAF dừng khi tab bị che, video sẽ đứng hình
