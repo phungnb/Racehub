@@ -7,7 +7,7 @@ import type { MemberProfile } from './clubApi'
 export type PostKind = 'POST' | 'ANNOUNCEMENT' | 'AUTO_RUN' | 'AUTO_JOIN' | 'RECAP' | 'CHALLENGE' | 'NEWS' | 'MILESTONE'
 /** Tin CLB (migration 006300): chuyên mục + link kèm theo */
 export type NewsCategory = 'NOTICE' | 'EVENT' | 'RACE' | 'RESULT' | 'TRAINING' | 'OTHER'
-export interface NewsMeta { category: NewsCategory; link: string | null; edited_at?: string }
+export interface NewsMeta { category: NewsCategory; link: string | null; edited_at?: string; /** Bài tự sinh từ lịch chạy CLB (migration 014300) */ event_id?: string }
 
 export interface RunMeta { distance_m: number; moving_s: number; avg_pace_s: number; elevation_gain_m?: number; source?: string; started_at?: string }
 export interface RecapMeta {
