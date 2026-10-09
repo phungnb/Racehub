@@ -16,7 +16,6 @@ export function enabledProviders(): OAuthProvider[] {
 
 export async function signInWithProvider(provider: OAuthProvider, next: string) {
   const native = Capacitor.isNativePlatform()
-  if (native && !Capacitor.isPluginAvailable('Browser')) throw new Error('APP_UPDATE_REQUIRED')
   const query = `?next=${encodeURIComponent(next)}`
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
@@ -28,14 +27,21 @@ export async function signInWithProvider(provider: OAuthProvider, next: string) 
   })
   if (error) throw error
   if (native && data.url) {
-    const { Browser } = await import('@capacitor/browser')
-    await Browser.open({ url: data.url, presentationStyle: 'popover' })
+    // Không kiểm tra isPluginAvailable trước khi nạp plugin: Capacitor chỉ biết plugin sau khi nạp, nên kiểm tra sớm báo thiếu nhầm.
+    // Thiếu thật (app bản cũ chưa có plugin Browser) thì Browser.open báo lỗi; kèm danh sách plugin native để dễ chẩn đoán.
+    try {
+      const { Browser } = await import('@capacitor/browser')
+      await Browser.open({ url: data.url, presentationStyle: 'popover' })
+    } catch (e) {
+      const names = ((Capacitor as unknown as { PluginHeaders?: { name: string }[] }).PluginHeaders ?? []).map((h) => h.name).join(',')
+      throw new Error(`APP_UPDATE_REQUIRED|${(e as Error)?.message ?? 'lỗi'}|plugins=${names || 'none'}`)
+    }
   }
 }
 
 export function socialErrorMessage(e: unknown): string {
   const m = (e as { message?: string } | null)?.message ?? ''
-  if (m.includes('APP_UPDATE_REQUIRED')) return 'Hãy cập nhật app RaceHub lên bản mới nhất để đăng nhập bằng Google / Apple.'
+  if (m.includes('APP_UPDATE_REQUIRED')) return `Hãy cập nhật app RaceHub lên bản mới nhất để đăng nhập bằng Google / Apple. (${m.split('|').slice(1).join(' | ')})`
   if (/provider is not enabled|Unsupported provider/i.test(m)) return 'Cách đăng nhập này chưa được bật. Hãy dùng email hoặc thử lại sau.'
   return 'Không mở được trang đăng nhập. Kiểm tra mạng rồi thử lại.'
 }
