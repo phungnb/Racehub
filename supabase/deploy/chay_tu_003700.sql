@@ -1,7 +1,7 @@
--- RaceHub: gộp 110 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 111 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -28463,6 +28463,33 @@ grant execute on function public.admin_delete_rejected_activities(uuid[]) to aut
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001014600_admin_banned_users.sql
+-- ===================================================================
+-- Danh sách tài khoản đang khóa cho admin (thẻ "N tài khoản đang khóa" ở Tổng quan bấm được).
+-- Khớp cách đếm của admin_inbox: profiles.banned_at is not null.
+-- Phân loại: SELF_DELETED = người dùng tự xóa (banned_reason = 'ACCOUNT_DELETED'), ADMIN = admin khóa tay.
+create or replace function public.admin_banned_users() returns jsonb
+language plpgsql stable security definer set search_path = public, auth as $$
+begin
+  perform private.require_admin();
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'id', pr.id, 'name', pr.display_name, 'avatar_url', pr.avatar_url, 'email', u.email,
+      'banned_at', pr.banned_at, 'reason', pr.banned_reason,
+      'kind', case when pr.banned_reason = 'ACCOUNT_DELETED' then 'SELF_DELETED' else 'ADMIN' end,
+      'banned_by', (select private.display_name(l.actor_id) from public.admin_audit_log l
+                     where l.action = 'USER_BAN' and l.target in ('user:' || pr.id, pr.id::text)
+                     order by l.created_at desc limit 1)
+    ) order by pr.banned_at desc)
+    from public.profiles pr left join auth.users u on u.id = pr.id
+    where pr.banned_at is not null), '[]'::jsonb);
+end $$;
+
+revoke all on function public.admin_banned_users() from public, anon;
+grant execute on function public.admin_banned_users() to authenticated;
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -28752,7 +28779,9 @@ begin
     jsonb_build_object('file', '20261001014400', 'label', 'Admin nhắc người mua thanh toán đơn chờ',
       'ok', to_regprocedure('public.admin_remind_order(uuid)') is not null),
     jsonb_build_object('file', '20261001014500', 'label', 'Admin xóa hàng loạt bài chạy bị loại',
-      'ok', to_regprocedure('public.admin_delete_rejected_activities(uuid[])') is not null));
+      'ok', to_regprocedure('public.admin_delete_rejected_activities(uuid[])') is not null),
+    jsonb_build_object('file', '20261001014600', 'label', 'Admin xem danh sách tài khoản đang khóa',
+      'ok', to_regprocedure('public.admin_banned_users()') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

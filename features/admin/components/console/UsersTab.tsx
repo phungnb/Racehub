@@ -10,7 +10,7 @@ import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import type { AccountHit } from '../../api/adminApi'
-import { adminSetUserBan, adminSetUserRole, adminUserDetail, auditLabel, consoleErrorMessage, type AdminUserDetail } from '../../api/consoleApi'
+import { adminBannedUsers, adminSetUserBan, adminSetUserRole, adminUserDetail, auditLabel, consoleErrorMessage, type AdminUserDetail, type BannedUser } from '../../api/consoleApi'
 import { AccountPicker } from '../economy/AccountPicker'
 import { inboxKey } from './InboxPanel'
 import { teamKey, useAdminTeam } from './TeamTab'
@@ -23,10 +23,40 @@ export function UsersTab() {
   return (
     <div className="space-y-3">
       <AccountPicker id="admin-user" value={pick} onChange={setPick} />
-      {!pick ? <p className="text-sm text-fg-muted">Tìm người dùng để xem hồ sơ, số dư, CLB, giao dịch gần đây; khóa tài khoản vi phạm hoặc cấp quyền quản trị.</p>
+      {!pick ? <>
+          <p className="text-sm text-fg-muted">Tìm người dùng để xem hồ sơ, số dư, CLB, giao dịch gần đây; khóa tài khoản vi phạm hoặc cấp quyền quản trị.</p>
+          <BannedList onPick={(b) => setPick({ kind: 'USER', id: b.id, name: b.name ?? 'Người dùng', subtitle: b.email ?? '', balance: 0 })} />
+        </>
         : pick.kind === 'CLUB' ? <Card className="text-sm">Đây là CLB — xem ở nhóm <b>Cộng đồng → CLB Pro</b> hoặc <Link className="text-brand underline" href={routes.club(pick.id)}>mở trang CLB</Link>.</Card>
         : <UserDetail id={pick.id} />}
     </div>
+  )
+}
+
+/** Tài khoản đang khóa: lý do, thời điểm, ai khóa; bấm để mở hồ sơ (mở khóa ở đó) */
+function BannedList({ onPick }: { onPick: (b: BannedUser) => void }) {
+  const q = useQuery({ queryKey: ['admin', 'banned-users'], queryFn: adminBannedUsers })
+  if (q.isPending) return <Skeleton className="h-24" />
+  if (q.isError) return <ErrorState message={consoleErrorMessage(q.error, 'Không tải được danh sách tài khoản khóa.')} error={q.error} onRetry={() => void q.refetch()} />
+  if (!q.data.length) return null
+  return (
+    <Card className="space-y-2">
+      <h2 className="font-semibold">Tài khoản đang khóa ({q.data.length})</h2>
+      <ul className="space-y-2">
+        {q.data.map((b) => (
+          <li key={b.id}>
+            <button type="button" onClick={() => onPick(b)} className="flex w-full items-start gap-3 rounded-xl border border-border p-3 text-left">
+              <Avatar src={b.avatar_url} name={b.name} size="lg" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-semibold">{b.name ?? 'Người dùng'}{b.email ? <span className="font-normal text-fg-muted"> · {b.email}</span> : null}</span>
+                <span className="block text-xs text-fg-muted">{b.kind === 'SELF_DELETED' ? 'Người dùng tự xóa tài khoản' : `Lý do: ${b.reason ?? '—'}`}</span>
+                <span className="block text-xs text-fg-subtle">Khóa lúc {fmt(b.banned_at)}{b.kind === 'ADMIN' && b.banned_by ? ` · bởi ${b.banned_by}` : ''}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Card>
   )
 }
 
