@@ -42,12 +42,15 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
   // Mở lại giữa chừng: hiện người trúng gần nhất
   const [shown, setShown] = useState<DrawWinner | null>(() => (draw.status === 'LIVE' ? latestWinner(draw.winners) : null))
   const [fire, setFire] = useState(0)
+  // Người vừa được máy chủ chọn nhưng vòng quay chưa dừng: chưa được lộ tên ở bảng người trúng
+  const [pendingKey, setPendingKey] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [confirm, setConfirm] = useState<'finish' | 'start' | null>(null)
   const [soundOn, setSoundOn] = useState(true)
   const sound = useStageSound(soundOn)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const seen = useRef<string | null>(latestWinner(draw.winners)?.key ?? null)
+  const [seenKey, setSeenKey] = useState<string | null>(latestWinner(draw.winners)?.key ?? null) // bản sao của `seen` để dùng khi vẽ
   const landedAt = useRef(0)
 
   const put = (x: LuckyDraw) => { setLocal(x); qc.setQueryData<LuckyDraw[]>(key, (l) => l?.map((y) => (y.id === x.id ? x : y))) }
@@ -59,13 +62,13 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
   const roll = useCallback((w: DrawWinner, pool: string[]) => {
     const delays = spinDelays()
     const names = reelNames(pool, w.name, delays.length)
-    setPhase('spinning'); setShown(null)
+    setPhase('spinning'); setShown(null); setPendingKey(w.key)
     let i = 0
     const step = () => {
       setReel({ name: names[i], n: i })
       sound.tick(i / names.length)
       if (i === names.length - 1) {
-        setPhase('landed'); setShown(w); setFire((f) => f + 1); sound.win(); landedAt.current = Date.now()
+        setPhase('landed'); setShown(w); setPendingKey(null); setFire((f) => f + 1); sound.win(); landedAt.current = Date.now()
         return
       }
       timer.current = setTimeout(() => { i++; step() }, delays[i])
@@ -95,11 +98,12 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
     try {
       const x = await drawNext(d.id, cur)
       clearInterval(pre)
-      put(x)
       const w = latestWinner(x.winners)
-      if (w) { seen.current = w.key; roll(w, poolNames(x)) }
+      if (w) setPendingKey(w.key)
+      put(x)
+      if (w) { seen.current = w.key; setSeenKey(w.key); roll(w, poolNames(x)) }
     } catch (e) {
-      clearInterval(pre); setPhase('idle'); setReel(null)
+      clearInterval(pre); setPhase('idle'); setReel(null); setPendingKey(null)
       toast.error(drawErrorMessage(e))
     } finally { setBusy(false) }
   }
@@ -125,7 +129,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
     put(x)
     if (x.status === 'READY') {
       if (timer.current) clearTimeout(timer.current)
-      setPhase('idle'); setShown(null); setReel(null); seen.current = null; setPrize(nextPrize(prizeProgress(x)))
+      setPhase('idle'); setShown(null); setReel(null); setPendingKey(null); seen.current = null; setSeenKey(null); setPrize(nextPrize(prizeProgress(x)))
     }
     void qc.invalidateQueries({ queryKey: key })
   }
@@ -149,7 +153,11 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
     else void el.requestFullscreen?.().catch(() => toast('Trình duyệt này không hỗ trợ toàn màn hình'))
   }
 
-  const won = d.winners.filter((w) => w.status === 'WON').length
+  // Người xem: người trúng mới đã về tới máy nhưng hiệu ứng quay chưa bắt đầu → cũng phải giấu
+  const newest = latestWinner(d.winners)
+  const hideKey = pendingKey ?? (!manage && newest && newest.key !== seenKey ? newest.key : null)
+  const winners = hideKey ? d.winners.filter((w) => w.key !== hideKey) : d.winners
+  const won = winners.filter((w) => w.status === 'WON').length
   const totalSlots = progress.reduce((a, p) => a + p.qty, 0)
   const curName = cur != null ? progress[cur].name : null
   const done = d.status === 'DONE'
@@ -172,7 +180,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
         <Gift className="size-5 shrink-0 text-coin" aria-hidden />
         <div className="min-w-0 flex-1">
           <p className="truncate font-bold sm:text-lg">{d.title}</p>
-          <p className="text-xs text-white/60">
+          <p className="hidden text-xs text-white/60 sm:block">
             {d.status === 'LIVE' && <span className="mr-1.5 inline-flex items-center gap-1 font-bold text-danger"><span className="size-2 animate-pulse rounded-full bg-danger" />TRỰC TIẾP</span>}
             {d.entrant_count ?? d.eligible_now ?? 0} người trong danh sách · {won}/{totalSlots} suất đã trao
           </p>
@@ -185,28 +193,34 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
           </span>
         )}
         {recorder.recording && (
-          <span className="flex items-center gap-1.5 rounded-full bg-danger/20 px-2.5 py-1 font-mono text-xs font-bold text-danger" role="status">
+          <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-danger/20 px-2 py-1 font-mono text-xs font-bold text-danger" role="status">
             <Circle className="size-2.5 animate-pulse fill-current" aria-hidden />REC {formatElapsed(recorder.elapsed)}
           </span>
         )}
         {recorder.support.ok ? (
           <button type="button" onClick={recorder.recording ? recorder.stop : recorder.start}
             aria-label={recorder.recording ? 'Dừng ghi hình và lưu video' : 'Ghi hình vùng quay thưởng'} title={recorder.recording ? 'Dừng & lưu video' : `Ghi hình vùng quay (video .${recorder.support.ok ? videoExt(recorder.support.type) : 'mp4'})`}
-            className={cn('grid size-10 place-items-center rounded-full hover:bg-white/10', recorder.recording && 'text-danger')}>
+            className={cn('grid size-9 shrink-0 place-items-center rounded-full sm:size-10 hover:bg-white/10', recorder.recording && 'text-danger')}>
             {recorder.recording ? <Square className="size-4 fill-current" aria-hidden /> : <Video className="size-5" aria-hidden />}
           </button>
         ) : recordHint ? (
           <button type="button" onClick={() => toast(recordHint, { duration: 8000 })} aria-label="Không ghi hình được trên trình duyệt này"
-            className="grid size-10 place-items-center rounded-full text-white/40 hover:bg-white/10">
+            className="grid size-9 shrink-0 place-items-center rounded-full sm:size-10 text-white/40 hover:bg-white/10">
             <VideoOff className="size-5" aria-hidden />
           </button>
         ) : null}
-        <button type="button" onClick={() => setSoundOn(!soundOn)} aria-label={soundOn ? 'Tắt âm thanh' : 'Bật âm thanh'} className="grid size-10 place-items-center rounded-full hover:bg-white/10">
+        <button type="button" onClick={() => setSoundOn(!soundOn)} aria-label={soundOn ? 'Tắt âm thanh' : 'Bật âm thanh'} className="grid size-9 shrink-0 place-items-center rounded-full sm:size-10 hover:bg-white/10">
           {soundOn ? <Volume2 className="size-5" aria-hidden /> : <VolumeX className="size-5" aria-hidden />}
         </button>
-        <button type="button" onClick={full} aria-label="Toàn màn hình" className="hidden size-10 place-items-center rounded-full hover:bg-white/10 sm:grid"><Expand className="size-5" aria-hidden /></button>
-        <button type="button" onClick={onClose} aria-label="Đóng" className="grid size-10 place-items-center rounded-full hover:bg-white/10"><X className="size-5" aria-hidden /></button>
+        <button type="button" onClick={full} aria-label="Toàn màn hình" className="hidden size-10 shrink-0 place-items-center rounded-full hover:bg-white/10 sm:grid"><Expand className="size-5" aria-hidden /></button>
+        <button type="button" onClick={onClose} aria-label="Đóng" className="grid size-9 shrink-0 place-items-center rounded-full sm:size-10 hover:bg-white/10"><X className="size-5" aria-hidden /></button>
       </header>
+
+      {/* Điện thoại: dòng trạng thái xuống hàng riêng để tiêu đề và nút không bị bóp */}
+      <p className="px-4 pb-1 text-xs text-white/60 sm:hidden">
+        {d.status === 'LIVE' && <span className="mr-1.5 inline-flex items-center gap-1 font-bold text-danger"><span className="size-2 animate-pulse rounded-full bg-danger" />TRỰC TIẾP</span>}
+        {d.entrant_count ?? d.eligible_now ?? 0} người · {won}/{totalSlots} suất đã trao
+      </p>
 
       {/* Chọn giải */}
       {d.status !== 'READY' && (
@@ -221,7 +235,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
         </ScrollRow></nav>
       )}
 
-      <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-5 px-4 text-center">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-3 px-4 text-center sm:gap-5">
         {d.status === 'READY' ? (
           <div className="max-w-md space-y-4">
             <Trophy className="mx-auto size-14 text-coin" aria-hidden />
@@ -236,16 +250,16 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
               {(done || pending) && phase === 'idle' ? 'Kết quả' : shown ? shown.prize : curName ?? 'Đã trao hết giải'}
             </p>
             {/* Ô quay */}
-            <div className={cn('relative grid w-full max-w-3xl place-items-center overflow-hidden rounded-[2rem] border-2 px-4 py-6 sm:py-10',
+            <div className={cn('relative grid min-h-[38dvh] w-full max-w-5xl flex-1 place-items-center overflow-hidden rounded-[2rem] border-2 px-4 py-6 sm:py-10',
               phase === 'landed' ? 'border-coin bg-coin/10 shadow-[0_0_80px_-10px_var(--color-coin)]' : 'border-white/15 bg-white/[0.04]')}>
               {phase === 'landed' && shown ? (
-                <div key={shown.key} className="flex flex-col items-center gap-3 animate-winner">
-                  <Avatar src={shown.avatar_url} name={shown.name} size="xl" className="ring-4 ring-coin" />
-                  <p className="text-4xl font-extrabold leading-tight sm:text-7xl">{shown.name}</p>
+                <div key={shown.key} className="flex w-full min-w-0 flex-col items-center gap-4 animate-winner">
+                  <Avatar src={shown.avatar_url} name={shown.name} size="xl" className="!size-32 shrink-0 ring-4 ring-coin sm:!size-44" />
+                  <p className="w-full break-words text-5xl font-extrabold leading-tight sm:text-8xl">{shown.name}</p>
                   <p className="text-sm font-semibold text-coin sm:text-xl">Chúc mừng! 🎉</p>
                 </div>
               ) : reel ? (
-                <p key={reel.n} className="text-4xl font-extrabold text-white/90 animate-reel sm:text-7xl">{reel.name}</p>
+                <p key={reel.n} className="w-full break-words text-5xl font-extrabold text-white/90 animate-reel sm:text-8xl">{reel.name}</p>
               ) : (
                 <p className="text-2xl font-bold text-white/40 sm:text-5xl">{done ? 'Đã công bố' : pending ? 'Chờ ban tổ chức xác nhận' : manage ? 'Sẵn sàng' : 'Chờ BTC quay…'}</p>
               )}
@@ -270,14 +284,14 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
       </main>
 
       {/* Bảng người trúng */}
-      {d.winners.length > 0 && (
-        <section aria-label="Người trúng" className="max-h-[32vh] overflow-y-auto border-t border-white/10 bg-black/30 px-4 py-3">
+      {winners.length > 0 && (
+        <section aria-label="Người trúng" className="max-h-[22vh] overflow-y-auto sm:max-h-[30vh] border-t border-white/10 bg-black/30 px-4 py-3">
           <div className="mx-auto grid max-w-5xl gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {progress.filter((p) => d.winners.some((w) => w.prize_idx === p.idx)).map((p) => (
+            {progress.filter((p) => winners.some((w) => w.prize_idx === p.idx)).map((p) => (
               <div key={p.idx}>
                 <p className="mb-1 text-xs font-bold uppercase tracking-wider text-coin">{p.name}</p>
                 <ul className="space-y-1">
-                  {d.winners.filter((w) => w.prize_idx === p.idx).map((w) => (
+                  {winners.filter((w) => w.prize_idx === p.idx).map((w) => (
                     <li key={w.key} className={cn('flex items-center gap-2 text-sm', w.status === 'ABSENT' && 'text-white/40')}>
                       <Avatar src={w.avatar_url} name={w.name} size="xs" />
                       <span className={cn('min-w-0 flex-1 truncate', w.status === 'ABSENT' && 'line-through')}>{w.name}</span>
