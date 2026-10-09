@@ -27,6 +27,9 @@ async function call<T>(fn: string, args: Record<string, unknown> = {}): Promise<
   return data as T
 }
 export const adminInbox = () => call<AdminInbox | null>('admin_inbox')
+export interface BannedUser { id: string; name: string | null; avatar_url: string | null; email: string | null; banned_at: string; reason: string | null; kind: 'ADMIN' | 'SELF_DELETED'; banned_by: string | null }
+/** Tài khoản đang khóa + lý do (migration 014600) */
+export const adminBannedUsers = async () => (await call<BannedUser[]>('admin_banned_users')) ?? []
 export const adminUserDetail = (id: string) => call<AdminUserDetail>('admin_user_detail', { p_user: id })
 export interface AdminAccount { id: string; display_name: string | null; avatar_url: string | null; email: string | null; last_sign_in_at: string | null; granted_at: string | null; is_me: boolean }
 /** Quản trị viên hệ thống hiện tại (migration 011400) */

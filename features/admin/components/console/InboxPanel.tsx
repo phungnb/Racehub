@@ -51,7 +51,10 @@ export function InboxPanel({ onGo }: { onGo: (tab: string) => void }) {
             <span className="block truncate text-xs text-fg-muted">Người mới 7 ngày</span></span>
         </button>
       </div>
-      <p className="flex items-center gap-1.5 text-xs text-fg-subtle"><Users className="size-3.5" aria-hidden />{d.active_7d} người có bài chạy trong 7 ngày · {d.banned} tài khoản đang khóa</p>
+      <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-fg-subtle"><Users className="size-3.5" aria-hidden />{d.active_7d} người có bài chạy trong 7 ngày ·{' '}
+        {d.banned > 0
+          ? <button type="button" onClick={() => onGo('users')} className="font-semibold text-brand underline">{d.banned} tài khoản đang khóa</button>
+          : <span>0 tài khoản đang khóa</span>}</p>
     </Card>
   )
 }
