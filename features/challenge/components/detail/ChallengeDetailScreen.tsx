@@ -7,24 +7,24 @@ import { DrawPanel } from '@/features/draw'
 import {
   ArrowLeft, CalendarDays, Check, CircleSlash, Clock, Coins, Copy, Crown, Gauge, Hourglass, Info, Lock, LogOut, MoreHorizontal,
   Repeat, Route, Share2, Shield, Timer, Trophy, Users, UsersRound, HeartPulse } from 'lucide-react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, ConfirmSheet, EmptyState, ErrorState, Field, LevelBadge, ProgressRing, RankSearch, scrollToRow, SegmentedControl, Sheet, Skeleton, Textarea, ScrollRow } from '@/shared/ui'
 import { filterSearch } from '@/shared/lib/search'
 import { routes } from '@/shared/config/routes'
 import { cn } from '@/shared/lib/cn'
 import { formatNumber, formatPace } from '@/shared/lib/format'
-import { challengeErrorMessage, setChallengeRecurrence, type ChallengeDetail, type LeaderboardEntry, type TeamStanding } from '../../api/challengeApi'
+import { challengeErrorMessage, getConquestBoard, setChallengeRecurrence, type ChallengeDetail, type LeaderboardEntry, type TeamStanding } from '../../api/challengeApi'
 import {
   AUDIENCE_LABEL, challengePhase, FORMAT_META, formatScore, isCommunity, isConquest, nextOccurrenceStart, nextOccurrenceTitle, OBJECTIVE_META, objectiveMeta, planStatus,
-  RECURRENCE_LABEL, rewardSummary, scoringLines, TEAM_MODE_META, timeLabel,
+  parseClock, RECURRENCE_LABEL, rewardSummary, scoringLines, TEAM_MODE_META, timeLabel,
   type Recurrence, type TeamMode,
 } from '../../model/challenge'
-import { ConquestPanel } from './ConquestPanel'
+import { CategoryPicker, ConquestPanel } from './ConquestPanel'
 import { MemberDaysSheet } from './MemberDaysSheet'
 import { ChallengeBoostDays, RegDeadlineCard } from './ChallengeExtras'
 import { EditChallengeCard } from './EditChallenge'
-import { useChallenge, useChallengeActions } from '../../hooks/useChallenge'
+import { challengeKeys, useChallenge, useChallengeActions } from '../../hooks/useChallenge'
 import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
 import { PledgeChooser, PledgePanel } from './PledgePanel'
 import { DoneFilter, useDoneFilter } from './DoneFilter'
@@ -460,7 +460,8 @@ function ActionBar({ d, phase, code }: { d: ChallengeDetail; phase: ReturnType<t
   const router = useRouter()
   const c = d.challenge
   const a = useChallengeActions(c.id)
-  const [sheet, setSheet] = useState<'team' | 'invite' | 'menu' | 'leave' | 'cancel' | 'pledge' | null>(null)
+  const [sheet, setSheet] = useState<'team' | 'invite' | 'menu' | 'leave' | 'cancel' | 'pledge' | 'conquest' | null>(null)
+  const [conquestPick, setConquestPick] = useState<Record<string, string>>({})
   const [pledgeKm, setPledgeKm] = useState<number | null>(null)
   const [reason, setReason] = useState('')
   const joined = !!d.me && d.me.status !== 'LEFT'
@@ -473,6 +474,10 @@ function ActionBar({ d, phase, code }: { d: ChallengeDetail; phase: ReturnType<t
   const canLeave = joined && open && (phase === 'UPCOMING' || (c.format !== 'TEAM' && c.format !== 'DUEL'))
   const canCancel = d.can_manage && open && (phase === 'UPCOMING' || d.stats.participants <= 1)
   const inviteCode = d.invite_code ?? code
+  // Chinh phục: tham gia phải kèm hạng mục. Chỉ 1 hạng mục và không cần mục tiêu riêng → tự gán, không bắt chọn
+  const conquest = isConquest(c.objective)
+  const board = useQuery({ queryKey: challengeKeys.conquest(c.id), queryFn: () => getConquestBoard(c.id), enabled: conquest && canJoin })
+  const autoCategory = board.data?.categories.length === 1 && board.data.mode !== 'SELF'
 
   const run = (p: Promise<unknown>, ok: string, after?: () => void) =>
     p.then(() => { toast.success(ok); setSheet(null); after?.() }).catch((e) => toast.error(challengeErrorMessage(e)))
@@ -482,10 +487,12 @@ function ActionBar({ d, phase, code }: { d: ChallengeDetail; phase: ReturnType<t
     <>
       <div className="fixed inset-x-0 bottom-[calc(3.5rem+1px+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-md gap-2 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur-md">
         {canJoin ? (
-          <Button block size="lg" loading={a.join.isPending}
+          <Button block size="lg" loading={a.join.isPending || a.joinConquest.isPending || (conquest && board.isPending)}
+            disabled={conquest && !board.data}
             onClick={() => pickTeam ? setSheet('team') : c.pledge_enabled ? setSheet('pledge')
-              : run(a.join.mutateAsync({ code }), c.format === 'DUEL' ? 'Đã nhận lời thách đấu!' : isConquest(c.objective) ? 'Đã tham gia. Chọn hạng mục bạn muốn chinh phục!' : 'Đã tham gia. Chạy thôi!')}>
-            {pickTeam ? 'Chọn đội và tham gia' : c.pledge_enabled ? 'Chọn mục tiêu và tham gia' : c.format === 'DUEL' ? 'Nhận lời thách đấu' : 'Tham gia'}
+              : conquest ? (autoCategory ? run(a.joinConquest.mutateAsync({ items: [], code }), 'Đã tham gia. Chạy thôi!') : setSheet('conquest'))
+              : run(a.join.mutateAsync({ code }), c.format === 'DUEL' ? 'Đã nhận lời thách đấu!' : 'Đã tham gia. Chạy thôi!')}>
+            {pickTeam ? 'Chọn đội và tham gia' : c.pledge_enabled ? 'Chọn mục tiêu và tham gia' : conquest && !autoCategory ? 'Chọn hạng mục và tham gia' : c.format === 'DUEL' ? 'Nhận lời thách đấu' : 'Tham gia'}
           </Button>
         ) : joined && open ? (
           <Button block size="lg" variant="secondary" onClick={() => setSheet('invite')}><Share2 className="size-4" aria-hidden />Mời bạn cùng tham gia</Button>
@@ -515,6 +522,18 @@ function ActionBar({ d, phase, code }: { d: ChallengeDetail; phase: ReturnType<t
           onClick={() => pledgeKm && run(a.joinPledge.mutateAsync({ km: pledgeKm, code }), `Đã tham gia với mục tiêu ${pledgeKm} km. Chạy thôi!`)}>
           {pledgeKm ? `Tham gia với mục tiêu ${pledgeKm} km` : 'Chọn mục tiêu để tham gia'}</Button>}>
         <PledgeChooser c={c} value={pledgeKm} onChange={setPledgeKm} />
+      </Sheet>
+
+      {/* Chinh phục nhiều hạng mục: phải chọn ít nhất 1 mới vào được (vào + đăng ký cùng lúc, 014900) */}
+      <Sheet open={sheet === 'conquest'} onClose={() => setSheet(null)} title="Chọn hạng mục của bạn"
+        description={board.data?.mode === 'SELF' ? 'Bắt buộc. Chọn hạng mục và nhập mục tiêu của bạn; đổi được tới giờ xuất phát.' : 'Bắt buộc chọn ít nhất một hạng mục; đổi được tới giờ xuất phát.'}
+        footer={board.data && <Button block size="lg" loading={a.joinConquest.isPending}
+          disabled={!Object.keys(conquestPick).length || (board.data.mode === 'SELF' && Object.values(conquestPick).some((t) => parseClock(t) === null))}
+          onClick={() => run(a.joinConquest.mutateAsync({
+            items: Object.entries(conquestPick).map(([id, t]) => ({ category_id: id, target_s: board.data!.mode === 'SELF' ? parseClock(t) : null })), code,
+          }), 'Đã tham gia. Chạy thôi!')}>
+          {Object.keys(conquestPick).length ? 'Tham gia' : 'Chọn hạng mục để tham gia'}</Button>}>
+        {board.data && <CategoryPicker b={board.data} picked={conquestPick} setPicked={setConquestPick} />}
       </Sheet>
 
       <Sheet open={sheet === 'team'} onClose={() => setSheet(null)} title={joined ? 'Đổi đội' : 'Chọn đội'}

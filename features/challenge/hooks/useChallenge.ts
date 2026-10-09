@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/shared/lib/supabase'
 import {
-  cancelChallenge, changeTeam, getChallenge, getLeaderboard, getTeamStandings, joinChallenge, joinChallengePledge, leaveChallenge, listChallenges,
+  cancelChallenge, changeTeam, getChallenge, getLeaderboard, getTeamStandings, joinChallenge, joinChallengePledge, joinChallengeConquest, leaveChallenge, listChallenges,
   settleIfDue, type ChallengeTab,
 } from '../api/challengeApi'
 import { settlementDue } from '../model/challenge'
@@ -78,6 +78,7 @@ export function useChallengeActions(id: string) {
   }
   return {
     join: useMutation({ mutationFn: (v: { code?: string | null; teamId?: string | null }) => joinChallenge(id, v.code, v.teamId), onSuccess: refresh }),
+    joinConquest: useMutation({ mutationFn: (v: { items: { category_id: string; target_s: number | null }[]; code?: string | null }) => joinChallengeConquest(id, v.items, v.code), onSuccess: () => { refresh(); void qc.invalidateQueries({ queryKey: challengeKeys.conquest(id) }) } }),
     joinPledge: useMutation({ mutationFn: (v: { km: number; code?: string | null }) => joinChallengePledge(id, v.km, v.code), onSuccess: refresh }),
     leave: useMutation({ mutationFn: () => leaveChallenge(id), onSuccess: refresh }),
     changeTeam: useMutation({ mutationFn: (teamId: string) => changeTeam(id, teamId), onSuccess: refresh }),
