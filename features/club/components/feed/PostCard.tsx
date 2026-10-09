@@ -82,6 +82,12 @@ export function PostCard({ post, meId, isStaff, onComments, highlight }: {
         : <RunStats post={post} />) : null}
       {post.body && !isRun && <p className="whitespace-pre-line break-words text-[15px] leading-relaxed">{post.body}</p>}
       {post.image_paths.length > 0 && <Images paths={post.image_paths} />}
+      {isNews && post.meta.event_id && (
+        <Link href={`/clubs/${post.club_id}/events/${post.meta.event_id}`}
+          className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface-2 px-3 text-sm font-semibold hover:border-fg-subtle">
+          <span className="min-w-0 flex-1">Xem lịch & đăng ký tham gia</span><ChevronRight className="size-4 shrink-0 text-brand" aria-hidden />
+        </Link>
+      )}
       {isNews && post.meta.link && (
         <a href={post.meta.link} target="_blank" rel="noopener noreferrer nofollow"
           className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface-2 px-3 text-sm font-semibold hover:border-fg-subtle">
@@ -205,7 +211,7 @@ function PostMenu({ post, meId, isStaff }: { post: ClubPost; meId: string; isSta
       </button>
       <Sheet open={open} onClose={() => setOpen(false)} title="Bài đăng">
         <div className="space-y-1">
-          {isStaff && post.kind === 'NEWS' && <MenuItem icon={Pencil} label="Sửa tin" onClick={() => { setOpen(false); setEditing(true) }} />}
+          {isStaff && post.kind === 'NEWS' && !post.meta.event_id && <MenuItem icon={Pencil} label="Sửa tin" onClick={() => { setOpen(false); setEditing(true) }} />}
           {isStaff && (
             <MenuItem icon={post.is_pinned ? PinOff : Pin} label={post.is_pinned ? 'Bỏ ghim' : 'Ghim lên đầu bảng tin'}
               onClick={() => pin.mutate({ id: post.id, pinned: !post.is_pinned }, {
