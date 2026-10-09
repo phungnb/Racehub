@@ -45,12 +45,15 @@ export interface EventAttendee {
   avatar_url: string | null
   status: RsvpStatus
   checked_in_at: string | null
-  checkin_method: 'QR' | 'AUTO' | 'STAFF' | null
+  checkin_method: 'QR' | 'AUTO' | 'STAFF' | 'GPS' | null
 }
 
 export interface ClubEventDetail extends ClubEvent {
   can_manage: boolean
+  /** Khung điểm danh: từ 30 phút trước giờ hẹn đến khi kết thúc (migration 014800) */
   checkin_open: boolean
+  /** Ban quản trị chỉ tích tay được khi sự kiện đã bắt đầu; bản cũ chưa có trường này */
+  staff_can_mark?: boolean
   attendees: EventAttendee[]
 }
 
@@ -83,6 +86,8 @@ export const rsvpEvent = (eventId: string, status: RsvpStatus) => rpc<ClubEvent>
 export const checkinToken = (eventId: string) => rpc<{ token: string; expires_at: string }>('event_checkin_token', { p_event_id: eventId })
 export const checkinEvent = (token: string) =>
   rpc<{ new: boolean; event_id: string; club_id: string; title: string }>('checkin_club_event', { p_token: token })
+export const gpsCheckin = (eventId: string, lat: number, lng: number, accuracyM: number | null) =>
+  rpc<{ new: boolean; distance_m: number }>('gps_checkin_club_event', { p_event_id: eventId, p_lat: lat, p_lng: lng, p_accuracy_m: accuracyM })
 export const staffCheckin = (eventId: string, userId: string, checked: boolean) =>
   rpc<void>('staff_checkin', { p_event_id: eventId, p_user_id: userId, p_checked: checked })
 
@@ -199,7 +204,11 @@ const MESSAGES: Record<string, string> = {
   REASON_REQUIRED: 'Hãy ghi lý do.',
   INVALID_TOKEN: 'Mã QR không đúng. Hãy quét lại mã trên máy ban tổ chức.',
   TOKEN_EXPIRED: 'Mã QR đã hết hạn. Nhờ ban tổ chức mở mã mới.',
-  CHECKIN_CLOSED: 'Chưa tới hoặc đã quá giờ điểm danh.',
+  CHECKIN_CLOSED: 'Điểm danh chỉ mở từ 30 phút trước giờ hẹn đến khi buổi chạy kết thúc.',
+  EVENT_NOT_STARTED: 'Sự kiện chưa bắt đầu nên chưa điểm danh được.',
+  TOO_FAR: 'Bạn đang cách điểm hẹn quá 300 m. Hãy tới điểm hẹn rồi thử lại.',
+  LOW_ACCURACY: 'GPS chưa đủ chính xác. Ra chỗ thoáng, bật vị trí chính xác rồi thử lại.',
+  NO_EVENT_LOCATION: 'Sự kiện này chưa có tọa độ điểm hẹn. Hãy quét QR của ban tổ chức.',
   INVALID_BANK: 'Thông tin tài khoản ngân hàng chưa đúng.',
   INVALID_QR: 'Ảnh QR không hợp lệ. Hãy tải lại ảnh.',
   INVALID_AMOUNT: 'Số tiền không hợp lệ.',

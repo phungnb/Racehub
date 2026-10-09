@@ -12,8 +12,9 @@ import { Avatar, Button, Card, EmptyState, ErrorState, Field, Input, SectionTitl
 import { cn } from '@/shared/lib/cn'
 import { formatRelative } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
+import { freshPosition } from '@/shared/lib/geocode'
 import {
-  cancelEvent, checkinToken, eventsErrorMessage, rsvpEvent, staffCheckin, type ClubEventDetail, type RsvpStatus, eventRoutes,
+  cancelEvent, checkinToken, gpsCheckin, eventsErrorMessage, rsvpEvent, staffCheckin, type ClubEventDetail, type RsvpStatus, eventRoutes,
 } from '../../api/eventsApi'
 import { useClubMutation, useEvent } from '../../hooks/useEvents'
 import { eventCountdown, eventWhen, mapsUrl } from '../../model/events'
@@ -22,7 +23,7 @@ import { listAlbums } from '../../api/albumsApi'
 import { providerOf } from '../../model/media'
 import { RSVP_LABEL } from './ClubEventsScreen'
 
-const METHOD_LABEL = { QR: 'quét QR', AUTO: 'tự động từ bài chạy', STAFF: 'ban tổ chức' } as const
+const METHOD_LABEL = { QR: 'quét QR', AUTO: 'tự động từ bài chạy', STAFF: 'ban tổ chức', GPS: 'vị trí GPS' } as const
 
 /** Chi tiết sự kiện: thông tin, báo tham gia, người tham gia + điểm danh; ban quản trị mở QR điểm danh */
 export function ClubEventScreen({ clubId, eventId }: { clubId: string; eventId: string }) {
@@ -115,9 +116,10 @@ function Detail({ clubId, e }: { clubId: string; e: ClubEventDetail }) {
             <SegmentedControl value={e.my_status ?? ('' as RsvpStatus)}
               onChange={(s) => rsvp.mutate(s, { onSuccess: () => toast.success(s === 'GOING' ? 'Hẹn gặp bạn ở buổi chạy!' : 'Đã ghi nhận'), onError: (err) => toast.error(eventsErrorMessage(err)) })}
               options={(['GOING', 'MAYBE', 'NOT_GOING'] as const).map((s) => ({ value: s, label: RSVP_LABEL[s] }))} />
+            {e.checkin_open && e.lat != null && <GpsCheckinButton clubId={clubId} eventId={e.id} />}
             {e.checkin_open && (
               <p className="flex items-center gap-1.5 text-xs text-fg-subtle"><ScanLine className="size-3.5" aria-hidden />
-                Tới nơi thì quét mã QR của ban tổ chức bằng camera điện thoại. Chạy có GPS gần điểm hẹn cũng được tự điểm danh.</p>
+                Tới nơi thì quét mã QR của ban tổ chức bằng camera điện thoại. Hoặc bấm điểm danh bằng vị trí khi đang ở cách điểm hẹn dưới 300 m.</p>
             )}
           </div>
         ) : null}
@@ -147,7 +149,8 @@ function Detail({ clubId, e }: { clubId: string; e: ClubEventDetail }) {
                     {a.checked_in_at ? `Đã điểm danh · ${a.checkin_method ? METHOD_LABEL[a.checkin_method] : ''}` : RSVP_LABEL[a.status]}
                   </span>
                 </span>
-                {e.can_manage && !cancelled ? <CheckToggle clubId={clubId} eventId={e.id} userId={a.user_id} checked={!!a.checked_in_at} />
+                {e.can_manage && !cancelled ? <CheckToggle clubId={clubId} eventId={e.id} userId={a.user_id} checked={!!a.checked_in_at}
+                    locked={!a.checked_in_at && e.staff_can_mark === false} />
                   : a.checked_in_at ? <CheckCircle2 className="size-5 text-brand" aria-label="Đã điểm danh" /> : null}
               </li>
             ))}
@@ -172,11 +175,30 @@ function Info({ icon: Icon, label, children, className }: { icon: typeof MapPin;
   )
 }
 
-function CheckToggle({ clubId, eventId, userId, checked }: { clubId: string; eventId: string; userId: string; checked: boolean }) {
+/** Điểm danh bằng vị trí GPS: server kiểm tra khung giờ, khoảng cách ≤ 300 m và sai số GPS */
+function GpsCheckinButton({ clubId, eventId }: { clubId: string; eventId: string }) {
+  const m = useClubMutation(clubId, async () => {
+    let fix: Awaited<ReturnType<typeof freshPosition>>
+    try { fix = await freshPosition() } catch { throw new Error('GPS_UNAVAILABLE') }
+    return gpsCheckin(eventId, fix.lat, fix.lng, fix.accuracy)
+  })
+  return (
+    <Button block variant="secondary" disabled={m.isPending}
+      onClick={() => m.mutate(undefined, {
+        onSuccess: (r) => toast.success(r.new ? 'Điểm danh thành công!' : 'Bạn đã điểm danh rồi'),
+        onError: (err) => toast.error((err as Error).message === 'GPS_UNAVAILABLE' ? 'Không lấy được vị trí. Hãy cho phép truy cập vị trí rồi thử lại.' : eventsErrorMessage(err)),
+      })}>
+      <Navigation className="size-4" aria-hidden />{m.isPending ? 'Đang lấy vị trí…' : 'Điểm danh bằng vị trí'}
+    </Button>
+  )
+}
+
+function CheckToggle({ clubId, eventId, userId, checked, locked }: { clubId: string; eventId: string; userId: string; checked: boolean; locked?: boolean }) {
   const m = useClubMutation(clubId, (v: boolean) => staffCheckin(eventId, userId, v))
   return (
-    <button type="button" onClick={() => m.mutate(!checked, { onError: (e) => toast.error(eventsErrorMessage(e)) })} disabled={m.isPending}
-      aria-pressed={checked} aria-label={checked ? 'Bỏ điểm danh' : 'Điểm danh'}
+    <button type="button" onClick={() => m.mutate(!checked, { onError: (e) => toast.error(eventsErrorMessage(e)) })} disabled={m.isPending || locked}
+      aria-pressed={checked} aria-label={checked ? 'Bỏ điểm danh' : locked ? 'Chưa tới giờ, chưa điểm danh được' : 'Điểm danh'}
+      title={locked ? 'Sự kiện chưa bắt đầu' : undefined}
       className="grid size-11 place-items-center rounded-full hover:bg-surface-2 disabled:opacity-50">
       {checked ? <CheckCircle2 className="size-6 text-brand" aria-hidden /> : <Circle className="size-6 text-fg-subtle" aria-hidden />}
     </button>

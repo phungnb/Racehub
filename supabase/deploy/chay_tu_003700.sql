@@ -1,7 +1,7 @@
--- RaceHub: gộp 112 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 114 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014900, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -28490,6 +28490,271 @@ grant execute on function public.admin_banned_users() to authenticated;
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001014700_dm_delete.sql
+-- ===================================================================
+-- Xóa tin nhắn 1-1 kiểu Zalo (xóa mềm, không mất dữ liệu gốc):
+--  * Thu hồi (xóa với mọi người): chỉ tin của mình, trong 24 giờ kể từ lúc gửi; hai bên thấy "Tin nhắn đã được thu hồi".
+--  * Xóa ở phía tôi: ẩn một tin (của mình hoặc của người khác) chỉ với riêng mình.
+--  * Xóa cuộc trò chuyện: ẩn toàn bộ tin tới thời điểm bấm, chỉ với riêng mình; tin mới sau đó vẫn hiện lại bình thường.
+-- Mọi bảng mới bật RLS, không cấp quyền trực tiếp; chỉ đi qua RPC security definer có kiểm tra người tham gia.
+create table if not exists public.direct_message_hidden (
+  message_id uuid not null references public.direct_messages(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (message_id, user_id)
+);
+alter table public.direct_message_hidden enable row level security;
+revoke all on public.direct_message_hidden from anon, authenticated;
+
+alter table public.direct_threads add column if not exists a_cleared_at timestamptz;
+alter table public.direct_threads add column if not exists b_cleared_at timestamptz;
+
+-- Tin nhắn người dùng này còn nhìn thấy: chưa bị xóa phía mình, và sau mốc xóa cuộc trò chuyện
+create or replace function private.dm_visible(m public.direct_messages, p_uid uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select not exists (select 1 from public.direct_message_hidden h where h.message_id = m.id and h.user_id = p_uid)
+     and m.created_at > coalesce((select case when t.user_a = p_uid then t.a_cleared_at else t.b_cleared_at end
+                                    from public.direct_threads t where t.id = m.thread_id), '-infinity'::timestamptz)
+$$;
+revoke all on function private.dm_visible(public.direct_messages, uuid) from public, anon, authenticated;
+
+-- Mở cuộc trò chuyện: chỉ tin còn nhìn thấy
+create or replace function public.direct_thread(p_user uuid, p_before timestamptz default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  t public.direct_threads := (select x from public.direct_threads x where x.user_a = least(v_uid, p_user) and x.user_b = greatest(v_uid, p_user));
+  pr public.profiles := (select x from public.profiles x where x.id = p_user);
+begin
+  if pr.id is null or p_user = v_uid then raise exception 'USER_NOT_FOUND'; end if;
+  if t.id is not null then
+    update public.direct_threads set a_read_at = case when user_a = v_uid then now() else a_read_at end,
+                                     b_read_at = case when user_b = v_uid then now() else b_read_at end where id = t.id;
+  end if;
+  return jsonb_build_object(
+    'user', jsonb_build_object('id', pr.id, 'display_name', pr.display_name, 'avatar_url', pr.avatar_url, 'level', coalesce(pr.level, 1)),
+    'can_message', private.can_dm(v_uid, p_user),
+    'blocked', private.is_blocked(v_uid, p_user),
+    'blocked_by_me', exists (select 1 from public.user_blocks b where b.blocker = v_uid and b.blocked = p_user),
+    'messages', coalesce((select jsonb_agg(private.dm_json(m, v_uid) order by m.created_at)
+                  from (select x.id, row_number() over (order by x.created_at desc) as rn from public.direct_messages x
+                         where x.thread_id = t.id and x.created_at < coalesce(p_before, now() + interval '1 day')
+                           and private.dm_visible(x, v_uid)) r
+                  join public.direct_messages m on m.id = r.id
+                 where r.rn <= 60), '[]'::jsonb));
+end $$;
+
+-- Hộp thư: chỉ cuộc trò chuyện còn tin nhìn thấy; tin cuối và số chưa đọc cũng chỉ tính tin nhìn thấy
+create or replace function public.direct_inbox() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_uid uuid := private.require_uid();
+begin
+  return coalesce((select jsonb_agg(jsonb_build_object(
+            'user', jsonb_build_object('id', pr.id, 'display_name', pr.display_name, 'avatar_url', pr.avatar_url),
+            'last_message_at', (lm.x).created_at,
+            'last', private.dm_json(lm.x, v_uid),
+            'unread', (select count(*) from public.direct_messages m where m.thread_id = t.id and m.sender_id <> v_uid and m.deleted_at is null
+                         and private.dm_visible(m, v_uid)
+                         and m.created_at > coalesce(case when t.user_a = v_uid then t.a_read_at else t.b_read_at end, '-infinity'::timestamptz)))
+          order by (lm.x).created_at desc)
+    from public.direct_threads t
+    join public.profiles pr on pr.id = case when t.user_a = v_uid then t.user_b else t.user_a end
+    cross join lateral (select x from public.direct_messages x where x.thread_id = t.id and private.dm_visible(x, v_uid)
+                         order by x.created_at desc limit 1) lm
+   where (t.user_a = v_uid or t.user_b = v_uid) and t.last_message_at is not null
+     and not exists (select 1 from public.user_blocks b where b.blocker = v_uid and b.blocked = pr.id)), '[]'::jsonb);
+end $$;
+
+create or replace function public.direct_unread_count() returns integer
+language sql stable security definer set search_path = public as $$
+  select count(*)::int from public.direct_messages m join public.direct_threads t on t.id = m.thread_id
+   where (t.user_a = auth.uid() or t.user_b = auth.uid()) and m.sender_id <> auth.uid() and m.deleted_at is null
+     and private.dm_visible(m, auth.uid())
+     and m.created_at > coalesce(case when t.user_a = auth.uid() then t.a_read_at else t.b_read_at end, '-infinity'::timestamptz)
+     and not exists (select 1 from public.user_blocks b where b.blocker = auth.uid() and b.blocked = m.sender_id)
+$$;
+
+-- Thu hồi tin của mình: trong 24 giờ kể từ lúc gửi (quá hạn → RECALL_EXPIRED). Thu hồi lại tin đã thu hồi: không đổi gì.
+create or replace function public.delete_direct_message(p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare m public.direct_messages := (select x from public.direct_messages x where x.id = p_id);
+begin
+  if m.id is null then raise exception 'NOT_FOUND'; end if;
+  if m.sender_id is distinct from private.require_uid() then raise exception 'NOT_AUTHOR'; end if;
+  if m.deleted_at is not null then return; end if;
+  if m.created_at < now() - interval '24 hours' then raise exception 'RECALL_EXPIRED'; end if;
+  update public.direct_messages set deleted_at = now() where id = p_id;
+end $$;
+
+-- Xóa ở phía tôi: ẩn một tin với riêng mình (người tham gia cuộc trò chuyện, tin của ai cũng được)
+create or replace function public.hide_direct_message(p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  m public.direct_messages := (select x from public.direct_messages x where x.id = p_id);
+begin
+  if m.id is null or not exists (select 1 from public.direct_threads t where t.id = m.thread_id and v_uid in (t.user_a, t.user_b)) then
+    raise exception 'NOT_FOUND';
+  end if;
+  insert into public.direct_message_hidden (message_id, user_id) values (m.id, v_uid) on conflict do nothing;
+end $$;
+
+-- Xóa cả cuộc trò chuyện ở phía tôi: ẩn mọi tin tới bây giờ; người kia vẫn giữ nguyên
+create or replace function public.clear_direct_thread(p_user uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := private.require_uid();
+begin
+  if p_user is null or p_user = v_uid then raise exception 'INVALID_TARGET'; end if;
+  update public.direct_threads set a_cleared_at = case when user_a = v_uid then now() else a_cleared_at end,
+                                   b_cleared_at = case when user_b = v_uid then now() else b_cleared_at end,
+                                   a_read_at = case when user_a = v_uid then now() else a_read_at end,
+                                   b_read_at = case when user_b = v_uid then now() else b_read_at end
+   where user_a = least(v_uid, p_user) and user_b = greatest(v_uid, p_user);
+end $$;
+
+revoke all on function public.direct_thread(uuid, timestamptz), public.direct_inbox(), public.direct_unread_count(),
+  public.delete_direct_message(uuid), public.hide_direct_message(uuid), public.clear_direct_thread(uuid) from public, anon;
+grant execute on function public.direct_thread(uuid, timestamptz), public.direct_inbox(), public.direct_unread_count(),
+  public.delete_direct_message(uuid), public.hide_direct_message(uuid), public.clear_direct_thread(uuid) to authenticated;
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001014800_event_checkin_window.sql
+-- ===================================================================
+-- Điểm danh sự kiện CLB: chỉ mở trong khung giờ của sự kiện + điểm danh bằng GPS.
+-- Trước đây: ban quản trị tích điểm danh tay được bất cứ lúc nào (kể cả sự kiện chưa diễn ra), QR/"mở điểm danh" từ 2 giờ trước đến 2 giờ sau khi kết thúc,
+-- và thành viên không có cách tự điểm danh bằng vị trí (chỉ có tự động sau khi chạy xong).
+-- Quy tắc mới:
+--   * Khung điểm danh: từ 30 phút trước giờ hẹn đến khi sự kiện kết thúc (starts_at + duration_min). Sự kiện đã hủy thì không mở.
+--   * Thành viên tự điểm danh bằng GPS: trong khung trên, cách điểm hẹn ≤ 300 m, sai số GPS ≤ 100 m; sự kiện phải có tọa độ.
+--   * QR: cùng khung giờ.
+--   * Ban quản trị điểm danh tay: chỉ khi sự kiện đã bắt đầu (không giới hạn lúc kết thúc để còn bổ sung sau buổi chạy). Bỏ điểm danh thì luôn được.
+alter table public.club_event_rsvps drop constraint if exists club_event_rsvps_checkin_method_check;
+alter table public.club_event_rsvps add constraint club_event_rsvps_checkin_method_check
+  check (checkin_method is null or checkin_method in ('QR', 'AUTO', 'STAFF', 'GPS'));
+
+create or replace function private.event_checkin_open(e public.club_events) returns boolean
+language sql stable set search_path = public as $$
+  select e.status = 'SCHEDULED'
+     and now() between e.starts_at - interval '30 minutes' and e.starts_at + make_interval(mins => e.duration_min)
+$$;
+
+-- Chi tiết sự kiện: checkin_open theo khung giờ mới (còn lại giữ nguyên bản 006100)
+create or replace function public.club_event(p_event_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  e public.club_events := (select x from public.club_events x where x.id = p_event_id);
+  v_uid uuid := private.require_uid();
+  v_member boolean;
+begin
+  if e.id is null then raise exception 'EVENT_NOT_FOUND'; end if;
+  v_member := exists (select 1 from public.club_members m where m.club_id = e.club_id and m.user_id = v_uid and m.status = 'APPROVED');
+  if not v_member and e.visibility <> 'PUBLIC' and not public.is_system_admin() then
+    perform private.require_member(e.club_id);
+  end if;
+  return private.event_json(e, v_uid) || jsonb_build_object(
+    'is_member', v_member,
+    'club_name', (select c.name from public.clubs c where c.id = e.club_id),
+    'club_avatar', (select c.avatar_url from public.clubs c where c.id = e.club_id),
+    'can_manage', public.club_is_staff(e.club_id),
+    'checkin_open', private.event_checkin_open(e),
+    'staff_can_mark', e.status = 'SCHEDULED' and now() >= e.starts_at,
+    'attendees', case when v_member or public.is_system_admin() then (select coalesce(jsonb_agg(jsonb_build_object(
+        'user_id', r.user_id, 'display_name', p.display_name, 'avatar_url', p.avatar_url, 'status', r.status,
+        'checked_in_at', r.checked_in_at, 'checkin_method', r.checkin_method)
+        order by (r.checked_in_at is null), r.status, p.display_name), '[]'::jsonb)
+      from public.club_event_rsvps r join public.profiles p on p.id = r.user_id
+     where r.event_id = e.id and r.status <> 'NOT_GOING') else '[]'::jsonb end);
+end $$;
+
+-- QR: lấy mã và quét mã đều theo khung giờ mới
+create or replace function public.event_checkin_token(p_event_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  e public.club_events := (select x from public.club_events x where x.id = p_event_id);
+  v_exp bigint := extract(epoch from now() + interval '15 minutes')::bigint;
+begin
+  if e.id is null then raise exception 'EVENT_NOT_FOUND'; end if;
+  perform private.require_staff(e.club_id);
+  if e.status = 'CANCELLED' then raise exception 'EVENT_CANCELLED'; end if;
+  if not private.event_checkin_open(e) then raise exception 'CHECKIN_CLOSED'; end if;
+  return jsonb_build_object('token', e.id || '.' || v_exp || '.' || private.event_sig(e.id, v_exp),
+                            'expires_at', to_timestamp(v_exp));
+end $$;
+
+create or replace function public.checkin_club_event(p_token text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_parts text[] := string_to_array(coalesce(p_token, ''), '.');
+  v_event uuid;
+  v_exp bigint;
+  e public.club_events;
+begin
+  if cardinality(v_parts) <> 3 then raise exception 'INVALID_TOKEN'; end if;
+  begin
+    v_event := v_parts[1]::uuid;
+    v_exp := v_parts[2]::bigint;
+  exception when others then
+    raise exception 'INVALID_TOKEN';
+  end;
+  e := (select x from public.club_events x where x.id = v_event);
+  if e.id is null or private.event_sig(v_event, v_exp) is distinct from v_parts[3] then raise exception 'INVALID_TOKEN'; end if;
+  if extract(epoch from now()) > v_exp then raise exception 'TOKEN_EXPIRED'; end if;
+  if not public.club_is_member(e.club_id) then raise exception 'NOT_A_MEMBER'; end if;
+  if e.status = 'CANCELLED' then raise exception 'EVENT_CANCELLED'; end if;
+  if not private.event_checkin_open(e) then raise exception 'CHECKIN_CLOSED'; end if;
+  return jsonb_build_object('new', private.event_mark_checkin(e.id, v_uid, 'QR'), 'event_id', e.id, 'club_id', e.club_id, 'title', e.title);
+end $$;
+
+-- Thành viên tự điểm danh bằng vị trí GPS hiện tại
+create or replace function public.gps_checkin_club_event(p_event_id uuid, p_lat double precision, p_lng double precision,
+                                                         p_accuracy_m double precision default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  e public.club_events := (select x from public.club_events x where x.id = p_event_id);
+  v_dist numeric;
+begin
+  if e.id is null then raise exception 'EVENT_NOT_FOUND'; end if;
+  if not public.club_is_member(e.club_id) then raise exception 'NOT_A_MEMBER'; end if;
+  if e.status = 'CANCELLED' then raise exception 'EVENT_CANCELLED'; end if;
+  if not private.event_checkin_open(e) then raise exception 'CHECKIN_CLOSED'; end if;
+  if e.lat is null or e.lng is null then raise exception 'NO_EVENT_LOCATION'; end if;
+  if p_lat is null or p_lng is null or p_lat not between -90 and 90 or p_lng not between -180 and 180 then raise exception 'INVALID_LOCATION'; end if;
+  if p_accuracy_m is not null and p_accuracy_m > 100 then raise exception 'LOW_ACCURACY'; end if;
+  v_dist := private.haversine_m(p_lat::numeric, p_lng::numeric, e.lat::numeric, e.lng::numeric);
+  if v_dist > 300 then raise exception 'TOO_FAR'; end if;
+  return jsonb_build_object('new', private.event_mark_checkin(e.id, v_uid, 'GPS'), 'event_id', e.id, 'club_id', e.club_id,
+                            'title', e.title, 'distance_m', round(v_dist));
+end $$;
+
+-- Ban quản trị điểm danh tay: chỉ khi sự kiện đã bắt đầu
+create or replace function public.staff_checkin(p_event_id uuid, p_user_id uuid, p_checked boolean) returns void
+language plpgsql security definer set search_path = public as $$
+declare e public.club_events := (select x from public.club_events x where x.id = p_event_id);
+begin
+  if e.id is null then raise exception 'EVENT_NOT_FOUND'; end if;
+  perform private.require_staff(e.club_id);
+  if not exists (select 1 from public.club_members where club_id = e.club_id and user_id = p_user_id and status = 'APPROVED') then
+    raise exception 'NOT_A_MEMBER';
+  end if;
+  if p_checked then
+    if e.status = 'CANCELLED' then raise exception 'EVENT_CANCELLED'; end if;
+    if now() < e.starts_at then raise exception 'EVENT_NOT_STARTED'; end if;
+    perform private.event_mark_checkin(e.id, p_user_id, 'STAFF');
+  else
+    update public.club_event_rsvps set checked_in_at = null, checkin_method = null, activity_id = null, updated_at = now()
+     where event_id = e.id and user_id = p_user_id;
+  end if;
+end $$;
+
+revoke all on function public.gps_checkin_club_event(uuid, double precision, double precision, double precision) from public, anon;
+grant execute on function public.gps_checkin_club_event(uuid, double precision, double precision, double precision) to authenticated;
+revoke all on function private.event_checkin_open(public.club_events) from public, anon, authenticated;
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001014900_join_conquest.sql
 -- ===================================================================
 -- 014900: Thử thách chinh phục: tham gia BẮT BUỘC có hạng mục (như thử thách theo mục tiêu, 012000).
@@ -28843,6 +29108,10 @@ begin
       'ok', to_regprocedure('public.admin_delete_rejected_activities(uuid[])') is not null),
     jsonb_build_object('file', '20261001014600', 'label', 'Admin xem danh sách tài khoản đang khóa',
       'ok', to_regprocedure('public.admin_banned_users()') is not null),
+    jsonb_build_object('file', '20261001014700', 'label', 'Xóa tin nhắn kiểu Zalo (thu hồi, xóa phía tôi, xóa cuộc trò chuyện)',
+      'ok', to_regprocedure('public.hide_direct_message(uuid)') is not null and to_regprocedure('public.clear_direct_thread(uuid)') is not null),
+    jsonb_build_object('file', '20261001014800', 'label', 'Điểm danh sự kiện chỉ trong khung giờ + điểm danh GPS',
+      'ok', to_regprocedure('public.gps_checkin_club_event(uuid,double precision,double precision,double precision)') is not null),
     jsonb_build_object('file', '20261001014900', 'label', 'Chinh phục: tham gia bắt buộc có hạng mục (một bước)',
       'ok', to_regprocedure('public.join_challenge_conquest(uuid,jsonb,text)') is not null));
 
