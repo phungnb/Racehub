@@ -68,6 +68,36 @@ describe('CLB: sự kiện + điểm danh (001500)', () => {
     expect(await fails(db, '00000000-0000-0000-0000-0000000000c5', `select public.rsvp_club_event($1, 'GOING')`, [ev])).toContain('EVENT_FULL')
   })
 
+  it('điểm danh chỉ mở từ 30 phút trước giờ hẹn: sớm hơn thì QR / GPS / tích tay đều bị từ chối', async () => {
+    // sự kiện bắt đầu sau 60 phút → chưa mở
+    expect(await one<Ev>(db, MEM, `select public.club_event($1) as r`, [ev])).toMatchObject({ checkin_open: false })
+    expect(await fails(db, OWNER, `select public.event_checkin_token($1)`, [ev])).toContain('CHECKIN_CLOSED')
+    expect(await fails(db, MEM, `select public.gps_checkin_club_event($1, 21.0583, 105.8235, 10)`, [ev])).toContain('CHECKIN_CLOSED')
+    expect(await fails(db, OWNER, `select public.staff_checkin($1, $2, true)`, [ev, MEM2])).toContain('EVENT_NOT_STARTED')
+    // còn 10 phút nữa là bắt đầu → đã mở (từ -30 phút), nhưng ban quản trị vẫn chưa tích tay được
+    await db.exec(`update public.club_events set starts_at = now() + interval '10 minutes' where id = '${ev}'`)
+    expect(await one<Ev>(db, MEM, `select public.club_event($1) as r`, [ev])).toMatchObject({ checkin_open: true })
+    expect(await fails(db, OWNER, `select public.staff_checkin($1, $2, true)`, [ev, MEM2])).toContain('EVENT_NOT_STARTED')
+  })
+
+  it('điểm danh GPS: trong 300 m thì được; xa / sai số lớn / người ngoài CLB bị từ chối', async () => {
+    expect(await fails(db, MEM2, `select public.gps_checkin_club_event($1, 21.0300, 105.8500, 10)`, [ev])).toContain('TOO_FAR')
+    expect(await fails(db, MEM2, `select public.gps_checkin_club_event($1, 21.0583, 105.8235, 500)`, [ev])).toContain('LOW_ACCURACY')
+    expect(await fails(db, MEM2, `select public.gps_checkin_club_event($1, 95, 105.8235, 10)`, [ev])).toContain('INVALID_LOCATION')
+    expect(await fails(db, OUT, `select public.gps_checkin_club_event($1, 21.0583, 105.8235, 10)`, [ev])).toContain('NOT_A_MEMBER')
+    const r = await one<{ new: boolean; distance_m: number }>(db, MEM2, `select public.gps_checkin_club_event($1, 21.0590, 105.8240, 20) as r`, [ev])
+    expect(r).toMatchObject({ new: true })
+    expect(r.distance_m).toBeLessThan(300)
+    expect((await one<{ new: boolean }>(db, MEM2, `select public.gps_checkin_club_event($1, 21.0590, 105.8240, 20) as r`, [ev])).new).toBe(false)
+    const d = await one<Ev>(db, OWNER, `select public.club_event($1) as r`, [ev])
+    expect(d.attendees.find((a) => a.user_id === MEM2)).toMatchObject({ checkin_method: 'GPS' })
+    await rpc(db, OWNER, `select public.staff_checkin($1, $2, false)`, [ev, MEM2])    // trả về chưa điểm danh cho các test sau
+    // sự kiện không có tọa độ thì GPS không dùng được
+    const noLoc = (await db.query<{ id: string }>(`insert into public.club_events (club_id, title, starts_at, duration_min, created_by)
+      values ('${CLUB}', 'Không tọa độ', now() + interval '5 minutes', 60, '${OWNER}') returning id`)).rows[0].id
+    expect(await fails(db, MEM2, `select public.gps_checkin_club_event($1, 21.0583, 105.8235, 10)`, [noLoc])).toContain('NO_EVENT_LOCATION')
+  })
+
   it('điểm danh QR: mã đúng thì được, mã giả / hết hạn / người ngoài bị từ chối; có huy hiệu chạy nhóm', async () => {
     expect(await fails(db, MEM, `select public.event_checkin_token($1)`, [ev])).toContain('FORBIDDEN')
     const t = await one<{ token: string }>(db, OWNER, `select public.event_checkin_token($1) as r`, [ev])
@@ -86,7 +116,8 @@ describe('CLB: sự kiện + điểm danh (001500)', () => {
     expect(badge.rows).toHaveLength(1)
   })
 
-  it('ban quản trị điểm danh tay và bỏ điểm danh', async () => {
+  it('ban quản trị điểm danh tay (khi sự kiện đã bắt đầu) và bỏ điểm danh', async () => {
+    await db.exec(`update public.club_events set starts_at = now() - interval '5 minutes' where id = '${ev}'`)
     await rpc(db, OWNER, `select public.staff_checkin($1, $2, true)`, [ev, MEM2])
     let d = await one<Ev>(db, MEM, `select public.club_event($1) as r`, [ev])
     expect(d.checked_in_count).toBe(2)
@@ -110,8 +141,8 @@ describe('CLB: sự kiện + điểm danh (001500)', () => {
       const r = await db.query<{ rewarded_at: string | null }>(`select rewarded_at from public.activities where id = $1`, [id])
       expect(r.rows[0].rewarded_at).not.toBeNull()
     }
-    await run(MEM2, 21.0590, 105.8240, 70)       // ~90 m, 10 phút sau giờ hẹn
-    await run(OWNER, 21.0300, 105.8500, 60)      // ~4 km: không tính
+    await run(MEM2, 21.0590, 105.8240, 5)        // ~90 m, 10 phút sau giờ hẹn
+    await run(OWNER, 21.0300, 105.8500, -5)      // ~4 km: không tính
     const d = await one<Ev>(db, OWNER, `select public.club_event($1) as r`, [ev])
     expect(d.attendees.find((a) => a.user_id === MEM2)).toMatchObject({ checkin_method: 'AUTO' })
     expect(d.attendees.find((a) => a.user_id === OWNER)?.checked_in_at).toBeNull()

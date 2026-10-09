@@ -287,7 +287,9 @@ begin
     jsonb_build_object('file', '20261001014500', 'label', 'Admin xóa hàng loạt bài chạy bị loại',
       'ok', to_regprocedure('public.admin_delete_rejected_activities(uuid[])') is not null),
     jsonb_build_object('file', '20261001014600', 'label', 'Admin xem danh sách tài khoản đang khóa',
-      'ok', to_regprocedure('public.admin_banned_users()') is not null));
+      'ok', to_regprocedure('public.admin_banned_users()') is not null),
+    jsonb_build_object('file', '20261001014800', 'label', 'Điểm danh sự kiện chỉ trong khung giờ + điểm danh GPS',
+      'ok', to_regprocedure('public.gps_checkin_club_event(uuid,double precision,double precision,double precision)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

@@ -65,6 +65,17 @@ export function currentPosition(timeout = 10_000): Promise<{ lat: number; lng: n
   })
 }
 
+/** Vị trí hiện tại kèm sai số (m), luôn đo mới (không dùng vị trí cũ) — dùng cho điểm danh */
+export function freshPosition(timeout = 15_000): Promise<{ lat: number; lng: number; accuracy: number }> {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) { reject(new Error('NO_GEOLOCATION')); return }
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
+      reject, { enableHighAccuracy: true, timeout, maximumAge: 0 },
+    )
+  })
+}
+
 /** Chỉ lấy vị trí khi người dùng ĐÃ cho phép trước đó (không bật hộp hỏi quyền bất ngờ) */
 export async function positionIfAllowed(): Promise<{ lat: number; lng: number } | null> {
   try {
