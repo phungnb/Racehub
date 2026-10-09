@@ -235,7 +235,8 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
         </ScrollRow></nav>
       )}
 
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-3 px-4 text-center sm:gap-5">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col items-center overflow-y-auto px-4 text-center">
+        <div className="my-auto flex w-full min-w-0 flex-col items-center gap-3 py-2 sm:gap-5">
         {d.status === 'READY' ? (
           <div className="max-w-md space-y-4">
             <Trophy className="mx-auto size-14 text-coin" aria-hidden />
@@ -250,11 +251,11 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
               {(done || pending) && phase === 'idle' ? 'Kết quả' : shown ? shown.prize : curName ?? 'Đã trao hết giải'}
             </p>
             {/* Ô quay */}
-            <div className={cn('relative grid min-h-[38dvh] w-full max-w-5xl flex-1 place-items-center overflow-hidden rounded-[2rem] border-2 px-4 py-6 sm:py-10',
+            <div className={cn('relative grid min-h-[34dvh] w-full max-w-5xl shrink-0 place-items-center overflow-hidden rounded-[2rem] border-2 px-4 py-6 sm:py-10',
               phase === 'landed' ? 'border-coin bg-coin/10 shadow-[0_0_80px_-10px_var(--color-coin)]' : 'border-white/15 bg-white/[0.04]')}>
               {phase === 'landed' && shown ? (
                 <div key={shown.key} className="flex w-full min-w-0 flex-col items-center gap-4 animate-winner">
-                  <Avatar src={shown.avatar_url} name={shown.name} size="xl" className="!size-32 shrink-0 ring-4 ring-coin sm:!size-44" />
+                  <Avatar src={shown.avatar_url} name={shown.name} size="xl" className="!size-24 shrink-0 ring-4 ring-coin sm:!size-44" />
                   <p className="w-full break-words text-5xl font-extrabold leading-tight sm:text-8xl">{shown.name}</p>
                   <p className="text-sm font-semibold text-coin sm:text-xl">Chúc mừng! 🎉</p>
                 </div>
@@ -268,7 +269,7 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
             {manage && d.status === 'LIVE' && (
               <div className="flex flex-col items-center gap-3">
                 <button type="button" onClick={() => void spin()} disabled={busy || phase === 'spinning' || cur == null}
-                  className="grid size-28 place-items-center rounded-full bg-coin text-2xl font-black tracking-wider text-black shadow-[0_0_60px_-5px_var(--color-coin)] transition active:scale-95 disabled:opacity-40 sm:size-36 sm:text-3xl">
+                  className="grid size-20 shrink-0 place-items-center rounded-full bg-coin text-xl font-black tracking-wider text-black shadow-[0_0_60px_-5px_var(--color-coin)] transition active:scale-95 disabled:opacity-40 sm:size-36 sm:text-3xl">
                   QUAY
                 </button>
                 <p className="hidden text-xs text-white/50 sm:block">Phím cách để quay · bút trình chiếu cũng dùng được</p>
@@ -281,11 +282,12 @@ export function DrawStage({ draw, scope, refId, onClose }: { draw: LuckyDraw; sc
             )}
           </>
         )}
+        </div>
       </main>
 
       {/* Bảng người trúng */}
       {winners.length > 0 && (
-        <section aria-label="Người trúng" className="max-h-[22vh] overflow-y-auto sm:max-h-[30vh] border-t border-white/10 bg-black/30 px-4 py-3">
+        <section aria-label="Người trúng" className="h-[16dvh] shrink-0 overflow-y-auto overscroll-contain sm:h-[28dvh] border-t border-white/10 bg-black/30 px-4 py-3">
           <div className="mx-auto grid max-w-5xl gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {progress.filter((p) => winners.some((w) => w.prize_idx === p.idx)).map((p) => (
               <div key={p.idx}>
