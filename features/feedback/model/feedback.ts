@@ -1,4 +1,4 @@
-// Hộp thư góp ý (migration 015000): loại góp ý, điểm hài lòng và luật hiện / ẩn bong bóng
+// Hộp thư góp ý (migration 015100): loại góp ý, điểm hài lòng và luật hiện / ẩn bong bóng
 export type FeedbackKind = 'IDEA' | 'BUG' | 'LOVE' | 'OTHER'
 
 export const FEEDBACK_KINDS: { value: FeedbackKind; label: string }[] = [

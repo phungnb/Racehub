@@ -1,5 +1,5 @@
 -- RaceHub — PHẦN 25/26 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000
+-- Gồm: 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015100
 -- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
 -- Xong thì chạy phần tiếp theo.
 begin;
@@ -472,9 +472,9 @@ end $$;
 notify pgrst, 'reload schema';
 
 -- ===================================================================
--- 20261001015000_feedback_bubble.sql
+-- 20261001015100_feedback_bubble.sql
 -- ===================================================================
--- 015000: HỘP THƯ GÓP Ý (bong bóng nổi trong app)
+-- 015100: HỘP THƯ GÓP Ý (bong bóng nổi trong app)
 -- Người dùng gửi góp ý / điểm hài lòng / báo lỗi; admin xem và đánh dấu đã xử lý (Quản trị → Cộng đồng → Góp ý).
 -- Chỉ ghi qua RPC (client không đụng bảng). Mỗi người tối đa 5 góp ý / 24 giờ. Chạy lại an toàn.
 create table if not exists public.app_feedback (

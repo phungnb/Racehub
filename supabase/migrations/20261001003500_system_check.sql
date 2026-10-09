@@ -294,7 +294,7 @@ begin
       'ok', to_regprocedure('public.gps_checkin_club_event(uuid,double precision,double precision,double precision)') is not null),
     jsonb_build_object('file', '20261001014900', 'label', 'Chinh phục: tham gia bắt buộc có hạng mục (một bước)',
       'ok', to_regprocedure('public.join_challenge_conquest(uuid,jsonb,text)') is not null),
-    jsonb_build_object('file', '20261001015000', 'label', 'Hộp thư góp ý (bong bóng nổi trong app)',
+    jsonb_build_object('file', '20261001015100', 'label', 'Hộp thư góp ý (bong bóng nổi trong app)',
       'ok', to_regprocedure('public.submit_feedback(text,integer,text,text,text)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,

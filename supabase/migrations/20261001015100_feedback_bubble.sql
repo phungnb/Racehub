@@ -1,4 +1,4 @@
--- 015000: HỘP THƯ GÓP Ý (bong bóng nổi trong app)
+-- 015100: HỘP THƯ GÓP Ý (bong bóng nổi trong app)
 -- Người dùng gửi góp ý / điểm hài lòng / báo lỗi; admin xem và đánh dấu đã xử lý (Quản trị → Cộng đồng → Góp ý).
 -- Chỉ ghi qua RPC (client không đụng bảng). Mỗi người tối đa 5 góp ý / 24 giờ. Chạy lại an toàn.
 create table if not exists public.app_feedback (

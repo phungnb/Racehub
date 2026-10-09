@@ -73,7 +73,7 @@ export interface AdminReport {
 export const adminListReports = (status: 'OPEN' | 'ALL') => call<AdminReport[]>('admin_list_reports', { p_status: status }).then((x) => x ?? [])
 export const adminResolveReport = (id: string, action: 'DISMISS' | 'SUSPEND', note: string | null) =>
   call<void>('admin_resolve_report', { p_id: id, p_action: action, p_note: note })
-/** Hộp thư góp ý (migration 015000) */
+/** Hộp thư góp ý (migration 015100) */
 export interface AdminFeedback {
   id: string; user_id: string; name: string | null; email: string | null; kind: 'IDEA' | 'BUG' | 'LOVE' | 'OTHER'; rating: number | null
   body: string; platform: string | null; page: string | null; status: 'NEW' | 'DONE'; admin_note: string | null

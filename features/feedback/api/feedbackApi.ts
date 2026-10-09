@@ -1,4 +1,4 @@
-// Hộp thư góp ý (migration 015000). Chỉ ghi qua RPC.
+// Hộp thư góp ý (migration 015100). Chỉ ghi qua RPC.
 import { supabase } from '@/shared/lib/supabase'
 import { errorMessage } from '@/shared/lib/errors'
 import type { FeedbackKind } from '../model/feedback'

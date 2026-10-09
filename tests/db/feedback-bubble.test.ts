@@ -2,8 +2,8 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import { createDb, asUser } from './load-schema'
 
-// Migration 015000: hộp thư góp ý (bong bóng nổi)
-const id = (n: number) => `00000000-0000-0000-0000-0000000150${String(n).padStart(2, '0')}`
+// Migration 015100: hộp thư góp ý (bong bóng nổi)
+const id = (n: number) => `00000000-0000-0000-0000-0000000151${String(n).padStart(2, '0')}`
 const [ADM, U1, U2] = [1, 2, 3].map(id)
 
 async function seed(db: PGlite) {
@@ -20,10 +20,10 @@ const fails = async (p: Promise<unknown>) => { try { await p } catch (e) { retur
 const send = (db: PGlite, uid: string, kind: string, rating: number | null, body: string | null) =>
   rpc(db, uid, `select public.submit_feedback($1, $2, $3, 'web', '/me')::text as r`, [kind, rating, body])
 
-describe('hộp thư góp ý (015000)', () => {
+describe('hộp thư góp ý (015100)', () => {
   let db: PGlite
   beforeAll(async () => {
-    db = await createDb({ withMigrations: true, seed, until: '20261001015000' })
+    db = await createDb({ withMigrations: true, seed, until: '20261001015100' })
     await db.query(`update public.profiles set role = 'SYSTEM_ADMIN' where id = $1`, [ADM])
   }, 240_000)
 
