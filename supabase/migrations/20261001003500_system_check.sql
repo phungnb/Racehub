@@ -299,7 +299,13 @@ begin
     jsonb_build_object('file', '20261001015100', 'label', 'Hộp thư góp ý (bong bóng nổi trong app)',
       'ok', to_regprocedure('public.submit_feedback(text,integer,text,text,text)') is not null),
     jsonb_build_object('file', '20261001015200', 'label', 'Hiển thị tài khoản Strava đã liên kết (tên, ảnh, athlete id)',
-      'ok', to_regprocedure('public.set_provider_identity(uuid,text,jsonb)') is not null));
+      'ok', to_regprocedure('public.set_provider_identity(uuid,text,jsonb)') is not null),
+    jsonb_build_object('file', '20261001015300', 'label', 'Khối "Sắp tới" ở trang chủ (lịch CLB của tôi)',
+      'ok', to_regprocedure('public.my_upcoming_events(integer)') is not null),
+    jsonb_build_object('file', '20261001015400', 'label', 'Nhắc thành viên chưa đăng ký lịch CLB',
+      'ok', to_regprocedure('public.remind_club_event(uuid)') is not null),
+    jsonb_build_object('file', '20261001015500', 'label', 'Thông tin nhận tặng phẩm (thử thách, giải chạy)',
+      'ok', to_regprocedure('public.save_prize_address(text,uuid,jsonb)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
