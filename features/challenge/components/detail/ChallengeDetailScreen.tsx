@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { DrawPanel } from '@/features/draw'
+import { PrizePanel } from '@/features/prize'
 import {
   ArrowLeft, CalendarDays, Check, CircleSlash, Clock, Coins, Copy, Crown, Gauge, Hourglass, Info, Lock, LogOut, MoreHorizontal,
   Repeat, Route, Share2, Shield, Timer, Trophy, Users, UsersRound, HeartPulse } from 'lucide-react'
@@ -127,6 +128,7 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
             <ChallengeBoostDays d={d} />
             <RulesInfoCard challengeId={c.id} rules={c.rules_info} updatedAt={c.rules_updated_at}
               canEdit={d.can_manage && (phase === 'UPCOMING' || phase === 'LIVE')} /></div>}
+      <PrizePanel scope="CHALLENGE" refId={c.id} title={c.title} />
       <MemberDaysSheet challengeId={c.id} userId={pick} onClose={() => setPick(null)} />
       {tab !== 'RULES' && tab !== 'HONOR' && <TopSupported challengeId={c.id} />}
       {tab === 'RANK' && <ChallengeVouchers challengeId={c.id} canManage={d.can_manage} />}

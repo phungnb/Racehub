@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { routes } from '@/shared/config/routes'
 import { DrawPanel } from '@/features/draw'
+import { PrizePanel } from '@/features/prize'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Award, BadgeCheck, CalendarDays, Clock, Download, Flag, Maximize2, Medal, Palette, ScrollText, Timer, Users, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
@@ -55,6 +56,7 @@ export function RaceDetailScreen({ id }: { id: string }) {
 
       <BibCheck r={r} />
       <MyEntry r={r} now={now} />
+      <PrizePanel scope="RACE" refId={r.id} title={r.title} />
       <Rules />
       <Results r={r} />
       <DrawPanel scope="RACE" refId={r.id} canManage={r.can_manage} />
