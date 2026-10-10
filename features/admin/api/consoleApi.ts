@@ -5,7 +5,10 @@ export interface AdminInbox { orders: number; reviews: number; partners: number;
 export interface AdminUserDetail {
   id: string; display_name: string; avatar_url: string | null; role: string; level: number | null; xp: number | null; balance: number
   created_at: string; email: string | null; last_sign_in_at: string | null; banned_until: string | null; banned_at: string | null; banned_reason: string | null
-  strava_connected: boolean; referral_code: string | null; referred_by: string | null
+  strava_connected: boolean
+  /** Tài khoản Strava đã nối (migration 015200); null = chưa nối. name / avatar trống = kết nối cũ, người dùng chưa đồng bộ lại */
+  strava?: { athlete_id: string; name: string | null; username: string | null; avatar_url: string | null; connected_at: string | null; last_synced_at: string | null } | null
+  referral_code: string | null; referred_by: string | null
   plan: { plan_code: string; name: string; tier: number; ends_at: string } | null
   stats: { runs: number; km: number; pending_runs: number; last_run_at: string | null; challenges: number; orders_paid_vnd: number }
   clubs: { id: string; name: string; role: string; status: string }[]

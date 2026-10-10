@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 process.env.NEXT_PUBLIC_STRAVA_CLIENT_ID = '123'
 process.env.STRAVA_CLIENT_SECRET = 'secret'
-const { syncStravaActivities, handleStravaWebhookEvent } = await import('./strava.server')
+const { syncStravaActivities, handleStravaWebhookEvent, refreshStravaIdentity } = await import('./strava.server')
 
 /** Supabase admin client giả lập: ghi lại mọi lời gọi */
 function fakeAdmin(conn: Record<string, unknown> | null) {
@@ -32,7 +32,7 @@ describe('syncStravaActivities', () => {
   afterEach(() => vi.unstubAllGlobals())
 
   it('làm mới token hết hạn, nhập bài từ cũ đến mới, cập nhật mốc đồng bộ', async () => {
-    const { admin, calls } = fakeAdmin({ user_id: 'u1', provider_user_id: '9', access_token: 'old', refresh_token: 'r1', expires_at: '2000-01-01T00:00:00Z', last_synced_at: null })
+    const { admin, calls } = fakeAdmin({ user_id: 'u1', provider_user_id: '9', access_token: 'old', refresh_token: 'r1', expires_at: '2000-01-01T00:00:00Z', last_synced_at: null, identity_synced_at: '2026-01-01T00:00:00Z' })
     fetchMock
       .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'new', refresh_token: 'r2', expires_at: 4102444800 })))
       .mockResolvedValueOnce(new Response(JSON.stringify([run(2, '2026-09-21T00:00:00Z'), run(1, '2026-09-20T00:00:00Z')])))
@@ -55,8 +55,31 @@ describe('syncStravaActivities', () => {
   it('chưa kết nối / token bị thu hồi → lỗi rõ ràng', async () => {
     await expect(syncStravaActivities(fakeAdmin(null).admin, 'u1')).rejects.toThrow('STRAVA_NOT_CONNECTED')
     fetchMock.mockResolvedValueOnce(new Response('{}', { status: 401 }))
-    const { admin } = fakeAdmin({ user_id: 'u1', access_token: 'ok', refresh_token: 'r', expires_at: '2100-01-01T00:00:00Z', last_synced_at: null })
+    const { admin } = fakeAdmin({ user_id: 'u1', access_token: 'ok', refresh_token: 'r', expires_at: '2100-01-01T00:00:00Z', last_synced_at: null, identity_synced_at: '2026-01-01T00:00:00Z' })
     await expect(syncStravaActivities(admin, 'u1')).rejects.toThrow('STRAVA_REAUTH_REQUIRED')
+  })
+})
+
+describe('refreshStravaIdentity', () => {
+  const fetchMock = vi.fn()
+  beforeEach(() => { fetchMock.mockReset(); vi.stubGlobal('fetch', fetchMock) })
+  afterEach(() => vi.unstubAllGlobals())
+  const conn = { user_id: 'u1', provider_user_id: '9', access_token: 'tok', refresh_token: 'r', expires_at: '2100-01-01T00:00:00Z', last_synced_at: null, identity_synced_at: null }
+
+  it('kết nối cũ chưa có tên → lấy /athlete và lưu qua set_provider_identity', async () => {
+    const { admin, calls } = fakeAdmin(conn)
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ id: 9, username: 'vana', firstname: 'A', lastname: 'Nguyễn', profile_medium: 'https://x.test/a.jpg' })))
+    const id = await refreshStravaIdentity(admin, 'u1')
+    expect(fetchMock.mock.calls[0][0]).toBe('https://www.strava.com/api/v3/athlete')
+    expect(id).toEqual({ name: 'A Nguyễn', username: 'vana', avatar_url: 'https://x.test/a.jpg' })
+    expect(calls.rpc[0]).toEqual(['set_provider_identity', { p_user_id: 'u1', p_provider: 'STRAVA', p_identity: id }])
+  })
+
+  it('đã có tên thì không gọi Strava; Strava lỗi thì im lặng', async () => {
+    expect(await refreshStravaIdentity(fakeAdmin({ ...conn, identity_synced_at: '2026-01-01T00:00:00Z' }).admin, 'u1')).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+    fetchMock.mockResolvedValueOnce(new Response('{}', { status: 500 }))
+    expect(await refreshStravaIdentity(fakeAdmin(conn).admin, 'u1')).toBeNull()
   })
 })
 
@@ -64,7 +87,7 @@ describe('handleStravaWebhookEvent', () => {
   const fetchMock = vi.fn()
   beforeEach(() => { fetchMock.mockReset(); vi.stubGlobal('fetch', fetchMock) })
   afterEach(() => vi.unstubAllGlobals())
-  const conn = { user_id: 'u1', provider_user_id: '9', access_token: 'tok', refresh_token: 'r', expires_at: '2100-01-01T00:00:00Z', last_synced_at: null }
+  const conn = { user_id: 'u1', provider_user_id: '9', access_token: 'tok', refresh_token: 'r', expires_at: '2100-01-01T00:00:00Z', last_synced_at: null, identity_synced_at: '2026-01-01T00:00:00Z' }
 
   it('create → lấy bài từ API Strava rồi nhập', async () => {
     const { admin, calls } = fakeAdmin(conn)

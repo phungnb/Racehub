@@ -297,7 +297,9 @@ begin
     jsonb_build_object('file', '20261001015000', 'label', 'Admin tự nhập nội dung nhắc thanh toán',
       'ok', to_regprocedure('public.admin_remind_order(uuid,text)') is not null),
     jsonb_build_object('file', '20261001015100', 'label', 'Hộp thư góp ý (bong bóng nổi trong app)',
-      'ok', to_regprocedure('public.submit_feedback(text,integer,text,text,text)') is not null));
+      'ok', to_regprocedure('public.submit_feedback(text,integer,text,text,text)') is not null),
+    jsonb_build_object('file', '20261001015200', 'label', 'Hiển thị tài khoản Strava đã liên kết (tên, ảnh, athlete id)',
+      'ok', to_regprocedure('public.set_provider_identity(uuid,text,jsonb)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

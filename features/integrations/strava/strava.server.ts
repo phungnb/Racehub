@@ -13,7 +13,21 @@ export interface StravaTokenResponse {
   refresh_token: string
   expires_at: number
   scope?: string
-  athlete?: { id: number; firstname?: string; lastname?: string }
+  athlete?: StravaAthlete
+}
+
+/** Hồ sơ VĐV Strava (phần dùng để người dùng / admin nhận ra tài khoản đã nối) */
+export interface StravaAthlete { id: number; username?: string | null; firstname?: string; lastname?: string; profile?: string | null; profile_medium?: string | null }
+
+/** {name, username, avatar_url} lưu vào connected_accounts (migration 015200). Ảnh mặc định của Strava ("avatar/athlete/...") bỏ qua */
+export function stravaIdentity(a: StravaAthlete | undefined | null) {
+  if (!a) return null
+  const photo = a.profile_medium || a.profile || ''
+  return {
+    name: [a.firstname, a.lastname].filter(Boolean).join(' ').trim().slice(0, 80) || null,
+    username: a.username || null,
+    avatar_url: /^https:\/\//.test(photo) ? photo : null,
+  }
 }
 
 export function buildStravaAuthorizeUrl(origin: string, state: string) {
@@ -209,10 +223,31 @@ export async function enrichStravaActivity(admin: SupabaseClient, userId: string
   return 'OK'
 }
 
+/**
+ * Bổ sung tên + ảnh Strava cho kết nối cũ (nối trước migration 015200) hoặc làm mới khi `force`.
+ * Trả null nếu chưa có migration / Strava lỗi — không bao giờ làm hỏng việc đồng bộ.
+ */
+export async function refreshStravaIdentity(admin: SupabaseClient, userId: string, opts: { token?: string; force?: boolean } = {}) {
+  try {
+    const { data: row, error } = await admin.from('connected_accounts').select('identity_synced_at')
+      .eq('user_id', userId).eq('provider', 'STRAVA').maybeSingle<{ identity_synced_at: string | null }>()
+    if (error || !row) return null
+    if (row.identity_synced_at && !opts.force) return null
+    const token = opts.token ?? (await getValidStravaToken(admin, userId)).token
+    const identity = stravaIdentity(await stravaGet<StravaAthlete>(token, '/athlete'))
+    if (!identity) return null
+    const { error: e2 } = await admin.rpc('set_provider_identity', { p_user_id: userId, p_provider: 'STRAVA', p_identity: identity })
+    return e2 ? null : identity
+  } catch {
+    return null
+  }
+}
+
 /** Đồng bộ các bài chạy mới của một người (tối đa 30 ngày, 3 trang × 100 bài). */
 export async function syncStravaActivities(admin: SupabaseClient, userId: string): Promise<SyncSummary> {
   const { token, conn } = await getValidStravaToken(admin, userId)
   const after = Math.floor(syncWindowStart(conn.last_synced_at).getTime() / 1000)
+  await refreshStravaIdentity(admin, userId, { token })
   const results: Record<string, unknown>[] = []
   for (let page = 1; page <= 3; page++) {
     const list = await stravaGet<StravaSummaryActivity[]>(token, `/athlete/activities?after=${after}&per_page=100&page=${page}`)

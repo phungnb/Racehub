@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { BarChart3, ChevronRight, Crown, Gift, Pencil, Settings, Sparkles, Watch, Ticket, Store, Building2, Scale } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, ConfirmSheet, LevelBadge, ProgressBar, SegmentedControl, Skeleton } from '@/shared/ui'
-import { StravaConnectButton, StravaSyncButton } from '@/features/integrations'
+import { MyStravaAccount, StravaConnectButton, StravaSyncButton } from '@/features/integrations'
 import { formatKm, formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
 import { levelProgress } from '@/features/progression'
@@ -82,6 +82,7 @@ function Header({ profile }: { profile: Profile }) {
 function Devices({ profile }: { profile: Profile }) {
   const [busy, setBusy] = useState(false)
   const [confirm, setConfirm] = useState(false)
+  const [switching, setSwitching] = useState(false)
   const disconnect = async () => {
     setBusy(true)
     const res = await fetch('/api/connect/strava/disconnect', { method: 'POST' })
@@ -90,11 +91,22 @@ function Devices({ profile }: { profile: Profile }) {
     toast.success('Đã hủy kết nối Strava')
     window.location.reload()
   }
+  // Đổi tài khoản = ngắt kết nối cũ (thu hồi quyền ở Strava) rồi sang Strava chọn lại tài khoản
+  const switchAccount = async () => {
+    setBusy(true)
+    const res = await fetch('/api/connect/strava/disconnect', { method: 'POST' })
+    if (!res.ok) { setBusy(false); toast.error('Không đổi được tài khoản Strava. Thử lại sau.'); return }
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- route handler, cần tải trang đầy đủ để chuyển sang Strava
+    window.location.assign('/api/connect/strava')
+  }
   return (
     <>
     <ConfirmSheet open={confirm} onClose={() => setConfirm(false)} title="Ngắt kết nối Strava?" confirmLabel="Ngắt kết nối" loading={busy}
       description="Bài chạy mới trên Strava sẽ không tự về RaceHub nữa. Bài đã nhận vẫn giữ nguyên. Kết nối lại được bất cứ lúc nào."
       onConfirm={() => { void disconnect() }} />
+    <ConfirmSheet open={switching} onClose={() => setSwitching(false)} title="Đổi tài khoản Strava?" confirmLabel="Đổi tài khoản" loading={busy}
+      description="RaceHub sẽ ngắt tài khoản Strava hiện tại rồi chuyển sang Strava để bạn chọn lại. Nếu Strava tự đăng nhập đúng tài khoản cũ, hãy bấm “Not you?” trên trang Strava để đổi tài khoản. Bài đã nhận vẫn giữ nguyên."
+      onConfirm={() => { void switchAccount() }} />
     <ul className="divide-y divide-border">
       <li className="flex items-center gap-3 py-3">
         <span className="grid size-9 place-items-center rounded-lg bg-[#fc4c02]/15 font-black text-[#fc4c02]" aria-hidden>S</span>
@@ -106,6 +118,13 @@ function Devices({ profile }: { profile: Profile }) {
           ? <span className="flex shrink-0 gap-1.5"><StravaSyncButton /><Button size="sm" variant="ghost" loading={busy} onClick={() => setConfirm(true)}>Ngắt</Button></span>
           : <StravaConnectButton href="/api/connect/strava" size="sm" className="shrink-0" />}
       </li>
+      {profile.strava_connected && (
+        <li className="space-y-2 py-3">
+          <p className="text-xs text-fg-muted">Tài khoản Strava đang liên kết — bài chạy được lấy từ đây. Nếu không phải của bạn, hãy đổi tài khoản.</p>
+          <MyStravaAccount />
+          <Button size="sm" variant="secondary" loading={busy} onClick={() => setSwitching(true)}>Đổi tài khoản Strava</Button>
+        </li>
+      )}
       {['Garmin Connect', 'COROS', 'Apple Health'].map((n) => (
         <li key={n} className="flex items-center gap-3 py-3 opacity-60">
           <span className="grid size-9 place-items-center rounded-lg bg-surface-2"><Watch className="size-4" aria-hidden /></span>
