@@ -96,6 +96,7 @@ function Devices({ profile }: { profile: Profile }) {
     setBusy(true)
     const res = await fetch('/api/connect/strava/disconnect', { method: 'POST' })
     if (!res.ok) { setBusy(false); toast.error('Không đổi được tài khoản Strava. Thử lại sau.'); return }
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- route handler, cần tải trang đầy đủ để chuyển sang Strava
     window.location.assign('/api/connect/strava')
   }
   return (
