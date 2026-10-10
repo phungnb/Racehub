@@ -11,7 +11,7 @@ import { bucketChallenges, formatScore, timeLabel, useChallengeList, type Challe
 const RSVP_LABEL = { GOING: 'Đã tham gia', MAYBE: 'Có thể', NOT_GOING: 'Không tham gia' } as const
 
 function EventRow({ e, now }: { e: UpcomingEvent; now: Date }) {
-  const needsReply = !e.my_status
+  const needsReply = e.my_status !== 'GOING' && e.my_status !== 'NOT_GOING'   // 'Có thể' là dữ liệu cũ: coi như chưa trả lời
   return (
     <Link href={`${routes.club(e.club_id)}/events/${encodeURIComponent(e.id)}`}
       className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 hover:border-fg-subtle">

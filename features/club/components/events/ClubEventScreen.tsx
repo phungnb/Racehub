@@ -5,25 +5,39 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import QRCode from 'qrcode'
 import {
-  ArrowLeft, Ban, Camera, ExternalLink, CheckCircle2, Circle, MapPin, Navigation, Pencil, QrCode, RefreshCw, Route, ScanLine, Timer, Users, Share2,
+  ArrowLeft, Ban, Bell, Camera, ExternalLink, CheckCircle2, Circle, MapPin, Navigation, Pencil, QrCode, RefreshCw, Route, ScanLine, Timer, Users, Share2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, EmptyState, ErrorState, Field, Input, SectionTitle, SegmentedControl, Sheet, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatRelative } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
+import { saveFileBlob } from '@/shared/lib/saveImage'
 import { freshPosition } from '@/shared/lib/geocode'
 import {
   cancelEvent, checkinToken, gpsCheckin, eventsErrorMessage, rsvpEvent, staffCheckin, type ClubEventDetail, type RsvpStatus, eventRoutes,
 } from '../../api/eventsApi'
 import { useClubMutation, useEvent } from '../../hooks/useEvents'
 import { eventCountdown, eventWhen, mapsUrl } from '../../model/events'
+import { eventIcs } from '../../model/ics'
 import { EventFormSheet } from './EventFormSheet'
 import { listAlbums } from '../../api/albumsApi'
 import { providerOf } from '../../model/media'
 import { RSVP_LABEL } from './ClubEventsScreen'
 
 const METHOD_LABEL = { QR: 'quét QR', AUTO: 'tự động từ bài chạy', STAFF: 'ban tổ chức', GPS: 'vị trí GPS' } as const
+
+/** Tạo file .ics (chuông nhắc trước 1 ngày và 1 giờ) rồi mở bằng ứng dụng Lịch / bảng Chia sẻ của máy */
+async function addReminder(e: ClubEventDetail) {
+  try {
+    const blob = new Blob([eventIcs(e)], { type: 'text/calendar;charset=utf-8' })
+    const r = await saveFileBlob(blob, `racehub-lich-${e.id.slice(0, 8)}.ics`, e.title, 'Thêm vào lịch')
+    if (r === 'downloaded' || r === 'shared') toast.success('Mở file vừa tải để thêm vào Lịch, sẽ nhắc trước 1 ngày và 1 giờ')
+    else if (r === 'preview') toast.error('Máy chưa mở được file lịch, thử lại bằng trình duyệt')
+  } catch {
+    toast.error('Chưa tạo được nhắc lịch, thử lại sau')
+  }
+}
 
 /** Chi tiết sự kiện: thông tin, báo tham gia, người tham gia + điểm danh; ban quản trị mở QR điểm danh */
 export function ClubEventScreen({ clubId, eventId }: { clubId: string; eventId: string }) {
@@ -113,9 +127,10 @@ function Detail({ clubId, e }: { clubId: string; e: ClubEventDetail }) {
         ) : !cancelled && !ended ? (
           <div className="space-y-2">
             <p className="text-sm font-semibold text-fg-muted">Bạn có đi không?</p>
-            <SegmentedControl value={e.my_status ?? ('' as RsvpStatus)}
+            <SegmentedControl value={e.my_status === 'GOING' || e.my_status === 'NOT_GOING' ? e.my_status : ('' as RsvpStatus)}
               onChange={(s) => rsvp.mutate(s, { onSuccess: () => toast.success(s === 'GOING' ? 'Hẹn gặp bạn ở buổi chạy!' : 'Đã ghi nhận'), onError: (err) => toast.error(eventsErrorMessage(err)) })}
-              options={(['GOING', 'MAYBE', 'NOT_GOING'] as const).map((s) => ({ value: s, label: RSVP_LABEL[s] }))} />
+              options={(['GOING', 'NOT_GOING'] as const).map((s) => ({ value: s, label: RSVP_LABEL[s] }))} />
+            <Button block variant="secondary" onClick={() => void addReminder(e)}><Bell className="size-4" aria-hidden />Nhắc lịch (thêm vào lịch điện thoại)</Button>
             {e.checkin_open && e.lat != null && <GpsCheckinButton clubId={clubId} eventId={e.id} />}
             {e.checkin_open && (
               <p className="flex items-center gap-1.5 text-xs text-fg-subtle"><ScanLine className="size-3.5" aria-hidden />

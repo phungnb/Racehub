@@ -13,7 +13,7 @@ import { eventCountdown, eventDateBadge, eventWhen } from '../../model/events'
 import { EventFormSheet } from './EventFormSheet'
 import { PollCard, PollFormSheet } from './Polls'
 
-export const RSVP_LABEL = { GOING: 'Tham gia', MAYBE: 'Có thể', NOT_GOING: 'Không đi' } as const
+export const RSVP_LABEL = { GOING: 'Tham gia', MAYBE: 'Có thể', NOT_GOING: 'Không tham gia' } as const
 
 /** Tab Lịch của CLB: sự kiện chạy nhóm (sắp tới / đã qua) + bình chọn */
 export function ClubEventsScreen({ clubId }: { clubId: string }) {
