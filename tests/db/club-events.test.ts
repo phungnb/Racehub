@@ -75,6 +75,18 @@ describe('CLB: sự kiện + điểm danh (001500)', () => {
     expect(await one<Ev[]>(db, OUT, `select public.my_upcoming_events(5) as r`)).toEqual([])
   })
 
+  it('remind_club_event: chỉ nhắc người chưa đăng ký, chỉ ban quản trị, 6 giờ một lần', async () => {
+    // lúc này OWNER và MEM2 đã GOING, MEM đã GOING, Tú (c5) chưa trả lời
+    const tu = '00000000-0000-0000-0000-0000000000c5'
+    expect(await fails(db, MEM, `select public.remind_club_event($1)`, [ev])).toContain('FORBIDDEN')
+    await db.exec(`update public.club_event_rsvps set status = 'NOT_GOING' where event_id = '${ev}' and user_id = '${MEM2}'`)
+    expect(await one<number>(db, OWNER, `select public.remind_club_event($1) as r`, [ev])).toBe(1)
+    const n = await db.query(`select title from public.notifications where user_id = $1 and title like 'Chưa đăng ký:%'`, [tu])
+    expect(n.rows).toHaveLength(1)
+    expect((await db.query(`select 1 from public.notifications where user_id = $1 and title like 'Chưa đăng ký:%'`, [MEM])).rows).toHaveLength(0)
+    expect(await fails(db, OWNER, `select public.remind_club_event($1)`, [ev])).toContain('EVENT_REMIND_TOO_SOON')
+  })
+
   it('điểm danh chỉ mở từ 30 phút trước giờ hẹn: sớm hơn thì QR / GPS / tích tay đều bị từ chối', async () => {
     // sự kiện bắt đầu sau 60 phút → chưa mở
     expect(await one<Ev>(db, MEM, `select public.club_event($1) as r`, [ev])).toMatchObject({ checkin_open: false })
