@@ -1,7 +1,7 @@
 'use client'
 
 import { useMyProfile, useSession } from '@/features/auth'
-import { ConnectDeviceCard, ExploreShortcuts } from '@/features/home'
+import { ConnectDeviceCard, ExploreShortcuts, UpcomingCard } from '@/features/home'
 import { GameHub } from '@/features/game'
 import { StravaAutoSync } from '@/features/integrations'
 import { InstallCard } from '@/features/pwa'
@@ -19,6 +19,7 @@ export default function FeedPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <InstallCard />
+      {meId && <UpcomingCard />}
       {profile ? <GameHub profile={profile} /> : <Skeleton className="h-52" />}
       {meId && <MyMatchesCard />}
       <ExploreShortcuts />
