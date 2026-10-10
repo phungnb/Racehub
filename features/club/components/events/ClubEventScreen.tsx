@@ -12,32 +12,18 @@ import { Avatar, Button, Card, EmptyState, ErrorState, Field, Input, SectionTitl
 import { cn } from '@/shared/lib/cn'
 import { formatRelative } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
-import { saveFileBlob } from '@/shared/lib/saveImage'
 import { freshPosition } from '@/shared/lib/geocode'
 import {
-  cancelEvent, checkinToken, gpsCheckin, eventsErrorMessage, rsvpEvent, staffCheckin, type ClubEventDetail, type RsvpStatus, eventRoutes,
+  cancelEvent, remindEvent, checkinToken, gpsCheckin, eventsErrorMessage, rsvpEvent, staffCheckin, type ClubEventDetail, type RsvpStatus, eventRoutes,
 } from '../../api/eventsApi'
 import { useClubMutation, useEvent } from '../../hooks/useEvents'
 import { eventCountdown, eventWhen, mapsUrl } from '../../model/events'
-import { eventIcs } from '../../model/ics'
 import { EventFormSheet } from './EventFormSheet'
 import { listAlbums } from '../../api/albumsApi'
 import { providerOf } from '../../model/media'
 import { RSVP_LABEL } from './ClubEventsScreen'
 
 const METHOD_LABEL = { QR: 'quét QR', AUTO: 'tự động từ bài chạy', STAFF: 'ban tổ chức', GPS: 'vị trí GPS' } as const
-
-/** Tạo file .ics (chuông nhắc trước 1 ngày và 1 giờ) rồi mở bằng ứng dụng Lịch / bảng Chia sẻ của máy */
-async function addReminder(e: ClubEventDetail) {
-  try {
-    const blob = new Blob([eventIcs(e)], { type: 'text/calendar;charset=utf-8' })
-    const r = await saveFileBlob(blob, `racehub-lich-${e.id.slice(0, 8)}.ics`, e.title, 'Thêm vào lịch')
-    if (r === 'downloaded' || r === 'shared') toast.success('Mở file vừa tải để thêm vào Lịch, sẽ nhắc trước 1 ngày và 1 giờ')
-    else if (r === 'preview') toast.error('Máy chưa mở được file lịch, thử lại bằng trình duyệt')
-  } catch {
-    toast.error('Chưa tạo được nhắc lịch, thử lại sau')
-  }
-}
 
 /** Chi tiết sự kiện: thông tin, báo tham gia, người tham gia + điểm danh; ban quản trị mở QR điểm danh */
 export function ClubEventScreen({ clubId, eventId }: { clubId: string; eventId: string }) {
@@ -73,6 +59,7 @@ function Detail({ clubId, e }: { clubId: string; e: ClubEventDetail }) {
   const [now] = useState(() => Date.now())
   const ended = new Date(e.ends_at).getTime() < now
   const rsvp = useClubMutation(clubId, (s: RsvpStatus) => rsvpEvent(e.id, s))
+  const remind = useClubMutation(clubId, () => remindEvent(e.id))
   const map = mapsUrl(e)
   const checkedIn = e.attendees.filter((a) => a.checked_in_at)
 
@@ -130,7 +117,6 @@ function Detail({ clubId, e }: { clubId: string; e: ClubEventDetail }) {
             <SegmentedControl value={e.my_status === 'GOING' || e.my_status === 'NOT_GOING' ? e.my_status : ('' as RsvpStatus)}
               onChange={(s) => rsvp.mutate(s, { onSuccess: () => toast.success(s === 'GOING' ? 'Hẹn gặp bạn ở buổi chạy!' : 'Đã ghi nhận'), onError: (err) => toast.error(eventsErrorMessage(err)) })}
               options={(['GOING', 'NOT_GOING'] as const).map((s) => ({ value: s, label: RSVP_LABEL[s] }))} />
-            <Button block variant="secondary" onClick={() => void addReminder(e)}><Bell className="size-4" aria-hidden />Nhắc lịch (thêm vào lịch điện thoại)</Button>
             {e.checkin_open && e.lat != null && <GpsCheckinButton clubId={clubId} eventId={e.id} />}
             {e.checkin_open && (
               <p className="flex items-center gap-1.5 text-xs text-fg-subtle"><ScanLine className="size-3.5" aria-hidden />
@@ -140,9 +126,18 @@ function Detail({ clubId, e }: { clubId: string; e: ClubEventDetail }) {
         ) : null}
 
         {e.can_manage && !cancelled && (
-          <div className="flex gap-2">
-            {e.checkin_open && <Button block onClick={() => setQrOpen(true)}><QrCode className="size-4" aria-hidden />Mở QR điểm danh</Button>}
-            {!ended && <Button variant="secondary" className={e.checkin_open ? 'shrink-0' : 'flex-1'} onClick={() => setCancelling(true)}><Ban className="size-4" aria-hidden />Hủy</Button>}
+          <div className="space-y-2">
+            {!ended && (
+              <Button block variant="secondary" loading={remind.isPending}
+                onClick={() => remind.mutate(undefined, {
+                  onSuccess: (n) => toast.success(n ? `Đã nhắc ${n} thành viên chưa đăng ký` : 'Mọi thành viên đã đăng ký rồi'),
+                  onError: (err) => toast.error(eventsErrorMessage(err)),
+                })}><Bell className="size-4" aria-hidden />Nhắc thành viên chưa đăng ký</Button>
+            )}
+            <div className="flex gap-2">
+              {e.checkin_open && <Button block onClick={() => setQrOpen(true)}><QrCode className="size-4" aria-hidden />Mở QR điểm danh</Button>}
+              {!ended && <Button variant="secondary" className={e.checkin_open ? 'shrink-0' : 'flex-1'} onClick={() => setCancelling(true)}><Ban className="size-4" aria-hidden />Hủy</Button>}
+            </div>
           </div>
         )}
       </Card>

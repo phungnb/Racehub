@@ -95,6 +95,8 @@ export const getEvent = (eventId: string) => rpc<ClubEventDetail>('club_event', 
 export const createEvent = (clubId: string, input: EventInput) => rpc<ClubEvent>('create_club_event', { p_club_id: clubId, p: input })
 export const updateEvent = (eventId: string, input: EventInput) => rpc<ClubEvent>('update_club_event', { p_event_id: eventId, p: input })
 export const cancelEvent = (eventId: string, reason: string) => rpc<void>('cancel_club_event', { p_event_id: eventId, p_reason: reason })
+/** Ban quản trị nhắc thành viên chưa đăng ký (migration 015400); trả số người đã được nhắc */
+export const remindEvent = (eventId: string) => rpc<number>('remind_club_event', { p_event_id: eventId })
 export const rsvpEvent = (eventId: string, status: RsvpStatus) => rpc<ClubEvent>('rsvp_club_event', { p_event_id: eventId, p_status: status })
 export const checkinToken = (eventId: string) => rpc<{ token: string; expires_at: string }>('event_checkin_token', { p_event_id: eventId })
 export const checkinEvent = (token: string) =>
@@ -227,6 +229,7 @@ const MESSAGES: Record<string, string> = {
   INVALID_AMOUNT: 'Số tiền không hợp lệ.',
   DUE_NOT_FOUND: 'Không tìm thấy kỳ thu phí.',
   DUE_CLOSED: 'Kỳ thu phí đã đóng.',
+  EVENT_REMIND_TOO_SOON: 'Vừa nhắc rồi. Mỗi lịch chỉ nhắc 1 lần / 6 giờ.',
   REMIND_TOO_SOON: 'Vừa nhắc rồi. Mỗi kỳ chỉ nhắc 1 lần / 12 giờ.',
   INVALID_RECEIPT: 'Ảnh hóa đơn không hợp lệ.',
   ENTRY_VOIDED: 'Khoản này đã hủy.',
