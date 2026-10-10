@@ -9,6 +9,7 @@ import { Avatar, Button, Card, ConfirmSheet, ErrorState, Field, Input, LevelBadg
 import { cn } from '@/shared/lib/cn'
 import { formatCoin, formatNumber } from '@/shared/lib/format'
 import { routes } from '@/shared/config/routes'
+import { StravaAccountInfo } from '@/features/integrations'
 import type { AccountHit } from '../../api/adminApi'
 import { adminBannedUsers, adminSetUserBan, adminSetUserRole, adminUserDetail, auditLabel, consoleErrorMessage, type AdminUserDetail, type BannedUser } from '../../api/consoleApi'
 import { AccountPicker } from '../economy/AccountPicker'
@@ -89,10 +90,18 @@ export function UserDetail({ id }: { id: string }) {
           <Item label="Bài gần nhất">{fmt(u.stats.last_run_at)}</Item>
           <Item label="Thử thách đang tham gia">{u.stats.challenges}</Item>
           <Item label="Đã thanh toán">{formatNumber(u.stats.orders_paid_vnd)} đ</Item>
-          <Item label="Strava">{u.strava_connected ? 'Đã kết nối' : 'Chưa'}</Item>
           <Item label="Mã giới thiệu">{u.referral_code ?? '—'}</Item>
           <Item label="Được mời bởi">{u.referred_by ?? '—'}</Item>
         </dl>
+      </Card>
+      <Card className="space-y-2">
+        <h3 className="font-semibold">Tài khoản Strava</h3>
+        {!u.strava_connected ? <p className="text-sm text-fg-muted">Chưa liên kết Strava.</p> : u.strava ? (
+          <>
+            <StravaAccountInfo account={u.strava} />
+            <p className="text-xs text-fg-subtle">Đồng bộ gần nhất: {fmt(u.strava.last_synced_at)}{!u.strava.name && !u.strava.avatar_url ? ' · Chưa có tên / ảnh: tự cập nhật khi người dùng mở app (đồng bộ ngầm) hoặc mở trang Tôi.' : ''}</p>
+          </>
+        ) : <p className="text-sm text-fg-muted">Đã kết nối nhưng chưa đọc được thông tin tài khoản.</p>}
       </Card>
       <Actions u={u} />
       {u.clubs.length > 0 && (

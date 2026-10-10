@@ -179,6 +179,7 @@ begin
 end $$;
 
 -- Người dùng tự xem nguồn đã kết nối và lần đồng bộ gần nhất (không lộ token)
+drop function if exists public.my_provider_connections();   -- 015200 đổi cột trả về; drop để chạy lại không lỗi
 create or replace function public.my_provider_connections() returns table (provider text, provider_user_id text, connected_at timestamptz, last_synced_at timestamptz)
 language sql stable security definer set search_path = public as $$
   select provider, provider_user_id, created_at, last_synced_at

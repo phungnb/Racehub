@@ -5,7 +5,7 @@ import { OAUTH_NONCE_COOKIE, OAUTH_RETURN_COOKIE, verifyOAuthState } from '@/sha
 import { safeNext } from '@/shared/config/routes'
 import { getPublicOrigin } from '@/shared/lib/request-url'
 import { serverEnv } from '@/shared/config/env.server'
-import { exchangeStravaCode, syncStravaActivities } from '@/features/integrations/server'
+import { exchangeStravaCode, stravaIdentity, syncStravaActivities } from '@/features/integrations/server'
 
 function back(origin: string, to: string, params: Record<string, string>) {
   const url = new URL(to, origin)
@@ -58,6 +58,7 @@ export async function GET(request: Request) {
       p_refresh_token: token.refresh_token,
       p_expires_at: new Date(token.expires_at * 1000).toISOString(),
       p_scopes: (token.scope ?? '').split(',').filter(Boolean),
+      p_identity: stravaIdentity(token.athlete),
     })
     if (error) {
       if (error.message.includes('PROVIDER_ACCOUNT_CONFLICT')) {
