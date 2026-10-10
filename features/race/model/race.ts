@@ -1,4 +1,5 @@
 // Giải chạy: định dạng, trạng thái, CSV cho ban tổ chức (hàm thuần)
+import type { XlsxSheet } from '@/shared/lib/excel'
 import type { DashboardRow, Race } from '../api/raceApi'
 
 export type RacePhase = 'CANCELLED' | 'UPCOMING' | 'LIVE' | 'ENDED'
@@ -53,4 +54,36 @@ export function dashboardCsv(rows: DashboardRow[]) {
     r.finished_at ? new Date(r.finished_at).toLocaleDateString('vi-VN') : '', new Date(r.registered_at).toLocaleDateString('vi-VN'),
   ])
   return '﻿' + [head, ...body].map((r) => r.map(cell).join(',')).join('\n')
+}
+
+/** Kết quả giải → Excel cho CLB Pro: một sheet tổng hợp theo cự ly + một sheet danh sách VĐV (hạng trong từng cự ly) */
+export function raceXlsxSheets(rows: DashboardRow[]): XlsxSheet[] {
+  const rankOf = new Map<string, number>()
+  const kms = [...new Set(rows.map((r) => Number(r.distance_km)))].sort((a, b) => a - b)
+  for (const km of kms) {
+    rows.filter((r) => Number(r.distance_km) === km && r.status === 'FINISHED' && r.finish_time_s != null)
+      .sort((a, b) => a.finish_time_s! - b.finish_time_s!)
+      .forEach((r, i) => rankOf.set(r.bib, i + 1))
+  }
+  const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('vi-VN') : '')
+  const summary = kms.map((km) => {
+    const g = rows.filter((r) => Number(r.distance_km) === km && r.status !== 'WITHDRAWN')
+    return [distanceLabel(km), g.length, g.filter((r) => r.status === 'FINISHED').length, rows.filter((r) => Number(r.distance_km) === km && r.status === 'WITHDRAWN').length]
+  })
+  const list = [...rows].sort((a, b) => Number(a.distance_km) - Number(b.distance_km)
+    || (rankOf.get(a.bib) ?? 1e9) - (rankOf.get(b.bib) ?? 1e9) || a.bib.localeCompare(b.bib))
+  return [
+    { name: 'Tổng hợp', head: ['Cự ly', 'Đăng ký', 'Hoàn thành', 'Đã rút'], rows: summary },
+    {
+      name: 'Kết quả',
+      head: ['Cự ly', 'Hạng', 'BIB', 'Họ tên', 'Trạng thái', 'Thành tích', 'Pace', 'Quãng đường bài chạy (km)', 'Ngày chạy', 'Ngày đăng ký'],
+      rows: list.map((r) => [
+        distanceLabel(Number(r.distance_km)), rankOf.get(r.bib) ?? '', r.bib, r.display_name ?? '', STATUS_VI[r.status],
+        r.finish_time_s != null ? raceTime(r.finish_time_s) : '',
+        r.finish_time_s != null && r.finish_distance_m ? racePace((r.finish_time_s / r.finish_distance_m) * 1000) : '',
+        r.finish_distance_m != null ? Math.round(r.finish_distance_m / 10) / 100 : '',
+        date(r.finished_at), date(r.registered_at),
+      ]),
+    },
+  ]
 }

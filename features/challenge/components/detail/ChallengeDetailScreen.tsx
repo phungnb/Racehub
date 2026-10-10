@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { DrawPanel } from '@/features/draw'
+import { ClubProExportButton } from '@/features/club'
+import { downloadXlsx } from '@/shared/lib/excel'
 import {
   ArrowLeft, CalendarDays, Check, CircleSlash, Clock, Coins, Copy, Crown, Gauge, Hourglass, Info, Lock, LogOut, MoreHorizontal,
   Repeat, Route, Share2, Shield, Timer, Trophy, Users, UsersRound, HeartPulse } from 'lucide-react'
@@ -16,7 +18,7 @@ import { cn } from '@/shared/lib/cn'
 import { formatNumber, formatPace } from '@/shared/lib/format'
 import { challengeErrorMessage, getConquestBoard, setChallengeRecurrence, type ChallengeDetail, type LeaderboardEntry, type TeamStanding } from '../../api/challengeApi'
 import {
-  AUDIENCE_LABEL, challengePhase, FORMAT_META, formatScore, isCommunity, isConquest, nextOccurrenceStart, nextOccurrenceTitle, OBJECTIVE_META, objectiveMeta, planStatus,
+  AUDIENCE_LABEL, challengePhase, challengeXlsxSheets, FORMAT_META, formatScore, isCommunity, isConquest, nextOccurrenceStart, nextOccurrenceTitle, OBJECTIVE_META, objectiveMeta, planStatus,
   parseClock, RECURRENCE_LABEL, rewardSummary, scoringLines, TEAM_MODE_META, timeLabel,
   type Recurrence, type TeamMode,
 } from '../../model/challenge'
@@ -129,6 +131,11 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
               canEdit={d.can_manage && (phase === 'UPCOMING' || phase === 'LIVE')} /></div>}
       <MemberDaysSheet challengeId={c.id} userId={pick} onClose={() => setPick(null)} />
       {tab !== 'RULES' && tab !== 'HONOR' && <TopSupported challengeId={c.id} />}
+      {tab === 'RANK' && d.can_manage && d.club && !isConquest(c.objective) && (
+        <ClubProExportButton clubId={d.club.id} feature="xuất kết quả thử thách ra Excel" disabled={!leaderboard.data?.length}
+          onExport={() => downloadXlsx(`thu-thach-${c.title.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase().slice(0, 40)}`,
+            challengeXlsxSheets(c, leaderboard.data ?? [], standings))} />
+      )}
       {tab === 'RANK' && <ChallengeVouchers challengeId={c.id} canManage={d.can_manage} />}
       {tab === 'RANK' && <DrawPanel scope="CHALLENGE" refId={c.id} canManage={d.can_manage} />}
 
