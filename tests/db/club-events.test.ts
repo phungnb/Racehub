@@ -68,6 +68,13 @@ describe('CLB: sự kiện + điểm danh (001500)', () => {
     expect(await fails(db, '00000000-0000-0000-0000-0000000000c5', `select public.rsvp_club_event($1, 'GOING')`, [ev])).toContain('EVENT_FULL')
   })
 
+  it('my_upcoming_events: gom lịch sắp tới của CLB tôi tham gia, kèm tên CLB; người ngoài thấy rỗng', async () => {
+    const mine = await one<(Ev & { club_name: string })[]>(db, MEM, `select public.my_upcoming_events(5) as r`)
+    expect(mine).toHaveLength(1)
+    expect(mine[0]).toMatchObject({ id: ev, club_name: 'Hồ Tây Runners', my_status: 'GOING' })
+    expect(await one<Ev[]>(db, OUT, `select public.my_upcoming_events(5) as r`)).toEqual([])
+  })
+
   it('điểm danh chỉ mở từ 30 phút trước giờ hẹn: sớm hơn thì QR / GPS / tích tay đều bị từ chối', async () => {
     // sự kiện bắt đầu sau 60 phút → chưa mở
     expect(await one<Ev>(db, MEM, `select public.club_event($1) as r`, [ev])).toMatchObject({ checkin_open: false })

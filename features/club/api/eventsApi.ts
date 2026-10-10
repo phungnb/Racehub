@@ -2,6 +2,7 @@
 import { supabase } from '@/shared/lib/supabase'
 import type { CashEntry } from '../model/finance'
 import { systemErrorMessage } from '@/shared/lib/errors'
+import { listInbox } from './hubApi'
 
 export type RsvpStatus = 'GOING' | 'MAYBE' | 'NOT_GOING'
 
@@ -78,6 +79,18 @@ const rpc = async <T>(fn: string, args: Record<string, unknown>) => {
 }
 
 export const listEvents = (clubId: string, scope: 'UPCOMING' | 'PAST') => rpc<ClubEvent[]>('club_events', { p_club_id: clubId, p_scope: scope })
+export type UpcomingEvent = ClubEvent & { club_name: string | null; club_accent: string | null }
+
+/** Lịch sắp tới của mọi CLB tôi tham gia, gần nhất trước (migration 015300); chưa chạy migration thì gom từng CLB */
+export async function myUpcomingEvents(limit = 5): Promise<UpcomingEvent[]> {
+  const r = await supabase.rpc('my_upcoming_events', { p_limit: limit })
+  if (!r.error) return (r.data ?? []) as UpcomingEvent[]
+  if (!/my_upcoming_events|PGRST202|42883/.test(`${r.error.code} ${r.error.message}`)) throw r.error
+  const clubs = (await listInbox()).filter((c) => c.member_status === 'APPROVED').slice(0, 8)
+  const lists = await Promise.all(clubs.map((c) =>
+    listEvents(c.club_id, 'UPCOMING').then((es) => es.map((e) => ({ ...e, club_name: c.name, club_accent: c.accent_color }))).catch(() => [])))
+  return lists.flat().filter((e) => e.status === 'SCHEDULED').sort((a, b) => a.starts_at.localeCompare(b.starts_at)).slice(0, limit)
+}
 export const getEvent = (eventId: string) => rpc<ClubEventDetail>('club_event', { p_event_id: eventId })
 export const createEvent = (clubId: string, input: EventInput) => rpc<ClubEvent>('create_club_event', { p_club_id: clubId, p: input })
 export const updateEvent = (eventId: string, input: EventInput) => rpc<ClubEvent>('update_club_event', { p_event_id: eventId, p: input })
