@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canRegister, dashboardCsv, distanceLabel, racePace, racePhase, raceTime } from './race'
+import { canRegister, dashboardCsv, distanceLabel, racePace, racePhase, raceTime, raceXlsxSheets } from './race'
 
 describe('giải chạy', () => {
   const r = { status: 'PUBLISHED' as const, start_at: '2026-10-10T00:00:00Z', end_at: '2026-10-20T00:00:00Z', reg_close_at: '2026-10-15T00:00:00Z' }
@@ -33,5 +33,17 @@ describe('giải chạy', () => {
     expect(lines[1].split(',')[5]).toBe('2')           // hạng 2 ở cự ly 10 km
     expect(lines[2]).toContain('RH-0002,Bình,10,Hoàn thành,1,50:00')
     expect(lines[3]).toContain('Chưa hoàn thành')
+  })
+  it('Excel CLB Pro: tổng hợp theo cự ly và kết quả có hạng, pace', () => {
+    const base = { user_id: 'u', registered_at: '2026-10-01T00:00:00Z', activity_id: null }
+    const [sum, res] = raceXlsxSheets([
+      { ...base, bib: 'RH-0001', display_name: 'An', distance_km: 10, status: 'FINISHED', finish_time_s: 3300, finish_distance_m: 11000, finished_at: '2026-10-12T00:00:00Z' },
+      { ...base, bib: 'RH-0002', display_name: 'Bình', distance_km: 10, status: 'FINISHED', finish_time_s: 3000, finish_distance_m: 10000, finished_at: '2026-10-12T00:00:00Z' },
+      { ...base, bib: 'RH-0003', display_name: 'Chi', distance_km: 5, status: 'WITHDRAWN', finish_time_s: null, finish_distance_m: null, finished_at: null },
+    ])
+    expect(sum.rows).toEqual([['5 km', 0, 0, 1], ['10 km', 2, 2, 0]])
+    expect(res.rows[1].slice(1, 4)).toEqual([1, 'RH-0002', 'Bình'])
+    expect(res.rows[1][6]).toBe('5:00/km')
+    expect(res.rows[0][4]).toBe('Đã rút')
   })
 })
