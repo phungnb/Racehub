@@ -6,7 +6,15 @@ import { ChevronRight, Compass, Flag, Plus, Shield, Swords, Trophy } from 'lucid
 import { Button, EmptyState, ErrorState, SegmentedControl, Skeleton } from '@/shared/ui'
 import type { ChallengeTab } from '../api/challengeApi'
 import { useChallengeList } from '../hooks/useChallenge'
+import { BUCKET_LABEL, bucketChallenges, type ChallengeBucket } from '../model/challenge'
 import { ChallengeCard } from './list/ChallengeCard'
+
+const BUCKETS: ChallengeBucket[] = ['UPCOMING', 'LIVE', 'ENDED']
+const BUCKET_EMPTY: Record<ChallengeBucket, string> = {
+  UPCOMING: 'Chưa có thử thách nào sắp diễn ra.',
+  LIVE: 'Không có thử thách nào đang diễn ra.',
+  ENDED: 'Chưa có thử thách nào kết thúc gần đây.',
+}
 
 const TABS: { value: ChallengeTab; label: string }[] = [
   { value: 'MINE', label: 'Của tôi' },
@@ -25,6 +33,11 @@ const EMPTY: Record<ChallengeTab, { title: string; description: string }> = {
 export function ChallengesScreen() {
   const [tab, setTab] = useState<ChallengeTab>('MINE')
   const q = useChallengeList(tab)
+  // Lọc theo thời gian: mặc định "Đang diễn ra"; tab "Đã xong" vốn chỉ có thử thách đã kết thúc nên không lọc
+  const [bucket, setBucket] = useState<ChallengeBucket>('LIVE')
+  const [now] = useState(() => new Date())
+  const buckets = bucketChallenges(q.data ?? [], now)
+  const filtered = tab !== 'ENDED'
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -61,7 +74,15 @@ export function ChallengesScreen() {
             ? <Button size="sm" variant="secondary" onClick={() => setTab('DISCOVER')}><Compass className="size-4" aria-hidden />Khám phá</Button>
             : <Link href="/challenges/new"><Button size="sm"><Plus className="size-4" aria-hidden />Tạo thử thách</Button></Link>} />
       ) : (
-        <ul className="space-y-3">{q.data.map((c) => <li key={c.id}><ChallengeCard c={c} /></li>)}</ul>
+        <>
+          {filtered && (
+            <SegmentedControl value={bucket} onChange={setBucket}
+              options={BUCKETS.map((b) => ({ value: b, label: BUCKET_LABEL[b], count: buckets[b].length }))} />
+          )}
+          {(filtered ? buckets[bucket] : q.data).length
+            ? <ul className="space-y-3">{(filtered ? buckets[bucket] : q.data).map((c) => <li key={c.id}><ChallengeCard c={c} /></li>)}</ul>
+            : <p className="py-8 text-center text-sm text-fg-muted">{BUCKET_EMPTY[bucket]}</p>}
+        </>
       )}
     </div>
   )
