@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { routes } from '@/shared/config/routes'
 import { DrawPanel } from '@/features/draw'
+import { PrizePanel } from '@/features/prize'
 import { ClubProExportButton } from '@/features/club'
 import { downloadXlsx } from '@/shared/lib/excel'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -57,6 +58,7 @@ export function RaceDetailScreen({ id }: { id: string }) {
 
       <BibCheck r={r} />
       <MyEntry r={r} now={now} />
+      <PrizePanel scope="RACE" refId={r.id} title={r.title} />
       <Rules />
       <Results r={r} />
       <DrawPanel scope="RACE" refId={r.id} canManage={r.can_manage} />

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { DrawPanel } from '@/features/draw'
+import { PrizePanel } from '@/features/prize'
 import { ClubProExportButton } from '@/features/club'
 import { downloadXlsx } from '@/shared/lib/excel'
 import {
@@ -129,6 +130,7 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
             <ChallengeBoostDays d={d} />
             <RulesInfoCard challengeId={c.id} rules={c.rules_info} updatedAt={c.rules_updated_at}
               canEdit={d.can_manage && (phase === 'UPCOMING' || phase === 'LIVE')} /></div>}
+      <PrizePanel scope="CHALLENGE" refId={c.id} title={c.title} />
       <MemberDaysSheet challengeId={c.id} userId={pick} onClose={() => setPick(null)} />
       {tab !== 'RULES' && tab !== 'HONOR' && <TopSupported challengeId={c.id} />}
       {tab === 'RANK' && d.can_manage && d.club && !isConquest(c.objective) && (
