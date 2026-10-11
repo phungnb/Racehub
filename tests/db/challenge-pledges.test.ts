@@ -67,7 +67,7 @@ describe('Thử thách theo mục tiêu tự đăng ký (002000)', () => {
     expect(await me(db, cid, B)).toMatchObject({ current_progress: '30.00', status: 'JOINED' })
 
     const b = await board(db, B, cid)
-    expect(b.members.map((m) => [m.user_id, Number(m.pct)])).toEqual([[A, 150], [B, 50]])   // xếp theo % mục tiêu
+    expect(b.members.map((m) => [m.user_id, Number(m.pct)])).toEqual([[A, 166.7], [B, 50]])   // xếp theo km được tính (trần 150%); % hiển thị theo km chạy thực tế (35/21)
     expect(await fails(db, A, `select public.set_challenge_pledge($1, '{"options":[10]}'::jsonb)`, [cid])).toContain('PLEDGE_RULES_LOCKED')
   })
 
