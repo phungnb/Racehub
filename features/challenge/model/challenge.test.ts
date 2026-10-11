@@ -215,3 +215,17 @@ describe('chỉnh sửa lần 7', () => {
     expect(m.nextOccurrenceStart('2026-01-31T17:00:00Z', 'QUARTERLY').toISOString()).toBe('2026-05-01T17:00:00.000Z')
   })
 })
+
+describe('Excel CLB Pro', () => {
+  it('xếp hạng thử thách có cột đội khi là thử thách đội', async () => {
+    const { challengeXlsxSheets } = await import('./challenge')
+    const row = (rank: number, name: string, team: string | null) => ({ rank, participant_id: `p${rank}`, user_id: `u${rank}`, display_name: name, avatar_url: null, level: 1,
+      team_id: team, score: 10 * rank, distance_m: 5000, run_count: 2, moving_s: 1800, streak_days: 2, completed_at: null, reward_xu: 0 })
+    const c = { title: 'T', objective: 'DISTANCE', start_date: '2026-10-01', end_date: '2026-10-31', target_value: 100 }
+    const solo = challengeXlsxSheets(c, [row(1, 'An', null)])
+    expect(solo.map((s) => s.name)).toEqual(['Thông tin', 'Xếp hạng'])
+    const team = challengeXlsxSheets(c, [row(1, 'An', 't1')], [{ team_id: 't1', name: 'Đỏ', color: '#f00', members: 1, active_members: 1, total: 10, score: 10 }])
+    expect(team.map((s) => s.name)).toEqual(['Thông tin', 'Xếp hạng', 'Đội'])
+    expect(team[1].rows[0].slice(0, 3)).toEqual([1, 'An', 'Đỏ'])
+  })
+})

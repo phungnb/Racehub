@@ -1,6 +1,9 @@
 // Logic thuần của thử thách: nhãn, định dạng điểm, tiến độ theo kế hoạch, kiểm tra dữ liệu tạo mới.
 // Luật tính điểm thật nằm ở DB (migration 000600) — file này chỉ để hiển thị và kiểm tra sớm ở client.
 
+import type { XlsxSheet } from '@/shared/lib/excel'
+import type { LeaderboardEntry, TeamStanding } from '../api/challengeApi'
+
 export type ChallengePhase = 'UPCOMING' | 'LIVE' | 'SETTLING' | 'ENDED' | 'CANCELLED'
 export type ChallengeFormat = 'SOLO_GOAL' | 'RANKED' | 'DUEL' | 'TEAM' | 'COLLECTIVE'
 export type Objective = 'DISTANCE' | 'RUNS' | 'DURATION' | 'STREAK_DAYS' | 'BEST_TIME' | 'BEST_PACE'
@@ -600,4 +603,44 @@ export function draftFromTemplate(t: {
     rules: t.rules_info ?? {},
     personal: format === 'SOLO_GOAL' && t.max_slots <= 1,
   }
+}
+
+/** Bảng xếp hạng thử thách → Excel cho CLB Pro: sheet thông tin chung, sheet xếp hạng cá nhân, thêm sheet đội nếu có */
+export function challengeXlsxSheets(
+  c: { title: string; objective: Objective | string; start_date: string; end_date: string; target_value: number | string },
+  rows: LeaderboardEntry[], teams: TeamStanding[] = [],
+): XlsxSheet[] {
+  const unit = OBJECTIVE_META[c.objective as Objective]?.unit ?? 'km'
+  const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('vi-VN') : '')
+  const teamName = new Map(teams.map((t) => [t.team_id, t.name]))
+  const hasTeam = teams.length > 0
+  const sheets: XlsxSheet[] = [
+    {
+      name: 'Thông tin',
+      head: ['Mục', 'Giá trị'],
+      rows: [
+        ['Thử thách', c.title], ['Thời gian', `${date(c.start_date)} - ${date(c.end_date)}`],
+        ['Mục tiêu', Number(c.target_value) > 0 ? formatScore(c.objective, c.target_value) : ''],
+        ['Số người tham gia', rows.length], ['Số người hoàn thành', rows.filter((r) => r.completed_at).length],
+      ],
+      widths: [22, 40],
+    },
+    {
+      name: 'Xếp hạng',
+      head: ['Hạng', 'Họ tên', ...(hasTeam ? ['Đội'] : []), `Điểm (${unit})`, 'Quãng đường (km)', 'Số buổi chạy', 'Thời gian chạy (phút)', 'Số ngày chạy', 'Hoàn thành', 'Thưởng (Xu)'],
+      rows: rows.map((r) => [
+        r.rank, r.display_name, ...(hasTeam ? [r.team_id ? teamName.get(r.team_id) ?? '' : ''] : []),
+        Number(r.score) || 0, Math.round(Number(r.distance_m) / 10) / 100, r.run_count, Math.round(Number(r.moving_s) / 60),
+        r.streak_days, r.completed_at ? date(r.completed_at) : '', r.reward_xu || '',
+      ]),
+    },
+  ]
+  if (hasTeam) {
+    sheets.push({
+      name: 'Đội',
+      head: ['Hạng', 'Đội', 'Thành viên', 'Đang hoạt động', 'Tổng', 'Điểm'],
+      rows: teams.map((t, i) => [t.rank ?? i + 1, t.name, t.members, t.active_members, Number(t.total) || 0, Number(t.score) || 0]),
+    })
+  }
+  return sheets
 }

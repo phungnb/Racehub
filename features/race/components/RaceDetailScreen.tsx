@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { routes } from '@/shared/config/routes'
 import { DrawPanel } from '@/features/draw'
 import { PrizePanel } from '@/features/prize'
+import { ClubProExportButton } from '@/features/club'
+import { downloadXlsx } from '@/shared/lib/excel'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Award, BadgeCheck, CalendarDays, Clock, Download, Flag, Maximize2, Medal, Palette, ScrollText, Timer, Users, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
@@ -18,7 +20,7 @@ import {
   type Race,
 } from '../api/raceApi'
 import { CERT_FORMATS, drawCertificate, resolveCert } from '../model/certificate'
-import { canRegister, dashboardCsv, distanceLabel, racePace, racePhase, raceTime } from '../model/race'
+import { canRegister, dashboardCsv, distanceLabel, racePace, racePhase, raceTime, raceXlsxSheets } from '../model/race'
 import { fmtDate, PHASE } from './RaceCard'
 import { BibDesigner } from './BibDesigner'
 import { CertDesigner } from './CertDesigner'
@@ -326,6 +328,10 @@ function Organizer({ r }: { r: Race }) {
           <Button onClick={() => setDesign('bib')}><Palette className="size-4" aria-hidden />Thiết kế BIB</Button>
           <Button variant="secondary" onClick={() => setDesign('cert')}><ScrollText className="size-4" aria-hidden />Chứng nhận</Button>
         </div>
+        {r.club && (
+          <ClubProExportButton clubId={r.club.id} feature="xuất kết quả giải ra Excel" disabled={!dash.data?.length}
+            onExport={() => downloadXlsx(`ket-qua-${r.bib_prefix.toLowerCase()}-${new Date().toISOString().slice(0, 10)}`, raceXlsxSheets(dash.data ?? []))} />
+        )}
         <div className="grid grid-cols-2 gap-2">
           <Button variant="secondary" onClick={exportCsv} disabled={!dash.data?.length}><Download className="size-4" aria-hidden />Xuất CSV</Button>
           {r.status === 'PUBLISHED' && <Button variant="danger" onClick={() => setCancelOpen(true)}><XCircle className="size-4" aria-hidden />Hủy giải</Button>}
