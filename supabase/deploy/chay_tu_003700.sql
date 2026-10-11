@@ -1,7 +1,7 @@
--- RaceHub: gộp 120 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 121 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -29327,6 +29327,40 @@ revoke all on function public.set_prize_gift(text, uuid, jsonb), public.prize_gi
   public.save_prize_address(text, uuid, jsonb), public.prize_recipients(text, uuid) from public, anon;
 grant execute on function public.set_prize_gift(text, uuid, jsonb), public.prize_gift_get(text, uuid),
   public.save_prize_address(text, uuid, jsonb), public.prize_recipients(text, uuid) to authenticated;
+
+-- ===================================================================
+-- 20261001015600_pledge_board_actual_pct.sql
+-- ===================================================================
+-- Bảng xếp hạng mục tiêu: % hiển thị theo km chạy thực tế (distance_m), không bị chặn ở mức trần được tính.
+-- Xếp hạng vẫn theo km được tính (counted_km, đã áp trần); chỉ thêm tiêu chí phụ là km thực tế khi bằng nhau.
+create or replace function public.challenge_pledge_board(p_challenge_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare c public.challenges := (select x from public.challenges x where x.id = p_challenge_id);
+begin
+  if c.id is null or not public.challenge_visible(c.id) then raise exception 'CHALLENGE_NOT_FOUND'; end if;
+  return jsonb_build_object(
+    'can_manage', private.challenge_is_manager(c),
+    'missing', (select count(*) from public.challenge_participants x
+                 where x.challenge_id = c.id and x.status <> 'LEFT' and x.pledge_km is null),
+    'members', (select coalesce(jsonb_agg(jsonb_build_object(
+        'participant_id', x.id, 'user_id', x.profile_id, 'display_name', pr.display_name, 'avatar_url', pr.avatar_url,
+        'team_id', x.team_id, 'pledge_km', x.pledge_km, 'km', round(x.distance_m / 1000.0, 2), 'counted_km', x.current_progress,
+        'pct', case when x.pledge_km > 0 then round(x.distance_m / 1000.0 / x.pledge_km * 100, 1) end,
+        'completed', x.completed_at is not null)
+        order by case when x.pledge_km > 0 then x.current_progress / x.pledge_km else -1 end desc, x.current_progress desc, x.distance_m desc, pr.display_name), '[]'::jsonb)
+      from public.challenge_participants x join public.profiles pr on pr.id = x.profile_id
+     where x.challenge_id = c.id and x.status <> 'LEFT'),
+    'teams', case when c.format = 'TEAM' then (
+      select coalesce(jsonb_agg(jsonb_build_object(
+          'team_id', t2.id, 'name', t2.name, 'color', t2.color,
+          'members', (select count(*) from public.challenge_participants x where x.team_id = t2.id and x.status <> 'LEFT'),
+          'pledge_total', (select coalesce(sum(x.pledge_km), 0) from public.challenge_participants x where x.team_id = t2.id and x.status <> 'LEFT'),
+          'counted_total', (select coalesce(sum(x.current_progress), 0) from public.challenge_participants x where x.team_id = t2.id and x.status <> 'LEFT'))
+          order by t2.position), '[]'::jsonb)
+        from public.challenge_teams t2 where t2.challenge_id = c.id) end);
+end $$;
+
+notify pgrst, 'reload schema';
 
 -- ===================================================================
 -- 20261001003500_system_check.sql
