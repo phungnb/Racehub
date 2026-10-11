@@ -29672,7 +29672,10 @@ begin
     jsonb_build_object('file', '20261001015400', 'label', 'Nhắc thành viên chưa đăng ký lịch CLB',
       'ok', to_regprocedure('public.remind_club_event(uuid)') is not null),
     jsonb_build_object('file', '20261001015500', 'label', 'Thông tin nhận tặng phẩm (thử thách, giải chạy)',
-      'ok', to_regprocedure('public.save_prize_address(text,uuid,jsonb)') is not null));
+      'ok', to_regprocedure('public.save_prize_address(text,uuid,jsonb)') is not null),
+    jsonb_build_object('file', '20261001015600', 'label', 'Bảng mục tiêu: % theo km chạy thực tế',
+      'ok', to_regprocedure('public.challenge_pledge_board(uuid)') is not null
+        and position('x.distance_m / 1000.0 / x.pledge_km' in pg_get_functiondef(to_regprocedure('public.challenge_pledge_board(uuid)'))) > 0));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
