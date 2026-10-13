@@ -1,7 +1,7 @@
--- RaceHub: gộp 121 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 122 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -29363,6 +29363,66 @@ end $$;
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001015700_challenge_resync.sql
+-- ===================================================================
+-- 015700: "Đồng bộ lại dữ liệu" cho thử thách (Ban quản trị CLB / người tạo / admin).
+--   Thử thách kéo dài (vd 01/01 → 31/12) cần lấy lại bài chạy Strava từ ngày bắt đầu: app chia lô từng thành viên (/api/challenges/[id]/resync),
+--   hai RPC dưới đây chỉ làm phần CSDL:
+--   1. challenge_resync_targets: ai được phép bấm + danh sách thành viên đã nối Strava + khoảng thời gian cần lấy.
+--   2. challenge_resync_apply: tính lại vào thử thách các bài APPROVED trong khoảng thời gian mà chưa có dòng tiến độ (idempotent).
+-- Chạy riêng được ngay; chạy lại nhiều lần vẫn an toàn.
+
+create or replace function public.challenge_resync_targets(p_challenge_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  c public.challenges := (select x from public.challenges x where x.id = p_challenge_id);
+begin
+  if auth.uid() is null then raise exception 'AUTH_REQUIRED'; end if;
+  if c.id is null then raise exception 'CHALLENGE_NOT_FOUND'; end if;
+  if not (private.challenge_is_manager(c) or public.is_system_admin()) then raise exception 'FORBIDDEN'; end if;
+  return jsonb_build_object(
+    'title', c.title, 'status', c.status, 'start_date', c.start_date, 'end_date', c.end_date,
+    'members', (select coalesce(jsonb_agg(jsonb_build_object('user_id', p.profile_id, 'name', pr.display_name) order by p.joined_at), '[]'::jsonb)
+                  from public.challenge_participants p
+                  join public.profiles pr on pr.id = p.profile_id
+                 where p.challenge_id = c.id and p.status in ('JOINED', 'COMPLETED')
+                   and exists (select 1 from public.connected_accounts ca where ca.user_id = p.profile_id and ca.provider = 'STRAVA')),
+    'not_connected', (select count(*) from public.challenge_participants p
+                       where p.challenge_id = c.id and p.status in ('JOINED', 'COMPLETED')
+                         and not exists (select 1 from public.connected_accounts ca where ca.user_id = p.profile_id and ca.provider = 'STRAVA')));
+end $$;
+
+create or replace function public.challenge_resync_apply(p_challenge_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  c public.challenges := (select x from public.challenges x where x.id = p_challenge_id);
+  r record;
+  n integer := 0;
+begin
+  if auth.uid() is null then raise exception 'AUTH_REQUIRED'; end if;
+  if c.id is null then raise exception 'CHALLENGE_NOT_FOUND'; end if;
+  if not (private.challenge_is_manager(c) or public.is_system_admin()) then raise exception 'FORBIDDEN'; end if;
+  if c.status <> 'ACTIVE' then raise exception 'CHALLENGE_CLOSED'; end if;
+
+  for r in
+    select a.id as activity_id, p.id as participant_id
+      from public.challenge_participants p
+      join public.activities a on a.user_id = p.profile_id
+     where p.challenge_id = c.id and p.status in ('JOINED', 'COMPLETED')
+       and a.validation_status = 'APPROVED'
+       and a.started_at >= c.start_date and a.started_at < least(c.end_date, now() + interval '1 day')
+       and not exists (select 1 from public.challenge_progress_events e where e.participant_id = p.id and e.activity_id = a.id)
+     order by a.started_at
+  loop
+    n := n + private.challenge_apply_activity(r.activity_id, r.participant_id);
+  end loop;
+  return jsonb_build_object('applied', n);
+end $$;
+
+revoke all on function public.challenge_resync_targets(uuid), public.challenge_resync_apply(uuid) from public, anon;
+grant execute on function public.challenge_resync_targets(uuid), public.challenge_resync_apply(uuid) to authenticated;
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -29675,7 +29735,9 @@ begin
       'ok', to_regprocedure('public.save_prize_address(text,uuid,jsonb)') is not null),
     jsonb_build_object('file', '20261001015600', 'label', 'Bảng mục tiêu: % theo km chạy thực tế',
       'ok', to_regprocedure('public.challenge_pledge_board(uuid)') is not null
-        and position('x.distance_m / 1000.0 / x.pledge_km' in pg_get_functiondef(to_regprocedure('public.challenge_pledge_board(uuid)'))) > 0));
+        and position('x.distance_m / 1000.0 / x.pledge_km' in pg_get_functiondef(to_regprocedure('public.challenge_pledge_board(uuid)'))) > 0),
+    jsonb_build_object('file', '20261001015700', 'label', 'Đồng bộ lại dữ liệu thử thách',
+      'ok', to_regprocedure('public.challenge_resync_apply(uuid)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

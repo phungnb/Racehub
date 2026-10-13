@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mapStravaActivity, summarize, syncWindowStart, tokenNeedsRefresh } from './mapping'
+import { mapStravaActivity, mergeSummary, parseRateUsage, rateHasRoom, summarize, syncWindowStart, tokenNeedsRefresh } from './mapping'
 
 describe('mapStravaActivity', () => {
   it('bài chạy Garmin qua Strava', () => {
@@ -66,5 +66,24 @@ describe('mapStravaDetail', () => {
     const { mapStravaDetail } = await import('./mapping')
     expect(mapStravaDetail({ id: 1, map: { polyline: 'FULL', summary_polyline: 'SUM' } }, false)).toMatchObject({ polyline: 'SUM', splits: null, detailed: false })
     expect(mapStravaDetail({ id: 1, map: { summary_polyline: '' } }, false)).toBeNull()
+  })
+})
+
+describe('hạn mức Strava & gộp lô', () => {
+  it('đọc header hạn mức', () => {
+    expect(parseRateUsage('100,1000', '34,120')).toEqual({ limit15: 100, limitDay: 1000, usage15: 34, usageDay: 120 })
+    expect(parseRateUsage(null, '1,2')).toBeNull()
+    expect(parseRateUsage('a,b', '1,2')).toBeNull()
+  })
+  it('dừng khi gần chạm hạn mức (chừa dư địa)', () => {
+    expect(rateHasRoom(null)).toBe(true)
+    expect(rateHasRoom({ limit15: 100, limitDay: 1000, usage15: 80, usageDay: 100 })).toBe(true)
+    expect(rateHasRoom({ limit15: 100, limitDay: 1000, usage15: 85, usageDay: 100 })).toBe(false)
+    expect(rateHasRoom({ limit15: 100, limitDay: 1000, usage15: 10, usageDay: 990 })).toBe(false)
+  })
+  it('gộp kết quả hai lô', () => {
+    const a = { imported: 2, pending: 1, skipped: 1, duplicates: 0, earned_xu: 1.5, skip_reasons: { NOT_RUN: 1 } }
+    const b = { imported: 3, pending: 0, skipped: 2, duplicates: 4, earned_xu: 0.5, skip_reasons: { NOT_RUN: 1, TOO_SHORT: 1 } }
+    expect(mergeSummary(a, b)).toMatchObject({ imported: 5, pending: 1, skipped: 3, duplicates: 4, earned_xu: 2, skip_reasons: { NOT_RUN: 2, TOO_SHORT: 1 } })
   })
 })

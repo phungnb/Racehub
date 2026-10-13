@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { serverEnv } from '@/shared/config/env.server'
 import { analyzeRun, compactStreams, isGpsJumpFlag, speedRulesFrom, stravaStreams, type FraudResult, type FraudStreams, type SpeedRules } from '@/features/activity/server'
 import { toOps } from '@/shared/lib/ops'
-import { mapStravaActivity, mapStravaDetail, summarize, syncWindowStart, tokenNeedsRefresh, type StravaSummaryActivity, type SyncSummary } from './mapping'
+import { mapStravaActivity, mapStravaDetail, parseRateUsage, rateHasRoom, summarize, syncWindowStart, tokenNeedsRefresh, type RateUsage, type StravaSummaryActivity, type SyncSummary } from './mapping'
 
 export const STRAVA_SCOPES = 'read,activity:read_all'
 export const STRAVA_CALLBACK_PATH = '/api/strava/callback'
@@ -117,8 +117,12 @@ export async function getValidStravaToken(admin: SupabaseClient, userId: string)
   return { token: data.access_token, conn: { ...conn, access_token: data.access_token, expires_at: expiresAt } }
 }
 
+/** Mức dùng hạn mức Strava thấy ở phản hồi gần nhất (theo ứng dụng, không theo người dùng) */
+let lastRate: RateUsage | null = null
+
 async function stravaGet<T>(token: string, path: string): Promise<T> {
   const res = await fetch(`${STRAVA_API}${path}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+  lastRate = parseRateUsage(res.headers.get('x-ratelimit-limit'), res.headers.get('x-ratelimit-usage')) ?? lastRate
   if (res.status === 429) throw new Error('STRAVA_RATE_LIMITED')
   if (res.status === 401) throw new Error('STRAVA_REAUTH_REQUIRED')
   if (!res.ok) throw new Error(`STRAVA_API_${res.status}`)
@@ -258,6 +262,52 @@ export async function syncStravaActivities(admin: SupabaseClient, userId: string
   await admin.from('connected_accounts').update({ last_synced_at: new Date().toISOString() })
     .eq('user_id', userId).eq('provider', 'STRAVA')
   return summarize(results)
+}
+
+export interface BackfillResult {
+  summary: SyncSummary
+  /** Trang kế tiếp cần lấy (null = đã hết). Giữ nguyên khi dừng vì hạn mức để chạy tiếp đúng chỗ. */
+  nextPage: number | null
+  /** Dừng sớm vì sắp chạm / đã chạm hạn mức Strava (100 lượt / 15 phút, 1.000 lượt / ngày cho cả ứng dụng) */
+  rateLimited: boolean
+  rate: RateUsage | null
+}
+
+const BACKFILL_PAGES_PER_CALL = 3
+const BACKFILL_BUDGET_MS = 40_000
+
+/**
+ * Lấy lại bài chạy của MỘT người trong khoảng [since, until] (thử thách kéo dài, lùi xa hơn cửa sổ 30 ngày của đồng bộ thường).
+ * Chia lô: tối đa 3 trang × 100 bài mỗi lần gọi (và ≤ 40 giây), trả `nextPage` để gọi tiếp; dừng sớm khi gần chạm hạn mức Strava.
+ * Nhập bài là idempotent (bài đã có chỉ cập nhật tiêu đề, không tải streams lại) nên chạy lại / lặp trang không gây trùng.
+ * Không đụng last_synced_at (đồng bộ thường vẫn chạy theo mốc riêng).
+ */
+export async function backfillStravaActivities(admin: SupabaseClient, userId: string,
+  opts: { since: Date; until?: Date; page?: number }): Promise<BackfillResult> {
+  const { token } = await getValidStravaToken(admin, userId)
+  const after = Math.floor(opts.since.getTime() / 1000)
+  const before = opts.until ? Math.ceil(opts.until.getTime() / 1000) : null
+  const started = Date.now()
+  const results: Record<string, unknown>[] = []
+  let page = Math.max(1, opts.page ?? 1)
+  let nextPage: number | null = page
+  let rateLimited = false
+  for (let i = 0; i < BACKFILL_PAGES_PER_CALL; i++) {
+    if (!rateHasRoom(lastRate)) { rateLimited = true; break }
+    if (i > 0 && Date.now() - started > BACKFILL_BUDGET_MS) break
+    let list: StravaSummaryActivity[]
+    try {
+      list = await stravaGet<StravaSummaryActivity[]>(token, `/athlete/activities?after=${after}${before ? `&before=${before}` : ''}&per_page=100&page=${page}`)
+    } catch (e) {
+      if (e instanceof Error && e.message === 'STRAVA_RATE_LIMITED') { rateLimited = true; break }
+      throw e
+    }
+    for (const a of [...list].reverse()) results.push(await ingest(admin, userId, a, false, token))
+    if (list.length < 100) { nextPage = null; break }
+    page++
+    nextPage = page
+  }
+  return { summary: summarize(results), nextPage, rateLimited, rate: lastRate }
 }
 
 /** Xử lý một sự kiện webhook của Strava. */

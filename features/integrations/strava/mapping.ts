@@ -119,6 +119,32 @@ export function syncWindowStart(lastSyncedAt: string | Date | null | undefined, 
   return new Date(Math.max(floor, new Date(lastSyncedAt).getTime() - 86400_000))
 }
 
+/** Hạn mức Strava (app-wide): header "x-ratelimit-limit: 100,1000" / "x-ratelimit-usage: 34,120" = [15 phút, ngày] */
+export interface RateUsage { usage15: number; limit15: number; usageDay: number; limitDay: number }
+
+export function parseRateUsage(limit: string | null | undefined, usage: string | null | undefined): RateUsage | null {
+  const l = (limit ?? '').split(',').map((x) => Number(x))
+  const u = (usage ?? '').split(',').map((x) => Number(x))
+  if (l.length < 2 || u.length < 2 || [...l, ...u].some((n) => !Number.isFinite(n))) return null
+  return { limit15: l[0], limitDay: l[1], usage15: u[0], usageDay: u[1] }
+}
+
+/** Còn đủ dư địa để gọi tiếp? Chừa `reserve` lượt cho đồng bộ thường / webhook của người dùng khác */
+export function rateHasRoom(r: RateUsage | null, reserve = 15): boolean {
+  if (!r) return true
+  return r.usage15 < r.limit15 - reserve && r.usageDay < r.limitDay - reserve
+}
+
+export function mergeSummary(a: SyncSummary, b: SyncSummary): SyncSummary {
+  const reasons: Record<string, number> = { ...(a.skip_reasons ?? {}) }
+  for (const [k, v] of Object.entries(b.skip_reasons ?? {})) reasons[k] = (reasons[k] ?? 0) + v
+  return {
+    imported: a.imported + b.imported, pending: a.pending + b.pending, skipped: a.skipped + b.skipped,
+    duplicates: a.duplicates + b.duplicates, earned_xu: Math.round((a.earned_xu + b.earned_xu) * 10) / 10,
+    rejected: (a.rejected ?? 0) + (b.rejected ?? 0) || undefined, skip_reasons: reasons,
+  }
+}
+
 export interface SyncSummary {
   imported: number
   pending: number
