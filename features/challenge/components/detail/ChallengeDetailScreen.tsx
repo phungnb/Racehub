@@ -19,7 +19,7 @@ import { cn } from '@/shared/lib/cn'
 import { formatNumber, formatPace } from '@/shared/lib/format'
 import { challengeErrorMessage, getConquestBoard, setChallengeRecurrence, type ChallengeDetail, type LeaderboardEntry, type TeamStanding } from '../../api/challengeApi'
 import {
-  AUDIENCE_LABEL, challengePhase, challengeXlsxSheets, FORMAT_META, formatScore, isCommunity, isConquest, nextOccurrenceStart, nextOccurrenceTitle, OBJECTIVE_META, objectiveMeta, planStatus,
+  AUDIENCE_LABEL, challengePhase, challengeXlsxSheets, FORMAT_META, formatScore, isCommunity, isConquest, OBJECTIVE_META, objectiveMeta, planStatus,
   parseClock, RECURRENCE_LABEL, rewardSummary, scoringLines, TEAM_MODE_META, timeLabel,
   type Recurrence, type TeamMode,
 } from '../../model/challenge'
@@ -98,8 +98,10 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
       </header>
 
       {d.can_manage && phase === 'UPCOMING' && c.status === 'ACTIVE' && <EditChallengeCard d={d} />}
-      <RecurrenceBar d={d} />
-      <ResyncChallengeCard d={d} />
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <RecurrenceBar d={d} />
+        <ResyncChallengeCard d={d} />
+      </div>
       <StatusBanner d={d} phase={phase} />
       <ProgressHero d={d} phase={phase} standings={standings} />
       {/* Ba lối vinh danh ngang hàng: ảnh hành trình của tôi · vinh danh thành viên (BTC) · vinh danh thử thách (bảng tôn vinh chung) */}
@@ -646,33 +648,30 @@ function RecurrenceBar({ d }: { d: ChallengeDetail }) {
   })
   const closed = c.status === 'CANCELLED'
   if (rec === 'NONE' && (!d.can_manage || closed || c.format === 'DUEL' || c.recur_next_id)) return null
+  const canEdit = d.can_manage && !closed && !c.recur_next_id
+  const label = rec === 'NONE' ? 'Lặp lại' : `Lặp ${RECURRENCE_LABEL[rec].toLowerCase()}`
+  const icon = <Repeat className={cn('size-4', rec === 'NONE' ? 'text-fg-subtle' : 'text-brand')} aria-hidden />
+  // Nút gọn nằm cùng hàng với "Đồng bộ lại" (cha là flex-wrap): đang lặp → bấm là tắt; chưa lặp → bấm để chọn chu kỳ
   return (
-    <Card className="space-y-2 text-sm">
-      <div className="flex items-center gap-2">
-        <Repeat className={cn('size-4 shrink-0', rec === 'NONE' ? 'text-fg-subtle' : 'text-brand')} aria-hidden />
-        <p className="min-w-0 flex-1">
-          {rec === 'NONE' ? <span className="text-fg-muted">Không tự lặp lại</span>
-            : <><span className="font-semibold">Lặp {RECURRENCE_LABEL[rec].toLowerCase()}</span><span className="text-fg-muted"> · kỳ {c.occurrence ?? 1}</span></>}
-        </p>
-        {c.recur_next_id && <Link href={`/challenges/${c.recur_next_id}`} className="font-semibold text-brand">Kỳ sau →</Link>}
-        {d.can_manage && !closed && !c.recur_next_id && (
-          <Button size="sm" variant="secondary" onClick={() => setPicking((v) => !v)}>{rec === 'NONE' ? 'Bật lặp lại' : 'Đổi'}</Button>
-        )}
-      </div>
-      {rec !== 'NONE' && !c.recur_next_id && !closed && (
-        <p className="text-xs text-fg-muted">Kỳ sau: <span className="font-medium text-fg">{nextOccurrenceTitle(c.title, rec, c.occurrence ?? 1, nextOccurrenceStart(c.start_date, rec))}</span></p>
+    <>
+      {canEdit ? (
+        <Button size="sm" variant="secondary" className="order-1" loading={set.isPending && set.variables === 'NONE'}
+          onClick={() => (rec === 'NONE' ? setPicking((v) => !v) : set.mutate('NONE'))}>{icon}{label}</Button>
+      ) : (
+        <span className="order-1 inline-flex items-center gap-1.5 rounded-xl bg-surface-2 px-3 py-1.5 text-sm font-medium">{icon}{label}</span>
       )}
+      {c.recur_next_id && <Link href={`/challenges/${c.recur_next_id}`} className="order-1 self-center text-sm font-semibold text-brand">Kỳ sau →</Link>}
       {c.recur_error && d.can_manage && !c.recur_next_id && (
-        <p className="rounded-lg bg-warning/15 p-2 text-xs text-warning">Chưa tạo được kỳ mới: {challengeErrorMessage({ message: c.recur_error })} Hệ thống thử lại mỗi ngày.</p>
+        <p className="order-2 w-full rounded-lg bg-warning/15 p-2 text-xs text-warning">Chưa tạo được kỳ mới: {challengeErrorMessage({ message: c.recur_error })} Hệ thống thử lại mỗi ngày.</p>
       )}
-      {picking && (
-        <div className="flex flex-wrap gap-1.5">
-          {(Object.keys(RECURRENCE_LABEL) as Recurrence[]).map((r) => (
-            <Button key={r} size="sm" variant={r === rec ? 'primary' : 'secondary'} loading={set.isPending && set.variables === r}
+      {picking && rec === 'NONE' && (
+        <div className="order-2 flex w-full flex-wrap gap-1.5">
+          {(Object.keys(RECURRENCE_LABEL) as Recurrence[]).filter((r) => r !== 'NONE').map((r) => (
+            <Button key={r} size="sm" variant="secondary" loading={set.isPending && set.variables === r}
               onClick={() => set.mutate(r)}>{RECURRENCE_LABEL[r]}</Button>
           ))}
         </div>
       )}
-    </Card>
+    </>
   )
 }

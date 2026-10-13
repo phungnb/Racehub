@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Card } from '@/shared/ui'
+import { Button } from '@/shared/ui'
 import { isSystemAdmin } from '@/features/admin'
 import { useMyProfile } from '@/features/auth'
 import { challengeKeys } from '../../hooks/useChallenge'
@@ -93,16 +93,11 @@ export function ResyncChallengeCard({ d }: { d: ChallengeDetail }) {
   }
 
   return (
-    <Card className="flex items-start gap-3">
-      <RefreshCw className="mt-0.5 size-5 shrink-0 text-brand" aria-hidden />
-      <div className="min-w-0 flex-1 space-y-2 text-sm">
-        <div>
-          <p className="font-semibold">Đồng bộ lại dữ liệu</p>
-          <p className="text-fg-muted">Lấy lại bài chạy Strava của thành viên từ ngày bắt đầu thử thách (kể cả khi đã quá 30 ngày). Chạy từng người, từng lô để không vượt hạn mức Strava.</p>
-        </div>
-        {text && <p className="text-fg-muted" role="status">{text}</p>}
-        <Button size="sm" loading={busy} onClick={() => void run()}>{paused ? 'Tiếp tục' : 'Đồng bộ lại'}</Button>
-      </div>
-    </Card>
+    <>
+      <Button size="sm" variant="secondary" className="order-1" loading={busy} onClick={() => void run()}>
+        <RefreshCw className="size-4 text-brand" aria-hidden />{paused ? 'Tiếp tục' : 'Đồng bộ lại'}
+      </Button>
+      {text && <p className="order-2 w-full text-xs text-fg-muted" role="status">{text}</p>}
+    </>
   )
 }
