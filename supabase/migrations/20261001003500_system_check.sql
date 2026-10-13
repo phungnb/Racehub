@@ -310,7 +310,11 @@ begin
       'ok', to_regprocedure('public.challenge_pledge_board(uuid)') is not null
         and position('x.distance_m / 1000.0 / x.pledge_km' in pg_get_functiondef(to_regprocedure('public.challenge_pledge_board(uuid)'))) > 0),
     jsonb_build_object('file', '20261001015700', 'label', 'Đồng bộ lại dữ liệu thử thách',
-      'ok', to_regprocedure('public.challenge_resync_apply(uuid)') is not null));
+      'ok', to_regprocedure('public.challenge_resync_apply(uuid)') is not null),
+    jsonb_build_object('file', '20261001015800', 'label', 'Ngày theo giờ Việt Nam (bỏ current_date UTC)',
+      'ok', not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                         where n.nspname in ('public', 'private') and p.prokind = 'f' and p.prosrc ~* '\mcurrent_date\M'
+                           and p.proname <> 'admin_system_check')));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
