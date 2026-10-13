@@ -32,6 +32,7 @@ import { FORMAT_ICON, FORMAT_TONE } from '../list/ChallengeCard'
 import { PledgeChooser, PledgePanel } from './PledgePanel'
 import { DoneFilter, useDoneFilter } from './DoneFilter'
 import { RulesInfoCard } from './RulesInfo'
+import { ResyncChallengeCard } from './ResyncCard'
 import { TopSupported } from '@/features/game'
 import { HonorPanel, useHonor } from '../honor/HonorPanel'
 import { ChallengeVouchers } from '@/features/voucher'
@@ -98,6 +99,7 @@ export function ChallengeDetailScreen({ id, code }: { id: string; code?: string 
 
       {d.can_manage && phase === 'UPCOMING' && c.status === 'ACTIVE' && <EditChallengeCard d={d} />}
       <RecurrenceBar d={d} />
+      <ResyncChallengeCard d={d} />
       <StatusBanner d={d} phase={phase} />
       <ProgressHero d={d} phase={phase} standings={standings} />
       {/* Ba lối vinh danh ngang hàng: ảnh hành trình của tôi · vinh danh thành viên (BTC) · vinh danh thử thách (bảng tôn vinh chung) */}
