@@ -11,7 +11,7 @@ const MAX_PAGES = 12
 const PAUSE_MS = 700
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-export interface ScanResult { source_id: string; found: number; pending: number; filtered: number; error: string | null }
+interface ScanResult { source_id: string; found: number; pending: number; filtered: number; error: string | null }
 
 type Source = { id: string; url: string | null; kind?: string | null; query?: string | null }
 

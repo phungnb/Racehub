@@ -2,12 +2,12 @@ import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 
 // Tải trang web do admin chỉ định: chặn địa chỉ nội bộ (SSRF), chuyển hướng tối đa 3 lần, giới hạn dung lượng và thời gian.
-export const BOT_UA = 'RaceHubBot/1.0 (+https://racehub.vn; admin-approved race listing)'
+const BOT_UA = 'RaceHubBot/1.0 (+https://racehub.vn; admin-approved race listing)'
 export class FetchError extends Error {
   constructor(public code: 'BAD_URL' | 'FETCH_FAILED' | 'NOT_HTML') { super(code) }
 }
 
-export function privateIp(ip: string): boolean {
+function privateIp(ip: string): boolean {
   if (ip.includes(':')) {
     const v = ip.toLowerCase()
     const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(v)

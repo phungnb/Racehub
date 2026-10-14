@@ -1,7 +1,7 @@
 import 'server-only'
 
-// Tìm kiếm web: Tavily (TAVILY_API_KEY, miễn phí 1.000 lượt / tháng, không cần thẻ) hoặc Brave (BRAVE_SEARCH_API_KEY, trả phí từ 02/2026).
-// Google Programmable Search API đã đóng cho khách hàng mới, nên không dùng.
+// Tìm kiếm web bằng Tavily (TAVILY_API_KEY, gói miễn phí 1.000 lượt / tháng, không cần thẻ).
+// Google Programmable Search API đã đóng cho khách hàng mới; Brave Search API không còn gói miễn phí.
 export class SearchError extends Error {
   constructor(public code: 'NO_SEARCH_KEY' | 'SEARCH_FAILED' | 'SEARCH_LIMIT') { super(code) }
 }
@@ -38,26 +38,8 @@ async function tavily(key: string, query: string, count: number): Promise<string
   return usableResultUrls((j?.results ?? []).map((r) => r.url ?? ''), count)
 }
 
-async function brave(key: string, query: string, count: number): Promise<string[]> {
-  const url = new URL('https://api.search.brave.com/res/v1/web/search')
-  url.searchParams.set('q', query)
-  url.searchParams.set('count', String(Math.min(count, 20)))
-  url.searchParams.set('country', 'vn')
-  url.searchParams.set('search_lang', 'vi')
-  url.searchParams.set('safesearch', 'moderate')
-  const res = await fetch(url, { headers: { accept: 'application/json', 'x-subscription-token': key }, signal: AbortSignal.timeout(10_000) }).catch(() => null)
-  if (!res) throw new SearchError('SEARCH_FAILED')
-  if (res.status === 429) throw new SearchError('SEARCH_LIMIT')
-  if (!res.ok) throw new SearchError('SEARCH_FAILED')
-  const j = (await res.json().catch(() => null)) as { web?: { results?: { url?: string }[] } } | null
-  return usableResultUrls((j?.web?.results ?? []).map((r) => r.url ?? ''), count)
-}
-
-/** Ưu tiên Tavily (gói miễn phí 1.000 lượt / tháng, không cần thẻ); không có thì dùng Brave. */
 export async function searchWeb(query: string, count = 20): Promise<string[]> {
-  const tav = process.env.TAVILY_API_KEY?.trim()
-  if (tav) return tavily(tav, query, count)
-  const br = process.env.BRAVE_SEARCH_API_KEY?.trim()
-  if (br) return brave(br, query, count)
-  throw new SearchError('NO_SEARCH_KEY')
+  const key = process.env.TAVILY_API_KEY?.trim()
+  if (!key) throw new SearchError('NO_SEARCH_KEY')
+  return tavily(key, query, count)
 }
