@@ -92,7 +92,7 @@ export function signupState(c: Pick<Cup, 'status' | 'require_signup' | 'my_clubs
   const closeAt = Date.parse(c.roster_close_at)
   const open = now < closeAt && now < Date.parse(c.end_at)
   if (c.my_signup) return { kind: 'SIGNED', clubId: c.my_signup, canLeave: open && now < Date.parse(c.start_at) }
-  const joined = c.my_clubs.filter((m) => m.joined)
+  const joined = c.my_clubs.filter((m) => m.joined && m.approved !== false)   // CLB chờ ban tổ chức duyệt chưa đăng ký thi đấu được
   if (!joined.length) return { kind: 'CLUB_NOT_IN' }
   if (!open) return { kind: 'LOCKED' }
   const ok = joined.find((m) => m.eligible !== false)

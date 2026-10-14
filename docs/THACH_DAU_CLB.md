@@ -54,3 +54,19 @@ Lời mời 1–1 không được trả lời trước giờ chốt danh sách t
 ## 5. Trận cũ
 
 Trận "CLB đấu CLB" tạo trước bản này được chuyển sang, giữ nguyên đường link. Các trận này vẫn tính như cũ: mọi thành viên, km, không cần đăng ký, chốt sau 2 giờ. Riêng người ở cả hai CLB nay chỉ được tính cho CLB vào trước, vì bản cũ có lỗi tính cho cả hai bên.
+
+## 6. Giải online nhiều CLB (migration 016200)
+
+Thách đấu nhiều CLB có thêm bộ luật tùy chọn cho giải online (ví dụ "Giao lưu các CLB"). Admin bật ở màn tạo giải, có nút "Dùng mẫu".
+
+| Luật | Ý nghĩa |
+|---|---|
+| Bài tối thiểu, dải pace | Bài dưới `min_run_km` hoặc pace ngoài `min_pace`–`max_pace` (phút/km) không tính cho giải |
+| Thành tích hợp lệ | Thành viên chạy tối thiểu `member_min_km` (km tính điểm, đã áp trần ngày) |
+| Điều kiện xếp hạng | CLB cần ít nhất `min_valid_pct`% thành viên đăng ký hợp lệ; CLB không đủ vẫn hiện nhưng xếp sau, ghi "Chưa xếp hạng", không thể vô địch |
+| Giới hạn runner | Đủ `max_runners` người đăng ký thi đấu thì chặn đăng ký mới (người rút nhường chỗ cho người sau) |
+| Duyệt CLB | `require_club_approval`: CLB phải đủ số VĐV tối thiểu, ban tổ chức duyệt mới được tính; chưa duyệt thì thành viên chưa đăng ký thi đấu được |
+| BXH cá nhân | Mọi runner đã đăng ký, theo tổng km tính điểm, có cờ "Hợp lệ" |
+| Form nhận giải | Ban tổ chức dán link https; chỉ thành viên CLB hạng ≤ `prize_top_clubs` (đủ điều kiện) hoặc cá nhân hạng ≤ `prize_top_runners`, đã đạt km hợp lệ, thấy link khi kết quả chính thức |
+
+Runner chưa có CLB thấy nút "Tạo CLB" ngay trong màn giải; tạo xong họ là Chủ nhiệm, mời đủ thành viên rồi đăng ký CLB vào giải.
