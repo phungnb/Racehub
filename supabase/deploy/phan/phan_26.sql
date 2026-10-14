@@ -1,12 +1,12 @@
 -- RaceHub — PHẦN 26/27 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 016000
+-- Gồm: 016300
 -- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
 -- Xong thì chạy phần tiếp theo.
 begin;
 -- ===================================================================
--- 20261001016000_partner_shop.sql
+-- 20261001016300_partner_shop.sql
 -- ===================================================================
--- 016000: Cửa hàng đối tác — đăng sản phẩm (ảnh, giá, biến thể, tồn kho), giỏ hàng / đặt hàng, thanh toán, quản lý đơn.
+-- 016300: Cửa hàng đối tác — đăng sản phẩm (ảnh, giá, biến thể, tồn kho), giỏ hàng / đặt hàng, thanh toán, quản lý đơn.
 -- • Đối tác (hồ sơ Chợ Runner, 005300) đăng sản phẩm ngay sau khi tạo hồ sơ; sản phẩm CHỈ hiện cho khách khi hồ sơ đã được xác minh.
 -- • Sản phẩm: nhiều ảnh, giá + giá gốc (gạch), danh mục, SKU, biến thể (size / màu… mỗi biến thể có giá + tồn kho riêng).
 -- • Khách chọn biến thể, thêm giỏ, đặt hàng: tên, điện thoại, địa chỉ giao. Server tự tính tiền, trừ tồn kho (khoá hàng chống bán lố).

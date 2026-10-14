@@ -1,4 +1,4 @@
-// Cửa hàng đối tác (migration 016000): sản phẩm, biến thể, tồn kho, đơn hàng. RaceHub KHÔNG giữ tiền — khách chuyển khoản thẳng cho đối tác hoặc COD.
+// Cửa hàng đối tác (migration 016300): sản phẩm, biến thể, tồn kho, đơn hàng. RaceHub KHÔNG giữ tiền — khách chuyển khoản thẳng cho đối tác hoặc COD.
 import { supabase } from '@/shared/lib/supabase'
 import { marketErrorMessage } from './marketApi'
 

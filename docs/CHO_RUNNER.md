@@ -20,7 +20,7 @@ Chợ Runner có 2 phần: **Đối tác** và **Chợ BIB**.
 - Đối tác đã được xác minh có thể được gắn làm **tác giả bài Kiến thức**. Cuối mỗi bài như vậy có nút "Xem hồ sơ & dịch vụ". Bài về giáo án, dinh dưỡng, thiết bị tự dẫn người đọc sang đúng nhóm đối tác.
 - Hiện **admin chưa đăng hồ sơ thay đối tác**. Hồ sơ gắn với tài khoản của chủ để họ tự cập nhật giá và liên hệ. Nếu cần, bản sau có thể thêm tính năng "admin tạo hồ sơ hộ rồi trao quyền cho chủ".
 
-### 1b. Cửa hàng đối tác (migration 016000)
+### 1b. Cửa hàng đối tác (migration 016300)
 
 Đối tác tạo hồ sơ xong là vào được **Quản lý cửa hàng** (`/market/me/shop/<id>`) để bán hàng; khách chỉ thấy sản phẩm sau khi hồ sơ được xác minh.
 

@@ -2,8 +2,8 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import { createDb, asUser } from './load-schema'
 
-// Migration 016000: Cửa hàng đối tác — sản phẩm, biến thể, tồn kho, đơn hàng, thanh toán
-const id = (n: number) => `00000000-0000-0000-0000-0000000160${String(n).padStart(2, '0')}`
+// Migration 016300: Cửa hàng đối tác — sản phẩm, biến thể, tồn kho, đơn hàng, thanh toán
+const id = (n: number) => `00000000-0000-0000-0000-0000000163${String(n).padStart(2, '0')}`
 const [OWNER, BUYER, OTHER, ADM] = [1, 2, 3, 4].map(id)
 const img = (uid: string, f = 'a.jpg') => `https://x.supabase.co/storage/v1/object/public/market-media/${uid}/${f}`
 
@@ -26,7 +26,7 @@ const order = (db: PGlite, uid: string, pid: string, items: object[], method = '
 const setStatus = (db: PGlite, uid: string, oid: string, st: string, note: string | null = null, tracking: string | null = null) =>
   rpc<Row>(db, uid, `select public.set_partner_order_status($1, $2, $3, $4) as r`, [oid, st, note, tracking])
 
-describe('Cửa hàng đối tác — sản phẩm & đơn hàng (016000)', () => {
+describe('Cửa hàng đối tác — sản phẩm & đơn hàng (016300)', () => {
   let db: PGlite
   let pid: string
   beforeAll(async () => {
