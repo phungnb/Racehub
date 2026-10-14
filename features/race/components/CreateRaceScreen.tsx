@@ -78,7 +78,7 @@ export function CreateRaceScreen() {
 
   return (
     <div className="space-y-5 pb-6">
-      <Link href="/races" className="inline-flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg"><ArrowLeft className="size-4" aria-hidden />Giải chạy</Link>
+      <Link href="/races" className="inline-flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg"><ArrowLeft className="size-4" aria-hidden />Race</Link>
       <h1 className="text-2xl font-bold">Tạo giải chạy</h1>
 
       <Field label="Đơn vị tổ chức">

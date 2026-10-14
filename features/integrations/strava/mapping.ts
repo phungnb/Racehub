@@ -141,7 +141,8 @@ export function mergeSummary(a: SyncSummary, b: SyncSummary): SyncSummary {
   return {
     imported: a.imported + b.imported, pending: a.pending + b.pending, skipped: a.skipped + b.skipped,
     duplicates: a.duplicates + b.duplicates, earned_xu: Math.round((a.earned_xu + b.earned_xu) * 10) / 10,
-    rejected: (a.rejected ?? 0) + (b.rejected ?? 0) || undefined, skip_reasons: reasons,
+    rejected: (a.rejected ?? 0) + (b.rejected ?? 0) || undefined,
+    removed: (a.removed ?? 0) + (b.removed ?? 0) || undefined, skip_reasons: reasons,
   }
 }
 
@@ -153,6 +154,8 @@ export interface SyncSummary {
   earned_xu: number
   /** Lần 7: bài nhập tay — đã lưu nhưng KHÔNG được ghi nhận */
   rejected?: number
+  /** Bài đã bị xóa bên Strava nên được gỡ khỏi RaceHub (thu hồi Xu/XP, tính lại thử thách) */
+  removed?: number
   /** Lý do bỏ qua → số bài (NOT_RUN, TOO_SHORT, OVERLAPS_EXISTING_ACTIVITY, FUTURE_START…) */
   skip_reasons?: Record<string, number>
 }

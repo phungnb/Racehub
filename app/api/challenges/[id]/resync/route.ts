@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/shared/lib/supabase-server'
-import { backfillStravaActivities } from '@/features/integrations/server'
+import { backfillStravaActivities, removeStravaActivitiesMissing } from '@/features/integrations/server'
 
 // "Đồng bộ lại dữ liệu" của thử thách: BQT CLB / người tạo / admin kéo lại bài Strava của thành viên từ ngày bắt đầu thử thách.
 // Chia lô để an toàn với hạn mức Strava: client gọi lần lượt từng thành viên (mỗi lần ≤ 3 trang × 100 bài), xem 3 bước ở dưới.
@@ -22,7 +22,7 @@ const RPC_ERRORS: Record<string, [number, string]> = {
 
 export async function POST(req: NextRequest, ctx: RouteContext<'/api/challenges/[id]/resync'>) {
   const { id } = await ctx.params
-  const body = await req.json().catch(() => ({})) as { step?: string; userId?: string; page?: number }
+  const body = await req.json().catch(() => ({})) as { step?: string; userId?: string; page?: number; seen?: string[] }
   const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'AUTH_REQUIRED', message: RPC_ERRORS.AUTH_REQUIRED[1] }, { status: 401 })
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/challenges/
   const { data: targets, error } = await supabase.rpc('challenge_resync_targets', { p_challenge_id: id })
   if (error) return fail(error.message)
   const t = targets as Targets
-  if (body.step !== 'member' && body.step !== 'finish') return NextResponse.json(t)
+  if (body.step !== 'member' && body.step !== 'finish' && body.step !== 'cleanup') return NextResponse.json(t)
 
   // Bước 3 "finish": tính lại các bài đã có vào thử thách (sau khi lấy xong tất cả thành viên)
   if (body.step === 'finish') {
@@ -52,6 +52,19 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/challenges/
     return NextResponse.json({ error: 'NOT_A_TARGET', message: 'Người này không nằm trong thử thách hoặc chưa nối Strava.' }, { status: 400 })
   }
   const until = new Date(Math.min(Date.parse(t.end_date), Date.now() + 86_400_000))
+
+  // Bước 2b "cleanup": sau khi đã liệt kê đủ mọi trang của một thành viên (seen = gộp ID các lô), gỡ bài đã xóa bên Strava trong khoảng thử thách.
+  // Trigger CSDL tự thu hồi bài đó khỏi tiến độ / bảng xếp hạng; bước "finish" sau đó tính lại phần còn lại.
+  if (body.step === 'cleanup') {
+    const seen = Array.isArray(body.seen) ? body.seen.filter((x): x is string => typeof x === 'string') : []
+    try {
+      const gone = await removeStravaActivitiesMissing(createSupabaseAdminClient(), body.userId, { since: new Date(t.start_date), until, seen })
+      return NextResponse.json({ removed: gone.removed })
+    } catch (e) {
+      console.error('[challenges/resync]', e instanceof Error ? e.message : e)
+      return NextResponse.json({ error: 'SERVER_ERROR', message: 'Không dọn được bài đã xóa bên Strava.' }, { status: 500 })
+    }
+  }
   try {
     const r = await backfillStravaActivities(createSupabaseAdminClient(), body.userId, {
       since: new Date(t.start_date), until, page: Number.isInteger(body.page) ? body.page : 1,

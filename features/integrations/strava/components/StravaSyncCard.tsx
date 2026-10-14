@@ -68,8 +68,10 @@ export function StravaSyncButton() {
       if (!s) { toast.info('Vừa đồng bộ xong — bài chạy mới nhất đã có trong app. Thử lại sau 1 phút nếu cần.'); return }
       refresh()
       const skipped = Object.entries(s.skip_reasons ?? {}).map(([k, n]) => `${n} bài ${SKIP_REASON_LABEL[k] ?? 'không hợp lệ'}`)
+      const removed = s.removed ? ` Đã gỡ ${s.removed} bài đã xóa bên Strava.` : ''
       if (s.imported === 0) {
-        if (skipped.length) toast.warning(`Không nhập bài nào: ${skipped.join('; ')}.`, { duration: 10000 })
+        if (s.removed) toast.success(`Đã gỡ ${s.removed} bài đã xóa bên Strava khỏi RaceHub.`)
+        else if (skipped.length) toast.warning(`Không nhập bài nào: ${skipped.join('; ')}.`, { duration: 10000 })
         else toast.info('Không có bài chạy mới trên Strava. Bài vừa chạy có thể cần vài phút để Strava xử lý xong.')
       } else {
         toast.success(
@@ -77,7 +79,7 @@ export function StravaSyncButton() {
             (s.earned_xu > 0 ? ` · +${formatCoin(s.earned_xu)} Xu` : '') +
             (s.pending > 0 ? ` · ${s.pending} bài chờ xác minh` : '') +
             (s.rejected ? ` · ${s.rejected} bài nhập tay không được ghi nhận` : '') +
-            (skipped.length ? ` · bỏ qua ${skipped.join('; ')}` : ''),
+            (skipped.length ? ` · bỏ qua ${skipped.join('; ')}` : '') + removed,
         )
       }
     },

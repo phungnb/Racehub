@@ -15,6 +15,8 @@ interface Targets { start_date: string; end_date: string; members: Member[]; not
 interface MemberResult {
   summary?: { imported: number }
   nextPage?: number | null
+  ids?: string[]
+  removed?: number
   rateLimited?: boolean
   error?: string
   message?: string
@@ -38,7 +40,7 @@ export function ResyncChallengeCard({ d }: { d: ChallengeDetail }) {
   const [text, setText] = useState('')
   const [paused, setPaused] = useState(false)
   // Vị trí đang chạy dở: giữ lại khi dừng vì hạn mức để "Tiếp tục" chạy đúng chỗ
-  const cursor = useRef<{ targets: Targets; idx: number; page: number; imported: number; failed: string[] } | null>(null)
+  const cursor = useRef<{ targets: Targets; idx: number; page: number; imported: number; removed: number; seen: string[]; failed: string[] } | null>(null)
 
   if (!(d.can_manage || isSystemAdmin(profile)) || c.status !== 'ACTIVE' || now < Date.parse(c.start_date)) return null
 
@@ -49,7 +51,7 @@ export function ResyncChallengeCard({ d }: { d: ChallengeDetail }) {
         setText('Đang chuẩn bị…')
         const t = await post<Targets>(c.id, {})
         if (t.status !== 200) throw new Error(t.data.message ?? 'Không đồng bộ lại được.')
-        cursor.current = { targets: t.data, idx: 0, page: 1, imported: 0, failed: [] }
+        cursor.current = { targets: t.data, idx: 0, page: 1, imported: 0, removed: 0, seen: [], failed: [] }
       }
       const cur = cursor.current
       const { members } = cur.targets
@@ -60,6 +62,7 @@ export function ResyncChallengeCard({ d }: { d: ChallengeDetail }) {
         if (r.status === 429 || r.data.rateLimited) {
           // Hạn mức Strava là của cả ứng dụng: dừng, giữ nguyên vị trí (kể cả trang đang dở), chờ rồi tiếp tục
           if (r.data.summary) cur.imported += r.data.summary.imported
+          cur.seen.push(...(r.data.ids ?? []))
           if (r.data.nextPage) cur.page = r.data.nextPage
           setPaused(true)
           setText(`Strava đang giới hạn lượt truy cập — đã xong ${cur.idx}/${members.length} thành viên. Chờ khoảng 15 phút rồi bấm "Tiếp tục" (tiến độ được giữ lại).`)
@@ -67,12 +70,19 @@ export function ResyncChallengeCard({ d }: { d: ChallengeDetail }) {
         }
         if (r.status !== 200 || r.data.error) {
           cur.failed.push(`${m.name ?? 'Thành viên'}: ${r.data.message ?? 'lỗi'}`)
-          cur.idx++; cur.page = 1
+          cur.idx++; cur.page = 1; cur.seen = []
           continue
         }
         cur.imported += r.data.summary?.imported ?? 0
+        cur.seen.push(...(r.data.ids ?? []))
         if (r.data.nextPage) cur.page = r.data.nextPage
-        else { cur.idx++; cur.page = 1 }
+        else {
+          // Đã liệt kê đủ bài của thành viên này → gỡ bài đã xóa bên Strava
+          const g = await post<{ removed?: number }>(c.id, { step: 'cleanup', userId: m.user_id, seen: cur.seen })
+          if (g.status === 200) cur.removed += g.data.removed ?? 0
+          else cur.failed.push(`${m.name ?? 'Thành viên'}: ${g.data.message ?? 'không gỡ được bài đã xóa'}`)
+          cur.idx++; cur.page = 1; cur.seen = []
+        }
         await new Promise((ok) => setTimeout(ok, 400))
       }
       setText('Đang tính lại vào thử thách…')
@@ -83,7 +93,7 @@ export function ResyncChallengeCard({ d }: { d: ChallengeDetail }) {
       void qc.invalidateQueries({ queryKey: challengeKeys.detail(c.id) })
       void qc.invalidateQueries({ queryKey: challengeKeys.leaderboard(c.id) })
       void qc.invalidateQueries({ queryKey: ['activities'] })
-      setText(`Xong: nhận thêm ${cur.imported} bài từ Strava, cập nhật ${f.data.applied ?? 0} bài vào thử thách.` + (failed.length ? ` Không lấy được: ${failed.join('; ')}.` : ''))
+      setText(`Xong: nhận thêm ${cur.imported} bài từ Strava, cập nhật ${f.data.applied ?? 0} bài vào thử thách, gỡ ${cur.removed} bài đã xóa bên Strava.` + (failed.length ? ` Không lấy được: ${failed.join('; ')}.` : ''))
       toast.success('Đã đồng bộ lại dữ liệu thử thách')
     } catch (e) {
       setText(e instanceof Error ? e.message : 'Không đồng bộ lại được. Thử lại sau.')

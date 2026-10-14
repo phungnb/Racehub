@@ -31,7 +31,7 @@ export const FEATURES: { key: FeatureKey; label: string; hint: string }[] = [
   { key: 'market', label: 'Chợ Runner', hint: 'HLV, cửa hàng, dịch vụ đã xác minh' },
   { key: 'bibMarket', label: 'Chợ BIB', hint: 'Nhượng lại / tìm mua BIB giải chạy' },
   { key: 'knowledge', label: 'Kiến thức Runner', hint: 'Bài viết, giáo án' },
-  { key: 'races', label: 'Giải chạy', hint: 'Đăng ký, BIB, chứng nhận' },
+  { key: 'races', label: 'Race', hint: 'Giải ngoài đời, đăng ký, BIB, chứng nhận' },
   { key: 'cups', label: 'Thách đấu CLB', hint: 'CLB đấu CLB, giải nhiều CLB' },
   { key: 'orgs', label: 'Tổ chức / Doanh nghiệp', hint: 'Chiến dịch, BXH phòng ban' },
   // 011100: mặc định TẮT — app iOS/Android ẩn giá, mua gói, nạp Xu (quy định App Store / Google Play). Web không đổi.
