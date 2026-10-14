@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/shared/lib/supabase-server'
-import { backfillStravaActivities } from '@/features/integrations/server'
+import { backfillStravaActivities, removeStravaActivitiesMissing } from '@/features/integrations/server'
 
 // Quản trị → Người dùng → "Đồng bộ lại": admin kéo lại bài Strava của MỘT người dùng.
 // Khoảng thời gian = từ ngày bắt đầu sớm nhất trong các thử thách đang diễn ra mà người này tham gia (không có thì 30 ngày gần nhất).
@@ -17,7 +17,7 @@ interface ChallengeRow { id: string; start_date: string; end_date: string }
 
 export async function POST(req: NextRequest, ctx: RouteContext<'/api/admin/users/[id]/resync'>) {
   const { id } = await ctx.params
-  const body = await req.json().catch(() => ({})) as { step?: string; page?: number }
+  const body = await req.json().catch(() => ({})) as { step?: string; page?: number; seen?: string[] }
   const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'AUTH_REQUIRED', message: 'Cần đăng nhập.' }, { status: 401 })
@@ -46,7 +46,15 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/admin/users
       if (error) { console.error('[admin/users/resync]', error.message); return NextResponse.json({ error: 'SERVER_ERROR', message: 'Không tính lại được vào thử thách.' }, { status: 500 }) }
       applied += (data as { applied?: number } | null)?.applied ?? 0
     }
-    return NextResponse.json({ applied })
+    // Bài đã xóa bên Strava: chỉ khi client báo đã liệt kê đủ mọi trang (seen = gộp ID các lô)
+    const seen = Array.isArray(body.seen) ? body.seen.filter((x): x is string => typeof x === 'string') : []
+    try {
+      const gone = await removeStravaActivitiesMissing(admin, id, { since, seen })
+      return NextResponse.json({ applied, removed: gone.removed })
+    } catch (e) {
+      console.error('[admin/users/resync]', e instanceof Error ? e.message : e)
+      return NextResponse.json({ error: 'SERVER_ERROR', message: 'Không dọn được bài đã xóa bên Strava.' }, { status: 500 })
+    }
   }
 
   try {
