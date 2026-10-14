@@ -33,4 +33,16 @@ describe('Tin giải chạy offline (016000)', () => {
     const del = await asUser(db, USR, '/rest', `delete from public.race_listings returning id`)
     expect(del.rows).toHaveLength(0)
   })
+
+  it('nguồn quét và hàng chờ: chỉ admin đọc / ghi, không trùng link', async () => {
+    const q = (uid: string, sql: string, p: unknown[] = []) => asUser<{ id: string }>(db, uid, '/rest', sql, p)
+    expect(await fails(q(USR, `insert into public.race_sources (url) values ('https://btc.vn/lich')`))).not.toBe('OK')
+    const src = (await q(ADM, `insert into public.race_sources (url) values ('https://btc.vn/lich') returning id`)).rows[0].id
+    expect(await fails(q(ADM, `insert into public.race_sources (url) values ('https://BTC.vn/lich')`))).not.toBe('OK')
+    await q(ADM, `insert into public.race_candidates (source_id, url, title, status) values ($1, 'https://btc.vn/a', 'Giải A', 'PENDING')`, [src])
+    expect(await fails(q(ADM, `insert into public.race_candidates (source_id, url, title) values ($1, 'https://BTC.vn/a', 'Giải A')`, [src]))).not.toBe('OK')
+    expect((await q(USR, `select id from public.race_candidates`)).rows).toHaveLength(0)
+    expect((await q(USR, `select id from public.race_sources`)).rows).toHaveLength(0)
+    expect((await q(ADM, `select id from public.race_candidates`)).rows).toHaveLength(1)
+  })
 })

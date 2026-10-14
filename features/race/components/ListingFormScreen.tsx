@@ -8,7 +8,7 @@ import { ArrowLeft, Flag, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, EmptyState, Field, Input, Skeleton, Textarea } from '@/shared/ui'
 import { useOrganizer } from '../hooks/useOrganizer'
-import { deleteListing, getListing, importFromUrl, saveListing, type ListingInput, type ListingStatus } from '../api/listingApi'
+import { deleteListing, getCandidate, getListing, importFromUrl, saveListing, setCandidateStatus, type ListingInput, type ListingStatus, type RaceCandidate } from '../api/listingApi'
 
 const EMPTY: ListingInput = {
   title: '', race_date: '', end_date: null, location: null, province: null, distances: [], organizer: null,
@@ -18,17 +18,25 @@ const nil = (s: string) => (s.trim() ? s.trim() : null)
 const httpUrl = (s: string) => !s || /^https?:\/\/\S+$/i.test(s)
 
 /** Admin đăng / sửa tin giải offline. Dán link trang giải để gợi ý điền form; lưu nháp trước, bấm "Đăng" mới hiện cho mọi người. */
-export function ListingFormScreen({ id }: { id: string | null }) {
+export function ListingFormScreen({ id, candidateId = null }: { id: string | null; candidateId?: string | null }) {
   const { isAdmin, isLoading } = useOrganizer()
   const existing = useQuery({ queryKey: ['race-listing', id], queryFn: () => getListing(id as string), enabled: !!id && isAdmin })
-  if (isLoading || (id && existing.isPending)) return <Skeleton className="h-96" />
+  const cand = useQuery({ queryKey: ['race-candidate', candidateId], queryFn: () => getCandidate(candidateId as string), enabled: !!candidateId && isAdmin })
+  if (isLoading || (id && existing.isPending) || (candidateId && cand.isPending)) return <Skeleton className="h-96" />
   if (!isAdmin) return <EmptyState icon={Flag} title="Chỉ admin được đăng tin giải" description="Tin giải chạy ngoài đời do RaceHub đăng." />
   if (id && !existing.data) return <EmptyState icon={Flag} title="Không tìm thấy tin giải" description="Tin này đã bị xóa hoặc không tồn tại." />
   const { id: _id, ...init } = existing.data ?? { id: '', ...EMPTY } // eslint-disable-line @typescript-eslint/no-unused-vars
-  return <ListingForm id={id} init={init} />
+  return <ListingForm id={id} init={cand.data && !id ? fromCandidate(cand.data) : init} candidateId={cand.data?.id ?? null} />
 }
 
-function ListingForm({ id, init }: { id: string | null; init: ListingInput }) {
+const iso = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null)
+/** Giải tự tìm được → điền sẵn form (vẫn là NHÁP, admin chỉnh rồi mới đăng) */
+function fromCandidate(c: RaceCandidate): ListingInput {
+  return { ...EMPTY, title: c.title, race_date: iso(c.race_date) ?? '', end_date: iso(c.end_date), location: c.location, organizer: c.organizer,
+    image_url: c.image_url, description: c.description, distances: c.distances, reg_url: c.url, source_url: c.url }
+}
+
+function ListingForm({ id, init, candidateId }: { id: string | null; init: ListingInput; candidateId: string | null }) {
   const router = useRouter()
   const qc = useQueryClient()
   const [v, setV] = useState<ListingInput>(init)
@@ -56,7 +64,9 @@ function ListingForm({ id, init }: { id: string | null; init: ListingInput }) {
       const distances = dist.split(/[,;]/).map((s) => s.trim().toUpperCase()).filter(Boolean).slice(0, 12)
       return saveListing(id, { ...v, distances, title: v.title.trim(), status })
     },
-    onSuccess: (_i, status) => {
+    onSuccess: async (listingId, status) => {
+      if (candidateId) await setCandidateStatus(candidateId, 'APPROVED', listingId).catch(() => undefined)
+      void qc.invalidateQueries({ queryKey: ['race-candidates'] }); void qc.invalidateQueries({ queryKey: ['race-pending'] })
       void qc.invalidateQueries({ queryKey: ['race-listings'] }); void qc.invalidateQueries({ queryKey: ['race-listing'] })
       toast.success(status === 'PUBLISHED' ? 'Đã đăng' : 'Đã lưu')
       router.replace('/races')

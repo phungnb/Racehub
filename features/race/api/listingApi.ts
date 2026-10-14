@@ -74,3 +74,58 @@ export async function importFromUrl(url: string): Promise<{ source_url: string; 
   }
   return { source_url: j.source_url ?? url, draft: j.draft }
 }
+
+// ── Quét giải tự động: nguồn + hàng chờ duyệt (migration 016100). Chỉ admin (RLS). ──
+export interface RaceSource { id: string; url: string; label: string | null; active: boolean; last_scanned_at: string | null; last_error: string | null }
+export type CandidateState = 'PENDING' | 'FILTERED' | 'APPROVED' | 'REJECTED'
+export interface RaceCandidate {
+  id: string; url: string; title: string; race_date: string | null; end_date: string | null; location: string | null
+  organizer: string | null; image_url: string | null; description: string | null; distances: string[]
+  score: number; status: CandidateState; filter_reason: string | null
+}
+const CAND = 'id,url,title,race_date,end_date,location,organizer,image_url,description,distances,score,status,filter_reason'
+
+export async function listSources(): Promise<RaceSource[]> {
+  const { data, error } = await supabase.from('race_sources').select('id,url,label,active,last_scanned_at,last_error').order('created_at')
+  if (error) throw error
+  return data as RaceSource[]
+}
+export async function addSource(url: string, label: string | null) {
+  const { error } = await supabase.from('race_sources').insert({ url, label })
+  if (error) throw error
+}
+export async function setSourceActive(id: string, active: boolean) {
+  const { error } = await supabase.from('race_sources').update({ active }).eq('id', id)
+  if (error) throw error
+}
+export async function deleteSource(id: string) {
+  const { error } = await supabase.from('race_sources').delete().eq('id', id)
+  if (error) throw error
+}
+export async function scanNow(sourceId: string): Promise<{ found: number; pending: number; filtered: number; error: string | null }> {
+  const res = await fetch('/api/admin/race-scan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ source_id: sourceId }) })
+  const j = (await res.json().catch(() => ({}))) as { result?: { found: number; pending: number; filtered: number; error: string | null } }
+  if (!res.ok || !j.result) throw new Error('Không quét được nguồn này.')
+  return j.result
+}
+export async function listCandidates(status: CandidateState): Promise<RaceCandidate[]> {
+  const { data, error } = await supabase.from('race_candidates').select(CAND).eq('status', status)
+    .order('score', { ascending: false }).order('race_date', { ascending: true }).limit(100)
+  if (error) throw error
+  return data as RaceCandidate[]
+}
+export async function getCandidate(id: string): Promise<RaceCandidate | null> {
+  const { data, error } = await supabase.from('race_candidates').select(CAND).eq('id', id).maybeSingle()
+  if (error) throw error
+  return data as RaceCandidate | null
+}
+export async function setCandidateStatus(id: string, status: CandidateState, listingId?: string) {
+  const { error } = await supabase.from('race_candidates')
+    .update({ status, reviewed_at: new Date().toISOString(), ...(listingId ? { listing_id: listingId } : {}) }).eq('id', id)
+  if (error) throw error
+}
+export async function countPending(): Promise<number> {
+  const { count, error } = await supabase.from('race_candidates').select('id', { count: 'exact', head: true }).eq('status', 'PENDING')
+  if (error) throw error
+  return count ?? 0
+}

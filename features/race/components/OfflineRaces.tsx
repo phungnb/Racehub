@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import { Flag } from 'lucide-react'
 import { EmptyState, ErrorState, SegmentedControl, Skeleton } from '@/shared/ui'
-import { listListings } from '../api/listingApi'
+import { countPending, listListings } from '../api/listingApi'
 import { ListingCard } from './ListingCard'
 
 const WHEN = [{ value: 'NEXT', label: 'Sắp tới' }, { value: 'PAST', label: 'Đã diễn ra' }] as const
@@ -16,8 +17,15 @@ export function OfflineRaces({ isAdmin }: { isAdmin: boolean }) {
   const [when, setWhen] = useState<'NEXT' | 'PAST'>('NEXT')
   const [today] = useState(todayVN)
   const q = useQuery({ queryKey: ['race-listings', when, today], queryFn: () => listListings(when === 'PAST', today) })
+  const pending = useQuery({ queryKey: ['race-pending'], queryFn: countPending, enabled: isAdmin, staleTime: 60_000 })
   return (
     <div className="space-y-3">
+      {isAdmin && (
+        <Link href="/races/listing/queue" className="flex items-center justify-between rounded-xl border border-brand/30 bg-brand/10 px-3 py-2 text-sm font-semibold">
+          <span>Duyệt giải tự tìm</span>
+          <span className="rounded-full bg-brand px-2 py-0.5 text-xs text-brand-fg">{pending.data ?? 0} chờ</span>
+        </Link>
+      )}
       <SegmentedControl value={when} onChange={setWhen} options={[...WHEN]} />
       {q.isPending ? <div className="space-y-3">{[0, 1].map((i) => <Skeleton key={i} className="h-40" />)}</div>
         : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} />
