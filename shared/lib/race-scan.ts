@@ -40,3 +40,12 @@ export function screenCandidate(d: RaceDraft, nowMs: number): Screened {
   const score = 40 + (d.distances.length ? 20 : 0) + (d.location ? 15 : 0) + (d.image_url ? 10 : 0) + (d.organizer ? 10 : 0) + (d.description ? 5 : 0)
   return { status: 'PENDING', score, reason: null }
 }
+
+/** Link trang kết quả tìm kiếm (Google, Bing, Cốc Cốc…): bị chặn tải tự động và không phải trang giải. */
+export function isSearchResultsUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw.trim())
+    const h = u.hostname.replace(/^www\./, '')
+    return (/^(google|bing|coccoc|duckduckgo)\./.test(h) || h.endsWith('.google.com')) && /^\/(search|url|imgres|aclk)?$|^\/search/.test(u.pathname) && (u.searchParams.has('q') || u.searchParams.has('query') || u.pathname === '/url')
+  } catch { return false }
+}

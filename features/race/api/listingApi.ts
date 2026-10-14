@@ -67,6 +67,7 @@ export async function importFromUrl(url: string): Promise<{ source_url: string; 
   const j = (await res.json().catch(() => ({}))) as { error?: string; source_url?: string; draft?: ImportDraft }
   if (!res.ok || !j.draft) {
     const m: Record<string, string> = {
+      SEARCH_URL: 'Đây là link trang kết quả tìm kiếm nên không đọc được. Mở một kết quả rồi dán link giải đó, hoặc dùng "Tìm bằng từ khóa" ở Duyệt giải tự tìm.',
       BAD_URL: 'Link không hợp lệ hoặc không truy cập được.', FETCH_FAILED: 'Không tải được trang này.',
       NOT_HTML: 'Link này không phải trang web.', FORBIDDEN: 'Chỉ admin dùng được.', AUTH_REQUIRED: 'Cần đăng nhập.',
     }
@@ -76,7 +77,7 @@ export async function importFromUrl(url: string): Promise<{ source_url: string; 
 }
 
 // ── Quét giải tự động: nguồn + hàng chờ duyệt (migration 016100). Chỉ admin (RLS). ──
-export interface RaceSource { id: string; url: string; label: string | null; active: boolean; last_scanned_at: string | null; last_error: string | null }
+export interface RaceSource { id: string; kind: 'PAGE' | 'SEARCH'; url: string | null; query: string | null; label: string | null; active: boolean; last_scanned_at: string | null; last_error: string | null }
 export type CandidateState = 'PENDING' | 'FILTERED' | 'APPROVED' | 'REJECTED'
 export interface RaceCandidate {
   id: string; url: string; title: string; race_date: string | null; end_date: string | null; location: string | null
@@ -86,12 +87,12 @@ export interface RaceCandidate {
 const CAND = 'id,url,title,race_date,end_date,location,organizer,image_url,description,distances,score,status,filter_reason'
 
 export async function listSources(): Promise<RaceSource[]> {
-  const { data, error } = await supabase.from('race_sources').select('id,url,label,active,last_scanned_at,last_error').order('created_at')
+  const { data, error } = await supabase.from('race_sources').select('id,kind,url,query,label,active,last_scanned_at,last_error').order('created_at')
   if (error) throw error
   return data as RaceSource[]
 }
-export async function addSource(url: string, label: string | null) {
-  const { error } = await supabase.from('race_sources').insert({ url, label })
+export async function addSource(v: { kind: 'PAGE' | 'SEARCH'; value: string; label: string | null }) {
+  const { error } = await supabase.from('race_sources').insert(v.kind === 'SEARCH' ? { kind: 'SEARCH', query: v.value, label: v.label } : { kind: 'PAGE', url: v.value, label: v.label })
   if (error) throw error
 }
 export async function setSourceActive(id: string, active: boolean) {

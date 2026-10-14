@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractEventLinks, screenCandidate } from './race-scan'
+import { extractEventLinks, isSearchResultsUrl, screenCandidate } from './race-scan'
 import { robotsAllowsPath } from './safe-fetch'
 import type { RaceDraft } from './race-import'
 
@@ -43,5 +43,14 @@ describe('robotsAllowsPath', () => {
   })
   it('chặn toàn bộ khi Disallow: /', () => {
     expect(robotsAllowsPath('User-agent: *\nDisallow: /', '/a')).toBe(false)
+  })
+})
+
+describe('isSearchResultsUrl', () => {
+  it('nhận link kết quả tìm kiếm, bỏ qua trang giải', () => {
+    expect(isSearchResultsUrl('https://www.google.com/search?q=lich+giai+chay')).toBe(true)
+    expect(isSearchResultsUrl('https://www.bing.com/search?q=marathon')).toBe(true)
+    expect(isSearchResultsUrl('https://hue-marathon.vn/')).toBe(false)
+    expect(isSearchResultsUrl('khong phai url')).toBe(false)
   })
 })

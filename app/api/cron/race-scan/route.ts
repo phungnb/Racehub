@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: NextRequest) {
   if (!isCronAuthorized(req.headers.get('authorization'))) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 })
   const admin = createSupabaseAdminClient()
-  const { data, error } = await admin.from('race_sources').select('id,url').eq('active', true).order('last_scanned_at', { ascending: true, nullsFirst: true }).limit(10)
+  const { data, error } = await admin.from('race_sources').select('id,url,kind,query').eq('active', true).order('last_scanned_at', { ascending: true, nullsFirst: true }).limit(10)
   if (error) { console.error('[cron/race-scan]', error.message); return NextResponse.json({ error: 'FAILED' }, { status: 500 }) }
   const deadline = Date.now() + 50_000
   const results = []

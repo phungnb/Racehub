@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as { source_id?: string }
   if (!body.source_id || !/^[0-9a-f-]{36}$/i.test(body.source_id)) return NextResponse.json({ error: 'BAD_REQUEST' }, { status: 400 })
   // Đọc nguồn bằng phiên của admin (RLS) rồi mới quét bằng khóa máy chủ
-  const { data: src } = await supabase.from('race_sources').select('id,url').eq('id', body.source_id).maybeSingle()
+  const { data: src } = await supabase.from('race_sources').select('id,url,kind,query').eq('id', body.source_id).maybeSingle()
   if (!src) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
   const result = await scanSource(createSupabaseAdminClient(), src, Date.now() + 50_000)
   return NextResponse.json({ ok: true, result })
