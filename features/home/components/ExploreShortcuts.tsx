@@ -9,7 +9,7 @@ import type { FeatureKey } from '@/shared/lib/ops'
 const ITEMS: { href: string; label: string; icon: LucideIcon; tone: string; feature?: FeatureKey }[] = [
   { href: routes.nearby, label: 'Quanh đây', icon: Radar, tone: 'bg-live/15 text-live', feature: 'nearby' },
   { href: routes.hub, label: 'Hội quán', icon: UsersRound, tone: 'bg-violet-500/15 text-violet-300', feature: 'nearby' },
-  { href: routes.races, label: 'Giải chạy', icon: Medal, tone: 'bg-brand/15 text-brand', feature: 'races' },
+  { href: routes.races, label: 'Race', icon: Medal, tone: 'bg-brand/15 text-brand', feature: 'races' },
   { href: routes.learn, label: 'Kiến thức Runner', icon: BookOpen, tone: 'bg-warning/15 text-warning', feature: 'knowledge' },
   { href: routes.market, label: 'Chợ Runner', icon: Store, tone: 'bg-sky-500/15 text-sky-400', feature: 'market' },
   { href: routes.invite, label: 'Mời bạn bè', icon: Gift, tone: 'bg-coin/15 text-coin' },
