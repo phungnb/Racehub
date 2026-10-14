@@ -138,7 +138,7 @@ export function UserDetail({ id }: { id: string }) {
   )
 }
 
-interface ResyncResult { summary?: { imported: number }; nextPage?: number | null; rateLimited?: boolean; error?: string; message?: string; applied?: number }
+interface ResyncResult { summary?: { imported: number }; nextPage?: number | null; rateLimited?: boolean; error?: string; message?: string; applied?: number; removed?: number; ids?: string[] }
 
 const resyncPost = async (id: string, body: object) => {
   const res = await fetch(`/api/admin/users/${id}/resync`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -153,6 +153,7 @@ function ResyncStrava({ userId }: { userId: string }) {
   const [paused, setPaused] = useState(false)
   const page = useRef(1)
   const imported = useRef(0)
+  const seen = useRef<string[]>([])
 
   const run = async () => {
     setBusy(true); setPaused(false); setText('Đang lấy dữ liệu…')
@@ -161,20 +162,22 @@ function ResyncStrava({ userId }: { userId: string }) {
         const r = await resyncPost(userId, { step: 'member', page: page.current })
         if (r.status === 429 || r.data.rateLimited) {
           imported.current += r.data.summary?.imported ?? 0
+          seen.current.push(...(r.data.ids ?? []))
           if (r.data.nextPage) page.current = r.data.nextPage
           setPaused(true); setText('Strava đang giới hạn lượt truy cập. Chờ khoảng 15 phút rồi bấm "Tiếp tục" (tiến độ được giữ lại).')
           return
         }
         if (r.status !== 200 || r.data.error) throw new Error(r.data.message ?? 'Không đồng bộ lại được.')
         imported.current += r.data.summary?.imported ?? 0
+        seen.current.push(...(r.data.ids ?? []))
         if (!r.data.nextPage) break
         page.current = r.data.nextPage
         await new Promise((ok) => setTimeout(ok, 400))
       }
-      const f = await resyncPost(userId, { step: 'finish' })
+      const f = await resyncPost(userId, { step: 'finish', seen: seen.current })
       if (f.status !== 200) throw new Error(f.data.message ?? 'Không tính lại được vào thử thách.')
-      setText(`Xong: nhận thêm ${imported.current} bài từ Strava, cập nhật ${f.data.applied ?? 0} bài vào thử thách.`)
-      page.current = 1; imported.current = 0
+      setText(`Xong: nhận thêm ${imported.current} bài từ Strava, cập nhật ${f.data.applied ?? 0} bài vào thử thách, gỡ ${f.data.removed ?? 0} bài đã xóa bên Strava.`)
+      page.current = 1; imported.current = 0; seen.current = []
       toast.success('Đã đồng bộ lại')
       void qc.invalidateQueries({ queryKey: ['admin', 'user', userId] })
     } catch (e) {

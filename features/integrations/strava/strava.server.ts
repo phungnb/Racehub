@@ -271,6 +271,8 @@ export interface BackfillResult {
   /** Dừng sớm vì sắp chạm / đã chạm hạn mức Strava (100 lượt / 15 phút, 1.000 lượt / ngày cho cả ứng dụng) */
   rateLimited: boolean
   rate: RateUsage | null
+  /** ID bài Strava vừa liệt kê trong lần gọi này (mọi môn, kể cả bài bị bỏ qua) — dùng để đối chiếu bài đã xóa bên Strava */
+  ids: string[]
 }
 
 const BACKFILL_PAGES_PER_CALL = 3
@@ -289,6 +291,7 @@ export async function backfillStravaActivities(admin: SupabaseClient, userId: st
   const before = opts.until ? Math.ceil(opts.until.getTime() / 1000) : null
   const started = Date.now()
   const results: Record<string, unknown>[] = []
+  const ids: string[] = []
   let page = Math.max(1, opts.page ?? 1)
   let nextPage: number | null = page
   let rateLimited = false
@@ -302,12 +305,37 @@ export async function backfillStravaActivities(admin: SupabaseClient, userId: st
       if (e instanceof Error && e.message === 'STRAVA_RATE_LIMITED') { rateLimited = true; break }
       throw e
     }
+    for (const a of list) ids.push(String(a.id))
     for (const a of [...list].reverse()) results.push(await ingest(admin, userId, a, false, token))
     if (list.length < 100) { nextPage = null; break }
     page++
     nextPage = page
   }
-  return { summary: summarize(results), nextPage, rateLimited, rate: lastRate }
+  return { summary: summarize(results), nextPage, rateLimited, rate: lastRate, ids }
+}
+
+/**
+ * Sau khi đã liệt kê ĐỦ mọi trang của khoảng [since, now] (`seen` = gộp `ids` của các lần backfill): bài STRAVA của người này trong khoảng đó
+ * mà Strava không còn trả về = đã bị xóa bên Strava → gỡ như webhook xóa (thu hồi Xu/XP, trigger tự gỡ khỏi thử thách).
+ * An toàn: danh sách rỗng thì không xóa gì (Strava lỗi / mất quyền đọc trông giống "không có bài nào"); bỏ qua 1 ngày đầu khoảng để tránh lệch biên múi giờ.
+ */
+export async function removeStravaActivitiesMissing(admin: SupabaseClient, userId: string,
+  opts: { since: Date; seen: string[] }): Promise<{ removed: number; skipped?: 'EMPTY_LIST' }> {
+  if (!opts.seen.length) return { removed: 0, skipped: 'EMPTY_LIST' }
+  const seen = new Set(opts.seen)
+  const from = new Date(opts.since.getTime() + 86_400_000).toISOString()
+  const { data, error } = await admin.from('activities').select('source_activity_id')
+    .eq('user_id', userId).eq('source', 'STRAVA').neq('status', 'DELETED').not('source_activity_id', 'is', null)
+    .gte('started_at', from).lt('started_at', new Date().toISOString()).limit(5000)
+    .returns<{ source_activity_id: string }[]>()
+  if (error) throw new Error(`LIST_FAILED:${error.message}`)
+  let removed = 0
+  for (const row of data ?? []) {
+    if (seen.has(row.source_activity_id)) continue
+    const { data: r } = await admin.rpc('remove_provider_activity', { p_source: 'STRAVA', p_external_id: row.source_activity_id })
+    if ((r as { result?: string } | null)?.result === 'DELETED') removed++
+  }
+  return { removed }
 }
 
 /** Xử lý một sự kiện webhook của Strava. */
