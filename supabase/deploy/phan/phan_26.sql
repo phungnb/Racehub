@@ -1,5 +1,5 @@
 -- RaceHub — PHẦN 26/27 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 016200, 016300
+-- Gồm: 016200, 016300, 016400
 -- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
 -- Xong thì chạy phần tiếp theo.
 begin;
@@ -1036,6 +1036,23 @@ grant execute on function public.partner_shop(uuid), public.get_shop_product(uui
 grant execute on function public.save_partner_shop(uuid, jsonb), public.save_partner_product(jsonb), public.delete_partner_product(uuid),
   public.place_partner_order(uuid, jsonb, jsonb, text, text), public.my_partner_orders(), public.cancel_my_partner_order(uuid),
   public.partner_orders_admin(uuid, text), public.set_partner_order_status(uuid, text, text, text) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
+-- 20261001016400_race_search_sources.sql
+-- ===================================================================
+-- 016400: Nguồn quét kiểu TÌM KIẾM TỪ KHÓA (ngoài kiểu "trang lịch giải" ở 016100).
+-- kind = 'PAGE': url là trang lịch giải; kind = 'SEARCH': query là từ khóa (VD "lịch giải marathon 2027 Việt Nam"), việc quét gọi API tìm kiếm web
+-- rồi đưa từng kết quả qua cùng bộ đọc + sàng lọc, vào HÀNG CHỜ duyệt. Vẫn không tự đăng.
+alter table public.race_sources add column if not exists kind text not null default 'PAGE';
+alter table public.race_sources add column if not exists query text;
+alter table public.race_sources alter column url drop not null;
+alter table public.race_sources drop constraint if exists race_sources_kind_ck;
+alter table public.race_sources add constraint race_sources_kind_ck check (
+  (kind = 'PAGE' and url is not null and query is null)
+  or (kind = 'SEARCH' and query is not null and char_length(btrim(query)) between 3 and 200 and url is null));
+create unique index if not exists race_sources_query_uniq on public.race_sources (lower(query)) where query is not null;
 
 notify pgrst, 'reload schema';
 

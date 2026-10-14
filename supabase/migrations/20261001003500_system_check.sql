@@ -327,7 +327,9 @@ begin
       'ok', to_regprocedure('public.review_cup_club(uuid,uuid,boolean,text)') is not null
         and to_regprocedure('public.club_cup_runner_board(uuid,integer)') is not null),
     jsonb_build_object('file', '20261001016300', 'label', 'Cửa hàng đối tác: sản phẩm, biến thể, tồn kho, đơn hàng',
-      'ok', to_regprocedure('public.place_partner_order(uuid,jsonb,jsonb,text,text)') is not null));
+      'ok', to_regprocedure('public.place_partner_order(uuid,jsonb,jsonb,text,text)') is not null),
+    jsonb_build_object('file', '20261001016400', 'label', 'Tab Race: nguồn quét theo từ khóa tìm kiếm',
+      'ok', private.sc_col('race_sources', 'query')));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

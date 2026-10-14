@@ -1,7 +1,7 @@
--- RaceHub: gộp 128 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 129 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 015800, 015900, 016000, 016100, 016200, 016300, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 015800, 015900, 016000, 016100, 016200, 016300, 016400, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -30644,6 +30644,23 @@ grant execute on function public.save_partner_shop(uuid, jsonb), public.save_par
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001016400_race_search_sources.sql
+-- ===================================================================
+-- 016400: Nguồn quét kiểu TÌM KIẾM TỪ KHÓA (ngoài kiểu "trang lịch giải" ở 016100).
+-- kind = 'PAGE': url là trang lịch giải; kind = 'SEARCH': query là từ khóa (VD "lịch giải marathon 2027 Việt Nam"), việc quét gọi API tìm kiếm web
+-- rồi đưa từng kết quả qua cùng bộ đọc + sàng lọc, vào HÀNG CHỜ duyệt. Vẫn không tự đăng.
+alter table public.race_sources add column if not exists kind text not null default 'PAGE';
+alter table public.race_sources add column if not exists query text;
+alter table public.race_sources alter column url drop not null;
+alter table public.race_sources drop constraint if exists race_sources_kind_ck;
+alter table public.race_sources add constraint race_sources_kind_ck check (
+  (kind = 'PAGE' and url is not null and query is null)
+  or (kind = 'SEARCH' and query is not null and char_length(btrim(query)) between 3 and 200 and url is null));
+create unique index if not exists race_sources_query_uniq on public.race_sources (lower(query)) where query is not null;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -30975,7 +30992,9 @@ begin
       'ok', to_regprocedure('public.review_cup_club(uuid,uuid,boolean,text)') is not null
         and to_regprocedure('public.club_cup_runner_board(uuid,integer)') is not null),
     jsonb_build_object('file', '20261001016300', 'label', 'Cửa hàng đối tác: sản phẩm, biến thể, tồn kho, đơn hàng',
-      'ok', to_regprocedure('public.place_partner_order(uuid,jsonb,jsonb,text,text)') is not null));
+      'ok', to_regprocedure('public.place_partner_order(uuid,jsonb,jsonb,text,text)') is not null),
+    jsonb_build_object('file', '20261001016400', 'label', 'Tab Race: nguồn quét theo từ khóa tìm kiếm',
+      'ok', private.sc_col('race_sources', 'query')));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

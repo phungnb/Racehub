@@ -45,4 +45,13 @@ describe('Tin giải chạy offline (016000)', () => {
     expect((await q(USR, `select id from public.race_sources`)).rows).toHaveLength(0)
     expect((await q(ADM, `select id from public.race_candidates`)).rows).toHaveLength(1)
   })
+
+  it('nguồn từ khóa: cần query, không có url; trùng từ khóa bị chặn', async () => {
+    const q = (sql: string) => asUser<{ id: string }>(db, ADM, '/rest', sql)
+    await q(`insert into public.race_sources (kind, query) values ('SEARCH', 'lịch giải marathon 2027')`)
+    expect(await fails(q(`insert into public.race_sources (kind, query) values ('SEARCH', 'Lịch giải marathon 2027')`))).not.toBe('OK')
+    expect(await fails(q(`insert into public.race_sources (kind, query) values ('SEARCH', null)`))).not.toBe('OK')
+    expect(await fails(q(`insert into public.race_sources (kind, url, query) values ('PAGE', 'https://a.vn', 'x y z')`))).not.toBe('OK')
+    expect(await fails(q(`insert into public.race_sources (kind, url) values ('PAGE', 'https://a.vn/lich')`))).toBe('OK')
+  })
 })

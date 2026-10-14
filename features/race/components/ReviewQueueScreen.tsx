@@ -13,6 +13,10 @@ import {
 } from '../api/listingApi'
 import { fmtDate } from './RaceCard'
 
+const ERRORS: Record<string, string> = {
+  NO_SEARCH_KEY: 'chưa đặt BRAVE_SEARCH_API_KEY trên máy chủ', SEARCH_LIMIT: 'hết lượt tìm kiếm trong tháng', SEARCH_FAILED: 'dịch vụ tìm kiếm lỗi',
+  BAD_URL: 'không truy cập được trang (hoặc robots.txt chặn)', FETCH_FAILED: 'không tải được trang', NOT_HTML: 'không phải trang web',
+}
 const VIEWS: { value: CandidateState; label: string }[] = [
   { value: 'PENDING', label: 'Chờ duyệt' }, { value: 'FILTERED', label: 'Đã lọc bỏ' }, { value: 'REJECTED', label: 'Đã bỏ' },
 ]
@@ -36,12 +40,13 @@ function Sources() {
   const qc = useQueryClient()
   const [url, setUrl] = useState('')
   const [label, setLabel] = useState('')
+  const [mode, setMode] = useState<'SEARCH' | 'PAGE'>('SEARCH')
   const q = useQuery({ queryKey: ['race-sources'], queryFn: listSources })
   const refresh = () => { void qc.invalidateQueries({ queryKey: ['race-sources'] }); void qc.invalidateQueries({ queryKey: ['race-candidates'] }) }
   const add = useMutation({
-    mutationFn: () => addSource(url.trim(), label.trim() || null),
+    mutationFn: () => addSource({ kind: mode, value: url.trim(), label: label.trim() || null }),
     onSuccess: () => { setUrl(''); setLabel(''); refresh(); toast.success('Đã thêm nguồn') },
-    onError: () => toast.error('Không thêm được (link sai hoặc nguồn đã có).'),
+    onError: () => toast.error('Không thêm được (sai định dạng hoặc nguồn đã có).'),
   })
   const scan = useMutation({
     mutationFn: scanNow,
@@ -53,15 +58,15 @@ function Sources() {
   return (
     <Card className="space-y-3">
       <p className="text-sm font-semibold">Nguồn quét</p>
-      <p className="text-xs text-fg-muted">Dán trang lịch giải (cùng tên miền với các trang chi tiết). Hệ thống quét mỗi thứ Hai và chỉ đưa vào hàng chờ, tôn trọng robots.txt của trang nguồn.</p>
+      <p className="text-xs text-fg-muted">Hai cách: tìm bằng từ khóa (như gõ Google) hoặc quét một trang lịch giải. Hệ thống quét mỗi thứ Hai và chỉ đưa vào hàng chờ, tôn trọng robots.txt của trang nguồn.</p>
       {q.isPending ? <Skeleton className="h-16" /> : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : (
         <ul className="space-y-2">
           {q.data.map((s) => (
             <li key={s.id} className="flex items-center gap-2 rounded-xl border border-border p-2.5 text-sm">
               <input type="checkbox" className="size-5 shrink-0 accent-[var(--color-brand)]" checked={s.active} onChange={(e) => toggle.mutate({ id: s.id, active: e.target.checked })} aria-label="Bật quét nguồn này" />
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold">{s.label || s.url}</span>
-                <span className="block truncate text-xs text-fg-muted">{s.last_error ? `Lỗi lần quét cuối: ${s.last_error}` : s.last_scanned_at ? `Quét lần cuối ${fmtDate(s.last_scanned_at)}` : 'Chưa quét'}</span>
+                <span className="block truncate font-semibold">{s.label || (s.kind === 'SEARCH' ? `Tìm: ${s.query}` : s.url)}</span>
+                <span className="block truncate text-xs text-fg-muted">{s.last_error ? `Lỗi lần quét cuối: ${ERRORS[s.last_error] ?? s.last_error}` : s.last_scanned_at ? `Quét lần cuối ${fmtDate(s.last_scanned_at)}` : 'Chưa quét'}</span>
               </span>
               <Button size="sm" variant="secondary" disabled={scan.isPending} onClick={() => scan.mutate(s.id)}><RefreshCw className="size-4" aria-hidden />{scan.isPending && scan.variables === s.id ? 'Đang quét…' : 'Quét ngay'}</Button>
               <button type="button" aria-label="Xóa nguồn" className="p-1.5 text-fg-muted hover:text-danger" onClick={() => { if (window.confirm('Xóa nguồn này và các giải đã tìm từ nguồn?')) del.mutate(s.id) }}><Trash2 className="size-4" aria-hidden /></button>
@@ -72,10 +77,12 @@ function Sources() {
       )}
       <Field label="Thêm nguồn" htmlFor="s-url">
         <div className="space-y-2">
-          <Input id="s-url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://… (trang lịch giải)" inputMode="url" />
+          <SegmentedControl value={mode} onChange={setMode} options={[{ value: 'SEARCH', label: 'Tìm bằng từ khóa' }, { value: 'PAGE', label: 'Trang lịch giải' }]} />
+          <Input id="s-url" value={url} onChange={(e) => setUrl(e.target.value)} inputMode={mode === 'PAGE' ? 'url' : 'text'}
+            placeholder={mode === 'SEARCH' ? 'VD: lịch giải chạy marathon 2027 Việt Nam' : 'https://… (trang lịch giải)'} />
           <div className="flex gap-2">
             <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Tên gọi (không bắt buộc)" maxLength={80} aria-label="Tên nguồn" />
-            <Button type="button" className="shrink-0" disabled={!/^https?:\/\/\S+$/i.test(url.trim()) || add.isPending} onClick={() => add.mutate()}>Thêm</Button>
+            <Button type="button" className="shrink-0" disabled={(mode === 'PAGE' ? !/^https?:\/\/\S+$/i.test(url.trim()) : url.trim().length < 3) || add.isPending} onClick={() => add.mutate()}>Thêm</Button>
           </div>
         </div>
       </Field>
