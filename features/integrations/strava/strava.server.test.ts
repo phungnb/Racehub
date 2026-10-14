@@ -110,12 +110,38 @@ describe('handleStravaWebhookEvent', () => {
     expect((args.p_activity as { risk: unknown }).risk).toMatchObject({ verdict: 'REVIEW', flags: [expect.objectContaining({ code: 'SUSTAINED_SPEED' })] })
   })
 
-  it('delete → thu hồi; thu hồi quyền → hủy kết nối; không gọi API Strava', async () => {
+  it('delete bài của đúng chủ → thu hồi, không gọi API Strava', async () => {
     const { admin, calls } = fakeAdmin(conn)
     await handleStravaWebhookEvent(admin, { object_type: 'activity', aspect_type: 'delete', object_id: 77, owner_id: 9 })
-    await handleStravaWebhookEvent(admin, { object_type: 'athlete', aspect_type: 'update', object_id: 9, owner_id: 9, updates: { authorized: 'false' } })
-    expect(calls.rpc.map(([fn]) => fn)).toEqual(['remove_provider_activity', 'unlink_provider_connection'])
+    expect(calls.rpc.map(([fn]) => fn)).toEqual(['remove_provider_activity'])
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('delete bài không thuộc chủ kết nối (sự kiện giả) → bỏ qua, không thu hồi', async () => {
+    const { admin, calls } = fakeAdmin(conn)
+    const from = admin.from.bind(admin)
+    admin.from = ((t: string) => t === 'activities'
+      ? { select: () => ({ eq: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }) }) }
+      : from(t)) as typeof admin.from
+    const r = await handleStravaWebhookEvent(admin, { object_type: 'activity', aspect_type: 'delete', object_id: 77, owner_id: 9 })
+    expect(r).toEqual({ result: 'NOT_OWNER' })
+    expect(calls.rpc).toHaveLength(0)
+  })
+
+  it('thu hồi quyền giả (token vẫn dùng được) → không hủy kết nối', async () => {
+    const { admin, calls } = fakeAdmin(conn)
+    fetchMock.mockResolvedValueOnce(new Response('{}', { status: 200 }))
+    const r = await handleStravaWebhookEvent(admin, { object_type: 'athlete', aspect_type: 'update', object_id: 9, owner_id: 9, updates: { authorized: 'false' } })
+    expect(r).toEqual({ result: 'STILL_AUTHORIZED' })
+    expect(calls.rpc).toHaveLength(0)
+  })
+
+  it('thu hồi quyền thật (Strava trả 401) → hủy kết nối', async () => {
+    const { admin, calls } = fakeAdmin(conn)
+    fetchMock.mockResolvedValueOnce(new Response('{}', { status: 401 }))
+    const r = await handleStravaWebhookEvent(admin, { object_type: 'athlete', aspect_type: 'update', object_id: 9, owner_id: 9, updates: { authorized: 'false' } })
+    expect(r).toEqual({ result: 'DEAUTHORIZED' })
+    expect(calls.rpc.map(([fn]) => fn)).toEqual(['unlink_provider_connection'])
   })
 
   it('vận động viên lạ → bỏ qua', async () => {

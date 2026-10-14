@@ -16,6 +16,10 @@ async function seed(db: PGlite) {
     insert into public.club_members (club_id, user_id, role, status) values
       ('${CLUB}', '${OWNER}', 'OWNER', 'APPROVED'), ('${CLUB}', '${RUNNER}', 'MEMBER', 'APPROVED')
       on conflict do nothing;
+
+      insert into auth.users (id, email) select ('00000000-0000-0000-0000-00000000fa' || i)::uuid, 'fill' || i || '@x.vn' from generate_series(10, 12) i on conflict do nothing;
+      insert into public.profiles (id, display_name, xp, level, created_at) select ('00000000-0000-0000-0000-00000000fa' || i)::uuid, 'Thành viên ' || i, 0, 1, now() from generate_series(10, 12) i on conflict do nothing;
+      insert into public.club_members (club_id, user_id, role, status) select '${CLUB}', ('00000000-0000-0000-0000-00000000fa' || i)::uuid, 'MEMBER', 'APPROVED' from generate_series(10, 12) i on conflict do nothing;  -- đủ 5 thành viên (015900: CLB < 5 người không có quyền duyệt)
   `)
 }
 
@@ -86,4 +90,24 @@ describe('duyệt bài chuyên nghiệp + nhịp tim (002400)', () => {
     const p = (await db.query<{ current_progress: string }>(`select current_progress from public.challenge_participants where challenge_id = $1 and profile_id = $2`, [cid, RUNNER])).rows[0]
     expect(Number(p.current_progress)).toBe(5)          // chỉ bài có nhịp tim
   })
+  // 015900: CLB tự lập chỉ vài tài khoản không duyệt hộ nhau; admin loại được cả bài đã ghi nhận
+  it('CLB dưới 5 thành viên không có quyền duyệt bài', async () => {
+    const [CAP2, RUN2] = ['00000000-0000-0000-0000-0000000004f1', '00000000-0000-0000-0000-0000000004f2']
+    const SMALL = '00000000-0000-0000-0000-0000000004f9'
+    await db.exec(`
+      insert into auth.users (id, email) values ('${CAP2}', 'c2@x.vn'), ('${RUN2}', 'r2@x.vn');
+      insert into public.profiles (id, display_name, xp, level, created_at) values ('${CAP2}', 'Chủ CLB ảo', 0, 1, now()), ('${RUN2}', 'Tài khoản chính', 0, 1, now()) on conflict do nothing;
+      insert into public.clubs (id, name, owner_id, invite_code) values ('${SMALL}', 'CLB tự lập', '${CAP2}', 'rv0009');
+      insert into public.club_members (club_id, user_id, role, status) values ('${SMALL}', '${CAP2}', 'OWNER', 'APPROVED'), ('${SMALL}', '${RUN2}', 'MEMBER', 'APPROVED');
+      insert into public.activities (id, user_id, source, validation_status, status, started_at, distance_m, moving_time_s)
+        values ('00000000-0000-0000-0000-0000000004fa', '${RUN2}', 'DIRECT_GPS', 'PENDING', 'READY', now() - interval '2 hours', 5000, 1800);
+    `)
+    expect(await fails(asUser(db, CAP2, '/rpc', `select public.review_activity('00000000-0000-0000-0000-0000000004fa', 'APPROVED')`))).toContain('FORBIDDEN')
+  })
+
+  it('admin_reject_activity: chỉ admin, chỉ bài đã ghi nhận, cần lý do', async () => {
+    const aid = (await db.query<{ id: string }>(`select id from public.activities where user_id = $1 and validation_status = 'APPROVED' limit 1`, [RUNNER])).rows[0].id
+    expect(await fails(asUser(db, OWNER, '/rpc', `select public.admin_reject_activity($1, 'gian lận rõ ràng')`, [aid]))).toContain('FORBIDDEN')
+  })
+
 })

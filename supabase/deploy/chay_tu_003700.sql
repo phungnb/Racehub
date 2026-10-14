@@ -1,7 +1,7 @@
--- RaceHub: gộp 123 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 124 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 015800, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 015800, 015900, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -29449,6 +29449,58 @@ begin
 end $$;
 
 -- ===================================================================
+-- 20261001015900_review_gate_reject_approved.sql
+-- ===================================================================
+-- Vá lỗ hổng chống gian lận (đánh giá khoa học 14/10/2026):
+--  1. CLB tự lập (chỉ 2 tài khoản) duyệt/khôi phục bài cho nhau → chỉ BQT CLB có ít nhất 5 thành viên đã duyệt mới có quyền duyệt bài của thành viên.
+--     Admin hệ thống không bị ảnh hưởng.
+--  2. Admin loại được bài ĐÃ ghi nhận (trước đây chỉ có bài chờ duyệt) → trigger sẵn có thu hồi Xu, XP, thử thách, nhiệm vụ.
+
+create or replace function private.can_review_activity(p_runner uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.is_system_admin() or exists (
+    select 1 from public.club_members me join public.club_members runner on runner.club_id = me.club_id
+     where me.user_id = auth.uid() and me.status = 'APPROVED' and me.role in ('OWNER', 'CAPTAIN')
+       and runner.user_id = p_runner and runner.status = 'APPROVED'
+       and (select count(*) from public.club_members m where m.club_id = me.club_id and m.status = 'APPROVED') >= 5)
+$$;
+
+create or replace function public.admin_reject_activity(p_activity_id uuid, p_reason text) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  a public.activities := (select x from public.activities x where x.id = p_activity_id for update);
+  v_reason text := nullif(trim(coalesce(p_reason, '')), '');
+begin
+  if not public.is_system_admin() then raise exception 'FORBIDDEN'; end if;
+  if a.id is null or coalesce(a.status, '') = 'DELETED' then raise exception 'ACTIVITY_NOT_FOUND'; end if;
+  if a.validation_status <> 'APPROVED' then raise exception 'ACTIVITY_NOT_APPROVED'; end if;
+  if v_reason is null or length(v_reason) < 5 then raise exception 'NOTE_REQUIRED'; end if;
+
+  perform private.revoke_run_reward(a.id, 'Thu hồi thưởng — bài đã ghi nhận bị ban quản trị loại');
+  perform set_config('racehub.decision_kind', 'REVIEWER', true);
+  update public.activities
+     set validation_status = 'REJECTED', status = 'REJECTED',
+         validation_reason = 'Bị loại sau khi đã ghi nhận.',
+         review_detail = left('Loại: ' || v_reason, 500),
+         reviewed_by = v_uid, reviewed_at = now(), updated_at = now()
+   where id = a.id;                      -- trigger thu hồi thử thách, nhiệm vụ, huy hiệu
+  perform set_config('racehub.decision_kind', '', true);
+
+  insert into public.admin_audit_log (actor_id, action, target, new_value)
+  values (v_uid, 'REJECT_APPROVED_ACTIVITY', a.id::text, jsonb_build_object('reason', v_reason));
+
+  perform private.notify(a.user_id, null, 'RUN_REVIEW', 'Bài chạy không còn được ghi nhận',
+    round(coalesce(a.distance_m, 0) / 1000.0, 2) || ' km — ban quản trị xác định dữ liệu không hợp lệ; Xu, XP và thử thách liên quan đã được thu hồi.',
+    '/activities/' || a.id, v_uid, true);
+end $$;
+
+revoke all on function public.admin_reject_activity(uuid, text) from public, anon;
+grant execute on function public.admin_reject_activity(uuid, text) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -29767,7 +29819,10 @@ begin
     jsonb_build_object('file', '20261001015800', 'label', 'Ngày theo giờ Việt Nam (bỏ current_date UTC)',
       'ok', not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                          where n.nspname in ('public', 'private') and p.prokind = 'f' and p.prosrc ~* '\mcurrent_date\M'
-                           and p.proname <> 'admin_system_check')));
+                           and p.proname <> 'admin_system_check')),
+    jsonb_build_object('file', '20261001015900', 'label', 'Chống gian lận: CLB < 5 người không duyệt bài; admin loại bài đã ghi nhận',
+      'ok', to_regprocedure('public.admin_reject_activity(uuid,text)') is not null
+        and position('>= 5' in pg_get_functiondef(to_regprocedure('private.can_review_activity(uuid)'))) > 0));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

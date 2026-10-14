@@ -346,12 +346,25 @@ export async function handleStravaWebhookEvent(admin: SupabaseClient, event: {
     .eq('provider', 'STRAVA').eq('provider_user_id', String(event.owner_id)).maybeSingle<{ user_id: string }>()
   if (!conn) return { result: 'UNKNOWN_ATHLETE' }
 
+  // Sự kiện webhook không có chữ ký → không tin nội dung: thu hồi quyền chỉ hủy kết nối khi Strava thật sự từ chối token của người này
   if (event.object_type === 'athlete' && event.updates?.authorized === 'false') {
-    await admin.rpc('unlink_provider_connection', { p_user_id: conn.user_id, p_provider: 'STRAVA' })
-    return { result: 'DEAUTHORIZED' }
+    try {
+      const { token } = await getValidStravaToken(admin, conn.user_id)
+      await stravaGet<unknown>(token, '/athlete')
+    } catch (err) {
+      if (!(err instanceof Error) || err.message !== 'STRAVA_REAUTH_REQUIRED') throw err
+      await admin.rpc('unlink_provider_connection', { p_user_id: conn.user_id, p_provider: 'STRAVA' })
+      return { result: 'DEAUTHORIZED' }
+    }
+    return { result: 'STILL_AUTHORIZED' }
   }
   if (event.object_type !== 'activity') return { result: 'IGNORED' }
   if (event.aspect_type === 'delete') {
+    // Chỉ xóa bài thuộc đúng chủ kết nối (owner_id trong sự kiện là số công khai, object_id có thể là bài của người khác)
+    const { data: own } = await admin.from('activities').select('id')
+      .eq('source', 'STRAVA').eq('source_activity_id', String(event.object_id)).eq('user_id', conn.user_id)
+      .maybeSingle<{ id: string }>()
+    if (!own) return { result: 'NOT_OWNER' }
     const { data } = await admin.rpc('remove_provider_activity', { p_source: 'STRAVA', p_external_id: String(event.object_id) })
     return data
   }

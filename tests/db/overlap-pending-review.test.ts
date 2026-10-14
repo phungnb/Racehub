@@ -31,6 +31,9 @@ describe('bài trùng giờ dài hơn nghi vấn (013700)', () => {
     await db.exec(`
       insert into public.clubs (id, name, owner_id, invite_code) values ('${CLB}', 'CLB 137', '${CAPTAIN}', 'q137');
       insert into public.club_members (club_id, user_id, role, status) values ('${CLB}', '${CAPTAIN}', 'OWNER', 'APPROVED'), ('${CLB}', '${RUNNER}', 'MEMBER', 'APPROVED') on conflict do nothing;
+      insert into auth.users (id, email) select ('00000000-0000-0000-0000-00000000fb' || i)::uuid, 'fill' || i || '@x.vn' from generate_series(10, 12) i on conflict do nothing;
+      insert into public.profiles (id, display_name, xp, level, created_at) select ('00000000-0000-0000-0000-00000000fb' || i)::uuid, 'Thành viên ' || i, 0, 1, now() from generate_series(10, 12) i on conflict do nothing;
+      insert into public.club_members (club_id, user_id, role, status) select '${CLB}', ('00000000-0000-0000-0000-00000000fb' || i)::uuid, 'MEMBER', 'APPROVED' from generate_series(10, 12) i on conflict do nothing;  -- đủ 5 thành viên (015900: CLB < 5 người không có quyền duyệt)
     `)
   }, 240_000)
 
