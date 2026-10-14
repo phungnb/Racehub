@@ -253,15 +253,24 @@ export async function syncStravaActivities(admin: SupabaseClient, userId: string
   const after = Math.floor(syncWindowStart(conn.last_synced_at).getTime() / 1000)
   await refreshStravaIdentity(admin, userId, { token })
   const results: Record<string, unknown>[] = []
+  const seen: string[] = []
+  let listedAll = false
   for (let page = 1; page <= 3; page++) {
     const list = await stravaGet<StravaSummaryActivity[]>(token, `/athlete/activities?after=${after}&per_page=100&page=${page}`)
+    for (const a of list) seen.push(String(a.id))
     // Xử lý từ cũ đến mới để trần thưởng/ngày và thứ tự thử thách đúng thời gian
     for (const a of [...list].reverse()) results.push(await ingest(admin, userId, a, false, token))
-    if (list.length < 100) break
+    if (list.length < 100) { listedAll = true; break }
+  }
+  // Bài đã xóa bên Strava (webhook delete có thể bị lỡ): chỉ đối chiếu khi đã liệt kê ĐỦ mọi trang của cửa sổ đồng bộ
+  let removed = 0
+  if (listedAll) {
+    try { removed = (await removeStravaActivitiesMissing(admin, userId, { since: new Date(after * 1000), seen, allowEmpty: true })).removed }
+    catch (e) { console.warn('[strava] reconcile deleted', e instanceof Error ? e.message : e) }
   }
   await admin.from('connected_accounts').update({ last_synced_at: new Date().toISOString() })
     .eq('user_id', userId).eq('provider', 'STRAVA')
-  return summarize(results)
+  return { ...summarize(results), ...(removed ? { removed } : {}) }
 }
 
 export interface BackfillResult {
@@ -317,16 +326,17 @@ export async function backfillStravaActivities(admin: SupabaseClient, userId: st
 /**
  * Sau khi đã liệt kê ĐỦ mọi trang của khoảng [since, now] (`seen` = gộp `ids` của các lần backfill): bài STRAVA của người này trong khoảng đó
  * mà Strava không còn trả về = đã bị xóa bên Strava → gỡ như webhook xóa (thu hồi Xu/XP, trigger tự gỡ khỏi thử thách).
- * An toàn: danh sách rỗng thì không xóa gì (Strava lỗi / mất quyền đọc trông giống "không có bài nào"); bỏ qua 1 ngày đầu khoảng để tránh lệch biên múi giờ.
+ * An toàn: danh sách rỗng thì không xóa gì trừ khi `allowEmpty` (Strava lỗi / mất quyền đọc trông giống "không có bài nào"); bỏ qua 1 ngày đầu khoảng để tránh lệch biên múi giờ.
+ * `until`: cận trên của khoảng đã liệt kê (mặc định = bây giờ); thử thách đã quá hạn kết thúc phải truyền ngày kết thúc để không gỡ nhầm bài sau đó.
  */
 export async function removeStravaActivitiesMissing(admin: SupabaseClient, userId: string,
-  opts: { since: Date; seen: string[] }): Promise<{ removed: number; skipped?: 'EMPTY_LIST' }> {
-  if (!opts.seen.length) return { removed: 0, skipped: 'EMPTY_LIST' }
+  opts: { since: Date; until?: Date; seen: string[]; allowEmpty?: boolean }): Promise<{ removed: number; skipped?: 'EMPTY_LIST' }> {
+  if (!opts.seen.length && !opts.allowEmpty) return { removed: 0, skipped: 'EMPTY_LIST' }
   const seen = new Set(opts.seen)
   const from = new Date(opts.since.getTime() + 86_400_000).toISOString()
   const { data, error } = await admin.from('activities').select('source_activity_id')
     .eq('user_id', userId).eq('source', 'STRAVA').neq('status', 'DELETED').not('source_activity_id', 'is', null)
-    .gte('started_at', from).lt('started_at', new Date().toISOString()).limit(5000)
+    .gte('started_at', from).lt('started_at', (opts.until ?? new Date()).toISOString()).limit(5000)
     .returns<{ source_activity_id: string }[]>()
   if (error) throw new Error(`LIST_FAILED:${error.message}`)
   let removed = 0
