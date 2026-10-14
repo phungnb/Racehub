@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import { createDb, asUser } from './load-schema'
 
-// Migration 016000: giải online "Giao lưu các CLB" — bài tối thiểu + dải pace, ngưỡng hợp lệ mỗi thành viên, CLB cần đủ % thành viên
+// Migration 016200: giải online "Giao lưu các CLB" — bài tối thiểu + dải pace, ngưỡng hợp lệ mỗi thành viên, CLB cần đủ % thành viên
 // hợp lệ mới được xếp hạng, giới hạn số runner đăng ký, CLB chờ ban tổ chức duyệt, BXH cá nhân, link form nhận giải.
 const id = (n: number) => `00000000-0000-0000-0000-0000000160${String(n).padStart(2, '0')}`
 const [OA, A1, A2, OB, B1, B2, OC, OD, AD, C1] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(id)
@@ -54,7 +54,7 @@ const member = `select public.join_cup_as_member($1, $2) as r`
 const review = `select public.review_cup_club($1, $2, $3, $4) as r`
 const view = `select public.club_cup($1) as r`
 
-describe('Giải online Giao lưu các CLB (016000)', () => {
+describe('Giải online Giao lưu các CLB (016200)', () => {
   let db: PGlite
   let cup = ''
   beforeAll(async () => {

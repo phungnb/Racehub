@@ -17,10 +17,10 @@ export interface CupContributor { user_id: string; display_name: string | null; 
 export interface CupStanding extends CupClub {
   rank: number; club_id: string; members: number; runners: number; km: number; avg_km: number; score: number | null
   time_s?: number; days?: number; forfeited?: boolean; top?: CupContributor[]
-  /** 016000 — giải online: số thành viên đạt km hợp lệ, CLB có đủ % thành viên hợp lệ để được xếp hạng không */
+  /** 016200 — giải online: số thành viên đạt km hợp lệ, CLB có đủ % thành viên hợp lệ để được xếp hạng không */
   valid?: number; eligible?: boolean
 }
-/** Luật giải online (016000) — null với giải thường */
+/** Luật giải online (016200) — null với giải thường */
 export interface CupLeague {
   min_run_km: number | null; min_pace: number | null; max_pace: number | null
   member_min_km: number | null; min_valid_pct: number | null

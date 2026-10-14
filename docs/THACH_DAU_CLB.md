@@ -55,7 +55,7 @@ Lời mời 1–1 không được trả lời trước giờ chốt danh sách t
 
 Trận "CLB đấu CLB" tạo trước bản này được chuyển sang, giữ nguyên đường link. Các trận này vẫn tính như cũ: mọi thành viên, km, không cần đăng ký, chốt sau 2 giờ. Riêng người ở cả hai CLB nay chỉ được tính cho CLB vào trước, vì bản cũ có lỗi tính cho cả hai bên.
 
-## 6. Giải online nhiều CLB (migration 016000)
+## 6. Giải online nhiều CLB (migration 016200)
 
 Thách đấu nhiều CLB có thêm bộ luật tùy chọn cho giải online (ví dụ "Giao lưu các CLB"). Admin bật ở màn tạo giải, có nút "Dùng mẫu".
 

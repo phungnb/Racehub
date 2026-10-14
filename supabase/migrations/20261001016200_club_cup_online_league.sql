@@ -1,4 +1,4 @@
--- 016000: GIẢI ONLINE "GIAO LƯU CÁC CLB" — bổ sung luật và tính năng còn thiếu cho Thách đấu CLB nhiều CLB.
+-- 016200: GIẢI ONLINE "GIAO LƯU CÁC CLB" — bổ sung luật và tính năng còn thiếu cho Thách đấu CLB nhiều CLB.
 -- • Bài tối thiểu (min_run_km) và dải pace (min_pace–max_pace, phút/km) áp cho bài tính điểm của giải.
 -- • Thành tích hợp lệ: mỗi thành viên chạy tối thiểu member_min_km; CLB chỉ được xếp hạng khi ít nhất min_valid_pct %
 --   thành viên đã đăng ký đạt mức đó (CLB không đủ vẫn hiện trên bảng nhưng xếp sau, "eligible" = false, không thể vô địch).
