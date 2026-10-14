@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Ban, Crown, ShieldCheck, ShieldOff, Unlock } from 'lucide-react'
+import { Ban, Crown, RefreshCw, ShieldCheck, ShieldOff, Unlock } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, ConfirmSheet, ErrorState, Field, Input, LevelBadge, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -99,6 +99,7 @@ export function UserDetail({ id }: { id: string }) {
         {!u.strava_connected ? <p className="text-sm text-fg-muted">Chưa liên kết Strava.</p> : u.strava ? (
           <>
             <StravaAccountInfo account={u.strava} />
+            <ResyncStrava userId={u.id} />
             <p className="text-xs text-fg-subtle">Đồng bộ gần nhất: {fmt(u.strava.last_synced_at)}{!u.strava.name && !u.strava.avatar_url ? ' · Chưa có tên / ảnh: tự cập nhật khi người dùng mở app (đồng bộ ngầm) hoặc mở trang Tôi.' : ''}</p>
           </>
         ) : <p className="text-sm text-fg-muted">Đã kết nối nhưng chưa đọc được thông tin tài khoản.</p>}
@@ -133,6 +134,62 @@ export function UserDetail({ id }: { id: string }) {
           </ul>
         </Card>
       )}
+    </div>
+  )
+}
+
+interface ResyncResult { summary?: { imported: number }; nextPage?: number | null; rateLimited?: boolean; error?: string; message?: string; applied?: number }
+
+const resyncPost = async (id: string, body: object) => {
+  const res = await fetch(`/api/admin/users/${id}/resync`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  return { status: res.status, data: (await res.json().catch(() => ({}))) as ResyncResult }
+}
+
+/** Nút "Đồng bộ lại": kéo lại bài Strava của người này (từng lô, dừng khi chạm hạn mức Strava rồi "Tiếp tục") và tính lại vào thử thách */
+function ResyncStrava({ userId }: { userId: string }) {
+  const qc = useQueryClient()
+  const [busy, setBusy] = useState(false)
+  const [text, setText] = useState('')
+  const [paused, setPaused] = useState(false)
+  const page = useRef(1)
+  const imported = useRef(0)
+
+  const run = async () => {
+    setBusy(true); setPaused(false); setText('Đang lấy dữ liệu…')
+    try {
+      for (;;) {
+        const r = await resyncPost(userId, { step: 'member', page: page.current })
+        if (r.status === 429 || r.data.rateLimited) {
+          imported.current += r.data.summary?.imported ?? 0
+          if (r.data.nextPage) page.current = r.data.nextPage
+          setPaused(true); setText('Strava đang giới hạn lượt truy cập. Chờ khoảng 15 phút rồi bấm "Tiếp tục" (tiến độ được giữ lại).')
+          return
+        }
+        if (r.status !== 200 || r.data.error) throw new Error(r.data.message ?? 'Không đồng bộ lại được.')
+        imported.current += r.data.summary?.imported ?? 0
+        if (!r.data.nextPage) break
+        page.current = r.data.nextPage
+        await new Promise((ok) => setTimeout(ok, 400))
+      }
+      const f = await resyncPost(userId, { step: 'finish' })
+      if (f.status !== 200) throw new Error(f.data.message ?? 'Không tính lại được vào thử thách.')
+      setText(`Xong: nhận thêm ${imported.current} bài từ Strava, cập nhật ${f.data.applied ?? 0} bài vào thử thách.`)
+      page.current = 1; imported.current = 0
+      toast.success('Đã đồng bộ lại')
+      void qc.invalidateQueries({ queryKey: ['admin', 'user', userId] })
+    } catch (e) {
+      setText(e instanceof Error ? e.message : 'Không đồng bộ lại được. Thử lại sau.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="space-y-1">
+      <Button size="sm" variant="secondary" loading={busy} onClick={() => void run()}>
+        <RefreshCw className="size-4 text-brand" aria-hidden />{paused ? 'Tiếp tục' : 'Đồng bộ lại'}
+      </Button>
+      {text && <p className="text-xs text-fg-muted" role="status">{text}</p>}
     </div>
   )
 }
