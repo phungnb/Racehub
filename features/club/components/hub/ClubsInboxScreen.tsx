@@ -139,7 +139,7 @@ function formatCompact(n: number) {
   return n >= 1000 ? `${(n / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}k` : String(n)
 }
 
-function CreateClubSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function CreateClubSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient()
   const router = useRouter()
   const [name, setName] = useState('')
