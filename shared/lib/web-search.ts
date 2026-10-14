@@ -1,6 +1,6 @@
 import 'server-only'
 
-// Tìm kiếm web bằng Brave Search API (khóa BRAVE_SEARCH_API_KEY, gói miễn phí ~2.000 lượt / tháng).
+// Tìm kiếm web: Tavily (TAVILY_API_KEY, miễn phí 1.000 lượt / tháng, không cần thẻ) hoặc Brave (BRAVE_SEARCH_API_KEY, trả phí từ 02/2026).
 // Google Programmable Search API đã đóng cho khách hàng mới, nên không dùng.
 export class SearchError extends Error {
   constructor(public code: 'NO_SEARCH_KEY' | 'SEARCH_FAILED' | 'SEARCH_LIMIT') { super(code) }
@@ -25,9 +25,20 @@ export function usableResultUrls(urls: string[], limit: number): string[] {
   return out
 }
 
-export async function searchWeb(query: string, count = 20): Promise<string[]> {
-  const key = process.env.BRAVE_SEARCH_API_KEY?.trim()
-  if (!key) throw new SearchError('NO_SEARCH_KEY')
+async function tavily(key: string, query: string, count: number): Promise<string[]> {
+  const res = await fetch('https://api.tavily.com/search', {
+    method: 'POST', signal: AbortSignal.timeout(15_000),
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+    body: JSON.stringify({ query, search_depth: 'basic', max_results: Math.min(count, 20), country: 'vietnam' }),
+  }).catch(() => null)
+  if (!res) throw new SearchError('SEARCH_FAILED')
+  if (res.status === 429 || res.status === 432 || res.status === 433) throw new SearchError('SEARCH_LIMIT')
+  if (!res.ok) throw new SearchError('SEARCH_FAILED')
+  const j = (await res.json().catch(() => null)) as { results?: { url?: string }[] } | null
+  return usableResultUrls((j?.results ?? []).map((r) => r.url ?? ''), count)
+}
+
+async function brave(key: string, query: string, count: number): Promise<string[]> {
   const url = new URL('https://api.search.brave.com/res/v1/web/search')
   url.searchParams.set('q', query)
   url.searchParams.set('count', String(Math.min(count, 20)))
@@ -40,4 +51,13 @@ export async function searchWeb(query: string, count = 20): Promise<string[]> {
   if (!res.ok) throw new SearchError('SEARCH_FAILED')
   const j = (await res.json().catch(() => null)) as { web?: { results?: { url?: string }[] } } | null
   return usableResultUrls((j?.web?.results ?? []).map((r) => r.url ?? ''), count)
+}
+
+/** Ưu tiên Tavily (gói miễn phí 1.000 lượt / tháng, không cần thẻ); không có thì dùng Brave. */
+export async function searchWeb(query: string, count = 20): Promise<string[]> {
+  const tav = process.env.TAVILY_API_KEY?.trim()
+  if (tav) return tavily(tav, query, count)
+  const br = process.env.BRAVE_SEARCH_API_KEY?.trim()
+  if (br) return brave(br, query, count)
+  throw new SearchError('NO_SEARCH_KEY')
 }
