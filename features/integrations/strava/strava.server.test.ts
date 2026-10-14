@@ -88,14 +88,42 @@ describe('syncStravaActivities — bài đã xóa bên Strava', () => {
   it('bài có trong RaceHub mà Strava không còn trả về → gỡ; bài còn thì giữ', async () => {
     const { admin, removes } = adminWith(['1', '2'])
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify([run(1, '2026-09-20T00:00:00Z')])))
+    fetchMock.mockResolvedValueOnce(new Response('{}', { status: 404 }))
     const s = await syncStravaActivities(admin, 'u1')
+    expect(fetchMock.mock.calls[1][0]).toBe('https://www.strava.com/api/v3/activities/2')
     expect(removes).toEqual(['2'])
     expect(s.removed).toBe(1)
   })
 
-  it('Strava trả về danh sách rỗng (đã xóa hết) → gỡ hết bài trong cửa sổ', async () => {
+  it('danh sách thiếu nhưng Strava vẫn trả bài khi hỏi riêng (vd bài riêng tư) → giữ', async () => {
+    const { admin, removes } = adminWith(['1', '2'])
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify([run(1, '2026-09-20T00:00:00Z')])))
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(run(2, '2026-09-21T00:00:00Z'))))
+    expect((await syncStravaActivities(admin, 'u1')).removed).toBeUndefined()
+    expect(removes).toEqual([])
+  })
+
+  it('Strava lỗi khi hỏi riêng (401 / 429 / 5xx) → dừng, không gỡ', async () => {
+    const { admin, removes } = adminWith(['1', '2', '3'])
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify([run(1, '2026-09-20T00:00:00Z')])))
+    fetchMock.mockResolvedValue(new Response('{}', { status: 500 }))
+    await syncStravaActivities(admin, 'u1')
+    expect(removes).toEqual([])
+  })
+
+  it('sự cố 14/10: danh sách trả về hụt phần lớn bài đang có → không gỡ gì, không hỏi Strava từng bài', async () => {
+    const { admin, removes } = adminWith(['1', '2', '3', '4', '5', '6'])
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify([run(1, '2026-09-20T00:00:00Z')])))
+    fetchMock.mockResolvedValue(new Response('{}', { status: 404 }))
+    await syncStravaActivities(admin, 'u1')
+    expect(removes).toEqual([])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('Strava trả về danh sách rỗng (đã xóa hết) + Strava xác nhận 404 → gỡ', async () => {
     const { admin, removes } = adminWith(['5'])
     fetchMock.mockResolvedValueOnce(new Response('[]'))
+    fetchMock.mockResolvedValueOnce(new Response('{}', { status: 404 }))
     expect((await syncStravaActivities(admin, 'u1')).removed).toBe(1)
     expect(removes).toEqual(['5'])
   })
