@@ -60,6 +60,55 @@ describe('syncStravaActivities', () => {
   })
 })
 
+describe('syncStravaActivities — bài đã xóa bên Strava', () => {
+  const fetchMock = vi.fn()
+  beforeEach(() => { fetchMock.mockReset(); vi.stubGlobal('fetch', fetchMock) })
+  afterEach(() => vi.unstubAllGlobals())
+  const conn = { user_id: 'u1', provider_user_id: '9', access_token: 'tok', refresh_token: 'r', expires_at: '2100-01-01T00:00:00Z', last_synced_at: null, identity_synced_at: '2026-01-01T00:00:00Z' }
+
+  /** admin giả: bảng activities có sẵn các bài STRAVA `stored`; ghi lại remove_provider_activity */
+  function adminWith(stored: string[]) {
+    const removes: string[] = []
+    const q: Record<string, unknown> = {}
+    for (const m of ['select', 'eq', 'neq', 'not', 'gte', 'lt', 'order']) q[m] = () => q
+    q.limit = () => q
+    q.returns = async () => ({ data: stored.map((id) => ({ source_activity_id: id })), error: null })
+    q.maybeSingle = async () => ({ data: conn, error: null })
+    q.update = () => ({ eq: () => ({ eq: async () => ({ error: null }) }) })
+    const admin = {
+      from: () => q,
+      rpc: async (fn: string, args: Record<string, unknown>) => {
+        if (fn === 'remove_provider_activity') { removes.push(String(args.p_external_id)); return { data: { result: 'DELETED' }, error: null } }
+        return { data: { result: 'DUPLICATE' }, error: null }
+      },
+    } as unknown as SupabaseClient
+    return { admin, removes }
+  }
+
+  it('bài có trong RaceHub mà Strava không còn trả về → gỡ; bài còn thì giữ', async () => {
+    const { admin, removes } = adminWith(['1', '2'])
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify([run(1, '2026-09-20T00:00:00Z')])))
+    const s = await syncStravaActivities(admin, 'u1')
+    expect(removes).toEqual(['2'])
+    expect(s.removed).toBe(1)
+  })
+
+  it('Strava trả về danh sách rỗng (đã xóa hết) → gỡ hết bài trong cửa sổ', async () => {
+    const { admin, removes } = adminWith(['5'])
+    fetchMock.mockResolvedValueOnce(new Response('[]'))
+    expect((await syncStravaActivities(admin, 'u1')).removed).toBe(1)
+    expect(removes).toEqual(['5'])
+  })
+
+  it('chưa liệt kê đủ (3 trang đầy) → không đối chiếu, không gỡ gì', async () => {
+    const { admin, removes } = adminWith(['999'])
+    const full = Array.from({ length: 100 }, (_, i) => run(i + 1, '2026-09-20T00:00:00Z'))
+    fetchMock.mockImplementation(async () => new Response(JSON.stringify(full)))
+    await syncStravaActivities(admin, 'u1')
+    expect(removes).toEqual([])
+  })
+})
+
 describe('refreshStravaIdentity', () => {
   const fetchMock = vi.fn()
   beforeEach(() => { fetchMock.mockReset(); vi.stubGlobal('fetch', fetchMock) })
