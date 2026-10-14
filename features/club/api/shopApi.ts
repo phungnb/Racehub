@@ -52,5 +52,5 @@ export function ordersCsv(orders: ClubOrder[]) {
   const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
   const rows = orders.map((o) => [o.code, o.buyer, o.items.map((i) => `${i.size ?? '-'}×${i.qty}`).join(' '), o.quantity, o.amount_vnd,
     ORDER_STATUS[o.status].label, o.note ?? '', new Date(o.created_at).toLocaleString('vi-VN')])
-  return '﻿' + [['Mã', 'Người đặt', 'Size', 'SL', 'Tiền (đ)', 'Trạng thái', 'Ghi chú', 'Thời gian'], ...rows].map((r) => r.map(esc).join(',')).join('\n')
+  return '﻿sep=,\n' + [['Mã', 'Người đặt', 'Size', 'SL', 'Tiền (đ)', 'Trạng thái', 'Ghi chú', 'Thời gian'], ...rows].map((r) => r.map(esc).join(',')).join('\n')
 }
