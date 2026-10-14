@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Field, Input } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import type { MatchFormat, MatchMeasure, MatchTerms, MatchTiebreak } from '../api/cupApi'
@@ -22,6 +23,21 @@ function Choice<T extends string | number | null>({ value, options, onChange, la
         </button>
       ))}
     </div>
+  )
+}
+
+/** Ô số VĐV tối thiểu: cho xoá trắng khi đang gõ (giữ nháp), rời ô thì hiện lại giá trị hợp lệ 1–100 */
+function MinRosterInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  return (
+    <Input id="m-min" inputMode="numeric" value={draft ?? String(value)}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => {
+        const d = e.target.value.replace(/\D/g, '').slice(0, 3)
+        setDraft(d)
+        if (d) onChange(Math.max(1, Math.min(100, Number(d))))
+      }}
+      onBlur={() => setDraft(null)} />
   )
 }
 
@@ -80,8 +96,7 @@ export function RulesForm({ value: t, onChange, kind }: { value: MatchTerms; onC
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="VĐV tối thiểu mỗi CLB" htmlFor="m-min">
-          <Input id="m-min" inputMode="numeric" value={String(t.min_roster)}
-            onChange={(e) => set('min_roster', Math.max(1, Math.min(100, Number(e.target.value.replace(/\D/g, '')) || 1)))} />
+          <MinRosterInput value={t.min_roster} onChange={(v) => set('min_roster', v)} />
         </Field>
         <Field label="Tối đa (để trống = không giới hạn)" htmlFor="m-max">
           <Input id="m-max" inputMode="numeric" value={t.max_roster == null ? '' : String(t.max_roster)}
