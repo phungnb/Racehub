@@ -5,7 +5,7 @@ import { useFeature } from '@/features/system'
 import Link from 'next/link'
 import { useDeferredValue, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { BadgeCheck, ChevronRight, Clock, Handshake, Mail, Search, Store, UserRound } from 'lucide-react'
+import { BadgeCheck, ChevronRight, Clock, Handshake, Mail, PackageOpen, Search, Store, UserRound } from 'lucide-react'
 import { BackLink, EmptyState, ErrorState, Input, SegmentedControl, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
@@ -33,10 +33,16 @@ export function MarketScreen() {
           <h1 className="text-2xl font-bold">Chợ Runner</h1>
           <p className="text-sm text-fg-muted">{section === 'bib' ? 'Nhượng lại, tìm mua BIB giải chạy — đúng giá, chuyển tên qua BTC.' : 'HLV, cửa hàng, dịch vụ cho runner — hồ sơ đã được RaceHub xác minh.'}</p>
         </div>
-        <Link href={routes.marketMine} aria-label="Hồ sơ đối tác của tôi"
-          className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-border bg-surface-2 px-3 text-sm font-semibold hover:border-fg-subtle">
-          <UserRound className="size-4" aria-hidden />Tôi
-        </Link>
+        <div className="flex shrink-0 gap-2">
+          <Link href={routes.marketOrders} aria-label="Đơn mua của tôi"
+            className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-xl border border-border bg-surface-2 px-3 text-sm font-semibold hover:border-fg-subtle">
+            <PackageOpen className="size-4" aria-hidden />Đơn mua
+          </Link>
+          <Link href={routes.marketMine} aria-label="Hồ sơ đối tác của tôi"
+            className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-xl border border-border bg-surface-2 px-3 text-sm font-semibold hover:border-fg-subtle">
+            <UserRound className="size-4" aria-hidden />Tôi
+          </Link>
+        </div>
       </header>
       <div role="tablist" className={cn('grid gap-2', bibOn ? 'grid-cols-2' : 'grid-cols-1')}>
         {([['partners', 'Đối tác', Store], ['bib', 'Chợ BIB', Handshake]] as const).filter(([v]) => bibOn || v !== 'bib').map(([v, label, Icon]) => (
