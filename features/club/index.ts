@@ -1,5 +1,5 @@
 // Cổng công khai của module club. Code ngoài module chỉ import từ '@/features/club'.
-export { ClubsInboxScreen } from './components/hub/ClubsInboxScreen'
+export { ClubsInboxScreen, CreateClubSheet } from './components/hub/ClubsInboxScreen'
 export { ClubShell } from './components/hub/ClubShell'
 export { ClubFeedScreen } from './components/feed/ClubFeedScreen'
 export { ClubChatScreen } from './components/chat/ClubChatScreen'

@@ -17,6 +17,28 @@ export interface CupContributor { user_id: string; display_name: string | null; 
 export interface CupStanding extends CupClub {
   rank: number; club_id: string; members: number; runners: number; km: number; avg_km: number; score: number | null
   time_s?: number; days?: number; forfeited?: boolean; top?: CupContributor[]
+  /** 016200 — giải online: số thành viên đạt km hợp lệ, CLB có đủ % thành viên hợp lệ để được xếp hạng không */
+  valid?: number; eligible?: boolean
+}
+/** Luật giải online (016200) — null với giải thường */
+export interface CupLeague {
+  min_run_km: number | null; min_pace: number | null; max_pace: number | null
+  member_min_km: number | null; min_valid_pct: number | null
+  max_runners: number | null; signed_runners: number
+  require_club_approval: boolean
+  prize_top_clubs: number | null; prize_top_runners: number | null
+  has_reward_form: boolean
+  /** Chỉ có với ban tổ chức hoặc người đạt giải khi giải đã kết thúc chính thức */
+  reward_form_url: string | null
+  my_prize: { club_rank: number | null; runner_rank: number | null; valid: boolean; qualified: boolean } | null
+  pending_clubs: { club_id: string; name: string; avatar_url: string | null; accent_color: string | null; members: number; requested_at: string }[] | null
+}
+/** Trường luật giải online khi tạo giải (bỏ trống = không áp) */
+export interface LeagueInput {
+  min_run_km?: number | null; min_pace?: number | null; max_pace?: number | null
+  member_min_km?: number | null; min_valid_pct?: number | null; max_runners?: number | null
+  require_club_approval?: boolean; reward_form_url?: string | null
+  prize_top_clubs?: number | null; prize_top_runners?: number | null
 }
 /** Điều khoản trận (gửi khi tạo / đề xuất lại) */
 export interface MatchTerms {
@@ -52,7 +74,7 @@ export interface Cup {
   host: CupClub | null
   creator: { id: string; display_name: string | null; avatar_url: string | null } | null
   clubs: number
-  my_clubs: (CupClub & { staff: boolean; joined: boolean; signed_up?: boolean; eligible?: boolean; forfeited?: boolean; roster?: number })[]
+  my_clubs: (CupClub & { staff: boolean; joined: boolean; approved?: boolean; signed_up?: boolean; eligible?: boolean; forfeited?: boolean; roster?: number })[]
   /** Từ 011700: thành viên phải tự đăng ký thi đấu mới được tính */
   require_signup?: boolean
   my_signup?: string | null
@@ -89,9 +111,10 @@ export interface Cup {
   mvp: (CupContributor & { club_id: string }) | null
   pending_runs: number | null
   my_strava_hidden: boolean
+  league?: CupLeague | null
 }
 
-export interface NewCup extends Omit<MatchTerms, 'forfeit_rule'> {
+export interface NewCup extends Omit<MatchTerms, 'forfeit_rule'>, LeagueInput {
   title: string
   description: string
   prize: string
@@ -115,6 +138,16 @@ export const joinCup = (id: string, clubId: string) => call<Cup>('join_club_cup'
 export const leaveCup = (id: string, clubId: string) => call<Cup>('leave_club_cup', { p_cup_id: id, p_club_id: clubId })
 
 export const joinCupAsMember = (id: string, clubId: string) => call<Cup>('join_cup_as_member', { p_cup_id: id, p_club_id: clubId })
+export const reviewCupClub = (id: string, clubId: string, approve: boolean, note?: string) =>
+  call<Cup>('review_cup_club', { p_cup_id: id, p_club_id: clubId, p_approve: approve, p_note: note ?? null })
+export const setRewardForm = (id: string, url: string) => call<Cup>('set_cup_reward_form', { p_cup_id: id, p_url: url })
+export interface RunnerBoardRow {
+  rank: number; user_id: string; display_name: string | null; avatar_url: string | null; club_id: string; club_name: string
+  km: number; raw_km: number; runs: number; days: number; pace_s: number | null; valid: boolean
+}
+export const getRunnerBoard = (id: string) =>
+  call<{ member_min_km: number | null; daily_cap_km: number | null; total: number; rows: RunnerBoardRow[] }>('club_cup_runner_board', { p_cup_id: id, p_limit: 500 })
+
 export const leaveCupAsMember = (id: string) => call<Cup>('leave_cup_as_member', { p_cup_id: id })
 export interface ClubBoardRow {
   rank: number; user_id: string; display_name: string | null; avatar_url: string | null; km: number; raw_km?: number; runs: number; days: number
@@ -183,6 +216,12 @@ const MESSAGES: Record<string, string> = {
   INVALID_REG_CLOSE: 'Hạn đăng ký phải sau hiện tại và trước khi kết thúc.',
   INVALID_MAX: 'Số CLB tối đa từ 2 đến 200.',
   REASON_REQUIRED: 'Nhập lý do từ chối (ít nhất 3 ký tự).',
+  CLUB_TOO_SMALL: 'CLB chưa đủ số thành viên tối thiểu của giải — mời thêm người vào CLB rồi đăng ký lại.',
+  CLUB_PENDING_APPROVAL: 'CLB của bạn đang chờ ban tổ chức duyệt — duyệt xong mới đăng ký thi đấu được.',
+  ENTRY_NOT_PENDING: 'CLB này không còn ở hàng chờ duyệt.',
+  RUNNERS_FULL: 'Giải đã đủ số runner đăng ký — rất tiếc, bạn không đăng ký thêm được.',
+  INVALID_LEAGUE: 'Luật giải online chưa hợp lệ: kiểm tra km, pace (tối thiểu < tối đa), phần trăm và số runner.',
+  INVALID_FORM_URL: 'Link form nhận giải phải bắt đầu bằng https:// và không có khoảng trắng.',
   RATE_LIMITED: 'Bạn tạo quá nhiều thách đấu trong hôm nay.',
 }
 

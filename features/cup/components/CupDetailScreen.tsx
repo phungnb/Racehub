@@ -12,6 +12,7 @@ import { cancelCup, cupErrorMessage, getClubBoard, getCup, joinCup, leaveCup, re
 import { canJoin } from '../model/cup'
 import { formatContribution, formatScore, PHASE_INFO } from '../model/match'
 import { fmtTime } from './CupCard'
+import { CreateClubPrompt, LeagueBox, PendingClubs, RunnerBoard } from './LeagueParts'
 import { DuelScoreboard, NegotiationBox, PhaseBadge, ResultBanner, RulesCard, SignupBox, useMatchMutation } from './MatchParts'
 
 export function CupDetailScreen({ id }: { id: string }) {
@@ -47,12 +48,16 @@ export function CupDetailScreen({ id }: { id: string }) {
         {c.cancel_reason && c.status === 'CANCELLED' && <p className="rounded-xl bg-surface-2 px-3 py-2 text-sm">{c.cancel_reason}</p>}
       </Card>
 
+      <LeagueBox c={c} />
       <ReviewBox c={c} />
+      <PendingClubs c={c} />
+      {!duel && <CreateClubPrompt c={c} />}
       {c.status === 'INVITED' && <NegotiationBox c={c} now={now} />}
       <ResultBanner c={c} now={now} />
       {c.status === 'OPEN' && !duel && <JoinBox c={c} now={now} />}
       <SignupBox c={c} now={now} />
       {showBoard && (duel ? <DuelScoreboard c={c} myClub={c.my_signup ?? c.my_clubs.find((m) => m.joined)?.id} /> : <Standings c={c} />)}
+      {showBoard && !duel && c.league && <RunnerBoard c={c} />}
       {showBoard && duel && <RosterLinks c={c} />}
       <RulesCard c={c} />
       {c.can_cancel && <CancelButton c={c} />}
@@ -124,6 +129,12 @@ function JoinBox({ c, now }: { c: Cup; now: number }) {
           <span className="min-w-0 flex-1 truncate text-sm font-semibold">{m.name}</span>
           {m.joined ? (
             started ? <span className="text-xs font-semibold text-brand">Đang thi đấu</span>
+              : m.approved === false ? (
+                <>
+                  <span className="text-xs font-semibold text-warning">Chờ BTC duyệt</span>
+                  <Button size="sm" variant="ghost" onClick={() => leave.mutate(m.id)} loading={leave.isPending && leave.variables === m.id}>Rút</Button>
+                </>
+              )
               : <Button size="sm" variant="ghost" onClick={() => leave.mutate(m.id)} loading={leave.isPending && leave.variables === m.id}>Rút</Button>
           ) : (
             <Button size="sm" onClick={() => join.mutate(m.id)} loading={join.isPending && join.variables === m.id} disabled={!open}>
@@ -163,14 +174,16 @@ function Standings({ c }: { c: Cup }) {
           {shown.map((s) => (
             <li key={s.club_id}>
               <button type="button" onClick={() => setOpen(s)} aria-label={`Xem bảng xếp hạng thành viên ${s.name}`}
-                className={cn('flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left hover:border-fg-subtle', mine.has(s.club_id) ? 'border-brand/50 bg-brand/10' : 'border-border bg-surface')}>
+                className={cn('flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left hover:border-fg-subtle', mine.has(s.club_id) ? 'border-brand/50 bg-brand/10' : 'border-border bg-surface', s.eligible === false && 'opacity-70')}>
                 <span className="grid w-7 place-items-center font-mono text-sm font-bold text-fg-muted">
-                  {s.rank <= 3 && c.status === 'FINISHED' ? (s.rank === 1 ? <Crown className={cn('size-5', MEDAL[0])} aria-label="Hạng 1" /> : <Medal className={cn('size-5', MEDAL[s.rank - 1])} aria-label={`Hạng ${s.rank}`} />) : s.rank}
+                  {s.rank <= 3 && c.status === 'FINISHED' && s.eligible !== false ? (s.rank === 1 ? <Crown className={cn('size-5', MEDAL[0])} aria-label="Hạng 1" /> : <Medal className={cn('size-5', MEDAL[s.rank - 1])} aria-label={`Hạng ${s.rank}`} />) : s.eligible === false ? '–' : s.rank}
                 </span>
                 <ClubAvatar club={s} size="sm" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">{s.name}</span>
-                  <span className="block text-[11px] text-fg-muted">{s.forfeited ? 'Thiếu người — xử thua' : `${s.runners}/${s.members} VĐV đã chạy · ${s.km.toLocaleString('vi-VN')} km`}</span>
+                  <span className="block text-[11px] text-fg-muted">{s.forfeited ? 'Thiếu người — xử thua'
+                    : s.eligible === false ? `Chưa xếp hạng: ${s.valid ?? 0}/${s.members} thành viên đạt ${c.league?.member_min_km ?? ''} km (cần ${c.league?.min_valid_pct ?? ''}%)`
+                    : `${s.runners}/${s.members} VĐV đã chạy · ${s.km.toLocaleString('vi-VN')} km${s.valid != null && c.league?.member_min_km ? ` · ${s.valid} đạt ${c.league.member_min_km} km` : ''}`}</span>
                 </span>
                 <span className="shrink-0 text-right">
                   <span className="block font-mono text-base font-bold tabular">{formatScore(c, s.score)}</span>
