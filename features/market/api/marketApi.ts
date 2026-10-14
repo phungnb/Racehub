@@ -20,6 +20,7 @@ export interface Partner {
   status: PartnerStatus
   is_mine: boolean
   services_count: number
+  products_count: number
   owner: { id: string; display_name: string; avatar_url: string | null }
   // hồ sơ đầy đủ
   bio?: string | null

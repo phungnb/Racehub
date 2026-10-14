@@ -317,7 +317,9 @@ begin
                            and p.proname <> 'admin_system_check')),
     jsonb_build_object('file', '20261001015900', 'label', 'Chống gian lận: CLB < 5 người không duyệt bài; admin loại bài đã ghi nhận',
       'ok', to_regprocedure('public.admin_reject_activity(uuid,text)') is not null
-        and position('>= 5' in pg_get_functiondef(to_regprocedure('private.can_review_activity(uuid)'))) > 0));
+        and position('>= 5' in pg_get_functiondef(to_regprocedure('private.can_review_activity(uuid)'))) > 0),
+    jsonb_build_object('file', '20261001016000', 'label', 'Cửa hàng đối tác: sản phẩm, biến thể, tồn kho, đơn hàng',
+      'ok', to_regprocedure('public.place_partner_order(uuid,jsonb,jsonb,text,text)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

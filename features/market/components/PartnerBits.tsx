@@ -41,6 +41,7 @@ export function PartnerCard({ p }: { p: Partner }) {
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg-subtle">
             <span>{PARTNER_KIND[p.kind].label}</span>
             {p.area && <span className="inline-flex items-center gap-0.5"><MapPin className="size-3" aria-hidden />{p.area}</span>}
+            {p.products_count > 0 && <span>{p.products_count} sản phẩm</span>}
             {p.services_count > 0 && <span>{p.services_count} dịch vụ</span>}
           </p>
           {!!p.specialties.length && (

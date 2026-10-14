@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, ExternalLink, Plus, Trash2 } from 'lucide-react'
+import { ChevronLeft, ExternalLink, Plus, Store, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, ErrorState, Field, Input, PlaceSearch, Skeleton, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -48,9 +48,11 @@ export function PartnerEditor() {
                 <span className="text-xs text-fg-muted">· {PARTNER_KIND[p.kind].label}</span>
                 {p.verified && p.status === 'APPROVED' ? <VerifiedBadge /> : <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-bold', STATUS[p.status].tone)}>{STATUS[p.status].label}</span>}
               </div>
+              {p.products_count > 0 && <p className="text-xs text-fg-muted">{p.products_count} sản phẩm đang bán</p>}
               {p.review_note && p.status !== 'APPROVED' && <p className="text-sm text-fg-muted"><b>Ghi chú của RaceHub:</b> {p.review_note}</p>}
               <div className="flex gap-2">
-                <Button size="sm" onClick={() => setEdit(p)}>Sửa hồ sơ</Button>
+                <Link href={routes.partnerShopManage(p.id)}><Button size="sm"><Store className="size-4" aria-hidden />{p.kind === 'COACH' ? 'Bán sản phẩm' : 'Quản lý cửa hàng'}</Button></Link>
+                <Button size="sm" variant="secondary" onClick={() => setEdit(p)}>Sửa hồ sơ</Button>
                 <Link href={routes.partner(p.id)}><Button size="sm" variant="ghost"><ExternalLink className="size-4" aria-hidden />Xem</Button></Link>
               </div>
             </Card>

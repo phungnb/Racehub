@@ -9,8 +9,8 @@ import { createDb } from './load-schema'
 // Hàm SECURITY DEFINER mà khách chưa đăng nhập ĐƯỢC PHÉP gọi (trang công khai, xem trước link mời, kiểm tra mã xác thực…)
 const ANON_ALLOWED = [
   'challenge_honor(uuid)', 'club_invite_preview(text)', 'club_public_page(text)', 'club_role(uuid,uuid)',
-  'get_active_config(text)', 'get_partner(uuid)', 'has_permission(uuid,uuid,text)', 'help_menu()', 'help_page(text)',
-  'is_system_admin()', 'list_partners(text,text,text)', 'ops_policy()', 'plan_compare()', 'referral_preview(text)',
+  'get_active_config(text)', 'get_partner(uuid)', 'get_shop_product(uuid)', 'has_permission(uuid,uuid,text)', 'help_menu()', 'help_page(text)',
+  'is_system_admin()', 'list_partners(text,text,text)', 'ops_policy()', 'partner_shop(uuid)', 'plan_compare()', 'referral_preview(text)',
   'request_enterprise_quote(jsonb)', 'resolve_club_slug(text)', 'system_notice()', 'verify_victory(text)',
 ]
 

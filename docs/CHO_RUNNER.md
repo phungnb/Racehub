@@ -20,6 +20,22 @@ Chợ Runner có 2 phần: **Đối tác** và **Chợ BIB**.
 - Đối tác đã được xác minh có thể được gắn làm **tác giả bài Kiến thức**. Cuối mỗi bài như vậy có nút "Xem hồ sơ & dịch vụ". Bài về giáo án, dinh dưỡng, thiết bị tự dẫn người đọc sang đúng nhóm đối tác.
 - Hiện **admin chưa đăng hồ sơ thay đối tác**. Hồ sơ gắn với tài khoản của chủ để họ tự cập nhật giá và liên hệ. Nếu cần, bản sau có thể thêm tính năng "admin tạo hồ sơ hộ rồi trao quyền cho chủ".
 
+### 1b. Cửa hàng đối tác (migration 016000)
+
+Đối tác tạo hồ sơ xong là vào được **Quản lý cửa hàng** (`/market/me/shop/<id>`) để bán hàng; khách chỉ thấy sản phẩm sau khi hồ sơ được xác minh.
+
+| Phần | Cách hoạt động |
+|---|---|
+| Sản phẩm | Tối đa 200 sản phẩm / đối tác: ≤ 8 ảnh, giá + giá gốc (hiện % giảm), danh mục, SKU, mô tả, bật / ẩn. |
+| Phân loại | ≤ 30 phân loại (size, màu…), mỗi cái có giá riêng (tuỳ chọn) và tồn kho riêng. Không có phân loại thì dùng tồn kho của sản phẩm. Tồn kho trống = không giới hạn. |
+| Đặt hàng | Giỏ hàng lưu trên máy khách. Khi đặt, **server tự tính lại giá, phí giao, tồn kho** (khoá hàng, chống bán lố); lỗi một dòng thì cả đơn không ghi. Đơn lưu ảnh chụp tên / giá lúc đặt. |
+| Thanh toán | **Chuyển khoản VietQR** thẳng vào tài khoản đối tác (nội dung = mã đơn `RHxxxxxx`) hoặc **COD** (đối tác bật). RaceHub không giữ tiền. |
+| Phí giao | Phí cố định + ngưỡng miễn phí do đối tác đặt. |
+| Đơn của đối tác | Chờ xác nhận → Đã nhận tiền → Đang giao (mã vận đơn) → Hoàn tất; hoặc Huỷ (hoàn lại tồn kho). Đơn chuyển khoản phải xác nhận nhận tiền trước khi giao. Xuất Excel (CSV). |
+| Đơn của khách | `/market/orders`: xem trạng thái, mã vận đơn, mở lại mã chuyển khoản, tự huỷ khi đơn còn "Chờ xác nhận". |
+| Thông báo | Đối tác nhận thông báo đơn mới / khách huỷ; khách nhận thông báo khi đối tác nhận tiền, giao, hoàn tất, huỷ. |
+| Riêng tư | Họ tên, điện thoại, địa chỉ nhận chỉ chủ shop và người đặt xem được. Tài khoản ngân hàng chỉ hiện cho khách trong đơn đang chờ chuyển khoản. |
+
 ## 2. Chợ BIB
 
 Runner nhượng lại BIB khi không chạy được, hoặc đăng tin cần mua BIB giải đã hết suất.

@@ -1,375 +1,465 @@
--- RaceHub — PHẦN 26/26 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 003500
+-- RaceHub — PHẦN 26/27 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- Gồm: 016000
 -- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
--- PHẦN CUỐI: luôn chạy phần này sau cùng (cập nhật trang Quản trị → Kiểm tra hệ thống).
+-- Xong thì chạy phần tiếp theo.
 begin;
 -- ===================================================================
--- 20261001003500_system_check.sql
+-- 20261001016000_partner_shop.sql
 -- ===================================================================
--- 003500: Trang "Kiểm tra hệ thống" cho admin.
--- admin_system_check() dò từng migration đã chạy chưa (qua một đối tượng đặc trưng của file đó),
--- kho ảnh, pg_net / cấu hình push, và dữ liệu bất thường (thử thách / trận CLB quá hạn chưa tất toán,
--- hàng đợi push bị kẹt, bài chờ duyệt). Chỉ đọc, không đổi gì. Chạy lại nhiều lần vẫn an toàn.
+-- 016000: Cửa hàng đối tác — đăng sản phẩm (ảnh, giá, biến thể, tồn kho), giỏ hàng / đặt hàng, thanh toán, quản lý đơn.
+-- • Đối tác (hồ sơ Chợ Runner, 005300) đăng sản phẩm ngay sau khi tạo hồ sơ; sản phẩm CHỈ hiện cho khách khi hồ sơ đã được xác minh.
+-- • Sản phẩm: nhiều ảnh, giá + giá gốc (gạch), danh mục, SKU, biến thể (size / màu… mỗi biến thể có giá + tồn kho riêng).
+-- • Khách chọn biến thể, thêm giỏ, đặt hàng: tên, điện thoại, địa chỉ giao. Server tự tính tiền, trừ tồn kho (khoá hàng chống bán lố).
+-- • Thanh toán: chuyển khoản VietQR thẳng vào tài khoản của đối tác (nội dung = mã đơn) hoặc COD. RaceHub KHÔNG giữ tiền.
+-- • Đối tác: đơn mới → xác nhận tiền → giao (mã vận đơn) → hoàn tất / huỷ (hoàn lại tồn kho). Khách theo dõi trong "Đơn của tôi".
+-- Cần 005300, 000500 (private.notify). Chạy lại nhiều lần vẫn an toàn. Không dùng SELECT … INTO, khối DO, LIMIT (SQL Editor).
 
-create or replace function private.sc_fn(p_schema text, p_name text) returns boolean
-language sql stable as $$
-  select exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = p_schema and p.proname = p_name)
+-- ---------------------------------------------------------------------
+-- 1. Cài đặt cửa hàng trên hồ sơ đối tác
+-- ---------------------------------------------------------------------
+alter table public.partners add column if not exists shop_bank_bin text;
+alter table public.partners add column if not exists shop_bank_account_no text;
+alter table public.partners add column if not exists shop_bank_account_name text;
+alter table public.partners add column if not exists ship_fee_vnd integer not null default 0 check (ship_fee_vnd between 0 and 500000);
+alter table public.partners add column if not exists free_ship_over_vnd integer check (free_ship_over_vnd is null or free_ship_over_vnd between 0 and 50000000);
+alter table public.partners add column if not exists cod_enabled boolean not null default false;
+alter table public.partners add column if not exists shop_policy text check (shop_policy is null or char_length(shop_policy) <= 1000);
+
+-- ---------------------------------------------------------------------
+-- 2. Bảng sản phẩm / biến thể / đơn hàng
+-- ---------------------------------------------------------------------
+create table if not exists public.partner_products (
+  id uuid primary key default gen_random_uuid(),
+  partner_id uuid not null references public.partners(id) on delete cascade,
+  title text not null check (char_length(title) between 2 and 100),
+  description text check (description is null or char_length(description) <= 2000),
+  images text[] not null default '{}' check (cardinality(images) <= 8),
+  category text check (category is null or char_length(category) <= 30),
+  price_vnd integer not null check (price_vnd between 0 and 50000000),
+  compare_price_vnd integer check (compare_price_vnd is null or compare_price_vnd between 0 and 50000000),
+  sku text check (sku is null or char_length(sku) <= 40),
+  stock integer check (stock is null or stock between 0 and 1000000),      -- null = không giới hạn (sản phẩm không có biến thể)
+  status text not null default 'ACTIVE' check (status in ('ACTIVE', 'HIDDEN')),
+  sold integer not null default 0 check (sold >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists partner_products_partner_idx on public.partner_products (partner_id, status, created_at desc);
+
+create table if not exists public.partner_variants (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid not null references public.partner_products(id) on delete cascade,
+  name text not null check (char_length(name) between 1 and 60),
+  price_vnd integer check (price_vnd is null or price_vnd between 0 and 50000000),   -- null = dùng giá sản phẩm
+  stock integer check (stock is null or stock between 0 and 1000000),
+  sku text check (sku is null or char_length(sku) <= 40),
+  position integer not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists partner_variants_product_idx on public.partner_variants (product_id, position);
+
+create table if not exists public.partner_orders (
+  id uuid primary key default gen_random_uuid(),
+  partner_id uuid not null references public.partners(id) on delete cascade,
+  user_id uuid references public.profiles(id) on delete set null,
+  code text not null unique,
+  items jsonb not null,                         -- ảnh chụp lúc đặt: [{product_id, variant_id, title, variant, price_vnd, qty, image}]
+  quantity integer not null check (quantity between 1 and 200),
+  subtotal_vnd bigint not null check (subtotal_vnd >= 0),
+  ship_fee_vnd integer not null default 0 check (ship_fee_vnd >= 0),
+  amount_vnd bigint not null check (amount_vnd >= 0),
+  buyer_name text not null check (char_length(buyer_name) between 2 and 60),
+  buyer_phone text not null check (buyer_phone ~ '^(0|\+84)[0-9]{9,10}$'),
+  ship_address text not null check (char_length(ship_address) between 8 and 250),
+  note text check (note is null or char_length(note) <= 300),
+  payment_method text not null check (payment_method in ('BANK', 'COD')),
+  status text not null default 'PENDING' check (status in ('PENDING', 'PAID', 'SHIPPING', 'DONE', 'CANCELLED')),
+  status_note text,
+  tracking_code text check (tracking_code is null or char_length(tracking_code) <= 60),
+  paid_at timestamptz,
+  shipped_at timestamptz,
+  done_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists partner_orders_partner_idx on public.partner_orders (partner_id, created_at desc);
+create index if not exists partner_orders_user_idx on public.partner_orders (user_id, created_at desc);
+
+alter table public.partner_products enable row level security;
+alter table public.partner_variants enable row level security;
+alter table public.partner_orders enable row level security;
+revoke all on public.partner_products, public.partner_variants, public.partner_orders from anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- 3. Hàm nội bộ
+-- ---------------------------------------------------------------------
+create or replace function private.shop_bank(p public.partners) returns jsonb
+language sql immutable as $$
+  select case when p.shop_bank_bin is null or p.shop_bank_account_no is null then null
+              else jsonb_build_object('bin', p.shop_bank_bin, 'account_no', p.shop_bank_account_no, 'account_name', p.shop_bank_account_name) end
 $$;
 
-create or replace function private.sc_col(p_table text, p_col text) returns boolean
-language sql stable as $$
-  select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = p_table and column_name = p_col)
+create or replace function private.shop_settings_json(p public.partners, p_owner boolean) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('ship_fee_vnd', p.ship_fee_vnd, 'free_ship_over_vnd', p.free_ship_over_vnd, 'cod_enabled', p.cod_enabled,
+    'shop_policy', p.shop_policy, 'bank_ready', p.shop_bank_bin is not null and p.shop_bank_account_no is not null)
+    || case when p_owner then jsonb_build_object('bank', private.shop_bank(p)) else '{}'::jsonb end
 $$;
 
-create or replace function public.admin_system_check() returns jsonb
-language plpgsql stable security definer set search_path = public as $$
-declare
-  v_mig jsonb;
-  v_buckets jsonb;
-  v_stats jsonb := '{}'::jsonb;
+create or replace function private.shop_product_json(pr public.partner_products) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('id', pr.id, 'partner_id', pr.partner_id, 'title', pr.title, 'description', pr.description,
+    'images', to_jsonb(pr.images), 'category', pr.category, 'price_vnd', pr.price_vnd, 'compare_price_vnd', pr.compare_price_vnd,
+    'sku', pr.sku, 'stock', pr.stock, 'status', pr.status, 'sold', pr.sold, 'created_at', pr.created_at,
+    'variants', coalesce((select jsonb_agg(jsonb_build_object('id', v.id, 'name', v.name, 'price_vnd', coalesce(v.price_vnd, pr.price_vnd),
+                    'own_price', v.price_vnd, 'stock', v.stock, 'sku', v.sku) order by v.position, v.created_at)
+                  from public.partner_variants v where v.product_id = pr.id), '[]'::jsonb),
+    'price_min', coalesce((select min(coalesce(v.price_vnd, pr.price_vnd)) from public.partner_variants v where v.product_id = pr.id), pr.price_vnd),
+    'price_max', coalesce((select max(coalesce(v.price_vnd, pr.price_vnd)) from public.partner_variants v where v.product_id = pr.id), pr.price_vnd),
+    'in_stock', case when exists (select 1 from public.partner_variants v where v.product_id = pr.id)
+                     then exists (select 1 from public.partner_variants v where v.product_id = pr.id and (v.stock is null or v.stock > 0))
+                     else (pr.stock is null or pr.stock > 0) end)
+$$;
+
+create or replace function private.shop_order_json(o public.partner_orders) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('id', o.id, 'partner_id', o.partner_id, 'shop_name', (select p.name from public.partners p where p.id = o.partner_id),
+    'user_id', o.user_id, 'code', o.code, 'items', o.items, 'quantity', o.quantity, 'subtotal_vnd', o.subtotal_vnd, 'ship_fee_vnd', o.ship_fee_vnd,
+    'amount_vnd', o.amount_vnd, 'buyer_name', o.buyer_name, 'buyer_phone', o.buyer_phone, 'ship_address', o.ship_address, 'note', o.note,
+    'payment_method', o.payment_method, 'status', o.status, 'status_note', o.status_note, 'tracking_code', o.tracking_code,
+    'paid_at', o.paid_at, 'shipped_at', o.shipped_at, 'done_at', o.done_at, 'created_at', o.created_at,
+    'bank', case when o.payment_method = 'BANK' and o.status = 'PENDING'
+                 then (select private.shop_bank(p) from public.partners p where p.id = o.partner_id) end)
+$$;
+
+-- Hoàn lại tồn kho + số đã bán khi đơn bị huỷ
+create or replace function private.shop_restore_stock(o public.partner_orders) returns void
+language plpgsql security definer set search_path = public as $$
+declare i jsonb;
 begin
-  if not public.is_system_admin() then raise exception 'FORBIDDEN'; end if;
-
-  v_mig := jsonb_build_array(
-    jsonb_build_object('file', '20261001000100', 'label', 'Khóa khẩn cấp quyền ghi', 'ok', not has_table_privilege('authenticated', 'public.clubs', 'INSERT')),
-    jsonb_build_object('file', '20261001000200', 'label', 'Sổ cái Xu', 'ok', private.sc_fn('private', 'ledger_post')),
-    jsonb_build_object('file', '20261001000300', 'label', 'RPC an toàn', 'ok', private.sc_fn('private', 'require_admin')),
-    jsonb_build_object('file', '20261001000400', 'label', 'Nhận bài chạy từ Strava', 'ok', private.sc_fn('public', 'ingest_provider_activity')),
-    jsonb_build_object('file', '20261001000500', 'label', 'CLB: bảng tin, chat, thông báo', 'ok', private.sc_fn('private', 'notify')),
-    jsonb_build_object('file', '20261001000600', 'label', 'Thử thách', 'ok', private.sc_fn('private', 'challenge_apply_activity')),
-    jsonb_build_object('file', '20261001000700', 'label', 'Kinh tế Xu + admin', 'ok', private.sc_fn('public', 'economy_policy')),
-    jsonb_build_object('file', '20261001000800', 'label', 'Lớp game', 'ok', private.sc_fn('private', 'game_config')),
-    jsonb_build_object('file', '20261001000900', 'label', 'Cửa hàng nhân vật', 'ok', private.sc_fn('private', 'character_look')),
-    jsonb_build_object('file', '20261001001000', 'label', 'Nhân vật 2D', 'ok', private.sc_col('avatar_items', 'render_kind')),
-    jsonb_build_object('file', '20261001001100', 'label', 'Bỏ cột 3D', 'ok', not private.sc_col('avatar_items', 'model_key')),
-    jsonb_build_object('file', '20261001001200', 'label', 'Admin vật phẩm', 'ok', private.sc_fn('public', 'admin_save_avatar_item')),
-    jsonb_build_object('file', '20261001001300', 'label', 'Bộ mũ / băng đô', 'ok', exists (select 1 from public.avatar_items where code = 'hat_cap_tempo_black')),
-    jsonb_build_object('file', '20261001001400', 'label', 'Hồ sơ chi tiết', 'ok', to_regclass('public.profile_details') is not null),
-    jsonb_build_object('file', '20261001001500', 'label', 'Sự kiện + quỹ CLB', 'ok', private.sc_fn('private', 'event_json')),
-    jsonb_build_object('file', '20261001001600', 'label', 'QR ngân hàng CLB', 'ok', private.sc_col('clubs', 'bank_qr_url')),
-    jsonb_build_object('file', '20261001001700', 'label', 'Thông báo đẩy', 'ok', private.sc_fn('private', 'push_kick')),
-    jsonb_build_object('file', '20261001001800', 'label', 'Onboarding', 'ok', private.sc_col('profiles', 'onboarded_at')),
-    jsonb_build_object('file', '20261001001900', 'label', 'Chi tiết bài chạy', 'ok', to_regclass('public.activity_details') is not null),
-    jsonb_build_object('file', '20261001002000', 'label', 'Mục tiêu tự đăng ký', 'ok', private.sc_fn('public', 'set_my_pledge')),
-    jsonb_build_object('file', '20261001002100', 'label', 'CLB không giới hạn thành viên', 'ok',
-      (select column_default from information_schema.columns where table_schema = 'public' and table_name = 'clubs' and column_name = 'member_limit') = '1000000'),
-    jsonb_build_object('file', '20261001002200', 'label', 'Tự chia đội', 'ok', private.sc_col('challenges', 'pledge_team_size')),
-    jsonb_build_object('file', '20261001002300', 'label', 'Chống gian lận', 'ok', private.sc_col('activities', 'risk_score')),
-    jsonb_build_object('file', '20261001002400', 'label', 'Duyệt bài nghi vấn', 'ok', private.sc_fn('private', 'can_review_activity')),
-    jsonb_build_object('file', '20261001002500', 'label', 'Bộ đồ NBNR', 'ok', exists (select 1 from public.avatar_items where code = 'bottom_nbnr_club')),
-    jsonb_build_object('file', '20261001002600', 'label', 'CLB đấu CLB', 'ok', private.sc_fn('public', 'create_club_battle')),
-    jsonb_build_object('file', '20261001002700', 'label', 'Giải chạy ảo', 'ok', to_regclass('public.virtual_races') is not null),
-    jsonb_build_object('file', '20261001002800', 'label', 'CLB Pro', 'ok', private.sc_col('clubs', 'plan')),
-    jsonb_build_object('file', '20261001002900', 'label', 'e-BIB + kho ảnh race-media', 'ok', private.sc_col('virtual_races', 'bib_design')),
-    jsonb_build_object('file', '20261001003000', 'label', 'BIB: ảnh có sẵn', 'ok', private.sc_fn('private', 'bib_num')),
-    jsonb_build_object('file', '20261001003100', 'label', 'Tìm kiếm không dấu', 'ok', private.sc_fn('private', 'search_key')),
-    jsonb_build_object('file', '20261001003200', 'label', 'BIB: 3 khung chữ', 'ok', private.sc_fn('private', 'bib_box')),
-    jsonb_build_object('file', '20261001003300', 'label', 'Gợi ý tìm kiếm + sửa kho ảnh', 'ok', private.sc_fn('public', 'can_upload_race_media')),
-    jsonb_build_object('file', '20261001003400', 'label', 'Chặn lộ mã mời CLB', 'ok', not has_column_privilege('authenticated', 'public.clubs', 'invite_code', 'SELECT')),
-    jsonb_build_object('file', '20261001003500', 'label', 'Kiểm tra hệ thống', 'ok', true),
-    jsonb_build_object('file', '20261001003600', 'label', 'Thách đấu nhiều CLB', 'ok', to_regclass('public.club_cups') is not null),
-    jsonb_build_object('file', '20261001003700', 'label', 'Kinh tế v2 (1 Xu = 100đ)', 'ok', private.sc_fn('private', 'run_xu_for_km')),
-    jsonb_build_object('file', '20261001003800', 'label', 'Gói VIP / Pro, đơn hàng', 'ok', to_regclass('public.orders') is not null),
-    jsonb_build_object('file', '20261001003900', 'label', 'Quà tặng', 'ok', to_regclass('public.gift_catalog') is not null),
-    jsonb_build_object('file', '20261001004000', 'label', 'Phân tích VIP + chỉ số kinh tế', 'ok', to_regprocedure('public.admin_economy_metrics(integer)') is not null),
-    jsonb_build_object('file', '20261001004100', 'label', 'Bảo mật + nhật ký không xóa được', 'ok', private.sc_fn('private', 'append_only')),
-    jsonb_build_object('file', '20261001004200', 'label', 'Phong độ + chào mừng trở lại', 'ok', to_regprocedure('public.runner_form(uuid)') is not null),
-    jsonb_build_object('file', '20261001004300', 'label', 'Nhiệm vụ do admin tạo + khuyến mãi', 'ok', to_regclass('public.promotions') is not null),
-    jsonb_build_object('file', '20261001004400', 'label', 'Thông báo hệ thống + nhật ký lỗi', 'ok', to_regprocedure('public.system_notice()') is not null),
-    jsonb_build_object('file', '20261001004500', 'label', 'Báo "Bài chạy đã về"', 'ok', private.sc_fn('private', 'run_synced_notify')),
-    jsonb_build_object('file', '20261001004600', 'label', 'Nhiệm vụ v2 (bậc, cộng đồng, gợi ý)', 'ok', private.sc_fn('private', 'quest_finish')),
-    jsonb_build_object('file', '20261001004700', 'label', 'Ví Tỏa sáng (đổi quà, bậc tỏa sáng)', 'ok', to_regclass('public.shine_shop') is not null),
-    jsonb_build_object('file', '20261001004800', 'label', 'Thiết kế BIB theo lớp + giấy chứng nhận', 'ok', private.sc_col('virtual_races', 'cert_design')),
-    jsonb_build_object('file', '20261001004900', 'label', 'Vinh danh thử thách (CLB Pro / VIP)', 'ok', to_regclass('public.challenge_honors') is not null),
-    jsonb_build_object('file', '20261001005000', 'label', 'Sửa trao quyền Chủ nhiệm CLB', 'ok',
-      exists (select 1 from pg_proc where proname = 'transfer_club_ownership' and prosrc like '%CAPTAIN%')),
-    jsonb_build_object('file', '20261001005100', 'label', 'Khuyến mãi vật phẩm (Xu)', 'ok', to_regclass('public.item_promotions') is not null),
-    jsonb_build_object('file', '20261001005200', 'label', 'Voucher tài trợ (thử thách / nhiệm vụ)', 'ok', to_regclass('public.voucher_campaigns') is not null),
-    jsonb_build_object('file', '20261001005300', 'label', 'Chợ Runner (hồ sơ HLV / Shop / Dịch vụ đã xác minh)', 'ok', to_regclass('public.partners') is not null),
-    jsonb_build_object('file', '20261001005400', 'label', 'Thể lệ thử thách + danh sách bỏ thử thách đã hủy', 'ok', to_regprocedure('public.set_challenge_rules(uuid, jsonb)') is not null),
-    jsonb_build_object('file', '20261001005500', 'label', 'Đăng nhập Google / Apple + mã giới thiệu + xem trước lời mời', 'ok', to_regprocedure('public.my_referral()') is not null),
-    jsonb_build_object('file', '20261001005600', 'label', 'Quản trị: việc cần xử lý, người dùng, thử thách, nhật ký', 'ok', to_regprocedure('public.admin_inbox()') is not null),
-    jsonb_build_object('file', '20261001005700', 'label', 'Gỡ ràng buộc vai trò CLB cũ (sửa lỗi trao quyền Chủ nhiệm)',
-      'ok', not exists (select 1 from pg_constraint where conname = 'club_members_role_check' and conrelid = 'public.club_members'::regclass)),
-    jsonb_build_object('file', '20261001005800', 'label', 'Trang phục: bộ sưu tập, vòng đời, điều kiện mở khóa, vùng in, đồng phục CLB',
-      'ok', to_regprocedure('public.request_club_uniform(uuid, jsonb)') is not null),
-    jsonb_build_object('file', '20261001005900', 'label', 'Bộ đồng phục: áo + quần + tất + giày, họa tiết, mặc cả bộ',
-      'ok', to_regprocedure('private.clean_design(jsonb, text)') is not null),
-    jsonb_build_object('file', '20261001006000', 'label', 'Bộ sưu tập nhân vật (dáng) + thiết kế in kéo thả, độ đậm màu, ảnh vải',
-      'ok', to_regprocedure('private.character_bodies()') is not null))
-  -- PostgreSQL giới hạn 100 tham số mỗi hàm → danh sách chia thành nhiều mảng rồi nối lại
-  || jsonb_build_array(
-    jsonb_build_object('file', '20261001006100', 'label', 'Quanh đây: runner gần bạn (ô ~1 km), kết nối, rủ chạy, buổi chạy công khai, chặn / báo cáo',
-      'ok', to_regprocedure('public.nearby_runners(jsonb)') is not null),
-    jsonb_build_object('file', '20261001006200', 'label', 'RaceHub Knowledge: kiến thức & tin tức, CMS có duyệt chuyên môn, tiến độ đọc, chuỗi bài → huy hiệu',
-      'ok', to_regprocedure('public.knowledge_home()') is not null),
-    jsonb_build_object('file', '20261001006300', 'label', 'Quản lý CLB: Tin CLB của ban chủ nhiệm + kho link ảnh CLB (album sự kiện, giải chạy)',
-      'ok', to_regprocedure('public.club_albums(uuid, jsonb)') is not null),
-    jsonb_build_object('file', '20261001006400', 'label', 'Chợ BIB: nhượng / tìm mua BIB (không cao hơn giá gốc, liên hệ ẩn, báo cáo, admin ẩn tin)',
-      'ok', to_regprocedure('public.bib_listings(jsonb)') is not null),
-    jsonb_build_object('file', '20261001006500', 'label', 'Chấm bài GPS: phát hiện mất tín hiệu (tắt màn hình) — tuyến nối thẳng phải xác minh',
-      'ok', exists (select 1 from pg_proc where proname = 'submit_and_process_activity' and prosrc like '%GPS_GAP%')),
-    jsonb_build_object('file', '20261001006600', 'label', 'Quãng đường bài GPS = số app đo (kẹp theo tuyến) + từng km trên máy chủ',
-      'ok', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'activity_track_points' and column_name = 'distance_m')),
-    jsonb_build_object('file', '20261001006700', 'label', 'Quy định API Strava: bài Strava của người khác chỉ hiện số tổng (ẩn bản đồ, từng km, nhịp tim)',
-      'ok', exists (select 1 from pg_proc where proname = 'activity_detail' and prosrc like '%strava_limited%')),
-    jsonb_build_object('file', '20261001006800', 'label', 'Xoá tài khoản trong app (Apple 5.1.1(v), Luật BVDLCN 2025): xoá dữ liệu cá nhân + ẩn danh',
-      'ok', to_regprocedure('public.delete_my_account(text)') is not null),
-    jsonb_build_object('file', '20261001006900', 'label', 'Thông báo / push lỗi không làm hỏng thao tác chính (gán Pro, nhập bài Strava…) + nhật ký lỗi',
-      'ok', to_regprocedure('public.admin_notify_errors()') is not null),
-    jsonb_build_object('file', '20261001007000', 'label', 'Bài Strava chỉ hiện cho người khác khi runner đồng ý (hướng B+) + công tắc chính sách của admin',
-      'ok', to_regprocedure('public.set_strava_sharing(boolean)') is not null),
-    jsonb_build_object('file', '20261001007100', 'label', 'Admin hệ thống toàn quyền trong mọi CLB (duyệt, sửa, đăng tin, trao quyền, giải tán)',
-      'ok', exists (select 1 from pg_proc where proname = 'club_is_staff' and prosrc like '%is_system_admin%')),
-    jsonb_build_object('file', '20261001007200', 'label', 'Hàm gán gói CLB Pro đúng bản chuẩn (sửa lỗi "chỉ quản trị viên…" khi gán Pro)',
-      'ok', exists (select 1 from pg_proc where proname = 'admin_set_club_plan' and prosrc like '%log_notify_error(''club_plan''%')),
-    jsonb_build_object('file', '20261001007300', 'label', 'Menu Hướng dẫn & Chính sách (trang admin soạn được, đọc khi chưa đăng nhập) + thông tin pháp nhân',
-      'ok', to_regprocedure('public.help_menu()') is not null),
-    jsonb_build_object('file', '20261001007400', 'label', 'Kết nối Strava = đồng ý hiện bài cho CLB & BXH (bỏ bước hỏi; runner tắt được trong Cài đặt)',
-      'ok', exists (select 1 from pg_proc where proname = 'activity_shared' and prosrc like '%strava_share from public.profile_settings s where s.user_id = p_user), true)%')),
-    jsonb_build_object('file', '20261001007500', 'label', 'Sửa lỗi "Không tính được phí" khi tạo thử thách / giải cho CLB Pro + báo giá biết gói VIP / Pro',
-      'ok', exists (select 1 from pg_proc where proname = 'issue_credits' and prosrc like '%r_credit%')),
-    jsonb_build_object('file', '20261001007600', 'label', 'Thử thách tự lặp lại hằng tuần / tháng / quý / năm (tạo kỳ mới như tạo tay: quyền, phí, lượt)',
-      'ok', to_regprocedure('public.spawn_recurring_challenges()') is not null),
-    jsonb_build_object('file', '20261001007700', 'label', 'Ngày vàng ×1,5 / ×2 / ×3 của CLB (nhân km thử thách CLB + BXH CLB, không nhân XP / Xu)',
-      'ok', to_regprocedure('public.club_leaderboard_v2(uuid, text)') is not null),
-    jsonb_build_object('file', '20261001007800', 'label', 'Đại sảnh danh vọng CLB + cột mốc km / Half / Full Marathon tự đăng bảng tin',
-      'ok', to_regprocedure('public.club_hall_of_fame(uuid)') is not null),
-    jsonb_build_object('file', '20261001007900', 'label', 'Cửa hàng CLB: đặt áo / BIB, VietQR vào tài khoản CLB (RaceHub không giữ tiền)',
-      'ok', to_regprocedure('public.place_club_order(uuid, jsonb, text)') is not null),
-    jsonb_build_object('file', '20261001008000', 'label', 'Trang công khai của CLB Pro (/c/<link-riêng>)',
-      'ok', to_regprocedure('public.club_public_page(text)') is not null),
-    jsonb_build_object('file', '20261001008100', 'label', 'Tường nhà CLB Pro (ảnh bìa, khẩu hiệu, chủ đề) + thư mời giao lưu CLB',
-      'ok', to_regprocedure('public.send_club_exchange(uuid, uuid, jsonb)') is not null and private.sc_col('clubs', 'cover_url')),
-    jsonb_build_object('file', '20261001008200', 'label', 'Hạn mức thử thách CLB theo gói (Free / Pro), chặn CLB một người',
-      'ok', to_regprocedure('public.club_challenge_quota(uuid, integer)') is not null),
-    jsonb_build_object('file', '20261001008300', 'label', 'RaceHub Doanh nghiệp / Liên CLB (tổ chức, chiến dịch, báo cáo, báo giá)',
-      'ok', to_regprocedure('public.org_campaign_board(uuid)') is not null),
-    jsonb_build_object('file', '20261001008400', 'label', 'Quản lý doanh nghiệp (email công ty, nhập danh sách, đơn vị nhiều cấp, chốt kết quả, chứng nhận, bảng tin) + quay thưởng',
-      'ok', to_regprocedure('public.run_lucky_draw(uuid)') is not null and to_regprocedure('public.org_import_members(uuid, jsonb, jsonb)') is not null),
-    jsonb_build_object('file', '20261001008500', 'label', 'Chống gian lận chỉ khi thi đấu, CLB miễn phí tối đa 50 thành viên, bảng so sánh gói, Điều khoản / Quyền riêng tư sửa được',
-      'ok', to_regprocedure('public.plan_compare()') is not null and private.sc_col('activities', 'review_skipped')),
-    jsonb_build_object('file', '20261001008600', 'label', 'Tổ chức demo cho admin / khách dùng thử gói Doanh nghiệp',
-      'ok', to_regprocedure('public.admin_create_demo_org(jsonb)') is not null),
-    jsonb_build_object('file', '20261001008700', 'label', 'Tổng quan tổ chức: chỉ số, BXH phòng ban / CLB / cá nhân, km theo ngày',
-      'ok', to_regprocedure('public.org_overview(uuid, timestamp with time zone, timestamp with time zone)') is not null),
-    jsonb_build_object('file', '20261001008800', 'label', 'Chất lượng GPS của bài chạy ghi bằng app + kiểm thử GPS thực địa',
-      'ok', to_regprocedure('public.admin_gps_qa_list(integer)') is not null and to_regclass('public.activity_gps_quality') is not null),
-    jsonb_build_object('file', '20261001008900', 'label', 'VÁ BẢO MẬT: chặn người ngoài CLB / khách sửa CLB, đổi mã mời, chuyển quyền chủ',
-      'ok', not has_function_privilege('anon', 'public.update_club(uuid, text, text, text, text)', 'execute')
-            and position('coalesce' in (select p.prosrc from pg_proc p where p.oid = 'public.transfer_ownership(uuid, uuid)'::regprocedure)) > 0),
-    jsonb_build_object('file', '20261001009000', 'label', 'Lỗi người dùng gặp: admin đánh dấu đã xử lý',
-      'ok', to_regprocedure('public.admin_resolve_client_error(text)') is not null),
-    jsonb_build_object('file', '20261001009100', 'label', 'Chính sách vận hành: bật / tắt tính năng, ghi bài chạy, ngưỡng chống gian lận, trang Doanh nghiệp + lịch sử / khôi phục',
-      'ok', to_regprocedure('public.admin_publish_ops_policy(jsonb, text)') is not null and to_regprocedure('public.admin_rollback_config(text, integer)') is not null),
-    jsonb_build_object('file', '20261001009200', 'label', 'Thẻ gói Miễn phí / CLB Miễn phí / Doanh nghiệp do admin soạn + số quản trị viên CLB miễn phí do admin đặt',
-      'ok', to_regprocedure('private.valid_plan_content(jsonb)') is not null and to_regprocedure('private.club_free_captains()') is not null),
-    jsonb_build_object('file', '20261001009300', 'label', 'Quay thưởng trên sân khấu: BTC chọn danh sách / loại trừ, quay từng giải, vắng mặt quay lại, mã cam kết',
-      'ok', to_regprocedure('public.draw_next(uuid, integer)') is not null and private.sc_col('lucky_draws', 'seed_hash')),
-    jsonb_build_object('file', '20261001009400', 'label', 'Điểm CLB: ban quản trị tự đặt luật tính điểm (phiên bản, lịch sử), BXH điểm, điểm từng bài',
-      'ok', to_regprocedure('public.save_club_point_rules(uuid, jsonb, text)') is not null and to_regclass('public.club_point_rules') is not null),
-    jsonb_build_object('file', '20261001009500', 'label', 'Quay thưởng: người điểm danh tại buổi, danh sách dán, nhà tài trợ',
-      'ok', to_regprocedure('public.draw_absent_key(uuid, text)') is not null and private.sc_col('lucky_draws', 'manual_names')),
-    jsonb_build_object('file', '20261001009600', 'label', 'Bảng điều khiển ban quản trị CLB + tổng kết tuần / tháng tự động',
-      'ok', to_regprocedure('public.club_admin_dashboard(uuid)') is not null and to_regprocedure('public.post_monthly_club_recaps()') is not null),
-    jsonb_build_object('file', '20261001009700', 'label', 'VÁ CHỐNG GIAN LẬN: không tự duyệt bài nghi vấn từ mức Trung bình, "chỉ tính phần có GPS", lời báo thân thiện',
-      'ok', to_regprocedure('public.accept_verified_distance(uuid)') is not null and private.sc_col('activities', 'review_detail')),
-    jsonb_build_object('file', '20261001009800', 'label', 'Chống gian lận cho MỌI bài chạy (không còn tự duyệt khi không thi đấu), lời báo ngắn',
-      'ok', coalesce((private.ops_defaults()->'antiCheat'->>'autoApproveMaxScore')::int, -1) = 0),
-    jsonb_build_object('file', '20261001009900', 'label', 'Bài chạy trùng giờ (nhiều thiết bị): mỗi thời điểm chỉ tính một bài, bài dài nhất; thu hồi thưởng bài bị thay',
-      'ok', to_regprocedure('private.activity_overlap_guard()') is not null
-            and exists (select 1 from pg_trigger t where t.tgname = 'trg_ac_activity_overlap' and t.tgrelid = 'public.activities'::regclass)),
-    jsonb_build_object('file', '20261001010000', 'label', 'Chống gian lận GPS V1: mất GPS một đoạn vẫn tính đủ km, điểm nhảy không cộng km, chỉ giữ bài có dấu hiệu rõ',
-      'ok', (private.ops_defaults()->'antiCheat') ? 'gapReviewPct'),
-    jsonb_build_object('file', '20261001010100', 'label', 'Vá sau nghiệm thu: thu hồi quyền ghi thừa trên 9 bảng, chống spam yêu cầu báo giá',
-      'ok', not has_table_privilege('anon', 'public.partners', 'insert') and to_regclass('public.org_leads_user_idx') is not null),
-    jsonb_build_object('file', '20261001010200', 'label', 'Đổi tên "Giải chạy ảo" thành "Giải chạy" (trang hướng dẫn, bài Kiến thức, thông báo, thẻ gói)',
-      'ok', not exists (select 1 from public.help_pages h where h.body ilike '%giải chạy ảo%')),
-    jsonb_build_object('file', '20261001010300', 'label', 'Tài khoản bất thường cho admin: hai nơi cùng lúc, chung thiết bị, bài trùng giờ, nuôi lời mời',
-      'ok', to_regprocedure('public.admin_account_risks(integer)') is not null and to_regclass('private.device_links') is not null),
-    jsonb_build_object('file', '20261001010400', 'label', 'Bình luận có Thích và Trả lời (bảng tin CLB + Doanh nghiệp), thông báo khi được trả lời / thích',
-      'ok', to_regprocedure('public.toggle_post_comment_like(uuid)') is not null and to_regprocedure('public.toggle_org_comment_like(uuid)') is not null),
-    jsonb_build_object('file', '20261001010500', 'label', 'Thích + quà tặng minh bạch (ai thích, ai tặng), bảng tin cộng đồng, xóa thông báo',
-      'ok', to_regprocedure('public.post_engagement(uuid)') is not null and to_regprocedure('public.community_feed(timestamp with time zone,integer)') is not null
-            and private.sc_col('club_posts', 'gift_count')),
-    jsonb_build_object('file', '20261001010600', 'label', 'Sự kiện chạy nhóm nhiều cự ly, báo cả CLB khi đổi lịch',
-      'ok', private.sc_col('club_events', 'routes') and private.sc_fn('private', 'event_routes')),
-    jsonb_build_object('file', '20261001010700', 'label', 'Thử thách chinh phục thời gian / pace nhiều hạng mục, hạn đăng ký, BXH theo ngày, ngày vàng riêng',
-      'ok', to_regclass('public.challenge_categories') is not null and to_regprocedure('public.challenge_member_days(uuid,uuid)') is not null
-            and to_regclass('public.challenge_boost_days') is not null),
-    jsonb_build_object('file', '20261001010800', 'label', 'Khóa chống trừ Xu hai lần, ví không bao giờ âm, quản trị viên không nhận Xu, sửa BXH đấu CLB',
-      'ok', to_regclass('public.ledger_transactions_idempotency_uidx') is not null and private.sc_fn('private', 'is_admin_account')
-            and exists (select 1 from pg_trigger where tgname = 'trg_ledger_no_negative')),
-    jsonb_build_object('file', '20261001010900', 'label', 'BXH giải chạy theo cự ly (ai hoàn thành, ai chưa), đổi "mốc" thành "mục tiêu"',
-      'ok', to_regprocedure('public.race_results_v2(uuid,numeric)') is not null),
-    jsonb_build_object('file', '20261001011000', 'label', 'Kho quà v2: quà tĩnh / quà hiệu ứng động, quà theo mốc (5K…Ultra, PR), 45 quà mới, ảnh riêng',
-      'ok', private.sc_col('gift_catalog', 'kind') and to_regprocedure('public.gift_catalog_for(uuid,uuid)') is not null),
-    jsonb_build_object('file', '20261001011100', 'label', 'App cửa hàng: ẩn mua bán trong app iOS/Android (công tắc "Cho phép mua trong app"), Zalo / Telegram hỗ trợ',
-      'ok', private.ops_defaults()->'features' ? 'nativePurchases' and 'support_zalo' = any (private.site_info_keys())),
-    jsonb_build_object('file', '20261001011200', 'label', 'Thử thách bị hủy tự ẩn khỏi bảng tin CLB và trang chủ',
-      'ok', exists (select 1 from pg_trigger where tgname = 'trg_hide_cancelled_challenge_posts')),
-    jsonb_build_object('file', '20261001011300', 'label', 'Admin cũng là VĐV: nhận Xu chạy bộ / nạp tiền, chặn Xu tự cấp (khuyến mãi, cộng tay, giới thiệu, nhiệm vụ)',
-      'ok', private.sc_fn('private', 'admin_credit_allowed')),
-    jsonb_build_object('file', '20261001011400', 'label', 'Danh sách quản trị viên hệ thống trong Quản trị → Người dùng',
-      'ok', to_regprocedure('public.admin_list_admins()') is not null),
-    jsonb_build_object('file', '20261001011500', 'label', 'Theo dõi runner, bảng tin Đang theo dõi, tin nhắn 1-1, sửa bình luận, thông báo hoạt động mới',
-      'ok', to_regclass('public.direct_messages') is not null and to_regprocedure('public.following_feed(timestamptz,integer)') is not null
-            and to_regprocedure('public.edit_post_comment(uuid,text)') is not null),
-    jsonb_build_object('file', '20261001011600', 'label', 'Victory Studio: ảnh vinh danh (thử thách, bài chạy, cột mốc km, Level, huy hiệu), mã xác thực /v/…, BTC vinh danh thành viên',
-      'ok', to_regclass('public.victory_certificates') is not null and to_regprocedure('public.issue_victory(text,text,uuid,text,jsonb)') is not null),
-    jsonb_build_object('file', '20261001011700', 'label', 'Chỉnh sửa lần 3: thành viên tự đăng ký thách đấu CLB + BXH từng CLB, cảm xúc tin nhắn, runner soạn bài / ebook (duyệt + thưởng Xu), thêm admin theo email',
-      'ok', to_regclass('public.club_cup_members') is not null and to_regclass('public.direct_message_reactions') is not null
-        and to_regprocedure('public.knowledge_submit(jsonb)') is not null and to_regprocedure('public.admin_find_user_by_email(text)') is not null),
-    jsonb_build_object('file', '20261001011800', 'label', 'Chỉnh sửa lần 4: Victory lấy đúng mục tiêu đăng ký, Victory Studio theo gói (VIP / CLB Pro / doanh nghiệp), Quản trị chính + phân quyền admin theo nhóm',
-      'ok', to_regclass('public.admin_permissions') is not null and to_regprocedure('public.admin_set_permissions(uuid,text[],timestamptz,text)') is not null
-        and to_regprocedure('public.victory_access(text)') is not null and to_regprocedure('private.admin_set_owner(text,boolean)') is not null),
-    jsonb_build_object('file', '20261001011900', 'label', 'Vá lộ dữ liệu: khách không đọc được hồ sơ; người khác chỉ thấy tên / ảnh / level; hồ sơ đầy đủ qua my_account()',
-      'ok', to_regprocedure('public.my_account()') is not null
-        and not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'profiles'
-                         and policyname in ('Allow public select profile', 'Public profiles are viewable by everyone'))
-        and not has_table_privilege('anon', 'public.profiles', 'SELECT')
-        and not has_column_privilege('authenticated', 'public.profiles', 'xu', 'SELECT')),
-    jsonb_build_object('file', '20261001012000', 'label', 'Thử thách theo mục tiêu: tham gia bắt buộc kèm mục tiêu (một bước)',
-      'ok', to_regprocedure('public.join_challenge_pledge(uuid,numeric,text)') is not null),
-    jsonb_build_object('file', '20261001012100', 'label', 'Tăng tốc tab CLB: đếm tin chưa đọc tối đa 100',
-      'ok', to_regprocedure('public.my_clubs_inbox()') is not null
-        and pg_get_functiondef('public.my_clubs_inbox()'::regprocedure) ~ 'limit 100'),
-    jsonb_build_object('file', '20261001012200', 'label', 'Tăng tốc Trang chủ: kiểm tra bù huy hiệu tối đa 1 lần / 10 phút',
-      'ok', to_regclass('private.achievement_catchup') is not null and to_regprocedure('private.catch_up_achievements(uuid)') is not null),
-    jsonb_build_object('file', '20261001012300', 'label', 'Tăng tốc phân quyền: kiểm tra thành viên CLB trước, quyền admin tính 1 lần / truy vấn',
-      'ok', pg_get_functiondef('public.club_is_member(uuid)'::regprocedure) ~* 'case\s+when exists'
-        and not exists (select 1 from pg_policies where schemaname = 'public'
-                         and (coalesce(qual, '') || ' ' || coalesce(with_check, '')) ~ '(?<!SELECT )(public\.)?is_system_admin\(\)')),
-    jsonb_build_object('file', '20261001012400', 'label', 'Chống gian lận Strava: một điểm GPS nhảy không còn làm bài bị chặn',
-      'ok', pg_get_functiondef('public.ingest_provider_activity(uuid,text,text,jsonb)'::regprocedure) ~ 'v_risk is null and (not v_no_gps and )?v_max_speed'),
-    jsonb_build_object('file', '20261001012500', 'label', 'Chống gian lận: lưu phân tích + lịch sử quyết định, khôi phục bài loại nhầm',
-      'ok', to_regclass('public.activity_analyses') is not null and to_regclass('public.activity_decisions') is not null
-        and to_regprocedure('public.restore_activity(uuid,text)') is not null and to_regprocedure('public.fraud_review_stats(integer)') is not null),
-    jsonb_build_object('file', '20261001012600', 'label', 'Giữ nguyên km của đối tác (Strava…); GPS nhảy chỉ dùng để phân loại',
-      'ok', pg_get_functiondef('public.ingest_provider_activity(uuid,text,text,jsonb)'::regprocedure) !~ 'v_clean'),
-    jsonb_build_object('file', '20261001012700', 'label', 'Thi đấu CLB v2: luật thi đấu, đăng ký + chốt danh sách, kết quả tạm → chính thức, huy hiệu, điểm uy tín',
-      'ok', to_regprocedure('public.create_club_duel(jsonb)') is not null and to_regprocedure('public.club_match_summary(uuid)') is not null
-        and to_regclass('public.club_match_ratings') is not null and private.sc_col('club_cups', 'roster_close_at')),
-    jsonb_build_object('file', '20261001012800', 'label', 'Quanh đây v2 (khu hay chạy tự động, bảng tin quanh đây) + Hội quán runner + link nhóm Facebook',
-      'ok', to_regclass('public.runner_home_area') is not null and to_regclass('public.hub_posts') is not null
-        and to_regprocedure('public.hub_runners(jsonb)') is not null and to_regprocedure('public.nearby_feed(jsonb)') is not null
-        and 'support_facebook' = any (private.site_info_keys())),
-    jsonb_build_object('file', '20261001012900', 'label', 'Trình soạn nội dung (CMS) đăng được Ebook PDF',
-      'ok', pg_get_functiondef('public.cms_save(jsonb)'::regprocedure) ~ 'EBOOK_PDF_REQUIRED'),
-    jsonb_build_object('file', '20261001013000', 'label', 'Trợ lý vận hành: schema ops (view tổng hợp) + role ops_reader chỉ đọc',
-      'ok', to_regclass('ops.tester_activity') is not null and to_regclass('ops.weekly_metrics') is not null
-        and to_regclass('ops.attention') is not null and exists (select 1 from pg_roles where rolname = 'ops_reader')),
-    jsonb_build_object('file', '20261001013100', 'label', 'Chỉnh sửa lần 6: tương tác ở bảng tin Đang theo dõi, báo bài chờ duyệt + giải trình, vinh danh theo cự ly, sửa thử thách trước khi bắt đầu',
-      'ok', to_regprocedure('private.can_engage_post(public.club_posts)') is not null and private.sc_col('activities', 'owner_note')
-        and to_regprocedure('public.explain_pending_run(uuid,text)') is not null and to_regprocedure('public.update_challenge(uuid,jsonb)') is not null),
-    jsonb_build_object('file', '20261001013200', 'label', 'Sửa đổi ảnh đại diện CLB',
-      'ok', pg_get_functiondef('public.update_club(uuid,text,text,text,text)'::regprocedure) !~ 'storage\.objects'),
-    jsonb_build_object('file', '20261001013300', 'label', 'Chỉnh sửa lần 7: thử thách sửa toàn bộ trước giờ bắt đầu, tên tuần khi lặp, vinh danh theo mục tiêu, khoá đăng ký chinh phục đã có kết quả',
-      'ok', to_regprocedure('private.recur_title(text,text,integer,timestamptz)') is not null
-        and pg_get_functiondef('public.set_my_conquest'::regproc) ~ 'CONQUEST_RESULT_LOCKED'),
-    jsonb_build_object('file', '20261001013400', 'label', 'Chỉnh sửa lần 7: luật Strava mới (GPS nhảy vẫn ghi nhận, nhập tay không ghi nhận, chạy máy cảnh báo) + danh sách bài có cảnh báo',
-      'ok', to_regprocedure('public.warned_activities(uuid,integer)') is not null),
-    jsonb_build_object('file', '20261001013500', 'label', 'Chỉnh sửa lần 7: Ban tổ chức chấp nhận / huỷ kết quả quay thưởng',
-      'ok', to_regclass('public.lucky_draw_rejections') is not null and to_regprocedure('public.confirm_lucky_draw(uuid)') is not null
-        and to_regprocedure('public.reject_lucky_draw(uuid,text)') is not null),
-    jsonb_build_object('file', '20261001013600', 'label', 'Nhắc runner 3 ngày chưa chạy',
-      'ok', to_regprocedure('public.send_run_reminders()') is not null),
-    jsonb_build_object('file', '20261001013700', 'label', 'Bài trùng giờ dài hơn nghi vấn: chờ duyệt, duyệt xong loại bài trùng',
-      'ok', pg_get_functiondef('public.review_activity(uuid,text)'::regprocedure) ~ 'rejected_overlaps'),
-    jsonb_build_object('file', '20261001013800', 'label', 'Chinh phục cự ly: chạy một bài đủ cự ly là đạt, không cần thời gian / pace',
-      'ok', pg_get_constraintdef((select oid from pg_constraint where conname = 'challenges_conquest_mode_chk')) like '%ANY%'),
-    jsonb_build_object('file', '20261001013900', 'label', 'Báo giá thử thách chinh phục nhiều người tính theo số chỗ thật (khớp hạn mức gói CLB)',
-      'ok', pg_get_functiondef('public.quote_challenge(integer,text,uuid)'::regprocedure) !~ 'SOLO_GOAL'),
-    jsonb_build_object('file', '20261001014000', 'label', 'Sửa lỗi lưu gói ở trang admin (UNK-FSZ)',
-      'ok', pg_get_functiondef('public.admin_save_plan(jsonb)'::regprocedure) !~ 'jsonb_array_elements\(p->''credits''\) e'),
-    jsonb_build_object('file', '20261001014100', 'label', 'Thử thách Công khai do CLB tổ chức (quỹ / lượt gói CLB trả phí)',
-      'ok', to_regprocedure('public.quote_challenge(integer,text,uuid,text)') is not null
-            and pg_get_functiondef('public.create_challenge_v2(jsonb,text)'::regprocedure) ~ 'v_audience = ''PUBLIC'' and v_club is not null'),
-    jsonb_build_object('file', '20261001014200', 'label', 'Sai số cự ly chinh phục do người tạo đặt',
-      'ok', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'challenges' and column_name = 'conquest_tolerance_pct')
-            and pg_get_functiondef('private.conquest_has_result(uuid,uuid)'::regprocedure) ~ 'conquest_tolerance_pct'),
-    jsonb_build_object('file', '20261001014300', 'label', 'Lịch sự kiện CLB tự đăng bài lên bảng tin',
-      'ok', to_regprocedure('private.club_event_to_post()') is not null),
-    jsonb_build_object('file', '20261001014400', 'label', 'Admin nhắc người mua thanh toán đơn chờ',
-      'ok', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders' and column_name = 'reminded_at')),
-    jsonb_build_object('file', '20261001014500', 'label', 'Admin xóa hàng loạt bài chạy bị loại',
-      'ok', to_regprocedure('public.admin_delete_rejected_activities(uuid[])') is not null),
-    jsonb_build_object('file', '20261001014600', 'label', 'Admin xem danh sách tài khoản đang khóa',
-      'ok', to_regprocedure('public.admin_banned_users()') is not null),
-    jsonb_build_object('file', '20261001014700', 'label', 'Xóa tin nhắn kiểu Zalo (thu hồi, xóa phía tôi, xóa cuộc trò chuyện)',
-      'ok', to_regprocedure('public.hide_direct_message(uuid)') is not null and to_regprocedure('public.clear_direct_thread(uuid)') is not null),
-    jsonb_build_object('file', '20261001014800', 'label', 'Điểm danh sự kiện chỉ trong khung giờ + điểm danh GPS',
-      'ok', to_regprocedure('public.gps_checkin_club_event(uuid,double precision,double precision,double precision)') is not null),
-    jsonb_build_object('file', '20261001014900', 'label', 'Chinh phục: tham gia bắt buộc có hạng mục (một bước)',
-      'ok', to_regprocedure('public.join_challenge_conquest(uuid,jsonb,text)') is not null),
-    jsonb_build_object('file', '20261001015000', 'label', 'Admin tự nhập nội dung nhắc thanh toán',
-      'ok', to_regprocedure('public.admin_remind_order(uuid,text)') is not null),
-    jsonb_build_object('file', '20261001015100', 'label', 'Hộp thư góp ý (bong bóng nổi trong app)',
-      'ok', to_regprocedure('public.submit_feedback(text,integer,text,text,text)') is not null),
-    jsonb_build_object('file', '20261001015200', 'label', 'Hiển thị tài khoản Strava đã liên kết (tên, ảnh, athlete id)',
-      'ok', to_regprocedure('public.set_provider_identity(uuid,text,jsonb)') is not null),
-    jsonb_build_object('file', '20261001015300', 'label', 'Khối "Sắp tới" ở trang chủ (lịch CLB của tôi)',
-      'ok', to_regprocedure('public.my_upcoming_events(integer)') is not null),
-    jsonb_build_object('file', '20261001015400', 'label', 'Nhắc thành viên chưa đăng ký lịch CLB',
-      'ok', to_regprocedure('public.remind_club_event(uuid)') is not null),
-    jsonb_build_object('file', '20261001015500', 'label', 'Thông tin nhận tặng phẩm (thử thách, giải chạy)',
-      'ok', to_regprocedure('public.save_prize_address(text,uuid,jsonb)') is not null),
-    jsonb_build_object('file', '20261001015600', 'label', 'Bảng mục tiêu: % theo km chạy thực tế',
-      'ok', to_regprocedure('public.challenge_pledge_board(uuid)') is not null
-        and position('x.distance_m / 1000.0 / x.pledge_km' in pg_get_functiondef(to_regprocedure('public.challenge_pledge_board(uuid)'))) > 0),
-    jsonb_build_object('file', '20261001015700', 'label', 'Đồng bộ lại dữ liệu thử thách',
-      'ok', to_regprocedure('public.challenge_resync_apply(uuid)') is not null),
-    jsonb_build_object('file', '20261001015800', 'label', 'Ngày theo giờ Việt Nam (bỏ current_date UTC)',
-      'ok', not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-                         where n.nspname in ('public', 'private') and p.prokind = 'f' and p.prosrc ~* '\mcurrent_date\M'
-                           and p.proname <> 'admin_system_check')),
-    jsonb_build_object('file', '20261001015900', 'label', 'Chống gian lận: CLB < 5 người không duyệt bài; admin loại bài đã ghi nhận',
-      'ok', to_regprocedure('public.admin_reject_activity(uuid,text)') is not null
-        and position('>= 5' in pg_get_functiondef(to_regprocedure('private.can_review_activity(uuid)'))) > 0));
-
-  v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
-                   'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
-                  from unnest(array['avatars', 'character-layers', 'club-media', 'race-media', 'uniform-media', 'content-media']) b(id)
-                  left join storage.buckets s on s.id = b.id);
-
-  v_stats := jsonb_build_object(
-    'pg_net', exists (select 1 from pg_extension where extname = 'pg_net'),
-    'push_url', case when to_regclass('private.app_settings') is not null
-                     then (select value from private.app_settings where key = 'push_dispatch_url') end,
-    'admins', (select count(*) from public.profiles where role = 'SYSTEM_ADMIN'),
-    'users', (select count(*) from public.profiles),
-    'clubs', (select count(*) from public.clubs));
-  if to_regclass('private.push_queue') is not null then
-    v_stats := v_stats || jsonb_build_object('push_stuck', (select count(*) from private.push_queue where claimed_at is null and created_at < now() - interval '15 minutes'));
-  end if;
-  if private.sc_col('challenges', 'end_date') then
-    v_stats := v_stats || jsonb_build_object('challenges_overdue', (select count(*) from public.challenges where status = 'ACTIVE' and end_date < now() - interval '1 day'));
-  end if;
-  if to_regclass('public.club_battles') is not null then
-    v_stats := v_stats || jsonb_build_object('battles_overdue', (select count(*) from public.club_battles where status = 'ACCEPTED' and end_at < now() - interval '1 day'));
-  end if;
-  if to_regclass('public.orders') is not null then
-    v_stats := v_stats || jsonb_build_object('orders_pending', (select count(*) from public.orders where status = 'PENDING' and expires_at > now()),
-                                             'payment_account', exists (select 1 from private.app_settings where key = 'pay_account_no'));
-  end if;
-  if to_regclass('public.club_cups') is not null then
-    v_stats := v_stats || jsonb_build_object('cups_overdue', (select count(*) from public.club_cups where status = 'OPEN' and end_at < now() - interval '1 day'),
-                                             'cups_pending', (select count(*) from public.club_cups where status = 'PENDING_REVIEW'));
-  end if;
-  if to_regclass('private.client_errors') is not null then
-    v_stats := v_stats || jsonb_build_object('client_errors_24h', (select coalesce(sum(hits), 0) from private.client_errors where last_at > now() - interval '24 hours'),
-                                             'not_deployed_24h', (select coalesce(sum(hits), 0) from private.client_errors where kind = 'NOT_DEPLOYED' and last_at > now() - interval '24 hours'));
-  end if;
-  if private.sc_col('activities', 'validation_status') then
-    v_stats := v_stats || jsonb_build_object('pending_reviews', (select count(*) from public.activities where validation_status = 'PENDING'));
-  end if;
-
-  return jsonb_build_object('migrations', v_mig, 'buckets', v_buckets, 'stats', v_stats, 'checked_at', now());
+  for i in select e from jsonb_array_elements(o.items) e loop
+    if nullif(i->>'variant_id', '') is not null then
+      update public.partner_variants set stock = stock + (i->>'qty')::int where id = (i->>'variant_id')::uuid and stock is not null;
+    else
+      update public.partner_products set stock = stock + (i->>'qty')::int where id = (i->>'product_id')::uuid and stock is not null;
+    end if;
+    update public.partner_products set sold = greatest(sold - (i->>'qty')::int, 0) where id = (i->>'product_id')::uuid;
+  end loop;
 end $$;
 
-revoke all on function private.sc_fn(text, text), private.sc_col(text, text) from public, anon, authenticated;
-revoke all on function public.admin_system_check() from public, anon;
-grant execute on function public.admin_system_check() to authenticated;
+-- Hồ sơ đối tác: thêm số sản phẩm đang bán (hiện trên danh sách Chợ)
+create or replace function private.partner_json(p public.partners, p_full boolean) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('id', p.id, 'kind', p.kind, 'name', p.name, 'tagline', p.tagline, 'avatar_url', p.avatar_url, 'cover_url', p.cover_url,
+    'area', p.area, 'specialties', to_jsonb(p.specialties), 'verified', p.status = 'APPROVED' and p.verified_at is not null,
+    'status', p.status, 'is_mine', p.owner_id = auth.uid(),
+    'services_count', jsonb_array_length(p.services),
+    'products_count', (select count(*) from public.partner_products x where x.partner_id = p.id and x.status = 'ACTIVE'),
+    'owner', jsonb_build_object('id', p.owner_id, 'display_name', private.display_name(p.owner_id),
+                                'avatar_url', (select x.avatar_url from public.profiles x where x.id = p.owner_id)))
+    || case when p_full then jsonb_build_object('bio', p.bio, 'address', p.address, 'services', p.services, 'contacts', p.contacts,
+         'review_note', case when p.owner_id = auth.uid() or public.is_system_admin() then p.review_note end,
+         'stats', case when p.kind = 'COACH' then private.partner_runner_stats(p.owner_id) end,
+         'updated_at', p.updated_at) else '{}'::jsonb end
+$$;
+
+-- ---------------------------------------------------------------------
+-- 4. RPC — cửa hàng & sản phẩm
+-- ---------------------------------------------------------------------
+-- Cửa hàng của một đối tác: cài đặt + sản phẩm (khách: chỉ hàng đang bán, hồ sơ phải được xác minh)
+create or replace function public.partner_shop(p_partner_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  p public.partners := (select x from public.partners x where x.id = p_partner_id);
+  v_mine boolean;
+begin
+  if p.id is null then raise exception 'SHOP_NOT_FOUND'; end if;
+  v_mine := p.owner_id = auth.uid();
+  if p.status <> 'APPROVED' and not v_mine and not public.is_system_admin() then raise exception 'SHOP_NOT_FOUND'; end if;
+  return jsonb_build_object(
+    'partner', jsonb_build_object('id', p.id, 'name', p.name, 'avatar_url', p.avatar_url, 'area', p.area, 'kind', p.kind, 'status', p.status,
+                                  'verified', p.status = 'APPROVED' and p.verified_at is not null, 'is_mine', v_mine),
+    'settings', private.shop_settings_json(p, v_mine),
+    'products', coalesce((select jsonb_agg(private.shop_product_json(x) order by (x.status = 'ACTIVE') desc, x.created_at desc)
+                  from public.partner_products x where x.partner_id = p.id and (x.status = 'ACTIVE' or v_mine)), '[]'::jsonb));
+end $$;
+
+create or replace function public.get_shop_product(p_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  pr public.partner_products := (select x from public.partner_products x where x.id = p_id);
+  p public.partners := (select x from public.partners x where x.id = pr.partner_id);
+  v_mine boolean;
+begin
+  if pr.id is null then raise exception 'PRODUCT_NOT_FOUND'; end if;
+  v_mine := p.owner_id = auth.uid();
+  if not v_mine and not public.is_system_admin() and (pr.status <> 'ACTIVE' or p.status <> 'APPROVED') then raise exception 'PRODUCT_NOT_FOUND'; end if;
+  return jsonb_build_object(
+    'product', private.shop_product_json(pr),
+    'partner', jsonb_build_object('id', p.id, 'name', p.name, 'avatar_url', p.avatar_url, 'area', p.area, 'kind', p.kind, 'status', p.status,
+                                  'verified', p.status = 'APPROVED' and p.verified_at is not null, 'is_mine', v_mine),
+    'settings', private.shop_settings_json(p, v_mine));
+end $$;
+
+create or replace function public.save_partner_shop(p_partner_id uuid, s jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  p public.partners := (select x from public.partners x where x.id = p_partner_id);
+  b jsonb := s->'bank';
+  v_bin text; v_acc text; v_name text;
+  v_fee integer := coalesce(nullif(s->>'ship_fee_vnd', '')::int, 0);
+  v_free integer := nullif(s->>'free_ship_over_vnd', '')::int;
+begin
+  if p.id is null or p.owner_id <> v_uid then raise exception 'FORBIDDEN'; end if;
+  if v_fee not between 0 and 500000 or (v_free is not null and v_free not between 0 and 50000000) then raise exception 'INVALID_SHIPPING'; end if;
+  if b is not null and jsonb_typeof(b) = 'object' and coalesce(b->>'bin', '') <> '' then
+    v_bin := b->>'bin'; v_acc := b->>'account_no'; v_name := upper(trim(coalesce(b->>'account_name', '')));
+    if v_bin !~ '^\d{6}$' or coalesce(v_acc, '') !~ '^[0-9A-Za-z]{4,20}$' or char_length(v_name) not between 2 and 60 then raise exception 'INVALID_BANK'; end if;
+  end if;
+  update public.partners set ship_fee_vnd = v_fee, free_ship_over_vnd = v_free, cod_enabled = coalesce((s->>'cod_enabled')::boolean, false),
+    shop_policy = nullif(left(trim(coalesce(s->>'shop_policy', '')), 1000), ''),
+    shop_bank_bin = v_bin, shop_bank_account_no = v_acc, shop_bank_account_name = v_name
+  where id = p.id;
+  p := (select x from public.partners x where x.id = p.id);
+  return private.shop_settings_json(p, true);
+end $$;
+
+create or replace function public.save_partner_product(p jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  v_id uuid := nullif(p->>'id', '')::uuid;
+  v_old public.partner_products := (select x from public.partner_products x where x.id = v_id);
+  v_partner uuid := coalesce(v_old.partner_id, nullif(p->>'partner_id', '')::uuid);
+  v_owner uuid := (select x.owner_id from public.partners x where x.id = v_partner);
+  v_images text[];
+  v_price integer;
+  v_compare integer := nullif(p->>'compare_price_vnd', '')::int;
+  v_status text := coalesce(nullif(p->>'status', ''), 'ACTIVE');
+  v_vars jsonb := coalesce(p->'variants', '[]'::jsonb);
+  v_keep uuid[] := '{}';
+  v jsonb;
+  v_vid uuid;
+  v_pos integer := 0;
+  r public.partner_products;
+begin
+  if v_partner is null or v_owner is distinct from v_uid then raise exception 'FORBIDDEN'; end if;
+  if char_length(trim(coalesce(p->>'title', ''))) not between 2 and 100 then raise exception 'INVALID_PRODUCT'; end if;
+  v_price := coalesce(nullif(p->>'price_vnd', '')::int, -1);
+  if v_price not between 0 and 50000000 or (v_compare is not null and (v_compare not between 0 and 50000000 or v_compare <= v_price)) then raise exception 'INVALID_PRICE'; end if;
+  if v_status not in ('ACTIVE', 'HIDDEN') then raise exception 'INVALID_PRODUCT'; end if;
+  if jsonb_typeof(v_vars) <> 'array' then v_vars := '[]'::jsonb; end if;
+  if jsonb_array_length(v_vars) > 30 then raise exception 'TOO_MANY_VARIANTS'; end if;
+  if jsonb_array_length(coalesce(p->'images', '[]'::jsonb)) > 8 then raise exception 'TOO_MANY_IMAGES'; end if;
+  v_images := array(select u from jsonb_array_elements_text(coalesce(p->'images', '[]'::jsonb)) with ordinality t(u, o) where trim(u) <> '' order by o);
+  if exists (select 1 from unnest(v_images) u where not private.market_media_ok(v_uid, u)) then raise exception 'INVALID_PARTNER_IMAGE'; end if;
+  if v_old.id is null and (select count(*) from public.partner_products x where x.partner_id = v_partner) >= 200 then raise exception 'TOO_MANY_PRODUCTS'; end if;
+
+  if v_old.id is null then
+    v_id := gen_random_uuid();
+    insert into public.partner_products (id, partner_id, title, description, images, category, price_vnd, compare_price_vnd, sku, stock, status)
+    values (v_id, v_partner, trim(p->>'title'), nullif(left(trim(coalesce(p->>'description', '')), 2000), ''), v_images,
+            nullif(left(trim(coalesce(p->>'category', '')), 30), ''), v_price, v_compare, nullif(left(trim(coalesce(p->>'sku', '')), 40), ''),
+            nullif(p->>'stock', '')::int, v_status);
+  else
+    update public.partner_products set title = trim(p->>'title'), description = nullif(left(trim(coalesce(p->>'description', '')), 2000), ''),
+      images = v_images, category = nullif(left(trim(coalesce(p->>'category', '')), 30), ''), price_vnd = v_price, compare_price_vnd = v_compare,
+      sku = nullif(left(trim(coalesce(p->>'sku', '')), 40), ''), stock = nullif(p->>'stock', '')::int, status = v_status, updated_at = now()
+    where id = v_id;
+  end if;
+
+  -- biến thể: giữ id cũ nếu có, thêm mới, xoá cái không còn trong danh sách
+  for v in select e from jsonb_array_elements(v_vars) e loop
+    if char_length(trim(coalesce(v->>'name', ''))) < 1 then continue; end if;
+    v_pos := v_pos + 1;
+    v_vid := (select x.id from public.partner_variants x where x.id = nullif(v->>'id', '')::uuid and x.product_id = v_id);
+    if coalesce(nullif(v->>'price_vnd', '')::int, 0) not between 0 and 50000000 or coalesce(nullif(v->>'stock', '')::int, 0) not between 0 and 1000000 then
+      raise exception 'INVALID_VARIANT';
+    end if;
+    if v_vid is null then
+      v_vid := gen_random_uuid();
+      insert into public.partner_variants (id, product_id, name, price_vnd, stock, sku, position)
+      values (v_vid, v_id, left(trim(v->>'name'), 60), nullif(v->>'price_vnd', '')::int, nullif(v->>'stock', '')::int,
+              nullif(left(trim(coalesce(v->>'sku', '')), 40), ''), v_pos);
+    else
+      update public.partner_variants set name = left(trim(v->>'name'), 60), price_vnd = nullif(v->>'price_vnd', '')::int,
+        stock = nullif(v->>'stock', '')::int, sku = nullif(left(trim(coalesce(v->>'sku', '')), 40), ''), position = v_pos
+      where id = v_vid;
+    end if;
+    v_keep := v_keep || v_vid;
+  end loop;
+  delete from public.partner_variants where product_id = v_id and not (id = any (v_keep));
+
+  r := (select x from public.partner_products x where x.id = v_id);
+  return private.shop_product_json(r);
+end $$;
+
+create or replace function public.delete_partner_product(p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  pr public.partner_products := (select x from public.partner_products x where x.id = p_id);
+begin
+  if pr.id is null or (select x.owner_id from public.partners x where x.id = pr.partner_id) is distinct from v_uid then raise exception 'FORBIDDEN'; end if;
+  delete from public.partner_products where id = pr.id;
+end $$;
+
+-- ---------------------------------------------------------------------
+-- 5. RPC — đặt hàng, đơn của tôi, quản lý đơn
+-- ---------------------------------------------------------------------
+create or replace function public.place_partner_order(p_partner_id uuid, p_items jsonb, p_buyer jsonb, p_method text, p_note text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  p public.partners := (select x from public.partners x where x.id = p_partner_id);
+  v_method text := upper(coalesce(p_method, ''));
+  v_name text := trim(coalesce(p_buyer->>'name', ''));
+  v_phone text := regexp_replace(coalesce(p_buyer->>'phone', ''), '[ .-]', '', 'g');
+  v_addr text := trim(coalesce(p_buyer->>'address', ''));
+  r record;
+  pr public.partner_products;
+  va public.partner_variants;
+  v_has_var boolean;
+  v_unit integer;
+  v_items jsonb := '[]'::jsonb;
+  v_sub bigint := 0;
+  v_qty integer := 0;
+  v_ship integer;
+  v_code text;
+  v_id uuid := gen_random_uuid();
+  o public.partner_orders;
+begin
+  if p.id is null or p.status <> 'APPROVED' then raise exception 'SHOP_NOT_FOUND'; end if;
+  if p.owner_id = v_uid then raise exception 'OWN_SHOP'; end if;
+  if v_method not in ('BANK', 'COD') then raise exception 'INVALID_PAYMENT'; end if;
+  if v_method = 'BANK' and private.shop_bank(p) is null then raise exception 'BANK_MISSING'; end if;
+  if v_method = 'COD' and not p.cod_enabled then raise exception 'COD_DISABLED'; end if;
+  if char_length(v_name) not between 2 and 60 or v_phone !~ '^(0|\+84)[0-9]{9,10}$' or char_length(v_addr) not between 8 and 250 then raise exception 'INVALID_BUYER'; end if;
+  if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then raise exception 'EMPTY_CART'; end if;
+  if jsonb_array_length(p_items) > 40 then raise exception 'EMPTY_CART'; end if;
+
+  -- gộp dòng trùng; khoá hàng theo thứ tự cố định để không deadlock
+  for r in
+    select (i->>'product_id')::uuid as pid, nullif(i->>'variant_id', '')::uuid as vid, sum(coalesce((i->>'qty')::int, 0))::int as qty
+      from jsonb_array_elements(p_items) i group by 1, 2 order by 1, 2
+  loop
+    if r.qty < 1 or r.qty > 20 then raise exception 'INVALID_QUANTITY'; end if;
+    pr := (select x from public.partner_products x where x.id = r.pid and x.partner_id = p.id for update);
+    if pr.id is null or pr.status <> 'ACTIVE' then raise exception 'PRODUCT_UNAVAILABLE'; end if;
+    v_has_var := exists (select 1 from public.partner_variants x where x.product_id = pr.id);
+    if v_has_var then
+      if r.vid is null then raise exception 'VARIANT_REQUIRED'; end if;
+      va := (select x from public.partner_variants x where x.id = r.vid and x.product_id = pr.id for update);
+      if va.id is null then raise exception 'PRODUCT_UNAVAILABLE'; end if;
+      if va.stock is not null and va.stock < r.qty then raise exception 'OUT_OF_STOCK: %', pr.title || ' (' || va.name || ')'; end if;
+      if va.stock is not null then update public.partner_variants set stock = stock - r.qty where id = va.id; end if;
+      v_unit := coalesce(va.price_vnd, pr.price_vnd);
+    else
+      if r.vid is not null then raise exception 'PRODUCT_UNAVAILABLE'; end if;
+      if pr.stock is not null and pr.stock < r.qty then raise exception 'OUT_OF_STOCK: %', pr.title; end if;
+      if pr.stock is not null then update public.partner_products set stock = stock - r.qty where id = pr.id; end if;
+      v_unit := pr.price_vnd;
+    end if;
+    update public.partner_products set sold = sold + r.qty where id = pr.id;
+    v_items := v_items || jsonb_build_object('product_id', pr.id, 'variant_id', case when v_has_var then va.id end, 'title', pr.title,
+      'variant', case when v_has_var then va.name end, 'price_vnd', v_unit, 'qty', r.qty, 'image', pr.images[1]);
+    v_sub := v_sub + v_unit::bigint * r.qty;
+    v_qty := v_qty + r.qty;
+  end loop;
+
+  v_ship := case when p.free_ship_over_vnd is not null and v_sub >= p.free_ship_over_vnd then 0 else p.ship_fee_vnd end;
+  loop
+    v_code := 'RH' || upper(substr(md5(gen_random_uuid()::text), 1, 6));
+    exit when not exists (select 1 from public.partner_orders x where x.code = v_code);
+  end loop;
+  insert into public.partner_orders (id, partner_id, user_id, code, items, quantity, subtotal_vnd, ship_fee_vnd, amount_vnd, buyer_name, buyer_phone,
+                                     ship_address, note, payment_method)
+  values (v_id, p.id, v_uid, v_code, v_items, v_qty, v_sub, v_ship, v_sub + v_ship, v_name, v_phone, v_addr,
+          nullif(left(trim(coalesce(p_note, '')), 300), ''), v_method);
+  o := (select t from public.partner_orders t where t.id = v_id);
+  perform private.notify(p.owner_id, null, 'MARKET', 'Đơn mới ' || v_code || ' · ' || to_char(o.amount_vnd, 'FM999G999G999') || 'đ',
+    v_name || ' đặt ' || v_qty || ' sản phẩm. Mở "Quản lý cửa hàng" để xác nhận.', '/market/me/shop/' || p.id, v_uid, true);
+  return private.shop_order_json(o);
+end $$;
+
+create or replace function public.my_partner_orders() returns jsonb
+language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(private.shop_order_json(o) order by o.created_at desc), '[]'::jsonb) from public.partner_orders o where o.user_id = auth.uid()
+$$;
+
+create or replace function public.cancel_my_partner_order(p_order_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  o public.partner_orders := (select x from public.partner_orders x where x.id = p_order_id for update);
+begin
+  if o.id is null or o.user_id is distinct from v_uid then raise exception 'ORDER_NOT_FOUND'; end if;
+  if o.status <> 'PENDING' then raise exception 'ORDER_LOCKED'; end if;
+  update public.partner_orders set status = 'CANCELLED', status_note = 'Người mua huỷ' where id = o.id;
+  perform private.shop_restore_stock(o);
+  o := (select t from public.partner_orders t where t.id = o.id);
+  perform private.notify((select p.owner_id from public.partners p where p.id = o.partner_id), null, 'MARKET', 'Đơn ' || o.code || ' đã bị khách huỷ',
+    o.buyer_name, '/market/me/shop/' || o.partner_id, v_uid, true);
+  return private.shop_order_json(o);
+end $$;
+
+create or replace function public.partner_orders_admin(p_partner_id uuid, p_status text default null) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare p public.partners := (select x from public.partners x where x.id = p_partner_id);
+begin
+  if p.id is null or p.owner_id is distinct from auth.uid() then raise exception 'FORBIDDEN'; end if;
+  return jsonb_build_object(
+    'orders', coalesce((select jsonb_agg(private.shop_order_json(o) order by o.created_at desc) from public.partner_orders o
+                         where o.partner_id = p.id and (p_status is null or o.status = upper(p_status))), '[]'::jsonb),
+    'totals', (select jsonb_build_object('pending', count(*) filter (where o.status = 'PENDING'), 'paid', count(*) filter (where o.status = 'PAID'),
+                        'shipping', count(*) filter (where o.status = 'SHIPPING'), 'done', count(*) filter (where o.status = 'DONE'),
+                        'revenue_vnd', coalesce(sum(o.amount_vnd) filter (where o.status in ('PAID', 'SHIPPING', 'DONE')), 0),
+                        'awaiting_vnd', coalesce(sum(o.amount_vnd) filter (where o.status = 'PENDING'), 0))
+                 from public.partner_orders o where o.partner_id = p.id));
+end $$;
+
+create or replace function public.set_partner_order_status(p_order_id uuid, p_status text, p_note text default null, p_tracking text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_uid();
+  o public.partner_orders := (select x from public.partner_orders x where x.id = p_order_id for update);
+  v_to text := upper(coalesce(p_status, ''));
+begin
+  if o.id is null or (select x.owner_id from public.partners x where x.id = o.partner_id) is distinct from v_uid then raise exception 'FORBIDDEN'; end if;
+  if not ((o.status = 'PENDING' and v_to in ('PAID', 'SHIPPING', 'CANCELLED')) or (o.status = 'PAID' and v_to in ('SHIPPING', 'DONE', 'CANCELLED'))
+          or (o.status = 'SHIPPING' and v_to in ('DONE', 'CANCELLED'))) then
+    raise exception 'INVALID_STATUS';
+  end if;
+  if v_to = 'SHIPPING' and o.payment_method = 'BANK' and o.status = 'PENDING' then raise exception 'PAYMENT_NOT_CONFIRMED'; end if;
+  update public.partner_orders set status = v_to, status_note = nullif(left(trim(coalesce(p_note, '')), 200), ''),
+    tracking_code = case when v_to = 'SHIPPING' then nullif(left(trim(coalesce(p_tracking, '')), 60), '') else tracking_code end,
+    paid_at = case when v_to = 'PAID' then coalesce(paid_at, now()) else paid_at end,
+    shipped_at = case when v_to = 'SHIPPING' then now() else shipped_at end,
+    done_at = case when v_to = 'DONE' then now() else done_at end
+  where id = o.id;
+  if v_to = 'CANCELLED' then perform private.shop_restore_stock(o); end if;
+  o := (select t from public.partner_orders t where t.id = o.id);
+  if o.user_id is not null then
+    perform private.notify(o.user_id, null, 'MARKET',
+      case v_to when 'PAID' then 'Cửa hàng đã nhận tiền đơn ' || o.code when 'SHIPPING' then 'Đơn ' || o.code || ' đang được giao'
+                when 'DONE' then 'Đơn ' || o.code || ' đã hoàn tất' else 'Đơn ' || o.code || ' đã bị huỷ' end,
+      coalesce(nullif(trim(coalesce(p_note, '')), ''), case when v_to = 'SHIPPING' and o.tracking_code is not null then 'Mã vận đơn: ' || o.tracking_code end,
+               (select p.name from public.partners p where p.id = o.partner_id)),
+      '/market/orders', v_uid, true);
+  end if;
+  return private.shop_order_json(o);
+end $$;
+
+revoke all on function private.shop_bank(public.partners), private.shop_settings_json(public.partners, boolean), private.shop_product_json(public.partner_products),
+  private.shop_order_json(public.partner_orders), private.shop_restore_stock(public.partner_orders), private.partner_json(public.partners, boolean)
+  from public, anon, authenticated;
+revoke all on function public.partner_shop(uuid), public.get_shop_product(uuid), public.save_partner_shop(uuid, jsonb), public.save_partner_product(jsonb),
+  public.delete_partner_product(uuid), public.place_partner_order(uuid, jsonb, jsonb, text, text), public.my_partner_orders(),
+  public.cancel_my_partner_order(uuid), public.partner_orders_admin(uuid, text), public.set_partner_order_status(uuid, text, text, text) from public, anon;
+grant execute on function public.partner_shop(uuid), public.get_shop_product(uuid) to anon, authenticated;
+grant execute on function public.save_partner_shop(uuid, jsonb), public.save_partner_product(jsonb), public.delete_partner_product(uuid),
+  public.place_partner_order(uuid, jsonb, jsonb, text, text), public.my_partner_orders(), public.cancel_my_partner_order(uuid),
+  public.partner_orders_admin(uuid, text), public.set_partner_order_status(uuid, text, text, text) to authenticated;
 
 notify pgrst, 'reload schema';
 

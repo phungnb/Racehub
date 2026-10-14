@@ -2,11 +2,14 @@
 
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, Globe, Mail, MapPin, MessageCircle, Pencil, Phone, ThumbsUp } from 'lucide-react'
+import { ChevronLeft, Globe, Mail, MapPin, MessageCircle, Package, Pencil, Phone, Store, ThumbsUp, Truck } from 'lucide-react'
 import { Avatar, Button, Card, ErrorState, LevelBadge, Skeleton } from '@/shared/ui'
 import { routes } from '@/shared/config/routes'
 import { contactLinks, getPartner, marketErrorMessage, PARTNER_KIND, type PartnerContacts } from '../api/marketApi'
+import { getShop } from '../api/shopApi'
 import { PartnerLogo, VerifiedBadge } from './PartnerBits'
+import { CartButton, ProductCard } from './shop/ShopBits'
+import { formatVnd } from '@/features/club'
 
 const CONTACT_ICON: Record<keyof PartnerContacts, typeof Phone> = { phone: Phone, zalo: MessageCircle, facebook: ThumbsUp, website: Globe, email: Mail }
 const STATUS_LABEL = { PENDING: 'Đang chờ xác minh', REJECTED: 'Cần bổ sung', HIDDEN: 'Đang bị ẩn', APPROVED: '' } as const
@@ -42,11 +45,18 @@ export function PartnerProfile({ id }: { id: string }) {
           {!!p.specialties.length && (
             <div className="flex flex-wrap gap-1.5">{p.specialties.map((s) => <span key={s} className="rounded-full bg-surface-2 px-2.5 py-1 text-xs">{s}</span>)}</div>
           )}
-          {p.is_mine && <Link href={routes.marketMine}><Button size="sm" variant="secondary"><Pencil className="size-4" aria-hidden />Sửa hồ sơ</Button></Link>}
+          {p.is_mine && (
+            <div className="flex flex-wrap gap-2">
+              <Link href={routes.marketMine}><Button size="sm" variant="secondary"><Pencil className="size-4" aria-hidden />Sửa hồ sơ</Button></Link>
+              <Link href={routes.partnerShopManage(p.id)}><Button size="sm"><Store className="size-4" aria-hidden />Quản lý cửa hàng</Button></Link>
+            </div>
+          )}
         </div>
       </Card>
 
       {p.status === 'REJECTED' && p.review_note && <Card className="border-coin/40 text-sm"><b>Cần bổ sung:</b> {p.review_note}</Card>}
+
+      <ShopSection partnerId={p.id} />
 
       {!!links.length && (
         <Card className="space-y-2">
@@ -101,5 +111,31 @@ export function PartnerProfile({ id }: { id: string }) {
         <p className="text-sm text-fg-muted">Chủ hồ sơ: <span className="font-semibold text-fg">{p.owner.display_name}</span></p>
       </Card>
     </div>
+  )
+}
+
+/** Sản phẩm của đối tác: lưới ảnh + giá, giỏ hàng, phí giao. Ẩn nếu chưa có sản phẩm (chủ shop thì thấy lối đăng). */
+function ShopSection({ partnerId }: { partnerId: string }) {
+  const q = useQuery({ queryKey: ['market', 'shop', partnerId], queryFn: () => getShop(partnerId), retry: false })
+  if (!q.data) return null
+  const { products, settings, partner } = q.data
+  if (!products.length && !partner.is_mine) return null
+  return (
+    <Card className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 font-semibold"><Package className="size-4" aria-hidden />Sản phẩm</h2>
+        {!partner.is_mine && <CartButton partnerId={partnerId} />}
+      </div>
+      {products.length ? (
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">{products.map((x) => <li key={x.id}><ProductCard p={x} /></li>)}</ul>
+      ) : (
+        <p className="text-sm text-fg-muted">Bạn chưa đăng sản phẩm nào. <Link href={routes.partnerShopManage(partnerId)} className="font-semibold text-brand">Đăng sản phẩm đầu tiên</Link></p>
+      )}
+      {!!products.length && (
+        <p className="flex items-start gap-2 text-xs text-fg-muted"><Truck className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>Phí giao {settings.ship_fee_vnd ? formatVnd(settings.ship_fee_vnd) : 'miễn phí'}{settings.free_ship_over_vnd !== null && settings.ship_fee_vnd > 0 ? `, miễn phí từ ${formatVnd(settings.free_ship_over_vnd)}` : ''}
+            . Thanh toán {[settings.bank_ready && 'chuyển khoản', settings.cod_enabled && 'COD'].filter(Boolean).join(' hoặc ') || 'chưa thiết lập'}.</span></p>
+      )}
+    </Card>
   )
 }
