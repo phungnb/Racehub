@@ -89,9 +89,22 @@ export function RulesForm({ value: t, onChange, kind }: { value: MatchTerms; onC
             options={[3, 7, 14, 30].map((v) => ({ v, label: v === 30 ? '1 tháng' : v % 7 === 0 ? `${v / 7} tuần` : `${v} ngày` }))} />
         </Field>
       </div>
-      <Field label="Chốt danh sách thi đấu" hint="Sau giờ chốt không đăng ký / rút được — tránh 'chiêu mộ' giữa trận">
-        <Choice<number> label="Chốt danh sách" value={t.lock_hours} onChange={(v) => set('lock_hours', v)}
-          options={[0, 1, 6, 24].map((v) => ({ v, label: v ? `Trước ${v} giờ` : 'Đúng giờ G' }))} />
+      <Field label="Kết thúc" htmlFor="m-end" hint="Chọn ngày giờ kết thúc, hoặc dùng nút Kéo dài ở trên">
+        <Input id="m-end" type="datetime-local" value={toLocal(t.end_at)} min={toLocal(t.start_at)}
+          onChange={(e) => { if (e.target.value) set('end_at', fromLocal(e.target.value)) }} />
+      </Field>
+      <Field label="Chốt đăng ký (danh sách thi đấu)" htmlFor="m-close" hint="Sau giờ chốt không đăng ký / rút được — tránh 'chiêu mộ' giữa trận. Chốt sớm nhất 72 giờ trước giờ bắt đầu.">
+        <Input id="m-close" type="datetime-local" value={toLocal(new Date(Date.parse(t.start_at) - t.lock_hours * 3600_000).toISOString())}
+          min={toLocal(new Date(Date.parse(t.start_at) - 72 * 3600_000).toISOString())} max={toLocal(t.start_at)}
+          onChange={(e) => {
+            if (!e.target.value) return
+            const h = Math.round((Date.parse(t.start_at) - new Date(e.target.value).getTime()) / 3600_000)
+            set('lock_hours', Math.max(0, Math.min(72, h)))
+          }} />
+        <div className="mt-2">
+          <Choice<number> label="Chốt danh sách" value={t.lock_hours} onChange={(v) => set('lock_hours', v)}
+            options={[0, 1, 6, 24].map((v) => ({ v, label: v ? `Trước ${v} giờ` : 'Đúng giờ G' }))} />
+        </div>
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
