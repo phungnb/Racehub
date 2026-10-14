@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, Download, ImagePlus, Minus, Package, Pencil, Plus, ShoppingBag } from 'lucide-react'
+import { Copy, Download, ImagePlus, Link2, Minus, Package, Pencil, Plus, ShoppingBag } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, EmptyState, ErrorState, Field, Input, SegmentedControl, Sheet, Skeleton, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
@@ -15,8 +15,9 @@ import {
   cancelMyOrder, getClubShop, getProductOrders, ORDER_STATUS, ordersCsv, placeOrder, saveProduct, setOrderStatus,
   type ClubBank, type ClubOrder, type ClubProduct, type OrderItem, type ProductInput, type ProductStatus,
 } from '../../api/shopApi'
-import { bankName, formatVnd, parseVnd, vietQrUrl } from '../../model/finance'
+import { bankName, formatVnd, vietQrUrl } from '../../model/finance'
 
+const MAX_PRICE = 50_000_000
 const key = (clubId: string) => ['club', clubId, 'shop'] as const
 const fmtDate = (d: string) => new Date(d).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
@@ -27,9 +28,14 @@ export function ClubShopScreen({ clubId }: { clubId: string }) {
   const [edit, setEdit] = useState<ClubProduct | 'new' | null>(null)
   const [orders, setOrders] = useState<ClubProduct | null>(null)
   const [pay, setPay] = useState<(ClubOrder & { bank: ClubBank }) | null>(null)
+  // Link chia sẻ sản phẩm: /clubs/<id>/shop?sp=<mã sản phẩm> → mở thẳng khung đặt hàng (BQT: danh sách đơn)
+  const [deep, setDeep] = useState<string | null>(() => (typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('sp')))
+  const deepProduct = deep ? q.data?.products.find((x) => x.id === deep) ?? null : null
   if (q.isPending) return <div className="grid grid-cols-2 gap-3"><Skeleton className="h-56" /><Skeleton className="h-56" /></div>
   if (q.isError) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />
   const s = q.data
+  const shownOpen = open ?? (s.is_staff ? null : deepProduct)
+  const shownOrders = orders ?? (s.is_staff ? deepProduct : null)
   return (
     <div className="space-y-5 pb-10">
       {s.is_staff && (
@@ -76,10 +82,10 @@ export function ClubShopScreen({ clubId }: { clubId: string }) {
         </section>
       )}
 
-      {open && <OrderSheet product={open} onClose={() => setOpen(null)} onPlaced={(o) => { setOpen(null); setPay(o) }} />}
+      {shownOpen && <OrderSheet product={shownOpen} onClose={() => { setOpen(null); setDeep(null) }} onPlaced={(o) => { setOpen(null); setPay(o) }} />}
       {pay && <PaySheet order={pay} onClose={() => setPay(null)} />}
       {edit && <ProductEditor clubId={clubId} initial={edit === 'new' ? null : edit} onClose={() => setEdit(null)} />}
-      {orders && <OrdersSheet product={orders} onClose={() => setOrders(null)} onEdit={() => { setEdit(orders); setOrders(null) }} onBuy={() => { setOpen(orders); setOrders(null) }} />}
+      {shownOrders && <OrdersSheet product={shownOrders} onClose={() => { setOrders(null); setDeep(null) }} onEdit={() => { setEdit(shownOrders); setOrders(null); setDeep(null) }} onBuy={() => { setOpen(shownOrders); setOrders(null); setDeep(null) }} />}
     </div>
   )
 }
@@ -176,6 +182,11 @@ function OrdersSheet({ product: p, onClose, onEdit, onBuy }: { product: ClubProd
     onSuccess: () => { void q.refetch(); void qc.invalidateQueries({ queryKey: key(p.club_id) }) },
     onError: (e) => toast.error(clubErrorMessage(e)),
   })
+  const share = () => {
+    const url = `${window.location.origin}${routes.clubTab(p.club_id, 'shop')}?sp=${encodeURIComponent(p.id)}`
+    if (navigator.share) void navigator.share({ title: p.title, url }).catch(() => undefined)
+    else void navigator.clipboard?.writeText(url).then(() => toast.success('Đã sao chép link sản phẩm'))
+  }
   const csv = () => {
     if (!q.data) return
     const url = URL.createObjectURL(new Blob([ordersCsv(q.data.orders)], { type: 'text/csv;charset=utf-8' }))
@@ -187,7 +198,8 @@ function OrdersSheet({ product: p, onClose, onEdit, onBuy }: { product: ClubProd
       <div className="space-y-3">
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={onEdit}><Pencil className="size-4" aria-hidden />Sửa</Button>
-          <Button size="sm" variant="secondary" onClick={csv} disabled={!q.data?.orders.length}><Download className="size-4" aria-hidden />CSV</Button>
+          <Button size="sm" variant="secondary" onClick={share}><Link2 className="size-4" aria-hidden />Link</Button>
+          <Button size="sm" variant="secondary" onClick={csv} disabled={!q.data?.orders.length}><Download className="size-4" aria-hidden />Excel</Button>
           {p.open && <Button size="sm" variant="ghost" onClick={onBuy}>Tự đặt</Button>}
         </div>
         {q.isPending ? <Skeleton className="h-40" /> : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : (
@@ -257,9 +269,9 @@ function ProductEditor({ clubId, initial, onClose }: { clubId: string; initial: 
         <Field label="Tên" htmlFor="pe-title"><Input id="pe-title" value={f.title} maxLength={80} placeholder="Áo CLB 2026" onChange={(e) => set('title', e.target.value)} /></Field>
         <Field label="Mô tả" htmlFor="pe-desc"><Textarea id="pe-desc" value={f.description ?? ''} maxLength={1000} rows={3} placeholder="Chất vải, bảng size, thời gian giao…" onChange={(e) => set('description', e.target.value)} /></Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Giá (đ)" htmlFor="pe-price"><Input id="pe-price" inputMode="numeric" value={f.price_vnd ? f.price_vnd.toLocaleString('vi-VN') : ''} onChange={(e) => set('price_vnd', parseVnd(e.target.value) || 0)} /></Field>
-          <Field label="Tối đa mỗi đơn" htmlFor="pe-max"><Input id="pe-max" inputMode="numeric" value={String(f.max_per_order)} onChange={(e) => set('max_per_order', Math.min(50, Math.max(1, Number(e.target.value.replace(/\D/g, '')) || 1)))} /></Field>
-          <Field label="Tổng số lượng (trống = không giới hạn)" htmlFor="pe-stock"><Input id="pe-stock" inputMode="numeric" value={f.stock ?? ''} onChange={(e) => set('stock', Number(e.target.value.replace(/\D/g, '')) || null)} /></Field>
+          <Field label="Giá (đ)" htmlFor="pe-price" hint="Tối đa 50.000.000 đ"><Input id="pe-price" inputMode="numeric" value={f.price_vnd ? f.price_vnd.toLocaleString('vi-VN') : ''} onChange={(e) => set('price_vnd', Math.min(MAX_PRICE, Number(e.target.value.replace(/\D/g, '')) || 0))} /></Field>
+          <Field label="Tối đa mỗi đơn" htmlFor="pe-max" hint="Số sản phẩm một người được đặt trong 1 đơn (1–50)"><Input id="pe-max" inputMode="numeric" value={String(f.max_per_order)} onChange={(e) => set('max_per_order', Math.min(50, Math.max(1, Number(e.target.value.replace(/\D/g, '')) || 1)))} /></Field>
+          <Field label="Tổng số lượng (trống = không giới hạn)" htmlFor="pe-stock" hint="Tổng số bán ra; hết là ngừng nhận đơn"><Input id="pe-stock" inputMode="numeric" value={f.stock ?? ''} onChange={(e) => set('stock', Number(e.target.value.replace(/\D/g, '')) || null)} /></Field>
           <Field label="Hạn chốt đơn" htmlFor="pe-deadline"><Input id="pe-deadline" type="datetime-local" value={toLocal(f.order_deadline)} onChange={(e) => set('order_deadline', e.target.value ? new Date(e.target.value).toISOString() : null)} /></Field>
         </div>
         <Field label="Size (cách nhau bằng dấu phẩy, trống = không có size)" htmlFor="pe-sizes">
