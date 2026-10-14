@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronRight, LogOut, Menu, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, LogOut, Menu, Store, Trash2, UsersRound, X } from 'lucide-react'
 import { supabase } from '@/shared/lib/supabase'
 import { cn } from '@/shared/lib/cn'
 import { CoinAmount } from '@/shared/ui'
@@ -45,6 +45,7 @@ function Drawer({ profile, onSignOut, onClose }: { profile: Profile | null; onSi
   const titleId = useId()
   const panel = useRef<HTMLDivElement>(null)
   const [leaving, setLeaving] = useState(false)
+  const [docsOpen, setDocsOpen] = useState(false)
   const menu = useQuery({ queryKey: ['help', 'menu'], queryFn: helpMenu, staleTime: 10 * 60_000 })
   // Chưa chạy migration 007300 / mất mạng: vẫn luôn có Điều khoản + Quyền riêng tư
   const groups = menu.data ? groupMenu(menu.data.pages) : [{ section: 'POLICY' as const, items: STATIC_POLICIES }]
@@ -138,24 +139,49 @@ function Drawer({ profile, onSignOut, onClose }: { profile: Profile | null; onSi
               </li>
             ))}
           </ul>
-          {groups.map((g) => (
-            <section key={g.section} className="mb-3">
-              <h2 className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-fg-subtle">{SECTION_LABEL[g.section]}</h2>
-              <ul>
-                {g.items.map((p) => (
-                  <li key={p.slug}>
-                    <Link href={staticHref(p.slug)} onClick={onClose}
-                      className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 hover:bg-surface-2">
-                      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-base" aria-hidden>{p.icon ?? '📄'}</span>
-                      <span className="min-w-0 flex-1 text-sm font-medium">{p.title}</span>
-                      <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
+          {/* Lối tắt: Hội quán + Chợ Runner (theo công tắc tính năng của admin) */}
+          {(ops.features.nearby || ops.features.market) && (
+            <ul className="mb-3 grid grid-cols-2 gap-2 px-1">
+              {ops.features.nearby && (
+                <li><Link href={routes.hub} onClick={onClose} className="flex min-h-11 items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-sm font-semibold">
+                  <UsersRound className="size-5 shrink-0 text-violet-300" aria-hidden />Hội quán runner
+                </Link></li>
+              )}
+              {ops.features.market && (
+                <li><Link href={routes.market} onClick={onClose} className="flex min-h-11 items-center gap-2 rounded-xl border border-brand/30 bg-brand/10 px-3 py-2 text-sm font-semibold">
+                  <Store className="size-5 shrink-0 text-brand" aria-hidden />Chợ Runner
+                </Link></li>
+              )}
+            </ul>
+          )}
+
+          {/* Hướng dẫn + Chính sách: thu gọn mặc định */}
+          <button type="button" onClick={() => setDocsOpen((v) => !v)} aria-expanded={docsOpen}
+            className="mb-1 flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-surface-2">
+            <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-base" aria-hidden>📚</span>
+            <span className="min-w-0 flex-1 text-sm font-semibold">Hướng dẫn & chính sách</span>
+            <ChevronDown className={cn('size-4 text-fg-subtle transition-transform', docsOpen && 'rotate-180')} aria-hidden />
+          </button>
+          {docsOpen && <div className="mb-3">
+            {groups.map((g) => (
+              <section key={g.section} className="mb-3">
+                <h2 className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-fg-subtle">{SECTION_LABEL[g.section]}</h2>
+                <ul>
+                  {g.items.map((p) => (
+                    <li key={p.slug}>
+                      <Link href={staticHref(p.slug)} onClick={onClose}
+                        className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 hover:bg-surface-2">
+                        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-base" aria-hidden>{p.icon ?? '📄'}</span>
+                        <span className="min-w-0 flex-1 text-sm font-medium">{p.title}</span>
+                        <ChevronRight className="size-4 text-fg-subtle" aria-hidden />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
           {menu.isPending && <p className="px-3 text-xs text-fg-subtle">Đang tải hướng dẫn…</p>}
+          </div>}
 
           {profile && (
             <section className="mb-3">
