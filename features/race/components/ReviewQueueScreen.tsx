@@ -14,7 +14,7 @@ import {
 import { fmtDate } from './RaceCard'
 
 const ERRORS: Record<string, string> = {
-  NO_SEARCH_KEY: 'chưa đặt BRAVE_SEARCH_API_KEY trên máy chủ', SEARCH_LIMIT: 'hết lượt tìm kiếm trong tháng', SEARCH_FAILED: 'dịch vụ tìm kiếm lỗi',
+  NO_SEARCH_KEY: 'chưa đặt TAVILY_API_KEY trên máy chủ', SEARCH_LIMIT: 'hết lượt tìm kiếm trong tháng', SEARCH_FAILED: 'dịch vụ tìm kiếm lỗi',
   BAD_URL: 'không truy cập được trang (hoặc robots.txt chặn)', FETCH_FAILED: 'không tải được trang', NOT_HTML: 'không phải trang web',
 }
 const VIEWS: { value: CandidateState; label: string }[] = [

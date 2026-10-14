@@ -56,7 +56,7 @@ export async function deleteListing(id: string) {
   if (error) throw error
 }
 
-export interface ImportDraft {
+interface ImportDraft {
   title: string; race_date: string; end_date: string; location: string; organizer: string
   image_url: string; description: string; distances: string[]
 }
@@ -77,7 +77,7 @@ export async function importFromUrl(url: string): Promise<{ source_url: string; 
 }
 
 // ── Quét giải tự động: nguồn + hàng chờ duyệt (migration 016100). Chỉ admin (RLS). ──
-export interface RaceSource { id: string; kind: 'PAGE' | 'SEARCH'; url: string | null; query: string | null; label: string | null; active: boolean; last_scanned_at: string | null; last_error: string | null }
+interface RaceSource { id: string; kind: 'PAGE' | 'SEARCH'; url: string | null; query: string | null; label: string | null; active: boolean; last_scanned_at: string | null; last_error: string | null }
 export type CandidateState = 'PENDING' | 'FILTERED' | 'APPROVED' | 'REJECTED'
 export interface RaceCandidate {
   id: string; url: string; title: string; race_date: string | null; end_date: string | null; location: string | null

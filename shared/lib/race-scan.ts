@@ -1,8 +1,8 @@
 import type { RaceDraft } from './race-import'
 
 // Quét nguồn giải → ứng viên → sàng lọc (hàm thuần). Kết quả chỉ vào HÀNG CHỜ; admin duyệt mới đăng.
-export type CandidateStatus = 'PENDING' | 'FILTERED'
-export interface Screened { status: CandidateStatus; score: number; reason: string | null }
+type CandidateStatus = 'PENDING' | 'FILTERED'
+interface Screened { status: CandidateStatus; score: number; reason: string | null }
 
 const SKIP_EXT = /\.(?:jpe?g|png|gif|webp|svg|pdf|zip|docx?|xlsx?|css|js|mp4|mp3)(?:$|\?)/i
 const SKIP_PATH = /\/(?:login|dang-nhap|dang-ky|register|cart|gio-hang|tag|category|author|feed|wp-json|wp-admin|search|tim-kiem|contact|lien-he)(?:\/|$)/i
