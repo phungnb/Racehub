@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Field, Input } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import type { MatchFormat, MatchMeasure, MatchTerms, MatchTiebreak } from '../api/cupApi'
@@ -22,6 +23,21 @@ function Choice<T extends string | number | null>({ value, options, onChange, la
         </button>
       ))}
     </div>
+  )
+}
+
+/** Ô số VĐV tối thiểu: cho xoá trắng khi đang gõ (giữ nháp), rời ô thì hiện lại giá trị hợp lệ 1–100 */
+function MinRosterInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  return (
+    <Input id="m-min" inputMode="numeric" value={draft ?? String(value)}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => {
+        const d = e.target.value.replace(/\D/g, '').slice(0, 3)
+        setDraft(d)
+        if (d) onChange(Math.max(1, Math.min(100, Number(d))))
+      }}
+      onBlur={() => setDraft(null)} />
   )
 }
 
@@ -73,15 +89,27 @@ export function RulesForm({ value: t, onChange, kind }: { value: MatchTerms; onC
             options={[3, 7, 14, 30].map((v) => ({ v, label: v === 30 ? '1 tháng' : v % 7 === 0 ? `${v / 7} tuần` : `${v} ngày` }))} />
         </Field>
       </div>
-      <Field label="Chốt danh sách thi đấu" hint="Sau giờ chốt không đăng ký / rút được — tránh 'chiêu mộ' giữa trận">
-        <Choice<number> label="Chốt danh sách" value={t.lock_hours} onChange={(v) => set('lock_hours', v)}
-          options={[0, 1, 6, 24].map((v) => ({ v, label: v ? `Trước ${v} giờ` : 'Đúng giờ G' }))} />
+      <Field label="Kết thúc" htmlFor="m-end" hint="Chọn ngày giờ kết thúc, hoặc dùng nút Kéo dài ở trên">
+        <Input id="m-end" type="datetime-local" value={toLocal(t.end_at)} min={toLocal(t.start_at)}
+          onChange={(e) => { if (e.target.value) set('end_at', fromLocal(e.target.value)) }} />
+      </Field>
+      <Field label="Chốt đăng ký (danh sách thi đấu)" htmlFor="m-close" hint="Sau giờ chốt không đăng ký / rút được — tránh 'chiêu mộ' giữa trận. Chốt sớm nhất 72 giờ trước giờ bắt đầu.">
+        <Input id="m-close" type="datetime-local" value={toLocal(new Date(Date.parse(t.start_at) - t.lock_hours * 3600_000).toISOString())}
+          min={toLocal(new Date(Date.parse(t.start_at) - 72 * 3600_000).toISOString())} max={toLocal(t.start_at)}
+          onChange={(e) => {
+            if (!e.target.value) return
+            const h = Math.round((Date.parse(t.start_at) - new Date(e.target.value).getTime()) / 3600_000)
+            set('lock_hours', Math.max(0, Math.min(72, h)))
+          }} />
+        <div className="mt-2">
+          <Choice<number> label="Chốt danh sách" value={t.lock_hours} onChange={(v) => set('lock_hours', v)}
+            options={[0, 1, 6, 24].map((v) => ({ v, label: v ? `Trước ${v} giờ` : 'Đúng giờ G' }))} />
+        </div>
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="VĐV tối thiểu mỗi CLB" htmlFor="m-min">
-          <Input id="m-min" inputMode="numeric" value={String(t.min_roster)}
-            onChange={(e) => set('min_roster', Math.max(1, Math.min(100, Number(e.target.value.replace(/\D/g, '')) || 1)))} />
+          <MinRosterInput value={t.min_roster} onChange={(v) => set('min_roster', v)} />
         </Field>
         <Field label="Tối đa (để trống = không giới hạn)" htmlFor="m-max">
           <Input id="m-max" inputMode="numeric" value={t.max_roster == null ? '' : String(t.max_roster)}
