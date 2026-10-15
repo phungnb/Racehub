@@ -33,7 +33,7 @@ function makeQueryClient() {
       onError: (e, query) => {
         const d = track(e)
         if (query.state.data !== undefined && d.kind !== 'OFFLINE' && !isResumeNoise()) {
-          toast.warning(d.title, { id: `refresh-${d.kind}`, description: 'Đang hiện dữ liệu đã tải trước đó. ' + d.message })
+          toast.warning(d.title, { id: `refresh-${d.kind}`, description: `Đang hiện dữ liệu đã tải trước đó. ${d.message} [${query.queryKey.slice(0, 3).map(String).join('/')} · ${d.code}${d.kind === 'UNKNOWN' ? ` · ${((e as { message?: string } | null)?.message ?? '').slice(0, 100)}` : ''}]` })
         }
       },
       onSuccess: () => noteRequestSuccess(),
