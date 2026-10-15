@@ -344,7 +344,7 @@ begin
       'ok', position('chỉ NÂNG CẤP' in pg_get_functiondef(to_regprocedure('public.knowledge_scan_ingest(jsonb)'))) > 0),
     jsonb_build_object('file', '20261001016700', 'label', 'Kiến thức: admin xoá được bài đã đăng',
       'ok', position('CONTENT_DELETE' in pg_get_functiondef(to_regprocedure('public.cms_delete(uuid)'))) > 0),
-    jsonb_build_object('file', '20261001016800', 'label', 'Race: bảng tổng hợp giải offline + online',
+    jsonb_build_object('file', '20261001016900', 'label', 'Race: bảng tổng hợp giải offline + online',
       'ok', private.sc_col('race_candidates', 'kind') and to_regprocedure('public.race_calendar()') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,

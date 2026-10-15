@@ -1,4 +1,4 @@
--- 016800: Bảng tổng hợp giải chạy (offline + online) thay cho đăng từng bài rời.
+-- 016900: Bảng tổng hợp giải chạy (offline + online) thay cho đăng từng bài rời.
 -- • race_candidates thêm: kind (OFFLINE / ONLINE), reg_deadline (hạn đăng ký), reg_url (link đăng ký), race_url (link trang giải).
 -- • Admin chọn nhiều dòng trong hàng chờ rồi "Đưa vào bảng" (status APPROVED, không cần tạo tin giải riêng cho từng giải).
 -- • race_calendar(): mọi người đăng nhập đọc được bảng các giải đã duyệt, chưa kết thúc. Chỉ trả cột cần hiển thị.

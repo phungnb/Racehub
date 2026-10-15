@@ -97,7 +97,7 @@ export const candidateToRow = (c: RaceCandidate): CalendarRow => ({
   id: c.id, kind: c.kind, title: c.title, location: c.location, race_date: c.race_date, end_date: c.end_date, reg_deadline: c.reg_deadline,
   race_url: c.race_url || c.url.split('#')[0], reg_url: c.reg_url, distances: c.distances, organizer: c.organizer,
 })
-/** Bảng giải đã duyệt, chưa kết thúc (migration 016800). */
+/** Bảng giải đã duyệt, chưa kết thúc (migration 016900). */
 export async function raceCalendar(): Promise<CalendarRow[]> {
   const { data, error } = await supabase.rpc('race_calendar')
   if (error) throw error

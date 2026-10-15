@@ -1,5 +1,5 @@
 -- RaceHub — PHẦN 26/27 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 016200, 016300, 016400, 016500, 016600, 016700, 016800
+-- Gồm: 016200, 016300, 016400, 016500, 016600, 016700, 016900
 -- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
 -- Xong thì chạy phần tiếp theo.
 begin;
@@ -1219,9 +1219,9 @@ grant execute on function public.cms_delete(uuid) to authenticated;
 notify pgrst, 'reload schema';
 
 -- ===================================================================
--- 20261001016800_race_calendar_table.sql
+-- 20261001016900_race_calendar_table.sql
 -- ===================================================================
--- 016800: Bảng tổng hợp giải chạy (offline + online) thay cho đăng từng bài rời.
+-- 016900: Bảng tổng hợp giải chạy (offline + online) thay cho đăng từng bài rời.
 -- • race_candidates thêm: kind (OFFLINE / ONLINE), reg_deadline (hạn đăng ký), reg_url (link đăng ký), race_url (link trang giải).
 -- • Admin chọn nhiều dòng trong hàng chờ rồi "Đưa vào bảng" (status APPROVED, không cần tạo tin giải riêng cho từng giải).
 -- • race_calendar(): mọi người đăng nhập đọc được bảng các giải đã duyệt, chưa kết thúc. Chỉ trả cột cần hiển thị.

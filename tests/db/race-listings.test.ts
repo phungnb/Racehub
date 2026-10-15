@@ -54,7 +54,7 @@ describe('Tin giải chạy offline (016000)', () => {
     expect(await fails(q(`insert into public.race_sources (kind, url, query) values ('PAGE', 'https://a.vn', 'x y z')`))).not.toBe('OK')
     expect(await fails(q(`insert into public.race_sources (kind, url) values ('PAGE', 'https://a.vn/lich')`))).toBe('OK')
   })
-  it('bảng tổng hợp (016800): chỉ giải đã duyệt và chưa kết thúc, tách offline / online, người đọc không thấy hàng chờ', async () => {
+  it('bảng tổng hợp (016900): chỉ giải đã duyệt và chưa kết thúc, tách offline / online, người đọc không thấy hàng chờ', async () => {
     const ins = (title: string, status: string, kind: string, days: number, url: string) => db.query(
       `insert into public.race_candidates (url, title, race_date, status, kind, reg_deadline, reg_url) values ($1, $2, current_date + $3::int, $4, $5, current_date + 5, 'https://btc.vn/dk')`,
       [url, title, days, status, kind])
