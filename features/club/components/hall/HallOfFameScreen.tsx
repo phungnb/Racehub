@@ -1,11 +1,12 @@
 'use client'
 
 import { useMemo, useState, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, Crown, Medal, Sparkles, Timer, Trophy } from 'lucide-react'
 import { Avatar, Card, EmptyState, ErrorState, RankSearch, scrollToRow, Sheet, Skeleton } from '@/shared/ui'
 import { filterSearch } from '@/shared/lib/search'
-import { useSession } from '@/features/auth'
+import { useMyProfile, useSession } from '@/features/auth'
+import { StravaYearScan } from '@/features/integrations'
 import { cn } from '@/shared/lib/cn'
 import { formatDuration, formatKm, formatNumber, formatRelative } from '@/shared/lib/format'
 import { getHallOfFame, type HallFinisher, type HallOfFame } from '../../api/hubApi'
@@ -21,6 +22,9 @@ const DIST_LABEL: Record<string, string> = { '5K': '5 km', '10K': '10 km', '21K'
 export function HallOfFameScreen({ clubId }: { clubId: string }) {
   const q = useQuery({ queryKey: ['club', clubId, 'hall'], queryFn: () => getHallOfFame(clubId), staleTime: 5 * 60_000 })
   const { isStaff } = useClub(clubId)
+  const qc = useQueryClient()
+  const { profile } = useMyProfile()
+  const scan = profile?.strava_connected ? <StravaYearScan onDone={() => void qc.invalidateQueries({ queryKey: ['club', clubId, 'hall'] })} /> : null
   if (q.isPending) return <div className="space-y-3"><Skeleton className="h-40" /><Skeleton className="h-56" /></div>
   if (q.isError) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />
   const h = q.data
@@ -28,11 +32,13 @@ export function HallOfFameScreen({ clubId }: { clubId: string }) {
   if (empty) return (
     <div className="space-y-6">
       <EmptyState icon={Trophy} title="Đại sảnh còn trống" description="Bài chạy hợp lệ của thành viên sẽ tự ghi danh: Half / Full Marathon, kỷ lục CLB, cột mốc km." />
+      {scan}
       <DrawPanel scope="CLUB" refId={clubId} canManage={isStaff} />
     </div>
   )
   return (
     <div className="space-y-6 pb-8">
+      {scan}
       <DrawPanel scope="CLUB" refId={clubId} canManage={isStaff} />
       <Finishers title="Full Marathon" emoji="🏅" rows={h.marathon} />
       <Finishers title="Half Marathon" emoji="🥈" rows={h.half} />
@@ -118,7 +124,9 @@ function BestSheet({ title, person, onClose }: { title: string; person: HallFini
             </li>
           ))}
         </ol>
-      ) : <p className="py-6 text-center text-sm text-fg-muted">Chưa có thành tích có thời gian hợp lệ.</p>}
+      ) : person.top3 === undefined
+        ? <p className="py-6 text-center text-sm text-fg-muted">Dữ liệu Đại sảnh chưa được cập nhật trên máy chủ (cần chạy migration 016800).</p>
+        : <p className="py-6 text-center text-sm text-fg-muted">Chưa có bài chạy sát cự ly {title} (không quá +6%) để xếp thành tích. Nếu thiếu bài, hãy quét Strava từ 1/1/2026 ở đầu tab này.</p>}
       <p className="pb-2 text-xs text-fg-subtle">Thời gian ước tính quy về đúng cự ly từ bài chạy sát mốc (≤ +6%).</p>
     </Sheet>
   )
