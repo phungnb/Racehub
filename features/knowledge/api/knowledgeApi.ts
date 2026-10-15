@@ -186,6 +186,10 @@ export async function setScanSourceActive(id: string, active: boolean) {
   const { error } = await supabase.from('race_sources').update({ active }).eq('id', id)
   if (error) throw error
 }
+export async function setScanSourceMode(id: string, scan_mode: 'SUMMARY' | 'FULL') {
+  const { error } = await supabase.from('race_sources').update({ scan_mode }).eq('id', id)
+  if (error) throw error
+}
 export async function deleteScanSource(id: string) {
   const { error } = await supabase.from('race_sources').delete().eq('id', id)
   if (error) throw error

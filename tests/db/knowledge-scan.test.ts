@@ -68,4 +68,27 @@ describe('Quét tin kiến thức (016500)', () => {
     expect(rb.content_type).toBe('NEWS')
     expect(rb.body).not.toContain('ngắn\n')
   })
+
+  it('quét lại ở chế độ đầy đủ nâng cấp bản tóm tắt chưa ai sửa; bài đã được sửa thì không bị ghi đè', async () => {
+    const full = 'Tuần 1: chạy nhẹ 5 km, pace 7:00, nhịp tim vùng 2. '.repeat(15)
+    await db.exec('set role service_role')
+    const a = await ingest({ ...base, source_url: 'https://bao.vn/up1', title: 'Giáo án 10K cho người mới' })
+    const up = await ingest({ ...base, source_url: 'https://bao.vn/up1', title: 'Giáo án 10K cho người mới', body: full })
+    const b = await ingest({ ...base, source_url: 'https://bao.vn/up2', title: 'Giáo án 21K cho người mới' })
+    await db.exec('reset role')
+    await db.query(`update public.content_articles set created_by = $1 where id = $2`, [USR, b])
+    await db.exec('set role service_role')
+    const noUp = await ingest({ ...base, source_url: 'https://bao.vn/up2', title: 'Giáo án 21K cho người mới', body: full })
+    const again = await ingest({ ...base, source_url: 'https://bao.vn/up1', title: 'Giáo án 10K cho người mới', body: full })
+    await db.exec('reset role')
+    expect(up).toBe(a)
+    expect(noUp).toBeNull()
+    expect(again).toBeNull()
+    const r = (await db.query<{ content_type: string; body: string }>(`select content_type, body from public.content_articles where id = $1`, [a])).rows[0]
+    expect(r.content_type).toBe('ARTICLE')
+    expect(r.body).toContain('nhịp tim vùng 2')
+    expect(r.body).toContain('https://bao.vn/up1')
+    const edited = (await db.query<{ content_type: string }>(`select content_type from public.content_articles where id = $1`, [b])).rows[0]
+    expect(edited.content_type).toBe('NEWS')
+  })
 })

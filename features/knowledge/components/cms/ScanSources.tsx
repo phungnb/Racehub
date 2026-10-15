@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Card, ErrorState, Field, Input, SegmentedControl, Skeleton } from '@/shared/ui'
-import { addScanSource, deleteScanSource, listScanSources, scanKnowledgeNow, setScanSourceActive, type CmsMeta } from '../../api/knowledgeApi'
+import { addScanSource, deleteScanSource, listScanSources, scanKnowledgeNow, setScanSourceActive, setScanSourceMode, type CmsMeta } from '../../api/knowledgeApi'
 import { formatDate } from '../../model/knowledge'
 
 const ERRORS: Record<string, string> = {
@@ -21,7 +21,7 @@ export function ScanSources({ meta }: { meta: CmsMeta }) {
   const [value, setValue] = useState('')
   const [label, setLabel] = useState('')
   const [cat, setCat] = useState('')
-  const [saveAs, setSaveAs] = useState<'SUMMARY' | 'FULL'>('SUMMARY')
+  const [saveAs, setSaveAs] = useState<'SUMMARY' | 'FULL'>('FULL')
   const q = useQuery({ queryKey: ['knowledge-scan-sources'], queryFn: listScanSources })
   const refresh = () => { void qc.invalidateQueries({ queryKey: ['knowledge-scan-sources'] }); void qc.invalidateQueries({ queryKey: ['cms'] }) }
   const add = useMutation({
@@ -35,6 +35,7 @@ export function ScanSources({ meta }: { meta: CmsMeta }) {
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Không quét được'),
   })
   const toggle = useMutation({ mutationFn: (v: { id: string; active: boolean }) => setScanSourceActive(v.id, v.active), onSuccess: refresh })
+  const mode2 = useMutation({ mutationFn: (v: { id: string; m: 'SUMMARY' | 'FULL' }) => setScanSourceMode(v.id, v.m), onSuccess: refresh })
   const del = useMutation({ mutationFn: deleteScanSource, onSuccess: refresh })
   return (
     <Card className="space-y-3">
@@ -46,7 +47,11 @@ export function ScanSources({ meta }: { meta: CmsMeta }) {
             <li key={s.id} className="flex items-center gap-2 rounded-xl border border-border p-2.5 text-sm">
               <input type="checkbox" className="size-5 shrink-0 accent-[var(--color-brand)]" checked={s.active} onChange={(e) => toggle.mutate({ id: s.id, active: e.target.checked })} aria-label="Bật quét nguồn này" />
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold">{s.label || (s.kind === 'SEARCH' ? `Tìm: ${s.query}` : s.url)}<span className="ml-1.5 text-xs font-normal text-fg-muted">· {s.scan_mode === 'FULL' ? 'bài đầy đủ' : 'tóm tắt'}</span></span>
+                <span className="block truncate font-semibold">{s.label || (s.kind === 'SEARCH' ? `Tìm: ${s.query}` : s.url)}</span>
+                <select value={s.scan_mode} onChange={(e) => mode2.mutate({ id: s.id, m: e.target.value as 'SUMMARY' | 'FULL' })} aria-label="Dạng lưu của nguồn"
+                  className="my-0.5 h-8 rounded-lg border border-border bg-surface px-2 text-xs">
+                  <option value="FULL">Bài đầy đủ</option><option value="SUMMARY">Tóm tắt + link</option>
+                </select>
                 <span className="block truncate text-xs text-fg-muted">{s.last_error ? `Lỗi lần quét cuối: ${ERRORS[s.last_error] ?? s.last_error}` : s.last_scanned_at ? `Quét lần cuối ${formatDate(s.last_scanned_at)}` : 'Chưa quét'}</span>
               </span>
               <Button size="sm" variant="secondary" disabled={scan.isPending} onClick={() => scan.mutate(s.id)}><RefreshCw className="size-4" aria-hidden />{scan.isPending && scan.variables === s.id ? 'Đang quét…' : 'Quét ngay'}</Button>
@@ -62,7 +67,7 @@ export function ScanSources({ meta }: { meta: CmsMeta }) {
           <Input id="ks-url" value={value} onChange={(e) => setValue(e.target.value)} inputMode={mode === 'PAGE' ? 'url' : 'text'}
             placeholder={mode === 'SEARCH' ? 'VD: cách phòng tránh chấn thương gối khi chạy bộ' : 'https://… (trang danh sách bài)'} />
           <SegmentedControl value={saveAs} onChange={setSaveAs} options={[{ value: 'SUMMARY', label: 'Tóm tắt + link' }, { value: 'FULL', label: 'Bài đầy đủ' }]} />
-          {saveAs === 'FULL' && <p className="text-xs text-fg-muted">AI viết lại bài đầy đủ từ trang nguồn (chỉ khi trang chứa toàn văn). Bài vào «Chờ duyệt», admin sửa và đối chiếu nguồn rồi mới đăng; bài sức khoẻ vẫn cần duyệt chuyên môn.</p>}
+          {saveAs === 'FULL' && <p className="text-xs text-fg-muted">AI viết lại đủ nội dung bài (trang danh sách thì mở từng bài con), ghi rõ nguồn ở cuối bài. Bài vào «Chờ duyệt», admin sửa và đối chiếu nguồn rồi mới đăng; bài sức khoẻ vẫn cần duyệt chuyên môn. Quét lại nguồn cũ sẽ nâng bản tóm tắt chưa ai sửa lên bài đầy đủ.</p>}
           <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Chuyên mục mặc định" className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm">
             <option value="">Chuyên mục: để AI chọn</option>
             {meta.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
