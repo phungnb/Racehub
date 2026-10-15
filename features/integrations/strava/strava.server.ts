@@ -326,7 +326,7 @@ export async function backfillStravaActivities(admin: SupabaseClient, userId: st
 }
 
 /**
- * Chạy MỘT lô của việc quét Strava (bảng strava_scan_jobs, migration 017000) cho một người: lấy ≤ 3 trang rồi lưu trang kế tiếp.
+ * Chạy MỘT lô của việc quét Strava (bảng strava_scan_jobs, migration 017100) cho một người: lấy ≤ 3 trang rồi lưu trang kế tiếp.
  * Gọi lặp lại (mỗi lần mở app, hoặc cron) cho đến khi DONE. Không có việc PENDING thì không làm gì.
  * `rateLimited` = Strava đang giới hạn lượt gọi: người gọi nên dừng, lần sau chạy tiếp đúng trang.
  */

@@ -348,7 +348,7 @@ begin
       'ok', position('best3' in pg_get_functiondef(to_regprocedure('public.club_hall_of_fame(uuid)'))) > 0),
     jsonb_build_object('file', '20261001016900', 'label', 'Race: bảng tổng hợp giải offline + online',
       'ok', private.sc_col('race_candidates', 'kind') and to_regprocedure('public.race_calendar()') is not null),
-    jsonb_build_object('file', '20261001017000', 'label', 'Quét Strava nền cho CLB (từ 1/1/2026)',
+    jsonb_build_object('file', '20261001017100', 'label', 'Quét Strava nền cho CLB (từ 1/1/2026)',
       'ok', to_regclass('public.strava_scan_jobs') is not null and to_regprocedure('public.club_request_strava_scan(uuid,timestamptz)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,

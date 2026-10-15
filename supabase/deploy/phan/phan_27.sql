@@ -1,5 +1,5 @@
 -- RaceHub — PHẦN 27/28 (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
--- Gồm: 016900, 017000
+-- Gồm: 016900, 017100
 -- Supabase → SQL Editor → New query → dán TOÀN BỘ phần này → Run. Lỗi thì không có gì thay đổi; chạy lại vẫn an toàn.
 -- Xong thì chạy phần tiếp theo.
 begin;
@@ -42,9 +42,9 @@ grant execute on function public.race_calendar() to authenticated;
 notify pgrst, 'reload schema';
 
 -- ===================================================================
--- 20261001017000_strava_scan_jobs.sql
+-- 20261001017100_strava_scan_jobs.sql
 -- ===================================================================
--- 017000: Quét Strava từ 1/1/2026 chạy nền, chia nhỏ theo thời gian (Đại sảnh CLB).
+-- 017100: Quét Strava từ 1/1/2026 chạy nền, chia nhỏ theo thời gian (Đại sảnh CLB).
 -- Ban quản trị CLB bấm một lần → mỗi thành viên đã nối Strava có một việc PENDING. Mỗi lần thành viên mở app (đồng bộ ngầm) hoặc cron hằng ngày,
 -- máy chủ lấy tiếp 1 lô (≤ 3 trang × 100 bài) cho đến hết; gặp hạn mức Strava thì dừng, lần sau chạy tiếp đúng trang.
 -- Bảng chỉ máy chủ (service role) ghi; người dùng chỉ đọc việc của mình. Chạy lại nhiều lần vẫn an toàn.

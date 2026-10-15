@@ -8,7 +8,7 @@ import { supabase } from '@/shared/lib/supabase'
 
 interface ScanStatus { members: number; connected: number; pending: number; done: number; failed: number; imported: number; queued?: number }
 
-/** Ban quản trị: bật quét Strava từ 1/1/2026 chạy nền cho cả CLB (migration 017000). Xem tiến độ ngay tại thẻ. */
+/** Ban quản trị: bật quét Strava từ 1/1/2026 chạy nền cho cả CLB (migration 017100). Xem tiến độ ngay tại thẻ. */
 export function ClubStravaScan({ clubId, onDone }: { clubId: string; onDone?: () => void }) {
   const qc = useQueryClient()
   const key = ['club', clubId, 'strava-scan']

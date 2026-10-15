@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import { createDb, asUser } from './load-schema'
 
-// Migration 017000: quét Strava nền từ 1/1/2026 cho cả CLB
+// Migration 017100: quét Strava nền từ 1/1/2026 cho cả CLB
 const OWNER = '00000000-0000-0000-0000-0000000170a1'
 const M1 = '00000000-0000-0000-0000-0000000170a2'
 const M2 = '00000000-0000-0000-0000-0000000170a3'
@@ -21,7 +21,7 @@ async function seed(db: PGlite) {
   await db.query(`insert into public.connected_accounts (user_id, provider, provider_user_id) values ($1, 'STRAVA', 'st170')`, [M1])
 }
 
-describe('Quét Strava nền (017000)', () => {
+describe('Quét Strava nền (017100)', () => {
   let db: PGlite
   beforeAll(async () => { db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed }) }, 240_000)
 
