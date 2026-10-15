@@ -5,11 +5,11 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ExternalLink, Flag, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Card, EmptyState, ErrorState, Field, Input, SegmentedControl, Skeleton } from '@/shared/ui'
+import { Button, Card, EmptyState, ErrorState, Field, Input, SegmentedControl, Sheet, Skeleton } from '@/shared/ui'
 import { useOrganizer } from '../hooks/useOrganizer'
 import {
-  addSource, candidateToRow, deleteSource, listCandidates, listSources, scanNow, setCandidateStatus, setCandidatesStatus, setSourceActive,
-  type CandidateState, type RaceCandidate,
+  addSource, candidateToRow, deleteSource, listCandidates, listSources, scanNow, setCandidateStatus, setCandidatesStatus, setSourceActive, updateCandidate,
+  type CandidateEdit, type CandidateState, type RaceCandidate, type RaceKind,
 } from '../api/listingApi'
 import { fmtDate } from './RaceCard'
 import { RaceTable } from './RaceTable'
@@ -71,7 +71,7 @@ function Sources() {
                 <span className="block truncate text-xs text-fg-muted">{s.last_error ? `Lỗi lần quét cuối: ${ERRORS[s.last_error] ?? s.last_error}` : s.last_scanned_at ? `Quét lần cuối ${fmtDate(s.last_scanned_at)}` : 'Chưa quét'}</span>
               </span>
               <Button size="sm" variant="secondary" disabled={scan.isPending} onClick={() => scan.mutate(s.id)}><RefreshCw className="size-4" aria-hidden />{scan.isPending && scan.variables === s.id ? 'Đang quét…' : 'Quét ngay'}</Button>
-              <button type="button" aria-label="Xóa nguồn" className="p-1.5 text-fg-muted hover:text-danger" onClick={() => { if (window.confirm('Xóa nguồn này và các giải đã tìm từ nguồn?')) del.mutate(s.id) }}><Trash2 className="size-4" aria-hidden /></button>
+              <button type="button" aria-label="Xóa nguồn" className="p-1.5 text-fg-muted hover:text-danger" onClick={() => { if (window.confirm('Xóa nguồn này? Giải đã đưa vào bảng vẫn được giữ; giải chưa duyệt của nguồn sẽ bị xóa.')) del.mutate(s.id) }}><Trash2 className="size-4" aria-hidden /></button>
             </li>
           ))}
           {!q.data.length && <li className="text-sm text-fg-muted">Chưa có nguồn nào.</li>}
@@ -96,6 +96,7 @@ function Candidates() {
   const qc = useQueryClient()
   const [view, setView] = useState<CandidateState>('PENDING')
   const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [editing, setEditing] = useState<RaceCandidate | null>(null)
   const q = useQuery({ queryKey: ['race-candidates', view], queryFn: () => listCandidates(view) })
   const refresh = () => { void qc.invalidateQueries({ queryKey: ['race-candidates'] }); void qc.invalidateQueries({ queryKey: ['race-pending'] }); void qc.invalidateQueries({ queryKey: ['race-calendar'] }) }
   const set = useMutation({
@@ -139,11 +140,50 @@ function Candidates() {
               )}
               {ids.length > 0 && view === 'APPROVED' && <Button size="sm" variant="secondary" loading={bulk.isPending} onClick={() => bulk.mutate({ ids, status: 'PENDING' })}>Gỡ {ids.length} giải khỏi bảng</Button>}
             </div>
-            <RaceTable rows={rows.map(candidateToRow)} sel={sel} editHref={(id) => `/races/listing/new?candidate=${id}`} />
+            <RaceTable rows={rows.map(candidateToRow)} sel={sel} editHref={(id) => `/races/listing/new?candidate=${id}`} onEdit={(id) => setEditing(rows.find((r) => r.id === id) ?? null)} />
           </>
         )
         : <ul className="space-y-3">{rows.map((c) => <li key={c.id}><CandidateRow c={c} busy={set.isPending} onSet={(status) => set.mutate({ id: c.id, status })} /></li>)}</ul>}
+      {editing && <EditRow key={editing.id} c={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh() }} />}
     </div>
+  )
+}
+
+const isHttp = (v: string) => v.trim() === '' || /^https?:\/\/\S+$/i.test(v.trim())
+
+/** Admin sửa một dòng của bảng: nhất là link mua bib / đăng ký do trang nguồn thường ghi sai hoặc thiếu. */
+function EditRow({ c, onClose, onSaved }: { c: RaceCandidate; onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState<CandidateEdit>({
+    title: c.title, kind: c.kind, location: c.location ?? '', race_date: c.race_date ?? '', end_date: c.end_date ?? '',
+    reg_deadline: c.reg_deadline ?? '', race_url: c.race_url ?? c.url.split('#')[0], reg_url: c.reg_url ?? '',
+  })
+  const set = <K extends keyof CandidateEdit>(k: K, v: CandidateEdit[K]) => setF((x) => ({ ...x, [k]: v }))
+  const save = useMutation({ mutationFn: () => updateCandidate(c.id, f), onSuccess: () => { toast.success('Đã lưu'); onSaved() }, onError: () => toast.error('Không lưu được (kiểm tra lại link và ngày).') })
+  const bad = f.title.trim().length < 3 || !isHttp(f.race_url) || !isHttp(f.reg_url) || (f.end_date !== '' && f.race_date !== '' && f.end_date < f.race_date)
+  return (
+    <Sheet open onClose={onClose} title="Sửa giải trong bảng" description="Link mua bib / đăng ký để trống nếu chưa có."
+      footer={<Button block loading={save.isPending} disabled={bad} onClick={() => save.mutate()}>Lưu</Button>}>
+      <div className="space-y-3">
+        <Field label="Tên giải" htmlFor="e-title"><Input id="e-title" value={f.title} maxLength={200} onChange={(e) => set('title', e.target.value)} /></Field>
+        <Field label="Loại giải" htmlFor="e-kind">
+          <select id="e-kind" value={f.kind} onChange={(e) => set('kind', e.target.value as RaceKind)} className="h-11 w-full rounded-xl border border-border bg-bg px-3 text-[15px]">
+            <option value="OFFLINE">Offline (chạy trực tiếp)</option><option value="ONLINE">Online (chạy ảo)</option>
+          </select>
+        </Field>
+        <Field label="Địa điểm" htmlFor="e-loc"><Input id="e-loc" value={f.location} maxLength={200} onChange={(e) => set('location', e.target.value)} /></Field>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Ngày chạy" htmlFor="e-date"><Input id="e-date" type="date" value={f.race_date} onChange={(e) => set('race_date', e.target.value)} /></Field>
+          <Field label="Đến ngày" htmlFor="e-end"><Input id="e-end" type="date" value={f.end_date} onChange={(e) => set('end_date', e.target.value)} /></Field>
+        </div>
+        <Field label="Hạn đăng ký" htmlFor="e-dl"><Input id="e-dl" type="date" value={f.reg_deadline} onChange={(e) => set('reg_deadline', e.target.value)} /></Field>
+        <Field label="Link giải" htmlFor="e-url" error={isHttp(f.race_url) ? undefined : 'Link phải bắt đầu bằng http(s)://'}>
+          <Input id="e-url" inputMode="url" value={f.race_url} onChange={(e) => set('race_url', e.target.value)} />
+        </Field>
+        <Field label="Link mua bib (đăng ký)" htmlFor="e-reg" error={isHttp(f.reg_url) ? undefined : 'Link phải bắt đầu bằng http(s)://'}>
+          <Input id="e-reg" inputMode="url" value={f.reg_url} onChange={(e) => set('reg_url', e.target.value)} />
+        </Field>
+      </div>
+    </Sheet>
   )
 }
 

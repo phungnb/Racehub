@@ -70,4 +70,15 @@ describe('Tin giải chạy offline (016000)', () => {
     await expect(db.query(`select public.race_calendar()`)).rejects.toThrow(/permission denied/)
     await db.exec('reset role')
   })
+  it('xoá nguồn quét (017000): giải đã vào bảng được giữ, giải chưa duyệt đi theo nguồn', async () => {
+    const src = (await db.query<{ id: string }>(`insert into public.race_sources (url) values ('https://xoa-nguon.vn/lich') returning id`)).rows[0].id
+    const ins = (title: string, status: string, url: string) => db.query(
+      `insert into public.race_candidates (source_id, url, title, race_date, status) values ($1, $2, $3, current_date + 40, $4)`, [src, url, title, status])
+    await ins('Giải giữ lại', 'APPROVED', 'https://xoa-nguon.vn/a#1')
+    await ins('Giải chờ', 'PENDING', 'https://xoa-nguon.vn/b#2')
+    await ins('Giải lọc', 'FILTERED', 'https://xoa-nguon.vn/c#3')
+    await db.query(`delete from public.race_sources where id = $1`, [src])
+    const left = (await db.query<{ title: string; source_id: string | null }>(`select title, source_id from public.race_candidates where url like 'https://xoa-nguon.vn/%'`)).rows
+    expect(left).toEqual([{ title: 'Giải giữ lại', source_id: null }])
+  })
 })

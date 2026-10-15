@@ -17,7 +17,7 @@ function Link2({ href, label }: { href: string | null; label: string }) {
   return <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 font-semibold text-brand">{label}<ExternalLink className="size-3" aria-hidden /></a>
 }
 
-function Section({ kind, rows, sel, editHref }: { kind: RaceKind; rows: CalendarRow[]; sel?: Selection; editHref?: (id: string) => string }) {
+function Section({ kind, rows, sel, editHref, onEdit }: { kind: RaceKind; rows: CalendarRow[]; sel?: Selection; editHref?: (id: string) => string; onEdit?: (id: string) => void }) {
   const all = rows.length > 0 && rows.every((r) => sel?.picked.has(r.id))
   return (
     <details open className="rounded-xl border border-border bg-surface">
@@ -31,8 +31,8 @@ function Section({ kind, rows, sel, editHref }: { kind: RaceKind; rows: Calendar
             <tr>
               {sel && <th className="w-8 px-2 py-2"><input type="checkbox" className="size-4" aria-label="Chọn cả nhóm" checked={all} onChange={(e) => sel.onToggleAll(rows.map((r) => r.id), e.target.checked)} /></th>}
               <th className="w-8 px-2 py-2">TT</th><th className="px-2 py-2">Tên giải</th><th className="px-2 py-2">Địa điểm</th><th className="px-2 py-2">Ngày chạy</th>
-              <th className="px-2 py-2">Hạn đăng ký</th><th className="px-2 py-2">Cự ly</th><th className="px-2 py-2">Link giải</th><th className="px-2 py-2">Link đăng ký</th>
-              {editHref && <th className="px-2 py-2" />}
+              <th className="px-2 py-2">Hạn đăng ký</th><th className="px-2 py-2">Cự ly</th><th className="px-2 py-2">Link giải</th><th className="px-2 py-2">Link mua bib</th>
+              {(editHref || onEdit) && <th className="px-2 py-2" />}
             </tr>
           </thead>
           <tbody>
@@ -46,8 +46,13 @@ function Section({ kind, rows, sel, editHref }: { kind: RaceKind; rows: Calendar
                 <td className="whitespace-nowrap px-2 py-2">{r.reg_deadline ? fmtDate(r.reg_deadline) : '—'}</td>
                 <td className="px-2 py-2">{r.distances.length ? r.distances.join(', ') : '—'}</td>
                 <td className="px-2 py-2"><Link2 href={r.race_url} label="Trang giải" /></td>
-                <td className="px-2 py-2"><Link2 href={r.reg_url} label="Đăng ký" /></td>
-                {editHref && <td className="px-2 py-2"><Link href={editHref(r.id)} className="whitespace-nowrap font-semibold text-brand">Đăng tin</Link></td>}
+                <td className="px-2 py-2"><Link2 href={r.reg_url} label="Mua bib" /></td>
+                {(editHref || onEdit) && (
+                  <td className="space-y-1 px-2 py-2">
+                    {onEdit && <button type="button" onClick={() => onEdit(r.id)} className="block whitespace-nowrap font-semibold text-brand">Sửa</button>}
+                    {editHref && <Link href={editHref(r.id)} className="block whitespace-nowrap font-semibold text-fg-muted">Đăng tin</Link>}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -58,12 +63,12 @@ function Section({ kind, rows, sel, editHref }: { kind: RaceKind; rows: Calendar
 }
 
 /** Bảng tổng hợp giải chạy: hai nhóm Offline / Online, mỗi nhóm thu gọn được, sắp theo ngày chạy. */
-export function RaceTable({ rows, sel, editHref }: { rows: CalendarRow[]; sel?: Selection; editHref?: (id: string) => string }) {
+export function RaceTable({ rows, sel, editHref, onEdit }: { rows: CalendarRow[]; sel?: Selection; editHref?: (id: string) => string; onEdit?: (id: string) => void }) {
   const by = (k: RaceKind) => rows.filter((r) => r.kind === k).sort((a, b) => (a.race_date ?? '9').localeCompare(b.race_date ?? '9'))
   return (
     <div className="space-y-3">
-      <Section kind="OFFLINE" rows={by('OFFLINE')} sel={sel} editHref={editHref} />
-      <Section kind="ONLINE" rows={by('ONLINE')} sel={sel} editHref={editHref} />
+      <Section kind="OFFLINE" rows={by('OFFLINE')} sel={sel} editHref={editHref} onEdit={onEdit} />
+      <Section kind="ONLINE" rows={by('ONLINE')} sel={sel} editHref={editHref} onEdit={onEdit} />
     </div>
   )
 }
