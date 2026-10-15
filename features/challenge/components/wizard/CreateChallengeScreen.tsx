@@ -392,13 +392,28 @@ function NumberField({ label, value, onChange, unit, step = 1, min = 0, max, err
   error?: string; hint?: ReactNode; id: string
 }) {
   const clamp = (v: number) => Math.min(max ?? Infinity, Math.max(min, Math.round(v / step) * step))
+  // Giữ chữ đang gõ: nếu hiển thị lại từ số thì "3," bị đổi thành "3" ngay và không gõ được 3,5 (như KmInput)
+  const fmt = (v: number) => (Number.isFinite(v) ? String(v).replace('.', ',') : '')
+  const parse = (t: string) => (t === '' ? 0 : Number(t.replace(',', '.')))
+  const [text, setText] = useState(fmt(value))
+  const [seen, setSeen] = useState(value)
+  if (seen !== value) {
+    setSeen(value)
+    if (parse(text) !== value) setText(fmt(value))
+  }
   return (
     <Field label={label} htmlFor={id} error={error} hint={hint}>
       <div className="flex items-center gap-2">
         <Button type="button" variant="secondary" aria-label={`Giảm ${label}`} className="w-11 shrink-0 px-0" onClick={() => onChange(clamp(value - step))}><Minus className="size-4" aria-hidden /></Button>
         <div className="relative flex-1">
-          <Input id={id} inputMode="decimal" value={Number.isFinite(value) ? String(value).replace('.', ',') : ''} className="pr-14 text-center font-mono text-lg"
-            onChange={(e) => { const v = Number(e.target.value.replace(',', '.')); if (!Number.isNaN(v)) onChange(v) }} />
+          <Input id={id} inputMode="decimal" value={text} className="pr-14 text-center font-mono text-lg"
+            onChange={(e) => {
+              const t = e.target.value
+              if (!/^\d*[.,]?\d*$/.test(t)) return
+              setText(t)
+              const v = parse(t)
+              if (!Number.isNaN(v)) onChange(v)
+            }} />
           {unit && <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-fg-subtle">{unit}</span>}
         </div>
         <Button type="button" variant="secondary" aria-label={`Tăng ${label}`} className="w-11 shrink-0 px-0" onClick={() => onChange(clamp(value + step))}><Plus className="size-4" aria-hidden /></Button>
