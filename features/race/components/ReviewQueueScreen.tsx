@@ -8,10 +8,11 @@ import { toast } from 'sonner'
 import { Button, Card, EmptyState, ErrorState, Field, Input, SegmentedControl, Skeleton } from '@/shared/ui'
 import { useOrganizer } from '../hooks/useOrganizer'
 import {
-  addSource, deleteSource, listCandidates, listSources, scanNow, setCandidateStatus, setSourceActive,
+  addSource, candidateToRow, deleteSource, listCandidates, listSources, scanNow, setCandidateStatus, setCandidatesStatus, setSourceActive,
   type CandidateState, type RaceCandidate,
 } from '../api/listingApi'
 import { fmtDate } from './RaceCard'
+import { RaceTable } from './RaceTable'
 
 const ERRORS: Record<string, string> = {
   NO_SEARCH_KEY: 'chưa đặt TAVILY_API_KEY trên máy chủ', SEARCH_LIMIT: 'hết lượt tìm kiếm trong tháng', SEARCH_FAILED: 'dịch vụ tìm kiếm lỗi',
@@ -19,7 +20,7 @@ const ERRORS: Record<string, string> = {
   BAD_URL: 'không truy cập được trang (hoặc robots.txt chặn)', FETCH_FAILED: 'không tải được trang', NOT_HTML: 'không phải trang web',
 }
 const VIEWS: { value: CandidateState; label: string }[] = [
-  { value: 'PENDING', label: 'Chờ duyệt' }, { value: 'FILTERED', label: 'Đã lọc bỏ' }, { value: 'REJECTED', label: 'Đã bỏ' },
+  { value: 'PENDING', label: 'Chờ duyệt' }, { value: 'APPROVED', label: 'Trong bảng' }, { value: 'FILTERED', label: 'Đã lọc bỏ' }, { value: 'REJECTED', label: 'Đã bỏ' },
 ]
 
 /** Admin: khai báo nguồn quét, xem giải tự tìm được, duyệt (mở form chỉnh rồi đăng) hoặc bỏ. Không có gì tự đăng. */
@@ -94,18 +95,54 @@ function Sources() {
 function Candidates() {
   const qc = useQueryClient()
   const [view, setView] = useState<CandidateState>('PENDING')
+  const [picked, setPicked] = useState<Set<string>>(new Set())
   const q = useQuery({ queryKey: ['race-candidates', view], queryFn: () => listCandidates(view) })
+  const refresh = () => { void qc.invalidateQueries({ queryKey: ['race-candidates'] }); void qc.invalidateQueries({ queryKey: ['race-pending'] }); void qc.invalidateQueries({ queryKey: ['race-calendar'] }) }
   const set = useMutation({
     mutationFn: (v: { id: string; status: CandidateState }) => setCandidateStatus(v.id, v.status),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['race-candidates'] }); void qc.invalidateQueries({ queryKey: ['race-pending'] }) },
+    onSuccess: refresh,
     onError: () => toast.error('Không cập nhật được'),
   })
+  const bulk = useMutation({
+    mutationFn: (v: { ids: string[]; status: CandidateState }) => setCandidatesStatus(v.ids, v.status),
+    onSuccess: (_r, v) => {
+      setPicked(new Set()); refresh()
+      toast.success(v.status === 'APPROVED' ? `Đã đưa ${v.ids.length} giải vào bảng` : v.status === 'REJECTED' ? `Đã bỏ ${v.ids.length} giải` : `Đã đưa ${v.ids.length} giải về chờ duyệt`)
+    },
+    onError: () => toast.error('Không cập nhật được'),
+  })
+  const rows = q.data ?? []
+  const ids = rows.filter((r) => picked.has(r.id)).map((r) => r.id)
+  const tableView = view === 'PENDING' || view === 'APPROVED'
+  const sel = {
+    picked,
+    onToggle: (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n }),
+    onToggleAll: (all: string[], on: boolean) => setPicked((p) => { const n = new Set(p); for (const id of all) { if (on) n.add(id); else n.delete(id) } return n }),
+  }
   return (
     <div className="space-y-3">
-      <SegmentedControl value={view} onChange={setView} options={VIEWS} />
+      <SegmentedControl value={view} onChange={(v) => { setView(v); setPicked(new Set()) }} options={VIEWS} />
       {q.isPending ? <Skeleton className="h-32" /> : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} />
-        : !q.data.length ? <EmptyState icon={Flag} title="Không có giải nào" description={view === 'PENDING' ? 'Thêm nguồn rồi bấm "Quét ngay", hoặc chờ lần quét thứ Hai.' : 'Trống.'} />
-        : <ul className="space-y-3">{q.data.map((c) => <li key={c.id}><CandidateRow c={c} busy={set.isPending} onSet={(status) => set.mutate({ id: c.id, status })} /></li>)}</ul>}
+        : !rows.length ? <EmptyState icon={Flag} title="Không có giải nào" description={view === 'PENDING' ? 'Thêm nguồn rồi bấm "Quét ngay", hoặc chờ lần quét thứ Hai.' : 'Trống.'} />
+        : tableView ? (
+          <>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <label className="flex min-h-11 items-center gap-2 font-semibold">
+                <input type="checkbox" className="size-5" checked={ids.length === rows.length} onChange={(e) => sel.onToggleAll(rows.map((r) => r.id), e.target.checked)} />
+                Chọn tất cả ({rows.length})
+              </label>
+              {ids.length > 0 && view === 'PENDING' && (
+                <>
+                  <Button size="sm" loading={bulk.isPending} onClick={() => bulk.mutate({ ids, status: 'APPROVED' })}>Đưa {ids.length} giải vào bảng</Button>
+                  <Button size="sm" variant="secondary" disabled={bulk.isPending} onClick={() => bulk.mutate({ ids, status: 'REJECTED' })}>Bỏ {ids.length}</Button>
+                </>
+              )}
+              {ids.length > 0 && view === 'APPROVED' && <Button size="sm" variant="secondary" loading={bulk.isPending} onClick={() => bulk.mutate({ ids, status: 'PENDING' })}>Gỡ {ids.length} giải khỏi bảng</Button>}
+            </div>
+            <RaceTable rows={rows.map(candidateToRow)} sel={sel} editHref={(id) => `/races/listing/new?candidate=${id}`} />
+          </>
+        )
+        : <ul className="space-y-3">{rows.map((c) => <li key={c.id}><CandidateRow c={c} busy={set.isPending} onSet={(status) => set.mutate({ id: c.id, status })} /></li>)}</ul>}
     </div>
   )
 }

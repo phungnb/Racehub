@@ -20,6 +20,14 @@ describe('normalizeExtracted', () => {
     expect(r).toHaveLength(1)
     expect(r[0]).toMatchObject({ title: 'Dalat Marathon', race_date: '2027-03-01', end_date: '', reg_url: '', distances: ['21K'] })
   })
+  it('phân loại online/offline, hạn đăng ký và link giải; giá trị lạ rơi về offline', () => {
+    const r = normalizeExtracted({ races: [
+      { title: 'Giải chạy ảo tháng 11', race_date: '2026-11-01', kind: 'ONLINE', reg_deadline: '2026-10-30', race_url: 'https://a.vn/g', reg_url: 'https://a.vn/dk' },
+      { title: 'Giải Y', race_date: '2026-11-02', kind: 'LẠ', reg_deadline: '30/10', race_url: 'ftp://x' },
+    ] })
+    expect(r[0]).toMatchObject({ kind: 'ONLINE', reg_deadline: '2026-10-30', race_url: 'https://a.vn/g', reg_url: 'https://a.vn/dk' })
+    expect(r[1]).toMatchObject({ kind: 'OFFLINE', reg_deadline: '', race_url: '' })
+  })
   it('đầu vào rác → rỗng', () => { expect(normalizeExtracted(null)).toEqual([]); expect(normalizeExtracted({ races: 'x' })).toEqual([]) })
 })
 

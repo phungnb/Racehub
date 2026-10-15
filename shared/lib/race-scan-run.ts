@@ -77,6 +77,7 @@ async function ingestLinks(db: SupabaseClient, sourceId: string, links: string[]
           const { error } = await db.from('race_candidates').insert({
             source_id: sourceId, url: candidateKey(pageUrl, r), title: r.title, race_date: r.race_date || null, end_date: r.end_date || null,
             location: loc || null, organizer: r.organizer || null, description: desc || null, distances: r.distances,
+            kind: r.kind, reg_deadline: r.reg_deadline || null, reg_url: r.reg_url || null, race_url: r.race_url || null,
             score: s.score, status: s.status, filter_reason: s.reason,
           })
           if (!error) { out.found++; if (s.status === 'PENDING') out.pending++; else out.filtered++ }
