@@ -15,6 +15,7 @@ import { fmtDate } from './RaceCard'
 
 const ERRORS: Record<string, string> = {
   NO_SEARCH_KEY: 'chưa đặt TAVILY_API_KEY trên máy chủ', SEARCH_LIMIT: 'hết lượt tìm kiếm trong tháng', SEARCH_FAILED: 'dịch vụ tìm kiếm lỗi',
+  AI_KEY: 'khoá AI (GEMINI_API_KEY / ANTHROPIC_API_KEY) sai hoặc hết tiền', AI_LIMIT: 'AI hết hạn mức / quá tải, thử lại sau', AI_FAILED: 'AI đọc trang lỗi',
   BAD_URL: 'không truy cập được trang (hoặc robots.txt chặn)', FETCH_FAILED: 'không tải được trang', NOT_HTML: 'không phải trang web',
 }
 const VIEWS: { value: CandidateState; label: string }[] = [
