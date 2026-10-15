@@ -33,7 +33,7 @@ const iso = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null
 /** Giải tự tìm được → điền sẵn form (vẫn là NHÁP, admin chỉnh rồi mới đăng) */
 function fromCandidate(c: RaceCandidate): ListingInput {
   return { ...EMPTY, title: c.title, race_date: iso(c.race_date) ?? '', end_date: iso(c.end_date), location: c.location, organizer: c.organizer,
-    image_url: c.image_url, description: c.description, distances: c.distances, reg_url: c.url, source_url: c.url }
+    image_url: c.image_url, description: c.description, distances: c.distances, reg_url: c.url.split('#')[0], source_url: c.url.split('#')[0] }
 }
 
 function ListingForm({ id, init, candidateId }: { id: string | null; init: ListingInput; candidateId: string | null }) {
