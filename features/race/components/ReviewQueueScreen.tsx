@@ -5,13 +5,14 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ExternalLink, Flag, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button, Card, EmptyState, ErrorState, Field, Input, SegmentedControl, Sheet, Skeleton } from '@/shared/ui'
+import { Button, Card, EmptyState, ErrorState, Field, Input, SegmentedControl, Skeleton } from '@/shared/ui'
 import { useOrganizer } from '../hooks/useOrganizer'
 import {
-  addSource, candidateToRow, deleteSource, listCandidates, listSources, scanNow, setCandidateStatus, setCandidatesStatus, setSourceActive, updateCandidate,
-  type CandidateEdit, type CandidateState, type RaceCandidate, type RaceKind,
+  addSource, candidateToRow, deleteSource, listCandidates, listSources, scanNow, setCandidateStatus, setCandidatesStatus, setSourceActive,
+  type CandidateState, type RaceCandidate,
 } from '../api/listingApi'
 import { fmtDate } from './RaceCard'
+import { EditRaceSheet } from './EditRaceSheet'
 import { RaceTable } from './RaceTable'
 
 const ERRORS: Record<string, string> = {
@@ -38,6 +39,19 @@ export function ReviewQueueScreen() {
   )
 }
 
+const PRESETS: { kind: 'SEARCH' | 'PAGE'; value: string; label: string }[] = [
+  { kind: 'SEARCH', value: 'lịch giải chạy bộ Việt Nam 2027 đăng ký', label: 'Lịch giải chung' },
+  { kind: 'SEARCH', value: 'giải marathon bán marathon 2027 Việt Nam mở đăng ký', label: 'Marathon / bán marathon' },
+  { kind: 'SEARCH', value: 'giải chạy trail 2027 Việt Nam đăng ký', label: 'Trail' },
+  { kind: 'SEARCH', value: 'giải chạy online virtual run 2027 Việt Nam đăng ký', label: 'Chạy online' },
+  { kind: 'SEARCH', value: 'giải chạy phí đăng ký thấp giá rẻ 2027 Việt Nam', label: 'Giá vé rẻ' },
+  { kind: 'SEARCH', value: 'giải chạy early bird giảm giá bib 2027 Việt Nam', label: 'Early bird / giảm giá' },
+  { kind: 'SEARCH', value: 'giải chạy từ thiện cộng đồng 2027 phí 0 đồng 100k 200k', label: 'Từ thiện / phí thấp' },
+  { kind: 'SEARCH', value: 'giải chạy bộ địa phương tỉnh thành 2027 Hà Nội TP.HCM Đà Nẵng Đà Lạt', label: 'Giải địa phương' },
+  { kind: 'PAGE', value: 'https://thegioichaybo.vn', label: 'thegioichaybo.vn' },
+  { kind: 'PAGE', value: 'https://chay365.com', label: 'chay365.com' },
+]
+
 function Sources() {
   const qc = useQueryClient()
   const [url, setUrl] = useState('')
@@ -49,6 +63,11 @@ function Sources() {
     mutationFn: () => addSource({ kind: mode, value: url.trim(), label: label.trim() || null }),
     onSuccess: () => { setUrl(''); setLabel(''); refresh(); toast.success('Đã thêm nguồn') },
     onError: () => toast.error('Không thêm được (sai định dạng hoặc nguồn đã có).'),
+  })
+  const addPreset = useMutation({
+    mutationFn: (p: (typeof PRESETS)[number]) => addSource(p),
+    onSuccess: () => { refresh(); toast.success('Đã thêm nguồn') },
+    onError: () => toast.error('Không thêm được nguồn này.'),
   })
   const scan = useMutation({
     mutationFn: scanNow,
@@ -76,6 +95,17 @@ function Sources() {
           ))}
           {!q.data.length && <li className="text-sm text-fg-muted">Chưa có nguồn nào.</li>}
         </ul>
+      )}
+      {q.data && PRESETS.some((p) => !q.data.some((s) => (p.kind === 'SEARCH' ? s.query === p.value : s.url === p.value))) && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-semibold text-fg-muted">Gợi ý nguồn (bấm để thêm)</p>
+          <div className="flex flex-wrap gap-1.5">
+            {PRESETS.filter((p) => !q.data.some((s) => (p.kind === 'SEARCH' ? s.query === p.value : s.url === p.value))).map((p) => (
+              <button key={p.value} type="button" disabled={addPreset.isPending} onClick={() => addPreset.mutate(p)}
+                className="min-h-9 rounded-full border border-border px-3 text-xs font-semibold hover:bg-surface-2">+ {p.label}</button>
+            ))}
+          </div>
+        </div>
       )}
       <Field label="Thêm nguồn" htmlFor="s-url">
         <div className="space-y-2">
@@ -144,46 +174,8 @@ function Candidates() {
           </>
         )
         : <ul className="space-y-3">{rows.map((c) => <li key={c.id}><CandidateRow c={c} busy={set.isPending} onSet={(status) => set.mutate({ id: c.id, status })} /></li>)}</ul>}
-      {editing && <EditRow key={editing.id} c={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh() }} />}
+      {editing && <EditRaceSheet key={editing.id} row={candidateToRow(editing)} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh() }} />}
     </div>
-  )
-}
-
-const isHttp = (v: string) => v.trim() === '' || /^https?:\/\/\S+$/i.test(v.trim())
-
-/** Admin sửa một dòng của bảng: nhất là link mua bib / đăng ký do trang nguồn thường ghi sai hoặc thiếu. */
-function EditRow({ c, onClose, onSaved }: { c: RaceCandidate; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState<CandidateEdit>({
-    title: c.title, kind: c.kind, location: c.location ?? '', race_date: c.race_date ?? '', end_date: c.end_date ?? '',
-    reg_deadline: c.reg_deadline ?? '', race_url: c.race_url ?? c.url.split('#')[0], reg_url: c.reg_url ?? '',
-  })
-  const set = <K extends keyof CandidateEdit>(k: K, v: CandidateEdit[K]) => setF((x) => ({ ...x, [k]: v }))
-  const save = useMutation({ mutationFn: () => updateCandidate(c.id, f), onSuccess: () => { toast.success('Đã lưu'); onSaved() }, onError: () => toast.error('Không lưu được (kiểm tra lại link và ngày).') })
-  const bad = f.title.trim().length < 3 || !isHttp(f.race_url) || !isHttp(f.reg_url) || (f.end_date !== '' && f.race_date !== '' && f.end_date < f.race_date)
-  return (
-    <Sheet open onClose={onClose} title="Sửa giải trong bảng" description="Link mua bib / đăng ký để trống nếu chưa có."
-      footer={<Button block loading={save.isPending} disabled={bad} onClick={() => save.mutate()}>Lưu</Button>}>
-      <div className="space-y-3">
-        <Field label="Tên giải" htmlFor="e-title"><Input id="e-title" value={f.title} maxLength={200} onChange={(e) => set('title', e.target.value)} /></Field>
-        <Field label="Loại giải" htmlFor="e-kind">
-          <select id="e-kind" value={f.kind} onChange={(e) => set('kind', e.target.value as RaceKind)} className="h-11 w-full rounded-xl border border-border bg-bg px-3 text-[15px]">
-            <option value="OFFLINE">Offline (chạy trực tiếp)</option><option value="ONLINE">Online (chạy ảo)</option>
-          </select>
-        </Field>
-        <Field label="Địa điểm" htmlFor="e-loc"><Input id="e-loc" value={f.location} maxLength={200} onChange={(e) => set('location', e.target.value)} /></Field>
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Ngày chạy" htmlFor="e-date"><Input id="e-date" type="date" value={f.race_date} onChange={(e) => set('race_date', e.target.value)} /></Field>
-          <Field label="Đến ngày" htmlFor="e-end"><Input id="e-end" type="date" value={f.end_date} onChange={(e) => set('end_date', e.target.value)} /></Field>
-        </div>
-        <Field label="Hạn đăng ký" htmlFor="e-dl"><Input id="e-dl" type="date" value={f.reg_deadline} onChange={(e) => set('reg_deadline', e.target.value)} /></Field>
-        <Field label="Link giải" htmlFor="e-url" error={isHttp(f.race_url) ? undefined : 'Link phải bắt đầu bằng http(s)://'}>
-          <Input id="e-url" inputMode="url" value={f.race_url} onChange={(e) => set('race_url', e.target.value)} />
-        </Field>
-        <Field label="Link mua bib (đăng ký)" htmlFor="e-reg" error={isHttp(f.reg_url) ? undefined : 'Link phải bắt đầu bằng http(s)://'}>
-          <Input id="e-reg" inputMode="url" value={f.reg_url} onChange={(e) => set('reg_url', e.target.value)} />
-        </Field>
-      </div>
-    </Sheet>
   )
 }
 

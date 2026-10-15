@@ -9,8 +9,12 @@ export class SearchError extends Error {
 // Mạng xã hội / video: không đọc được bằng tải trang thường
 const SKIP_HOST = /(^|\.)(facebook|fb|instagram|tiktok|youtube|youtu|twitter|x|pinterest|zalo|linkedin|reddit|google|bing)\.(com|be|me|vn)$/i
 
-export function usableResultUrls(urls: string[], limit: number): string[] {
+// Tối đa PER_HOST kết quả / tên miền để một trang lịch giải không chiếm hết lượt đọc: quét ra nhiều nguồn khác nhau hơn
+const PER_HOST = 2
+
+export function usableResultUrls(urls: string[], limit: number, perHost = Infinity): string[] {
   const seen = new Set<string>()
+  const hosts = new Map<string, number>()
   const out: string[] = []
   for (const raw of urls) {
     let u: URL
@@ -19,6 +23,9 @@ export function usableResultUrls(urls: string[], limit: number): string[] {
     u.hash = ''
     const k = u.toString()
     if (seen.has(k)) continue
+    const host = u.hostname.replace(/^www\./, '').toLowerCase()
+    if ((hosts.get(host) ?? 0) >= perHost) continue
+    hosts.set(host, (hosts.get(host) ?? 0) + 1)
     seen.add(k); out.push(k)
     if (out.length >= limit) break
   }
@@ -29,13 +36,13 @@ async function tavily(key: string, query: string, count: number): Promise<string
   const res = await fetch('https://api.tavily.com/search', {
     method: 'POST', signal: AbortSignal.timeout(15_000),
     headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
-    body: JSON.stringify({ query, search_depth: 'basic', max_results: Math.min(count, 20), country: 'vietnam' }),
+    body: JSON.stringify({ query, search_depth: 'basic', max_results: 20, country: 'vietnam' }),
   }).catch(() => null)
   if (!res) throw new SearchError('SEARCH_FAILED')
   if (res.status === 429 || res.status === 432 || res.status === 433) throw new SearchError('SEARCH_LIMIT')
   if (!res.ok) throw new SearchError('SEARCH_FAILED')
   const j = (await res.json().catch(() => null)) as { results?: { url?: string }[] } | null
-  return usableResultUrls((j?.results ?? []).map((r) => r.url ?? ''), count)
+  return usableResultUrls((j?.results ?? []).map((r) => r.url ?? ''), count, PER_HOST)
 }
 
 export async function searchWeb(query: string, count = 20): Promise<string[]> {

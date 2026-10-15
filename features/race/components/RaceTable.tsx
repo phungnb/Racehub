@@ -1,7 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Search } from 'lucide-react'
 import { cn } from '@/shared/lib/cn'
 import type { CalendarRow, RaceKind } from '../api/listingApi'
 import { fmtDate } from './RaceCard'
@@ -63,10 +64,22 @@ function Section({ kind, rows, sel, editHref, onEdit }: { kind: RaceKind; rows: 
 }
 
 /** Bảng tổng hợp giải chạy: hai nhóm Offline / Online, mỗi nhóm thu gọn được, sắp theo ngày chạy. */
-export function RaceTable({ rows, sel, editHref, onEdit }: { rows: CalendarRow[]; sel?: Selection; editHref?: (id: string) => string; onEdit?: (id: string) => void }) {
+const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase()
+
+export function RaceTable({ rows: all, sel, editHref, onEdit }: { rows: CalendarRow[]; sel?: Selection; editHref?: (id: string) => string; onEdit?: (id: string) => void }) {
+  const [term, setTerm] = useState('')
+  const words = fold(term).split(/\s+/).filter(Boolean)
+  const rows = words.length ? all.filter((r) => { const hay = fold([r.title, r.location, r.organizer, ...r.distances].filter(Boolean).join(' ')); return words.every((w) => hay.includes(w)) }) : all
   const by = (k: RaceKind) => rows.filter((r) => r.kind === k).sort((a, b) => (a.race_date ?? '9').localeCompare(b.race_date ?? '9'))
   return (
     <div className="space-y-3">
+      <label className="relative block">
+        <span className="sr-only">Tìm giải</span>
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-muted" aria-hidden />
+        <input type="search" value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Tìm giải theo tên, địa điểm, cự ly…"
+          className="h-11 w-full rounded-xl border border-border bg-bg pl-9 pr-3 text-[15px]" />
+      </label>
+      {words.length > 0 && !rows.length && <p className="px-1 text-sm text-fg-muted">Không có giải nào khớp “{term.trim()}”.</p>}
       <Section kind="OFFLINE" rows={by('OFFLINE')} sel={sel} editHref={editHref} onEdit={onEdit} />
       <Section kind="ONLINE" rows={by('ONLINE')} sel={sel} editHref={editHref} onEdit={onEdit} />
     </div>
