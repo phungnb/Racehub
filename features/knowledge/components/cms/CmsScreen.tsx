@@ -3,13 +3,13 @@
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BadgeCheck, BarChart3, FileText, PenSquare, Plus, Search, ShieldCheck, UserPlus, Users } from 'lucide-react'
+import { BadgeCheck, BarChart3, FileText, PenSquare, Plus, Search, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react'
 import { toast } from 'sonner'
-import { Avatar, BarChart, Button, Card, EmptyState, ErrorState, Field, Input, SegmentedControl, Sheet, Skeleton, StatTile, SwitchRow, Textarea, ScrollRow } from '@/shared/ui'
+import { Avatar, BarChart, Button, Card, ConfirmSheet, EmptyState, ErrorState, Field, Input, SegmentedControl, Sheet, Skeleton, StatTile, SwitchRow, Textarea, ScrollRow } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { supabase } from '@/shared/lib/supabase'
 import {
-  cmsExpertReview, cmsList, cmsMeta, cmsSaveAuthor, cmsSetStatus, cmsSetStaff, cmsStats, knowledgeErrorMessage, uploadContentImage,
+  cmsDelete, cmsExpertReview, cmsList, cmsMeta, cmsSaveAuthor, cmsSetStatus, cmsSetStaff, cmsStats, knowledgeErrorMessage, uploadContentImage,
   type ArticleStatus, type CmsAuthor, type CmsMeta, type CmsRow,
 } from '../../api/knowledgeApi'
 import { AUTHOR_KIND, formatDate, ROLE_LABEL, STATUS_LABEL, STATUS_TONE } from '../../model/knowledge'
@@ -66,6 +66,23 @@ function Articles({ meta, onOpen }: { meta: CmsMeta; onOpen: (id: string) => voi
     getNextPageParam: (last, pages) => (pages.length * 30 < last.total ? pages.length * 30 : undefined),
   })
   const rows = list.data?.pages.flatMap((p) => p.items) ?? []
+  const qc = useQueryClient()
+  const editor = meta.role === 'ADMIN' || meta.role === 'EDITOR'
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [confirm, setConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const pickedIds = rows.filter((r) => picked.has(r.id)).map((r) => r.id)
+  const allPicked = rows.length > 0 && pickedIds.length === rows.length
+  const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const removePicked = async () => {
+    setDeleting(true)
+    const res = await Promise.allSettled(pickedIds.map((id) => cmsDelete(id)))
+    const failed = res.filter((x): x is PromiseRejectedResult => x.status === 'rejected')
+    setDeleting(false); setConfirm(false); setPicked(new Set())
+    void qc.invalidateQueries({ queryKey: ['cms'] }); void qc.invalidateQueries({ queryKey: ['knowledge'] })
+    if (failed.length === 0) toast.success(`Đã xoá ${pickedIds.length} bài`)
+    else toast.error(`Xoá được ${pickedIds.length - failed.length}/${pickedIds.length} bài. Lỗi: ${knowledgeErrorMessage(failed[0].reason)}`)
+  }
   const catName = (id: string) => meta.categories.find((c) => c.id === id)?.name ?? id
   return (
     <div className="space-y-3">
@@ -91,10 +108,32 @@ function Articles({ meta, onOpen }: { meta: CmsMeta; onOpen: (id: string) => voi
         : list.isError ? <ErrorState message={knowledgeErrorMessage(list.error)} error={list.error} onRetry={() => void list.refetch()} />
         : rows.length === 0 ? <EmptyState icon={FileText} title="Không có bài" description="Đổi bộ lọc hoặc tạo bài mới." />
         : (
-          <ul className="space-y-2">
-            {rows.map((r) => <li key={r.id}><Row r={r} role={meta.role} cat={catName(r.category_id)} onOpen={() => onOpen(r.id)} /></li>)}
-          </ul>
+          <>
+            {editor && (
+              <div className="flex items-center gap-3 text-sm">
+                <label className="flex min-h-11 items-center gap-2 font-semibold">
+                  <input type="checkbox" className="size-5" checked={allPicked} onChange={() => setPicked(allPicked ? new Set() : new Set(rows.map((r) => r.id)))} />
+                  Chọn tất cả ({rows.length})
+                </label>
+                {pickedIds.length > 0 && (
+                  <Button size="sm" variant="secondary" className="ml-auto text-danger" onClick={() => setConfirm(true)}>
+                    <Trash2 className="size-4" aria-hidden />Xoá {pickedIds.length} bài
+                  </Button>
+                )}
+              </div>
+            )}
+            <ul className="space-y-2">
+              {rows.map((r) => (
+                <li key={r.id} className="flex items-start gap-2">
+                  {editor && <input type="checkbox" className="mt-4 size-5 shrink-0" aria-label={`Chọn ${r.title}`} checked={picked.has(r.id)} onChange={() => toggle(r.id)} />}
+                  <div className="min-w-0 flex-1"><Row r={r} role={meta.role} cat={catName(r.category_id)} onOpen={() => onOpen(r.id)} /></div>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
+      <ConfirmSheet open={confirm} onClose={() => setConfirm(false)} title={`Xoá ${pickedIds.length} bài đã chọn?`} confirmLabel="Xoá" loading={deleting}
+        description="Không hoàn tác. Bài đã từng đăng cũng bị xoá (link cũ không mở được); muốn giữ thì mở bài và chọn Lưu trữ." onConfirm={() => void removePicked()} />
       {list.hasNextPage && <Button block variant="secondary" loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>Xem thêm</Button>}
     </div>
   )
