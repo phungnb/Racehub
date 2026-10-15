@@ -103,6 +103,17 @@ export async function raceCalendar(): Promise<CalendarRow[]> {
   if (error) throw error
   return (data ?? []) as CalendarRow[]
 }
+/** Admin sửa một dòng của bảng (link mua bib / đăng ký, link giải, ngày, hạn đăng ký, loại…). Chuỗi rỗng = xoá giá trị. */
+export interface CandidateEdit {
+  title: string; kind: RaceKind; location: string; race_date: string; end_date: string; reg_deadline: string; race_url: string; reg_url: string
+}
+export async function updateCandidate(id: string, v: CandidateEdit) {
+  const { error } = await supabase.from('race_candidates').update({
+    title: v.title.trim(), kind: v.kind, location: v.location.trim() || null, race_date: v.race_date || null, end_date: v.end_date || null,
+    reg_deadline: v.reg_deadline || null, race_url: v.race_url.trim() || null, reg_url: v.reg_url.trim() || null,
+  }).eq('id', id)
+  if (error) throw error
+}
 /** Duyệt / bỏ / khôi phục nhiều giải một lượt (đưa vào bảng = APPROVED, không tạo tin riêng). */
 export async function setCandidatesStatus(ids: string[], status: CandidateState) {
   if (!ids.length) return

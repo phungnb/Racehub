@@ -1,7 +1,7 @@
--- RaceHub: gộp 135 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 136 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 015800, 015900, 016000, 016100, 016200, 016300, 016400, 016500, 016600, 016700, 016800, 016900, 017100, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 015800, 015900, 016000, 016100, 016200, 016300, 016400, 016500, 016600, 016700, 016800, 016900, 017000, 017100, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -30941,6 +30941,29 @@ grant execute on function public.race_calendar() to authenticated;
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001017000_race_source_keep_approved.sql
+-- ===================================================================
+-- 017000: Xoá nguồn quét KHÔNG làm mất giải đã đưa vào bảng tổng hợp.
+-- Trước: xoá nguồn → xoá hết giải đã tìm từ nguồn (kể cả giải đã duyệt). Nay: giải APPROVED được giữ lại (source_id về null);
+-- chỉ các giải chưa duyệt / bị lọc / đã bỏ của nguồn đó mới bị xoá theo.
+-- Chạy lại nhiều lần vẫn an toàn.
+alter table public.race_candidates drop constraint if exists race_candidates_source_id_fkey;
+alter table public.race_candidates add constraint race_candidates_source_id_fkey
+  foreign key (source_id) references public.race_sources(id) on delete set null;
+
+create or replace function private.race_source_cleanup() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  delete from public.race_candidates where source_id = old.id and status <> 'APPROVED';
+  return old;
+end $$;
+drop trigger if exists trg_race_source_cleanup on public.race_sources;
+create trigger trg_race_source_cleanup before delete on public.race_sources
+  for each row execute function private.race_source_cleanup();
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001017100_strava_scan_jobs.sql
 -- ===================================================================
 -- 017100: Quét Strava từ 1/1/2026 chạy nền, chia nhỏ theo thời gian (Đại sảnh CLB).
@@ -31355,6 +31378,8 @@ begin
       'ok', position('best3' in pg_get_functiondef(to_regprocedure('public.club_hall_of_fame(uuid)'))) > 0),
     jsonb_build_object('file', '20261001016900', 'label', 'Race: bảng tổng hợp giải offline + online',
       'ok', private.sc_col('race_candidates', 'kind') and to_regprocedure('public.race_calendar()') is not null),
+    jsonb_build_object('file', '20261001017000', 'label', 'Race: xoá nguồn quét giữ giải đã vào bảng',
+      'ok', exists (select 1 from pg_trigger where tgname = 'trg_race_source_cleanup' and not tgisinternal)),
     jsonb_build_object('file', '20261001017100', 'label', 'Quét Strava nền cho CLB (từ 1/1/2026)',
       'ok', to_regclass('public.strava_scan_jobs') is not null and to_regprocedure('public.club_request_strava_scan(uuid,timestamptz)') is not null));
 
