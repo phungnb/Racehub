@@ -17,6 +17,7 @@ import { CharacterHub } from '@/features/character'
 import { BadgeGrid, GiftWall, LeagueEntry } from '@/features/game'
 import { getAthleteProfile } from '../api/athleteApi'
 import { AvatarPicker } from './AvatarPicker'
+import { RunnerProfileCard } from './RunnerProfileCard'
 import type { Profile } from '@/shared/types/profile'
 
 type Tab = 'character' | 'overview' | 'badges'
@@ -226,7 +227,7 @@ export function MeScreen({ profile }: { profile: Profile }) {
         </div>
       )}
 
-      {tab === 'character' && <CharacterHub />}
+      {tab === 'character' && <><CharacterHub /><RunnerProfileCard userId={profile.id} /></>}
     </div>
   )
 }
