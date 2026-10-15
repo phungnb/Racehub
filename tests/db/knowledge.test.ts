@@ -89,7 +89,9 @@ describe('RaceHub Knowledge (006200)', () => {
     expect(await fails(article(db, READER, 'giai-chay-mua-thu'))).toContain('ARTICLE_NOT_FOUND')
     await db.query(`update public.content_articles set published_at = now() - interval '1 minute' where id = $1`, [n])
     expect((await article(db, READER, 'giai-chay-mua-thu')).content_type).toBe('NEWS')
-    expect(await fails(rpc(db, EDITOR, `select public.cms_delete($1)`, [n]))).toContain('ARCHIVE_INSTEAD')
+    expect(await fails(rpc(db, WRITER, `select public.cms_delete($1)`, [n]))).toMatch(/ARCHIVE_INSTEAD|FORBIDDEN/)   // người viết thường không xoá được bài đã đăng
+    await rpc(db, EDITOR, `select public.cms_delete($1)`, [n])                                                          // biên tập / admin xoá được
+    expect((await db.query<Row>(`select count(*)::int c from public.content_articles where id = $1`, [n])).rows[0].c).toBe(0)
     expect((await db.query<Row>(`select count(*)::int c from public.admin_audit_log where action like 'CONTENT_%'`)).rows[0].c).toBeGreaterThan(3)
   })
 

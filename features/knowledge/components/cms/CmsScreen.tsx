@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BadgeCheck, BarChart3, FileText, PenSquare, Plus, Search, ShieldCheck, UserPlus, Users } from 'lucide-react'
 import { toast } from 'sonner'
@@ -21,7 +22,7 @@ type Tab = 'articles' | 'stats' | 'people' | 'scan'
 export function CmsScreen() {
   const meta = useQuery({ queryKey: ['cms', 'meta'], queryFn: cmsMeta })
   const [tab, setTab] = useState<Tab>('articles')
-  const [editing, setEditing] = useState<string | 'new' | null>(null)
+  const [editing, setEditing] = useState<string | 'new' | null>(useSearchParams().get('edit'))
   if (meta.isPending) return <div className="space-y-3"><Skeleton className="h-12" /><Skeleton className="h-64" /></div>
   if (meta.isError) return <ErrorState message={knowledgeErrorMessage(meta.error)} error={meta.error} onRetry={() => void meta.refetch()} />
   const m = meta.data

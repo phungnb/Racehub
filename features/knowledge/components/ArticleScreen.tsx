@@ -5,14 +5,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft, ArrowRight, Award, BadgeCheck, Bookmark, CheckCircle2, ChevronDown, Clock, ExternalLink, FileDown, ListTree, Share2, ShieldCheck,
-  ThumbsDown, ThumbsUp,
+  ThumbsDown, ThumbsUp, PenSquare,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, Button, Card, ErrorState, Skeleton, Textarea } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { routes } from '@/shared/config/routes'
 import { knowledgeErrorMessage, knowledgeFeedback, knowledgeProgress, knowledgeTrack, type Article } from '../api/knowledgeApi'
-import { knowledgeKeys, useArticle, useBookmark } from '../hooks/useKnowledge'
+import { knowledgeKeys, useArticle, useBookmark, useContentRole } from '../hooks/useKnowledge'
 import { AUTHOR_KIND, ctaHref, ctaLabel, DEFAULT_CTAS, formatDate } from '../model/knowledge'
 import { parseMarkdown, tocOf } from '../model/markdown'
 import { ArticleRow, CategoryIcon } from './ArticleCard'
@@ -87,6 +87,7 @@ function Reader({ a }: { a: Article }) {
   const body = useRef<HTMLDivElement>(null)
   const pct = useReadingProgress(a, body)
   const bookmark = useBookmark()
+  const role = useContentRole()
   const [saved, setSaved] = useState(a.saved)
   const [tocOpen, setTocOpen] = useState(false)
   const ctas = a.ctas.length ? a.ctas : DEFAULT_CTAS[a.category.id] ?? []
@@ -109,6 +110,11 @@ function Reader({ a }: { a: Article }) {
   return (
     <article className="space-y-5">
       <div className="fixed inset-x-0 top-0 z-40 h-0.5 bg-transparent" aria-hidden><div className="h-full bg-brand transition-[width]" style={{ width: `${pct}%` }} /></div>
+      {(role.data === 'ADMIN' || role.data === 'EDITOR') && (
+        <Link href={`${routes.learnStudio}?edit=${a.id}`} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-surface-2 px-3 text-sm font-semibold text-brand">
+          <PenSquare className="size-4" aria-hidden />Sửa / xoá bài này
+        </Link>
+      )}
       {a.preview && <p className="rounded-xl bg-warning/15 p-3 text-sm text-warning">Xem trước — bài chưa đăng ({a.status}). Người đọc chưa thấy bài này.</p>}
 
       <header className="space-y-3">

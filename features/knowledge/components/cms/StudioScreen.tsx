@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, PenSquare } from 'lucide-react'
 import { EmptyState, Skeleton } from '@/shared/ui'
@@ -18,7 +19,7 @@ export function StudioScreen() {
       <h1 className="text-2xl font-bold">Soạn bài Knowledge</h1>
       {role.isPending ? <Skeleton className="h-64" />
         : !role.data ? <EmptyState icon={PenSquare} title="Dành cho ban nội dung" description="Muốn cộng tác viết bài (HLV, chuyên gia, runner có kinh nghiệm)? Liên hệ RaceHub để được thêm vào ban nội dung." />
-        : <CmsScreen />}
+        : <Suspense fallback={<Skeleton className="h-64" />}><CmsScreen /></Suspense>}
     </div>
   )
 }
