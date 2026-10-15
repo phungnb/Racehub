@@ -5,6 +5,8 @@ import { analyzeRun, compactStreams, isGpsJumpFlag, speedRulesFrom, stravaStream
 import { toOps } from '@/shared/lib/ops'
 import { mapStravaActivity, mapStravaDetail, parseRateUsage, rateHasRoom, summarize, syncWindowStart, tokenNeedsRefresh, type RateUsage, type StravaSummaryActivity, type SyncSummary } from './mapping'
 
+/** Mốc quét lại toàn bộ lịch sử Strava (Đại sảnh CLB → Km năm 2026): 0h ngày 1/1/2026 giờ Việt Nam */
+export const STRAVA_YEAR_SCAN_SINCE = new Date('2026-01-01T00:00:00+07:00')
 export const STRAVA_SCOPES = 'read,activity:read_all'
 export const STRAVA_CALLBACK_PATH = '/api/strava/callback'
 

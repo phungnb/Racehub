@@ -12,6 +12,7 @@ import { formatDuration, formatKm, formatNumber, formatRelative } from '@/shared
 import { getHallOfFame, type HallFinisher, type HallOfFame } from '../../api/hubApi'
 import { useClub } from '../../hooks/useClub'
 import { DrawPanel } from '@/features/draw'
+import { ClubStravaScan } from './ClubStravaScan'
 
 const MEDAL = ['text-medal-gold', 'text-medal-silver', 'text-medal-bronze']
 const YEAR_PREVIEW = 10
@@ -24,7 +25,13 @@ export function HallOfFameScreen({ clubId }: { clubId: string }) {
   const { isStaff } = useClub(clubId)
   const qc = useQueryClient()
   const { profile } = useMyProfile()
-  const scan = profile?.strava_connected ? <StravaYearScan onDone={() => void qc.invalidateQueries({ queryKey: ['club', clubId, 'hall'] })} /> : null
+  const refreshHall = () => void qc.invalidateQueries({ queryKey: ['club', clubId, 'hall'] })
+  const scan = (
+    <>
+      {profile?.strava_connected && <StravaYearScan onDone={refreshHall} />}
+      {isStaff && <ClubStravaScan clubId={clubId} onDone={refreshHall} />}
+    </>
+  )
   if (q.isPending) return <div className="space-y-3"><Skeleton className="h-40" /><Skeleton className="h-56" /></div>
   if (q.isError) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />
   const h = q.data

@@ -1,14 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/shared/lib/supabase-server'
-import { backfillStravaActivities } from '@/features/integrations/server'
+import { STRAVA_YEAR_SCAN_SINCE, backfillStravaActivities } from '@/features/integrations/server'
 
 // Đại sảnh CLB → "Quét Strava từ 1/1/2026": người dùng tự kéo lại toàn bộ bài chạy từ đầu năm (một lần).
 // Chia lô như đồng bộ lại của thử thách: client gọi lần lượt, mỗi lần ≤ 3 trang × 100 bài; nhập bài idempotent nên chạy lại an toàn.
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
-
-/** 0h ngày 1/1/2026 giờ Việt Nam */
-const YEAR_SCAN_SINCE = new Date('2026-01-01T00:00:00+07:00')
 
 const MESSAGES: Record<string, [number, string]> = {
   STRAVA_NOT_CONNECTED: [400, 'Bạn chưa kết nối Strava.'],
@@ -23,7 +20,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'AUTH_REQUIRED', message: 'Cần đăng nhập.' }, { status: 401 })
   try {
     const r = await backfillStravaActivities(createSupabaseAdminClient(), user.id, {
-      since: YEAR_SCAN_SINCE, until: new Date(Date.now() + 86_400_000), page: Number.isInteger(body.page) ? body.page : 1,
+      since: STRAVA_YEAR_SCAN_SINCE, until: new Date(Date.now() + 86_400_000), page: Number.isInteger(body.page) ? body.page : 1,
     })
     return NextResponse.json({ summary: r.summary, nextPage: r.nextPage, rateLimited: r.rateLimited })
   } catch (err) {
