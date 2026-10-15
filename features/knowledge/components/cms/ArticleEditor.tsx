@@ -322,7 +322,7 @@ function Editor({ initial, meta, onClose }: { initial: CmsArticle | null; meta: 
           {editor && status === 'REVIEW' && initial?.created_by && <Button variant="ghost" onClick={() => { setNote(''); setSheet('return') }}>Trả về</Button>}
           {editor && status === 'PUBLISHED' && <Button variant="ghost" onClick={() => void setStatus('ARCHIVED', null, null, 'Đã lưu trữ — bài không còn hiện')}>Lưu trữ</Button>}
           {editor && status === 'ARCHIVED' && <Button variant="secondary" onClick={() => void setStatus('PUBLISHED', null, null, 'Đã đăng lại')}>Đăng lại</Button>}
-          {id && !initial?.published_at && <Button variant="ghost" className="ml-auto text-danger" aria-label="Xoá bài" onClick={() => setSheet('delete')}><Trash2 className="size-4" aria-hidden /></Button>}
+          {id && (editor || !initial?.published_at) && <Button variant="ghost" className="ml-auto text-danger" aria-label="Xoá bài" onClick={() => setSheet('delete')}><Trash2 className="size-4" aria-hidden /></Button>}
         </div>
       </div>
 
@@ -338,8 +338,8 @@ function Editor({ initial, meta, onClose }: { initial: CmsArticle | null; meta: 
         }}>Gửi</Button>}>
         <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={4} maxLength={300} placeholder="Cần sửa gì, vì sao…" />
       </Sheet>
-      <ConfirmSheet open={sheet === 'delete'} onClose={() => setSheet(null)} title="Xoá bài nháp?" confirmLabel="Xoá"
-        description="Chỉ xoá được bài chưa từng đăng. Không hoàn tác."
+      <ConfirmSheet open={sheet === 'delete'} onClose={() => setSheet(null)} title={initial?.published_at ? 'Xoá bài đã đăng?' : 'Xoá bài nháp?'} confirmLabel="Xoá"
+        description={initial?.published_at ? 'Bài biến mất khỏi mục Kiến thức, link cũ không còn mở được, thống kê mất theo. Không hoàn tác. Muốn giữ lại thì chọn Lưu trữ.' : 'Không hoàn tác.'}
         onConfirm={() => void cmsDelete(id!).then(() => { toast.success('Đã xoá'); refresh(); onClose() }, (e) => toast.error(knowledgeErrorMessage(e)))} />
     </div>
   )

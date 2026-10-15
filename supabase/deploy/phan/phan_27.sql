@@ -341,7 +341,9 @@ begin
     jsonb_build_object('file', '20261001016500', 'label', 'Kiến thức: quét tin gợi ý vào hàng chờ biên tập',
       'ok', private.sc_col('race_sources', 'target') and to_regprocedure('public.knowledge_scan_ingest(jsonb)') is not null),
     jsonb_build_object('file', '20261001016600', 'label', 'Kiến thức: quét bài đầy đủ, nâng cấp bản tóm tắt',
-      'ok', position('chỉ NÂNG CẤP' in pg_get_functiondef(to_regprocedure('public.knowledge_scan_ingest(jsonb)'))) > 0));
+      'ok', position('chỉ NÂNG CẤP' in pg_get_functiondef(to_regprocedure('public.knowledge_scan_ingest(jsonb)'))) > 0),
+    jsonb_build_object('file', '20261001016700', 'label', 'Kiến thức: admin xoá được bài đã đăng',
+      'ok', position('CONTENT_DELETE' in pg_get_functiondef(to_regprocedure('public.cms_delete(uuid)'))) > 0));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
