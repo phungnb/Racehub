@@ -26,6 +26,8 @@ export async function scanSource(db: SupabaseClient, src: Source, deadlineMs: nu
       const { html, url: base } = await fetchHtml(src.url ?? '')
       if (!(await robotsAllows(base))) throw new FetchError('BAD_URL')
       links = extractEventLinks(html, base)
+      // Có AI: đọc chính trang này trước (bài tổng hợp 16 giải = 16 dòng), rồi mới đến các trang con
+      if (extractionEnabled()) links = [base.toString(), ...links.filter((l) => l !== base.toString())]
     }
     await ingestLinks(db, src.id, links, deadlineMs, out)
   } catch (e) {
