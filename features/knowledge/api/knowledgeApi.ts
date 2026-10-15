@@ -167,7 +167,10 @@ const MESSAGES: Record<string, string> = {
 export function knowledgeErrorMessage(e: unknown): string {
   const msg = (e as { message?: string } | null)?.message ?? ''
   const key = Object.keys(MESSAGES).sort((a, b) => b.length - a.length).find((k) => msg.includes(k))
-  return key ? MESSAGES[key] : systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')
+  if (key) return MESSAGES[key]
+  const r = (e ?? {}) as { code?: string; message?: string; details?: string }
+  const raw = [r.code, r.message, r.details].filter(Boolean).join(' · ').slice(0, 160)
+  return `${systemErrorMessage(e, 'Không thực hiện được. Hãy thử lại.')}${raw ? ` [${raw}]` : ''}`
 }
 
 // ── Nguồn quét tin kiến thức (admin). Dùng chung bảng race_sources với target = 'KNOWLEDGE'; kết quả vào hàng chờ biên tập (REVIEW).
