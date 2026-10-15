@@ -72,9 +72,12 @@ export async function deleteBoostDay(clubId: string, day: string): Promise<Boost
 
 /** Đại sảnh danh vọng của CLB (migration 007800) */
 export interface HallPerson { user_id: string; name: string; avatar_url: string | null }
+/** Một thành tích Full / Half (giây đã quy về đúng cự ly) */
+export interface HallBest { best_s: number; at: string; km: number }
+export type HallFinisher = HallPerson & { times: number; first_at: string; best_s: number | null; top3?: HallBest[] }
 export interface HallOfFame {
-  marathon: (HallPerson & { times: number; first_at: string; best_s: number | null })[]
-  half: (HallPerson & { times: number; first_at: string; best_s: number | null })[]
+  marathon: HallFinisher[]
+  half: HallFinisher[]
   records: (HallPerson & { label: '5K' | '10K' | '21K' | '42K'; rank: number; best_s: number })[]
   year: (HallPerson & { rank: number; distance_m: number; runs: number })[]
   milestones: (HallPerson & { code: string; label: string; reached_at: string })[]

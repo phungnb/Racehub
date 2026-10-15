@@ -1,7 +1,7 @@
--- RaceHub: gộp 134 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 135 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 015800, 015900, 016000, 016100, 016200, 016300, 016400, 016500, 016600, 016700, 016900, 017000, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 015800, 015900, 016000, 016100, 016200, 016300, 016400, 016500, 016600, 016700, 016800, 016900, 017000, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -30823,6 +30823,86 @@ grant execute on function public.cms_delete(uuid) to authenticated;
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001016800_hall_of_fame_top3_all_members.sql
+-- ===================================================================
+-- Đại sảnh CLB: (1) mỗi người hoàn thành Full / Half có thêm top3 = 3 thành tích tốt nhất (giây quy về đúng cự ly, kèm ngày chạy);
+-- (2) bảng Km năm liệt kê TẤT CẢ thành viên đã duyệt (kể cả 0 km), không còn cắt top 10. Chỉ đổi hàm club_hall_of_fame, chạy lại an toàn.
+
+create or replace function public.club_hall_of_fame(p_club_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_year timestamptz := date_trunc('year', now() at time zone 'Asia/Ho_Chi_Minh') at time zone 'Asia/Ho_Chi_Minh';
+begin
+  if not public.club_is_member(p_club_id) then raise exception 'NOT_A_MEMBER'; end if;
+  return (
+    with mem as (
+      select m.user_id from public.club_members m where m.club_id = p_club_id and m.status = 'APPROVED'
+    ), runs as (
+      select x.id, x.user_id, x.distance_m, x.moving_time_s, x.started_at
+        from public.activities x join mem on mem.user_id = x.user_id
+       where x.validation_status = 'APPROVED' and x.shared and public.activity_is_countable(x.status, x.validation_status)
+         and coalesce(x.distance_m, 0) > 0
+    ), finishers as (
+      select r.user_id, d.kind, count(*)::int as times, min(r.started_at) as first_at,
+             min(case when r.distance_m <= d.need * 1.06 and r.moving_time_s > 0 then round(r.moving_time_s * d.need / r.distance_m) end)::int as best_s
+        from runs r join (values ('FM', 42195::numeric), ('HM', 21097.5)) d(kind, need) on r.distance_m >= d.need
+       group by r.user_id, d.kind
+    ), best3 as (
+      select t.user_id, t.kind, jsonb_agg(jsonb_build_object('best_s', t.secs, 'at', t.started_at, 'km', round(t.distance_m / 1000, 2)) order by t.secs) as top3
+        from (
+          select r.user_id, d.kind, r.started_at, r.distance_m, round(r.moving_time_s * d.need / r.distance_m)::int as secs,
+                 row_number() over (partition by r.user_id, d.kind order by r.moving_time_s * d.need / r.distance_m) as rn
+            from runs r join (values ('FM', 42195::numeric), ('HM', 21097.5)) d(kind, need)
+              on r.distance_m >= d.need and r.distance_m <= d.need * 1.06 and r.moving_time_s > 0
+        ) t where t.rn <= 3 group by t.user_id, t.kind
+    ), rec as (
+      select d.label, d.need, r.user_id, min(round(r.moving_time_s * d.need / r.distance_m))::int as best_s
+        from runs r join (values ('5K', 5000::numeric), ('10K', 10000), ('21K', 21097.5), ('42K', 42195)) d(label, need)
+          on r.distance_m >= d.need and r.distance_m <= d.need * 1.05 and r.moving_time_s > 0
+       group by d.label, d.need, r.user_id
+    ), rec_ranked as (
+      select rec.*, row_number() over (partition by rec.label order by rec.best_s) as rn from rec
+    ), yr as (
+      select mem.user_id, coalesce(sum(r.distance_m), 0) as distance_m, count(r.id)::int as runs,
+             row_number() over (order by coalesce(sum(r.distance_m), 0) desc, private.display_name(mem.user_id)) as rn
+        from mem left join runs r on r.user_id = mem.user_id and r.started_at >= v_year group by mem.user_id
+    ), ms as (
+      select um.user_id, um.code, um.reached_at, row_number() over (order by um.reached_at desc) as rn
+        from public.user_milestones um join mem on mem.user_id = um.user_id
+       where um.activity_id is not null
+    )
+    select jsonb_build_object(
+      'marathon', coalesce((select jsonb_agg(jsonb_build_object('user_id', f.user_id, 'name', private.display_name(f.user_id),
+                    'avatar_url', p.avatar_url, 'times', f.times, 'first_at', f.first_at, 'best_s', f.best_s,
+                    'top3', coalesce(b.top3, '[]'::jsonb)) order by f.first_at)
+                  from finishers f join public.profiles p on p.id = f.user_id
+                  left join best3 b on b.user_id = f.user_id and b.kind = f.kind where f.kind = 'FM'), '[]'::jsonb),
+      'half', coalesce((select jsonb_agg(jsonb_build_object('user_id', f.user_id, 'name', private.display_name(f.user_id),
+                    'avatar_url', p.avatar_url, 'times', f.times, 'first_at', f.first_at, 'best_s', f.best_s,
+                    'top3', coalesce(b.top3, '[]'::jsonb)) order by f.first_at)
+                  from finishers f join public.profiles p on p.id = f.user_id
+                  left join best3 b on b.user_id = f.user_id and b.kind = f.kind where f.kind = 'HM'), '[]'::jsonb),
+      'records', coalesce((select jsonb_agg(jsonb_build_object('label', rr.label, 'rank', rr.rn, 'user_id', rr.user_id,
+                    'name', private.display_name(rr.user_id), 'avatar_url', p.avatar_url, 'best_s', rr.best_s) order by rr.need, rr.rn)
+                  from rec_ranked rr join public.profiles p on p.id = rr.user_id where rr.rn <= 3), '[]'::jsonb),
+      'year', coalesce((select jsonb_agg(jsonb_build_object('rank', y.rn, 'user_id', y.user_id, 'name', private.display_name(y.user_id),
+                    'avatar_url', p.avatar_url, 'distance_m', y.distance_m, 'runs', y.runs) order by y.rn)
+                  from yr y join public.profiles p on p.id = y.user_id ), '[]'::jsonb),
+      'milestones', coalesce((select jsonb_agg(jsonb_build_object('user_id', ms.user_id, 'name', private.display_name(ms.user_id),
+                    'avatar_url', p.avatar_url, 'code', ms.code, 'label', d.label, 'reached_at', ms.reached_at) order by ms.reached_at desc)
+                  from ms join public.profiles p on p.id = ms.user_id join private.milestone_defs() d on d.code = ms.code
+                 where ms.rn <= 20), '[]'::jsonb),
+      'year_start', v_year));
+end $$;
+
+revoke all on function private.milestone_defs(), private.countable_km_m(uuid), private.check_milestones(uuid, uuid),
+  private.milestones_on_activity() from public, anon, authenticated;
+revoke all on function public.club_hall_of_fame(uuid) from public, anon;
+grant execute on function public.club_hall_of_fame(uuid) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001016900_race_calendar_table.sql
 -- ===================================================================
 -- 016900: Bảng tổng hợp giải chạy (offline + online) thay cho đăng từng bài rời.
@@ -31224,6 +31304,8 @@ begin
       'ok', position('chỉ NÂNG CẤP' in pg_get_functiondef(to_regprocedure('public.knowledge_scan_ingest(jsonb)'))) > 0),
     jsonb_build_object('file', '20261001016700', 'label', 'Kiến thức: admin xoá được bài đã đăng',
       'ok', position('CONTENT_DELETE' in pg_get_functiondef(to_regprocedure('public.cms_delete(uuid)'))) > 0),
+    jsonb_build_object('file', '20261001016800', 'label', 'Đại sảnh CLB: top 3 thành tích, Km năm đủ thành viên',
+      'ok', position('best3' in pg_get_functiondef(to_regprocedure('public.club_hall_of_fame(uuid)'))) > 0),
     jsonb_build_object('file', '20261001016900', 'label', 'Race: bảng tổng hợp giải offline + online',
       'ok', private.sc_col('race_candidates', 'kind') and to_regprocedure('public.race_calendar()') is not null),
     jsonb_build_object('file', '20261001017000', 'label', 'Race: xoá nguồn quét giữ giải đã vào bảng',
