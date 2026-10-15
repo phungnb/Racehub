@@ -13,8 +13,9 @@ import {
 } from '../../api/knowledgeApi'
 import { AUTHOR_KIND, formatDate, ROLE_LABEL, STATUS_LABEL, STATUS_TONE } from '../../model/knowledge'
 import { ArticleEditor } from './ArticleEditor'
+import { ScanSources } from './ScanSources'
 
-type Tab = 'articles' | 'stats' | 'people'
+type Tab = 'articles' | 'stats' | 'people' | 'scan'
 
 /** CMS RaceHub Knowledge: dùng trong Quản trị (tab Nội dung) và ở /learn/studio cho ban nội dung không phải admin */
 export function CmsScreen() {
@@ -33,10 +34,12 @@ export function CmsScreen() {
       </div>
       <SegmentedControl value={tab} onChange={setTab} options={[
         { value: 'articles', label: 'Bài viết' }, { value: 'stats', label: 'Thống kê' }, { value: 'people', label: 'Tác giả & ban' },
+        ...(m.role === 'ADMIN' ? [{ value: 'scan' as const, label: 'Tự tìm tin' }] : []),
       ]} />
       {tab === 'articles' && <Articles meta={m} onOpen={setEditing} />}
       {tab === 'stats' && <Stats onOpen={setEditing} />}
       {tab === 'people' && <People meta={m} />}
+      {tab === 'scan' && m.role === 'ADMIN' && <ScanSources meta={m} />}
     </div>
   )
 }

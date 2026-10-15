@@ -1,7 +1,7 @@
--- RaceHub: gộp 129 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 130 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 015800, 015900, 016000, 016100, 016200, 016300, 016400, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 015800, 015900, 016000, 016100, 016200, 016300, 016400, 016500, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -30661,6 +30661,60 @@ create unique index if not exists race_sources_query_uniq on public.race_sources
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001016500_knowledge_scan.sql
+-- ===================================================================
+-- 016500: Quét & gợi ý TIN KIẾM THỨC cho mục Kiến thức runner (dùng chung bảng nguồn quét của tab Race).
+-- • race_sources.target: 'RACE' (giải chạy, như cũ) | 'KNOWLEDGE' (tin / bài kiến thức); category_id = chuyên mục mặc định khi AI không chắc.
+-- • knowledge_scan_ingest (CHỈ service_role): tạo bài NEWS ở trạng thái REVIEW (chờ biên tập), kèm link + tên nguồn gốc.
+--   Không bao giờ đăng thẳng. Chuyên mục sức khoẻ / giáo án vẫn bắt buộc duyệt chuyên môn như mọi bài khác (needs_expert_review).
+--   Trùng link nguồn với bài đã có thì bỏ qua.
+-- Chạy lại nhiều lần vẫn an toàn.
+alter table public.race_sources add column if not exists target text not null default 'RACE';
+alter table public.race_sources drop constraint if exists race_sources_target_ck;
+alter table public.race_sources add constraint race_sources_target_ck check (target in ('RACE', 'KNOWLEDGE'));
+alter table public.race_sources add column if not exists category_id text references public.content_categories(id) on delete set null;
+
+create or replace function public.knowledge_scan_ingest(p jsonb) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_title text := trim(coalesce(p->>'title', ''));
+  v_url text := trim(coalesce(p->>'source_url', ''));
+  v_cat text := coalesce(nullif(p->>'category_id', ''), 'RACES');
+  v_summary text := nullif(left(trim(coalesce(p->>'summary', '')), 300), '');
+  v_name text := nullif(left(trim(coalesce(p->>'source_name', '')), 80), '');
+  v_body text;
+  v_slug text;
+  v_id uuid;
+begin
+  if char_length(v_title) < 5 or char_length(v_title) > 140 then return null; end if;
+  if v_url !~ '^https?://[^[:space:]]+$' or char_length(v_url) > 500 then return null; end if;
+  if v_summary is null then return null; end if;
+  if not exists (select 1 from public.content_categories c where c.id = v_cat) then v_cat := 'RACES'; end if;
+  if exists (select 1 from public.content_articles x where lower(x.source_url) = lower(v_url)) then return null; end if;
+  v_body := v_summary || E'\n\nNguồn: ' || coalesce(v_name, v_url) || ' — ' || v_url;
+  v_slug := left(coalesce(nullif(private.slugify(v_title), ''), 'tin'), 80) || '-' || substr(md5(lower(v_url)), 1, 6);
+  if exists (select 1 from public.content_articles x where x.slug = v_slug) then return null; end if;
+  insert into public.content_articles (slug, title, summary, body, category_id, content_type, status, reading_time_minutes,
+    source_url, source_name, needs_expert_review, review_note)
+  values (v_slug, v_title, v_summary, v_body, v_cat, 'NEWS', 'REVIEW', 1, v_url, v_name,
+    coalesce((select c.needs_expert from public.content_categories c where c.id = v_cat), false),
+    'Tin tự quét: biên tập kiểm tra nội dung và nguồn trước khi đăng')
+  returning id into v_id;
+  insert into public.content_tags (slug, name)
+  select distinct private.slugify(t), left(trim(t), 40) from jsonb_array_elements_text(coalesce(p->'tags', '[]'::jsonb)) t
+   where private.slugify(t) <> '' on conflict (slug) do nothing;
+  insert into public.content_article_tags (article_id, tag_id)
+  select distinct v_id, ct.id from jsonb_array_elements_text(coalesce(p->'tags', '[]'::jsonb)) t
+    join public.content_tags ct on ct.slug = private.slugify(t)
+  on conflict do nothing;
+  return v_id;
+end $$;
+revoke all on function public.knowledge_scan_ingest(jsonb) from public, anon, authenticated;
+grant execute on function public.knowledge_scan_ingest(jsonb) to service_role;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -30994,7 +31048,9 @@ begin
     jsonb_build_object('file', '20261001016300', 'label', 'Cửa hàng đối tác: sản phẩm, biến thể, tồn kho, đơn hàng',
       'ok', to_regprocedure('public.place_partner_order(uuid,jsonb,jsonb,text,text)') is not null),
     jsonb_build_object('file', '20261001016400', 'label', 'Tab Race: nguồn quét theo từ khóa tìm kiếm',
-      'ok', private.sc_col('race_sources', 'query')));
+      'ok', private.sc_col('race_sources', 'query')),
+    jsonb_build_object('file', '20261001016500', 'label', 'Kiến thức: quét tin gợi ý vào hàng chờ biên tập',
+      'ok', private.sc_col('race_sources', 'target') and to_regprocedure('public.knowledge_scan_ingest(jsonb)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

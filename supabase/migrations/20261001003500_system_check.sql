@@ -329,7 +329,9 @@ begin
     jsonb_build_object('file', '20261001016300', 'label', 'Cửa hàng đối tác: sản phẩm, biến thể, tồn kho, đơn hàng',
       'ok', to_regprocedure('public.place_partner_order(uuid,jsonb,jsonb,text,text)') is not null),
     jsonb_build_object('file', '20261001016400', 'label', 'Tab Race: nguồn quét theo từ khóa tìm kiếm',
-      'ok', private.sc_col('race_sources', 'query')));
+      'ok', private.sc_col('race_sources', 'query')),
+    jsonb_build_object('file', '20261001016500', 'label', 'Kiến thức: quét tin gợi ý vào hàng chờ biên tập',
+      'ok', private.sc_col('race_sources', 'target') and to_regprocedure('public.knowledge_scan_ingest(jsonb)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
