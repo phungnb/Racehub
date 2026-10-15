@@ -1,7 +1,7 @@
--- RaceHub: gộp 132 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 133 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 015800, 015900, 016000, 016100, 016200, 016300, 016400, 016500, 016600, 016700, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 015800, 015900, 016000, 016100, 016200, 016300, 016400, 016500, 016600, 016700, 016800, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -30823,6 +30823,44 @@ grant execute on function public.cms_delete(uuid) to authenticated;
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001016800_race_calendar_table.sql
+-- ===================================================================
+-- 016800: Bảng tổng hợp giải chạy (offline + online) thay cho đăng từng bài rời.
+-- • race_candidates thêm: kind (OFFLINE / ONLINE), reg_deadline (hạn đăng ký), reg_url (link đăng ký), race_url (link trang giải).
+-- • Admin chọn nhiều dòng trong hàng chờ rồi "Đưa vào bảng" (status APPROVED, không cần tạo tin giải riêng cho từng giải).
+-- • race_calendar(): mọi người đăng nhập đọc được bảng các giải đã duyệt, chưa kết thúc. Chỉ trả cột cần hiển thị.
+-- Chạy lại nhiều lần vẫn an toàn.
+alter table public.race_candidates add column if not exists kind text not null default 'OFFLINE';
+alter table public.race_candidates add column if not exists reg_deadline date;
+alter table public.race_candidates add column if not exists reg_url text;
+alter table public.race_candidates add column if not exists race_url text;
+alter table public.race_candidates drop constraint if exists race_candidates_kind_check;
+alter table public.race_candidates add constraint race_candidates_kind_check check (kind in ('OFFLINE', 'ONLINE'));
+alter table public.race_candidates drop constraint if exists race_candidates_reg_url_check;
+alter table public.race_candidates add constraint race_candidates_reg_url_check
+  check (reg_url is null or (reg_url ~* '^https?://[^[:space:]]+$' and char_length(reg_url) <= 1000));
+alter table public.race_candidates drop constraint if exists race_candidates_race_url_check;
+alter table public.race_candidates add constraint race_candidates_race_url_check
+  check (race_url is null or (race_url ~* '^https?://[^[:space:]]+$' and char_length(race_url) <= 1000));
+
+create or replace function public.race_calendar() returns jsonb
+language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', c.id, 'kind', c.kind, 'title', c.title, 'location', c.location, 'race_date', c.race_date, 'end_date', c.end_date,
+    'reg_deadline', c.reg_deadline, 'race_url', coalesce(c.race_url, split_part(c.url, '#', 1)), 'reg_url', c.reg_url,
+    'distances', c.distances, 'organizer', c.organizer
+  ) order by c.kind, c.race_date, c.title), '[]'::jsonb)
+  from public.race_candidates c
+  where c.status = 'APPROVED'
+    and coalesce(c.end_date, c.race_date) >= (now() at time zone 'Asia/Ho_Chi_Minh')::date - 1
+    and auth.uid() is not null;
+$$;
+revoke all on function public.race_calendar() from public, anon;
+grant execute on function public.race_calendar() to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -31162,7 +31200,9 @@ begin
     jsonb_build_object('file', '20261001016600', 'label', 'Kiến thức: quét bài đầy đủ, nâng cấp bản tóm tắt',
       'ok', position('chỉ NÂNG CẤP' in pg_get_functiondef(to_regprocedure('public.knowledge_scan_ingest(jsonb)'))) > 0),
     jsonb_build_object('file', '20261001016700', 'label', 'Kiến thức: admin xoá được bài đã đăng',
-      'ok', position('CONTENT_DELETE' in pg_get_functiondef(to_regprocedure('public.cms_delete(uuid)'))) > 0));
+      'ok', position('CONTENT_DELETE' in pg_get_functiondef(to_regprocedure('public.cms_delete(uuid)'))) > 0),
+    jsonb_build_object('file', '20261001016800', 'label', 'Race: bảng tổng hợp giải offline + online',
+      'ok', private.sc_col('race_candidates', 'kind') and to_regprocedure('public.race_calendar()') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

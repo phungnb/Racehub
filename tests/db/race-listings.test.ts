@@ -54,4 +54,20 @@ describe('Tin giải chạy offline (016000)', () => {
     expect(await fails(q(`insert into public.race_sources (kind, url, query) values ('PAGE', 'https://a.vn', 'x y z')`))).not.toBe('OK')
     expect(await fails(q(`insert into public.race_sources (kind, url) values ('PAGE', 'https://a.vn/lich')`))).toBe('OK')
   })
+  it('bảng tổng hợp (016800): chỉ giải đã duyệt và chưa kết thúc, tách offline / online, người đọc không thấy hàng chờ', async () => {
+    const ins = (title: string, status: string, kind: string, days: number, url: string) => db.query(
+      `insert into public.race_candidates (url, title, race_date, status, kind, reg_deadline, reg_url) values ($1, $2, current_date + $3::int, $4, $5, current_date + 5, 'https://btc.vn/dk')`,
+      [url, title, days, status, kind])
+    await ins('Giải offline duyệt', 'APPROVED', 'OFFLINE', 20, 'https://t.vn/a#x')
+    await ins('Giải online duyệt', 'APPROVED', 'ONLINE', 25, 'https://t.vn/b#y')
+    await ins('Giải chờ duyệt', 'PENDING', 'OFFLINE', 30, 'https://t.vn/c#z')
+    await ins('Giải đã qua', 'APPROVED', 'OFFLINE', -10, 'https://t.vn/d#w')
+    expect(await fails(ins('Sai loại', 'APPROVED', 'KHAC', 5, 'https://t.vn/e#v'))).not.toBe('OK')
+    const rows = (await asUser<{ r: { title: string; kind: string; race_url: string; reg_url: string }[] }>(db, USR, '/rpc/race_calendar', `select public.race_calendar() as r`)).rows[0].r
+    expect(rows.map((x) => `${x.kind}:${x.title}`)).toEqual(['OFFLINE:Giải offline duyệt', 'ONLINE:Giải online duyệt'])
+    expect(rows[0]).toMatchObject({ race_url: 'https://t.vn/a', reg_url: 'https://btc.vn/dk' })
+    await db.exec('set role anon')
+    await expect(db.query(`select public.race_calendar()`)).rejects.toThrow(/permission denied/)
+    await db.exec('reset role')
+  })
 })

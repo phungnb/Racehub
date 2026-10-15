@@ -83,8 +83,32 @@ export interface RaceCandidate {
   id: string; url: string; title: string; race_date: string | null; end_date: string | null; location: string | null
   organizer: string | null; image_url: string | null; description: string | null; distances: string[]
   score: number; status: CandidateState; filter_reason: string | null
+  kind: RaceKind; reg_deadline: string | null; reg_url: string | null; race_url: string | null
 }
-const CAND = 'id,url,title,race_date,end_date,location,organizer,image_url,description,distances,score,status,filter_reason'
+export type RaceKind = 'OFFLINE' | 'ONLINE'
+const CAND = 'id,url,title,race_date,end_date,location,organizer,image_url,description,distances,score,status,filter_reason,kind,reg_deadline,reg_url,race_url'
+
+/** Một dòng của bảng tổng hợp (cả bản admin chờ duyệt lẫn bản công khai). */
+export interface CalendarRow {
+  id: string; kind: RaceKind; title: string; location: string | null; race_date: string | null; end_date: string | null
+  reg_deadline: string | null; race_url: string | null; reg_url: string | null; distances: string[]; organizer: string | null
+}
+export const candidateToRow = (c: RaceCandidate): CalendarRow => ({
+  id: c.id, kind: c.kind, title: c.title, location: c.location, race_date: c.race_date, end_date: c.end_date, reg_deadline: c.reg_deadline,
+  race_url: c.race_url || c.url.split('#')[0], reg_url: c.reg_url, distances: c.distances, organizer: c.organizer,
+})
+/** Bảng giải đã duyệt, chưa kết thúc (migration 016800). */
+export async function raceCalendar(): Promise<CalendarRow[]> {
+  const { data, error } = await supabase.rpc('race_calendar')
+  if (error) throw error
+  return (data ?? []) as CalendarRow[]
+}
+/** Duyệt / bỏ / khôi phục nhiều giải một lượt (đưa vào bảng = APPROVED, không tạo tin riêng). */
+export async function setCandidatesStatus(ids: string[], status: CandidateState) {
+  if (!ids.length) return
+  const { error } = await supabase.from('race_candidates').update({ status, reviewed_at: new Date().toISOString() }).in('id', ids)
+  if (error) throw error
+}
 
 export async function listSources(): Promise<RaceSource[]> {
   const { data, error } = await supabase.from('race_sources').select('id,kind,url,query,label,active,last_scanned_at,last_error').eq('target', 'RACE').order('created_at')
@@ -111,7 +135,7 @@ export async function scanNow(sourceId: string): Promise<{ found: number; pendin
 }
 export async function listCandidates(status: CandidateState): Promise<RaceCandidate[]> {
   const { data, error } = await supabase.from('race_candidates').select(CAND).eq('status', status)
-    .order('score', { ascending: false }).order('race_date', { ascending: true }).limit(100)
+    .order('score', { ascending: false }).order('race_date', { ascending: true }).limit(300)
   if (error) throw error
   return data as RaceCandidate[]
 }
