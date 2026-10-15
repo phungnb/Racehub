@@ -171,14 +171,14 @@ export function knowledgeErrorMessage(e: unknown): string {
 }
 
 // ── Nguồn quét tin kiến thức (admin). Dùng chung bảng race_sources với target = 'KNOWLEDGE'; kết quả vào hàng chờ biên tập (REVIEW).
-export interface ScanSource { id: string; kind: 'PAGE' | 'SEARCH'; url: string | null; query: string | null; label: string | null; category_id: string | null; active: boolean; last_scanned_at: string | null; last_error: string | null }
+export interface ScanSource { id: string; kind: 'PAGE' | 'SEARCH'; url: string | null; query: string | null; label: string | null; category_id: string | null; scan_mode: 'SUMMARY' | 'FULL'; active: boolean; last_scanned_at: string | null; last_error: string | null }
 export async function listScanSources(): Promise<ScanSource[]> {
-  const { data, error } = await supabase.from('race_sources').select('id,kind,url,query,label,category_id,active,last_scanned_at,last_error').eq('target', 'KNOWLEDGE').order('created_at')
+  const { data, error } = await supabase.from('race_sources').select('id,kind,url,query,label,category_id,scan_mode,active,last_scanned_at,last_error').eq('target', 'KNOWLEDGE').order('created_at')
   if (error) throw error
   return data as ScanSource[]
 }
-export async function addScanSource(v: { kind: 'PAGE' | 'SEARCH'; value: string; label: string | null; category_id: string | null }) {
-  const base = { target: 'KNOWLEDGE', label: v.label, category_id: v.category_id }
+export async function addScanSource(v: { kind: 'PAGE' | 'SEARCH'; value: string; label: string | null; category_id: string | null; scan_mode: 'SUMMARY' | 'FULL' }) {
+  const base = { target: 'KNOWLEDGE', label: v.label, category_id: v.category_id, scan_mode: v.scan_mode }
   const { error } = await supabase.from('race_sources').insert(v.kind === 'SEARCH' ? { ...base, kind: 'SEARCH', query: v.value } : { ...base, kind: 'PAGE', url: v.value })
   if (error) throw error
 }

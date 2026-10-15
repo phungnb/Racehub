@@ -51,4 +51,21 @@ describe('Quét tin kiến thức (016500)', () => {
     expect(rows.find((x) => x.id === a)?.needs_expert_review).toBe(true)
     expect(rows.find((x) => x.id === b)?.category_id).toBe('RACES')
   })
+
+  it('bài đầy đủ: lưu ARTICLE với toàn văn + nguồn; body quá ngắn thì rơi về tóm tắt', async () => {
+    const full = 'Đoạn nội dung đầy đủ của bài. '.repeat(20)
+    await db.exec('set role service_role')
+    const a = await ingest({ ...base, source_url: 'https://bao.vn/full', title: 'Bài viết đầy đủ về chạy bộ', body: full })
+    const b = await ingest({ ...base, source_url: 'https://bao.vn/short', title: 'Bài có body quá ngắn', body: 'ngắn' })
+    await db.exec('reset role')
+    const rows = (await db.query<{ id: string; content_type: string; body: string; status: string }>(
+      `select id, content_type, body, status from public.content_articles where id in ($1, $2)`, [a, b])).rows
+    const ra = rows.find((x) => x.id === a)!
+    const rb = rows.find((x) => x.id === b)!
+    expect([ra.content_type, ra.status]).toEqual(['ARTICLE', 'REVIEW'])
+    expect(ra.body).toContain('Đoạn nội dung đầy đủ của bài.')
+    expect(ra.body).toContain('https://bao.vn/full')
+    expect(rb.content_type).toBe('NEWS')
+    expect(rb.body).not.toContain('ngắn\n')
+  })
 })

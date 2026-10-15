@@ -21,4 +21,11 @@ describe('normalizeArticles', () => {
     expect(normalizeArticles({ articles: 'x' }, page, null)).toEqual([])
     expect(normalizeArticles({ articles: [art({ source_name: '' })] }, page, null)[0].source_name).toBe('bao.vn')
   })
+
+  it('chế độ bài đầy đủ: giữ body đủ dài; ngắn hoặc chế độ tóm tắt thì bỏ', () => {
+    const body = 'Nội dung bài. '.repeat(40)
+    expect(normalizeArticles({ articles: [art({ body })] }, page, null, true)[0].body).toBe(body.trim())
+    expect(normalizeArticles({ articles: [art({ body: 'ngắn' })] }, page, null, true)[0].body).toBeUndefined()
+    expect(normalizeArticles({ articles: [art({ body })] }, page, null, false)[0].body).toBeUndefined()
+  })
 })
