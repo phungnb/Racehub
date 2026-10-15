@@ -24,6 +24,10 @@
     {
       "path": "/api/cron/race-scan",
       "schedule": "0 23 * * 0"
+    },
+    {
+      "path": "/api/cron/strava-scan",
+      "schedule": "0 20 * * *"
     }
   ]
 }
