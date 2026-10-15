@@ -5,6 +5,8 @@ import { analyzeRun, compactStreams, isGpsJumpFlag, speedRulesFrom, stravaStream
 import { toOps } from '@/shared/lib/ops'
 import { mapStravaActivity, mapStravaDetail, parseRateUsage, rateHasRoom, summarize, syncWindowStart, tokenNeedsRefresh, type RateUsage, type StravaSummaryActivity, type SyncSummary } from './mapping'
 
+/** Mốc quét lại toàn bộ lịch sử Strava (Đại sảnh CLB → Km năm 2026): 0h ngày 1/1/2026 giờ Việt Nam */
+export const STRAVA_YEAR_SCAN_SINCE = new Date('2026-01-01T00:00:00+07:00')
 export const STRAVA_SCOPES = 'read,activity:read_all'
 export const STRAVA_CALLBACK_PATH = '/api/strava/callback'
 
@@ -321,6 +323,35 @@ export async function backfillStravaActivities(admin: SupabaseClient, userId: st
     nextPage = page
   }
   return { summary: summarize(results), nextPage, rateLimited, rate: lastRate, ids }
+}
+
+/**
+ * Chạy MỘT lô của việc quét Strava (bảng strava_scan_jobs, migration 017100) cho một người: lấy ≤ 3 trang rồi lưu trang kế tiếp.
+ * Gọi lặp lại (mỗi lần mở app, hoặc cron) cho đến khi DONE. Không có việc PENDING thì không làm gì.
+ * `rateLimited` = Strava đang giới hạn lượt gọi: người gọi nên dừng, lần sau chạy tiếp đúng trang.
+ */
+export async function runStravaScanJob(admin: SupabaseClient, userId: string): Promise<{ ran: boolean; rateLimited: boolean; done: boolean }> {
+  const { data: job } = await admin.from('strava_scan_jobs').select('since, next_page, imported, status').eq('user_id', userId)
+    .maybeSingle<{ since: string; next_page: number; imported: number; status: string }>()
+  if (!job || job.status !== 'PENDING') return { ran: false, rateLimited: false, done: job?.status === 'DONE' }
+  const stamp = () => new Date().toISOString()
+  try {
+    const r = await backfillStravaActivities(admin, userId, { since: new Date(job.since), until: new Date(Date.now() + 86_400_000), page: job.next_page })
+    const done = r.nextPage === null
+    await admin.from('strava_scan_jobs').update({
+      status: done ? 'DONE' : 'PENDING', next_page: r.nextPage ?? job.next_page, imported: job.imported + r.summary.imported, updated_at: stamp(),
+    }).eq('user_id', userId)
+    return { ran: true, rateLimited: r.rateLimited, done }
+  } catch (err) {
+    const code = err instanceof Error ? err.message.split(':')[0] : 'SERVER_ERROR'
+    if (code === 'STRAVA_RATE_LIMITED') return { ran: true, rateLimited: true, done: false }
+    // Chưa nối / hết hạn Strava: đánh dấu FAILED để không thử mãi (nối lại rồi nhờ ban quản trị bật quét lại)
+    if (code === 'STRAVA_NOT_CONNECTED' || code === 'STRAVA_REAUTH_REQUIRED') {
+      await admin.from('strava_scan_jobs').update({ status: 'FAILED', note: code, updated_at: stamp() }).eq('user_id', userId)
+      return { ran: true, rateLimited: false, done: false }
+    }
+    throw err
+  }
 }
 
 /** Mỗi lần đối chiếu chỉ kiểm tra tối đa chừng này bài (mỗi bài = 1 lượt gọi Strava); phần còn lại để lần sau */

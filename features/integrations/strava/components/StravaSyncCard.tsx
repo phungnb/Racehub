@@ -33,7 +33,10 @@ export function StravaAutoSync() {
   const refresh = useStravaRefresh()
   // Chỉ báo khi có bài mới, lỗi thì im lặng (người dùng vẫn bấm Đồng bộ ở trang Tôi được)
   const auto = useMutation({
-    mutationFn: syncNow,
+    // Kèm một lô quét Strava dang dở (ban quản trị CLB bật quét từ 1/1/2026); không có việc thì máy chủ trả về ngay
+    mutationFn: async () => {
+      try { return await syncNow() } finally { void fetch('/api/strava/scan-tick', { method: 'POST' }).catch(() => {}) }
+    },
     onSuccess: (s) => {
       if (s && s.imported > 0) {
         refresh()
