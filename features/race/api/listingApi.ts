@@ -87,7 +87,7 @@ export interface RaceCandidate {
 const CAND = 'id,url,title,race_date,end_date,location,organizer,image_url,description,distances,score,status,filter_reason'
 
 export async function listSources(): Promise<RaceSource[]> {
-  const { data, error } = await supabase.from('race_sources').select('id,kind,url,query,label,active,last_scanned_at,last_error').order('created_at')
+  const { data, error } = await supabase.from('race_sources').select('id,kind,url,query,label,active,last_scanned_at,last_error').eq('target', 'RACE').order('created_at')
   if (error) throw error
   return data as RaceSource[]
 }
