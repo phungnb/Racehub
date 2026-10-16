@@ -355,11 +355,13 @@ begin
     jsonb_build_object('file', '20261001017200', 'label', 'Thành tích Full/Half đầy đủ, nới sai số cự ly, hồ sơ runner',
       'ok', to_regprocedure('public.my_long_bests()') is not null and position('bests' in pg_get_functiondef(to_regprocedure('public.club_hall_of_fame(uuid)'))) > 0),
     jsonb_build_object('file', '20261001017300', 'label', 'Quét Strava tự chạy cho thành viên CLB',
-      'ok', to_regprocedure('public.strava_scan_enqueue(uuid)') is not null));
+      'ok', to_regprocedure('public.strava_scan_enqueue(uuid)') is not null),
+    jsonb_build_object('file', '20261001017400', 'label', 'Ly cà phê ủng hộ admin (lời nhắn, QR, tài khoản)',
+      'ok', to_regprocedure('public.support_coffee()') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
-                  from unnest(array['avatars', 'character-layers', 'club-media', 'race-media', 'uniform-media', 'content-media']) b(id)
+                  from unnest(array['avatars', 'character-layers', 'club-media', 'race-media', 'uniform-media', 'content-media', 'support-media']) b(id)
                   left join storage.buckets s on s.id = b.id);
 
   v_stats := jsonb_build_object(

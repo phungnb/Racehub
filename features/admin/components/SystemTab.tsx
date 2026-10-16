@@ -3,11 +3,11 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { AlertTriangle, BellOff, Bug, CheckCircle2, ChevronDown, Database, HardDrive, Megaphone, RefreshCw, Server, XCircle, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, BellOff, Bug, CheckCircle2, ChevronDown, Coffee, Database, HardDrive, Megaphone, RefreshCw, Server, XCircle, type LucideIcon } from 'lucide-react'
 import { Button, Card, Skeleton } from '@/shared/ui'
 import { cn } from '@/shared/lib/cn'
 import { formatRelative } from '@/shared/lib/format'
-import { ClientErrorsPanel, SystemNoticeEditor } from '@/features/system'
+import { ClientErrorsPanel, SupportCoffeeEditor, SystemNoticeEditor } from '@/features/system'
 import { getNotifyErrors, getServerCheck, getSystemCheck, registerStravaWebhook, type ServerCheckItem } from '../api/adminApi'
 
 type Status = 'ok' | 'warn' | 'fail'
@@ -125,6 +125,10 @@ export function SystemTab() {
 
       <Section icon={Megaphone} title="Thông báo cho người dùng">
         <SystemNoticeEditor />
+      </Section>
+
+      <Section icon={Coffee} title="Ly cà phê ủng hộ admin">
+        <SupportCoffeeEditor />
       </Section>
 
       <Section icon={Bug} title="Lỗi người dùng gặp">

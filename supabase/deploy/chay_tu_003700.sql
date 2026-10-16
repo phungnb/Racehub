@@ -1,7 +1,7 @@
--- RaceHub: gộp 138 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 139 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 015800, 015900, 016000, 016100, 016200, 016300, 016400, 016500, 016600, 016700, 016800, 016900, 017000, 017100, 017200, 017300, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 015800, 015900, 016000, 016100, 016200, 016300, 016400, 016500, 016600, 016700, 016800, 016900, 017000, 017100, 017200, 017300, 017400, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -31194,6 +31194,92 @@ select public.strava_scan_enqueue(u.user_id)
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001017400_support_coffee.sql
+-- ===================================================================
+-- 017400: Ly cà phê ủng hộ admin.
+-- Admin đặt lời nhắn + ảnh QR ngân hàng + thông tin tài khoản (Quản trị → Hệ thống → Ly cà phê). Người dùng bấm biểu tượng ly cà phê
+-- trên thanh trên cùng thì thấy đúng ba thứ đó. Chỉ một dòng cấu hình (id = 1). Ảnh QR nằm trong kho 'support-media' (công khai, chỉ admin tải lên).
+-- Chạy lại nhiều lần vẫn an toàn. Không dùng SELECT … INTO, khối DO, LIMIT (SQL Editor).
+
+create table if not exists private.support_coffee (
+  id integer primary key default 1 check (id = 1),
+  enabled boolean not null default true,
+  message text,
+  qr_url text,
+  bank_name text,
+  account_number text,
+  account_name text,
+  updated_by uuid,
+  updated_at timestamptz not null default now()
+);
+revoke all on private.support_coffee from public, anon, authenticated;
+
+-- Kho ảnh QR: ai cũng xem được (ảnh công khai), chỉ admin hệ thống tải lên / thay / xoá
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('support-media', 'support-media', true, 2097152, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do nothing;
+drop policy if exists support_media_insert on storage.objects;
+create policy support_media_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'support-media' and public.is_system_admin());
+drop policy if exists support_media_update on storage.objects;
+create policy support_media_update on storage.objects for update to authenticated
+  using (bucket_id = 'support-media' and public.is_system_admin());
+drop policy if exists support_media_delete on storage.objects;
+create policy support_media_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'support-media' and public.is_system_admin());
+
+-- Người dùng đã đăng nhập đọc; trả null khi chưa cấu hình hoặc admin tắt
+create or replace function public.support_coffee() returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('message', c.message, 'qr_url', c.qr_url, 'bank_name', c.bank_name,
+                            'account_number', c.account_number, 'account_name', c.account_name, 'updated_at', c.updated_at)
+  from private.support_coffee c
+  where c.id = 1 and c.enabled
+    and (coalesce(c.qr_url, '') <> '' or coalesce(c.account_number, '') <> '' or coalesce(c.message, '') <> '')
+$$;
+
+-- Admin đọc cả khi đang tắt (để sửa)
+create or replace function public.admin_get_support_coffee() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v jsonb;
+begin
+  perform private.require_admin();
+  v := (select jsonb_build_object('enabled', c.enabled, 'message', c.message, 'qr_url', c.qr_url, 'bank_name', c.bank_name,
+                                  'account_number', c.account_number, 'account_name', c.account_name, 'updated_at', c.updated_at)
+        from private.support_coffee c where c.id = 1);
+  return v;
+end $$;
+
+create or replace function public.admin_set_support_coffee(p jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := private.require_admin();
+  v_msg text := nullif(trim(coalesce(p->>'message', '')), '');
+  v_qr text := nullif(trim(coalesce(p->>'qr_url', '')), '');
+  v_bank text := nullif(trim(coalesce(p->>'bank_name', '')), '');
+  v_no text := nullif(trim(coalesce(p->>'account_number', '')), '');
+  v_name text := nullif(trim(coalesce(p->>'account_name', '')), '');
+  v_on boolean := coalesce((p->>'enabled')::boolean, true);
+begin
+  if char_length(coalesce(v_msg, '')) > 300 then raise exception 'INVALID_MESSAGE'; end if;
+  if char_length(coalesce(v_bank, '')) > 80 or char_length(coalesce(v_name, '')) > 80 then raise exception 'INVALID_BANK'; end if;
+  if char_length(coalesce(v_no, '')) > 40 then raise exception 'INVALID_BANK'; end if;
+  -- Chỉ nhận ảnh trong kho support-media của chính dự án
+  if v_qr is not null and v_qr !~ '/storage/v1/object/public/support-media/[A-Za-z0-9._-]{1,120}$' then raise exception 'INVALID_QR'; end if;
+  insert into private.support_coffee (id, enabled, message, qr_url, bank_name, account_number, account_name, updated_by, updated_at)
+  values (1, v_on, v_msg, v_qr, v_bank, v_no, v_name, v_uid, now())
+  on conflict (id) do update set enabled = excluded.enabled, message = excluded.message, qr_url = excluded.qr_url,
+    bank_name = excluded.bank_name, account_number = excluded.account_number, account_name = excluded.account_name,
+    updated_by = excluded.updated_by, updated_at = excluded.updated_at;
+  insert into public.admin_audit_log (actor_id, action, target, new_value)
+  values (v_uid, 'SUPPORT_COFFEE', 'support_coffee', jsonb_build_object('enabled', v_on, 'has_qr', v_qr is not null, 'has_account', v_no is not null));
+  return public.admin_get_support_coffee();
+end $$;
+
+revoke all on function public.support_coffee(), public.admin_get_support_coffee(), public.admin_set_support_coffee(jsonb) from public, anon;
+grant execute on function public.support_coffee(), public.admin_get_support_coffee(), public.admin_set_support_coffee(jsonb) to authenticated;
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -31545,11 +31631,13 @@ begin
     jsonb_build_object('file', '20261001017200', 'label', 'Thành tích Full/Half đầy đủ, nới sai số cự ly, hồ sơ runner',
       'ok', to_regprocedure('public.my_long_bests()') is not null and position('bests' in pg_get_functiondef(to_regprocedure('public.club_hall_of_fame(uuid)'))) > 0),
     jsonb_build_object('file', '20261001017300', 'label', 'Quét Strava tự chạy cho thành viên CLB',
-      'ok', to_regprocedure('public.strava_scan_enqueue(uuid)') is not null));
+      'ok', to_regprocedure('public.strava_scan_enqueue(uuid)') is not null),
+    jsonb_build_object('file', '20261001017400', 'label', 'Ly cà phê ủng hộ admin (lời nhắn, QR, tài khoản)',
+      'ok', to_regprocedure('public.support_coffee()') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)
-                  from unnest(array['avatars', 'character-layers', 'club-media', 'race-media', 'uniform-media', 'content-media']) b(id)
+                  from unnest(array['avatars', 'character-layers', 'club-media', 'race-media', 'uniform-media', 'content-media', 'support-media']) b(id)
                   left join storage.buckets s on s.id = b.id);
 
   v_stats := jsonb_build_object(

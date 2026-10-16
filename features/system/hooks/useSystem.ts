@@ -3,10 +3,10 @@
 import { useSyncExternalStore } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isNativeApp } from '@/shared/lib/native'
-import { getClientErrors, getConfigHistory, getOpsPolicy, getSystemNotice, publishOpsPolicy, resolveClientError, rollbackConfig, setSystemNotice, type ConfigKey } from '../api/systemApi'
+import { getClientErrors, getConfigHistory, getOpsPolicy, getSupportCoffee, getSupportCoffeeAdmin, getSystemNotice, setSupportCoffee, publishOpsPolicy, resolveClientError, rollbackConfig, setSystemNotice, type ConfigKey } from '../api/systemApi'
 import { DEFAULT_OPS, type FeatureKey, type OpsPolicy } from '@/shared/lib/ops'
 
-export const systemKeys = { notice: ['system', 'notice'] as const, errors: (days: number) => ['system', 'client-errors', days] as const }
+export const systemKeys = { coffee: ['system', 'coffee'] as const, coffeeAdmin: ['system', 'coffee-admin'] as const, notice: ['system', 'notice'] as const, errors: (days: number) => ['system', 'client-errors', days] as const }
 
 // Đọc lại mỗi 5 phút để thông báo bảo trì tới cả người đang mở app
 export const useSystemNotice = () =>
@@ -82,5 +82,19 @@ export function useRollbackConfig() {
       void qc.invalidateQueries({ queryKey: ['economy'] })
       void qc.invalidateQueries({ queryKey: ['billing'] })
     },
+  })
+}
+
+/** Ly cà phê ủng hộ admin: null = chưa cấu hình hoặc đang tắt → ẩn biểu tượng */
+export const useSupportCoffee = (enabled = true) =>
+  useQuery({ queryKey: systemKeys.coffee, queryFn: getSupportCoffee, enabled, staleTime: 5 * 60_000, retry: false })
+
+export const useSupportCoffeeAdmin = () => useQuery({ queryKey: systemKeys.coffeeAdmin, queryFn: getSupportCoffeeAdmin })
+
+export function useSetSupportCoffee() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: setSupportCoffee,
+    onSuccess: (d) => { qc.setQueryData(systemKeys.coffeeAdmin, d); void qc.invalidateQueries({ queryKey: systemKeys.coffee }) },
   })
 }

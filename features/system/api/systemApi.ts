@@ -27,6 +27,43 @@ export async function setSystemNotice(p: { level: NoticeLevel; title: string; me
   return (data ?? null) as SystemNotice | null
 }
 
+// ---------------- Ly cà phê ủng hộ admin (017400) ----------------
+export interface SupportCoffee {
+  message: string | null; qr_url: string | null; bank_name: string | null
+  account_number: string | null; account_name: string | null; updated_at: string
+}
+export interface SupportCoffeeAdmin extends SupportCoffee { enabled: boolean }
+export type SupportCoffeeInput = Omit<SupportCoffeeAdmin, 'updated_at'>
+
+const notDeployed = (e: { code?: string; message?: string }) => /PGRST202|could not find the function/i.test(`${e.code} ${e.message}`)
+
+export async function getSupportCoffee(): Promise<SupportCoffee | null> {
+  const { data, error } = await supabase.rpc('support_coffee')
+  if (error) { if (notDeployed(error)) return null; throw error }
+  return (data ?? null) as SupportCoffee | null
+}
+
+export async function getSupportCoffeeAdmin(): Promise<SupportCoffeeAdmin | null> {
+  const { data, error } = await supabase.rpc('admin_get_support_coffee')
+  if (error) throw error
+  return (data ?? null) as SupportCoffeeAdmin | null
+}
+
+export async function setSupportCoffee(p: SupportCoffeeInput): Promise<SupportCoffeeAdmin | null> {
+  const { data, error } = await supabase.rpc('admin_set_support_coffee', { p })
+  if (error) throw error
+  return (data ?? null) as SupportCoffeeAdmin | null
+}
+
+/** Tải ảnh QR lên kho support-media; tên file có mốc thời gian để không bị cache ảnh cũ khi thay */
+export async function uploadSupportQr(file: File): Promise<string> {
+  const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
+  const path = `qr-${Date.now()}.${ext}`
+  const { error } = await supabase.storage.from('support-media').upload(path, file, { contentType: file.type, upsert: false })
+  if (error) throw error
+  return supabase.storage.from('support-media').getPublicUrl(path).data.publicUrl
+}
+
 export async function getClientErrors(days: number): Promise<ClientErrorRow[]> {
   const { data, error } = await supabase.rpc('admin_client_errors', { p_days: days })
   if (error) throw error
@@ -45,6 +82,8 @@ const MESSAGES: Record<string, string> = {
   INVALID_TITLE: 'Tiêu đề cần 2–80 ký tự.',
   INVALID_MESSAGE: 'Nội dung tối đa 500 ký tự.',
   INVALID_TIME_RANGE: 'Thời điểm tự tắt phải ở tương lai.',
+  INVALID_QR: 'Ảnh QR phải được tải lên từ trang này.',
+  INVALID_BANK: 'Thông tin ngân hàng quá dài (tên ngân hàng / chủ tài khoản tối đa 80, số tài khoản tối đa 40 ký tự).',
   FORBIDDEN: 'Chỉ quản trị hệ thống mới làm được việc này.',
   INVALID_CONFIG: 'Giá trị ngoài giới hạn cho phép — kiểm tra lại các ô vừa sửa.',
   VERSION_NOT_FOUND: 'Không tìm thấy phiên bản này.',

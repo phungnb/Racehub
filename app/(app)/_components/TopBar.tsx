@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ShieldCheck } from 'lucide-react'
 import { isSystemAdmin } from '@/features/admin'
 import { NotificationBell, unsubscribeThisDevice } from '@/features/notification'
+import { SupportCoffeeButton } from '@/features/system'
 import { MenuDrawer } from '@/features/help'
 import { MessagesButton } from '@/features/social'
 import { CoinAmount } from '@/shared/ui'
@@ -33,6 +34,7 @@ export function TopBar({ profile }: { profile: Profile | null }) {
                 <ShieldCheck className="size-5" aria-hidden />
               </Link>
             )}
+            <SupportCoffeeButton />
             <MessagesButton />
             <NotificationBell userId={profile.id} />
             {/* Chỉ hiện số Xu (ví dùng ở mọi màn); cấp độ + thanh XP nằm ở trang Tôi */}
