@@ -74,7 +74,8 @@ export async function deleteBoostDay(clubId: string, day: string): Promise<Boost
 export interface HallPerson { user_id: string; name: string; avatar_url: string | null }
 /** Một thành tích Full / Half (giây đã quy về đúng cự ly) */
 export interface HallBest { best_s: number; at: string; km: number }
-export type HallFinisher = HallPerson & { times: number; first_at: string; best_s: number | null; top3?: HallBest[] }
+/** `bests` = mọi thành tích (migration 017200); bản cũ chỉ có `top3` */
+export type HallFinisher = HallPerson & { times: number; first_at: string; best_s: number | null; bests?: HallBest[]; top3?: HallBest[] }
 export interface HallOfFame {
   marathon: HallFinisher[]
   half: HallFinisher[]

@@ -116,25 +116,25 @@ function Finishers({ title, emoji, rows }: { title: string; emoji: string; rows:
   )
 }
 
-/** 3 thành tích tốt nhất của một VĐV ở cự ly Full / Half */
+/** Mọi thành tích của một VĐV ở cự ly Full / Half (nhanh nhất trước) */
 function BestSheet({ title, person, onClose }: { title: string; person: HallFinisher; onClose: () => void }) {
-  const top = person.top3 ?? []
+  const top = person.bests ?? person.top3 ?? []
   return (
-    <Sheet open onClose={onClose} title={person.name} description={`3 thành tích ${title} tốt nhất · ${person.times} lần hoàn thành`}>
+    <Sheet open onClose={onClose} title={person.name} description={`${top.length} thành tích ${title}, nhanh nhất trước · ${person.times} lần hoàn thành`}>
       {top.length ? (
-        <ol className="space-y-2 pb-2">
+        <ol className="max-h-[60vh] space-y-2 overflow-y-auto pb-2">
           {top.map((b, i) => (
             <li key={`${b.at}-${i}`} className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5">
-              <span className={cn('w-6 text-center font-mono text-sm font-bold', MEDAL[i])}>{i + 1}</span>
+              <span className={cn('w-6 text-center font-mono text-sm font-bold', MEDAL[i] ?? 'text-fg-muted')}>{i + 1}</span>
               <span className="min-w-0 flex-1 text-sm text-fg-muted">{new Date(b.at).toLocaleDateString('vi-VN')} · {formatKm(b.km * 1000)} km</span>
               <span className="font-mono tabular font-bold">{formatDuration(b.best_s)}</span>
             </li>
           ))}
         </ol>
-      ) : person.top3 === undefined
-        ? <p className="py-6 text-center text-sm text-fg-muted">Dữ liệu Đại sảnh chưa được cập nhật trên máy chủ (cần chạy migration 016800).</p>
-        : <p className="py-6 text-center text-sm text-fg-muted">Chưa có bài chạy sát cự ly {title} (không quá +6%) để xếp thành tích. Nếu thiếu bài, hãy quét Strava từ 1/1/2026 ở đầu tab này.</p>}
-      <p className="pb-2 text-xs text-fg-subtle">Thời gian ước tính quy về đúng cự ly từ bài chạy sát mốc (≤ +6%).</p>
+      ) : person.bests === undefined && person.top3 === undefined
+        ? <p className="py-6 text-center text-sm text-fg-muted">Dữ liệu Đại sảnh chưa được cập nhật trên máy chủ (cần chạy migration 017200).</p>
+        : <p className="py-6 text-center text-sm text-fg-muted">Chưa có bài chạy sát cự ly {title} (sai số −1,5% đến +6%) để xếp thành tích. Nếu thiếu bài, hãy quét Strava từ 1/1/2026 ở đầu tab này.</p>}
+      <p className="pb-2 text-xs text-fg-subtle">Thời gian ước tính quy về đúng cự ly từ bài chạy sát mốc (sai số −1,5% đến +6%).</p>
     </Sheet>
   )
 }

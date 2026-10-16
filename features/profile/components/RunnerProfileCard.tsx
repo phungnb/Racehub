@@ -5,8 +5,8 @@ import { useQuery } from '@tanstack/react-query'
 import { Pencil } from 'lucide-react'
 import { Card, Skeleton } from '@/shared/ui'
 import { routes } from '@/shared/config/routes'
-import { fmtKm, fmtPace, getAthleteProfile, paceOf } from '../api/athleteApi'
-import { getMyProfile } from '../api/profileApi'
+import { fmtDuration, fmtKm, fmtPace, getAthleteProfile, paceOf } from '../api/athleteApi'
+import { getMyLongBests, getMyProfile, type LongBest } from '../api/profileApi'
 import { myProfileKey } from '../hooks/useRefreshProfile'
 import { ageInfo } from '../model/profileForm'
 
@@ -19,10 +19,30 @@ function Fact({ label, value }: { label: string; value: string }) {
   )
 }
 
+function BestList({ title, rows }: { title: string; rows: LongBest[] }) {
+  if (!rows.length) return null
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-bold">{title} · {rows.length} lần</p>
+      <ol className="max-h-56 space-y-1 overflow-y-auto">
+        {rows.map((b, i) => (
+          <li key={b.activity_id} className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-1.5 text-sm">
+            <span className={i === 0 ? 'w-5 text-center font-mono text-xs font-bold text-medal-gold' : 'w-5 text-center font-mono text-xs text-fg-subtle'}>{i + 1}</span>
+            <span className="min-w-0 flex-1 truncate text-xs text-fg-muted">{new Date(b.at).toLocaleDateString('vi-VN')} · {b.km.toLocaleString('vi-VN')} km</span>
+            <span className="font-mono tabular font-bold">{fmtDuration(b.best_s)}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
 /** Hồ sơ runner trong tab Nhân vật của trang Tôi: thông tin cơ thể, thành tích tổng và CLB đang tham gia */
 export function RunnerProfileCard({ userId }: { userId: string }) {
   const me = useQuery({ queryKey: myProfileKey, queryFn: getMyProfile })
   const ath = useQuery({ queryKey: ['athlete', userId], queryFn: () => getAthleteProfile(userId) })
+  // Chưa chạy migration 017200 thì bỏ qua mục này, không làm hỏng cả thẻ
+  const bests = useQuery({ queryKey: ['my-long-bests'], queryFn: getMyLongBests, retry: false })
   if (me.isPending || ath.isPending) return <Skeleton className="h-56" />
   const p = me.data
   const a = ath.data
@@ -52,6 +72,13 @@ export function RunnerProfileCard({ userId }: { userId: string }) {
         <div className="px-2 py-2.5"><p className="font-mono tabular text-lg font-bold">{all ? fmtPace(paceOf(all.distance_m, all.time_s)) : dash}</p><p className="text-[11px] text-fg-muted">pace TB /km</p></div>
       </div>
       {year && <p className="text-xs text-fg-muted">Năm nay: <b className="font-mono text-fg">{fmtKm(year.distance_m)} km</b> · {year.count} buổi</p>}
+      {(bests.data?.fm.length || bests.data?.hm.length) ? (
+        <div className="space-y-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-fg-subtle">Thành tích cá nhân</p>
+          <BestList title="Full Marathon" rows={bests.data.fm} />
+          <BestList title="Half Marathon" rows={bests.data.hm} />
+        </div>
+      ) : null}
       {!!a?.clubs?.length && (
         <p className="text-xs text-fg-muted">CLB: {a.clubs.map((c) => c.name).join(', ')}</p>
       )}

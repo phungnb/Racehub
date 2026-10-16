@@ -50,3 +50,13 @@ export function profileErrorMessage(e: unknown): string {
   const key = Object.keys(MESSAGES).sort((a, b) => b.length - a.length).find((k) => (err?.message ?? '').includes(k))
   return key ? MESSAGES[key] : systemErrorMessage(e, 'Không lưu được. Hãy thử lại.')
 }
+
+/** Thành tích Full / Half của chính mình (migration 017200): thời gian quy về đúng cự ly, nhanh nhất trước */
+export interface LongBest { best_s: number; at: string; km: number; activity_id: string; title: string | null }
+export interface MyLongBests { fm: LongBest[]; hm: LongBest[] }
+export async function getMyLongBests(): Promise<MyLongBests> {
+  const { data, error } = await supabase.rpc('my_long_bests')
+  if (error) throw error
+  const d = (data ?? {}) as Partial<MyLongBests>
+  return { fm: d.fm ?? [], hm: d.hm ?? [] }
+}
