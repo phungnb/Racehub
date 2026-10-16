@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { AtSign, Award, Bell, BellRing, BookOpen, CalendarDays, CheckCheck, Coins, Crown, Flag, Footprints, Gift, Hand, HandCoins, Heart, Images, Medal, Megaphone, MessageCircle, Newspaper, Radar, ShieldAlert, Shirt, Sparkles, Store, Swords, ThumbsUp, Ticket, Trash2, TrendingUp, Trophy, UserCheck, UserPlus, Vote, X, type LucideIcon } from 'lucide-react'
+import { AtSign, Award, Bell, BellOff, BellRing, BookOpen, CalendarDays, CheckCheck, Coins, Crown, Flag, Footprints, Gift, Hand, HandCoins, Heart, Images, Medal, Megaphone, MessageCircle, Newspaper, Radar, ShieldAlert, Shirt, Sparkles, Store, Swords, ThumbsUp, Ticket, Trash2, TrendingUp, Trophy, UserCheck, UserPlus, Vote, X, type LucideIcon } from 'lucide-react'
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { routes } from '@/shared/config/routes'
 import { usePush } from '../hooks/usePush'
 import { Avatar, Button, ConfirmSheet, EmptyState, ErrorState, Skeleton } from '@/shared/ui'
@@ -91,6 +92,30 @@ function PushPrompt() {
   )
 }
 
+/** Nút chuông ở đầu trang: bấm để tắt (chuông gạch xéo) hoặc bật lại thông báo đẩy trên thiết bị này */
+function PushToggle() {
+  const push = usePush()
+  const [busy, setBusy] = useState(false)
+  if (push.support !== 'ok' || push.subscribed === null) return null
+  const on = push.subscribed
+  const toggle = async () => {
+    setBusy(true)
+    try {
+      if (on) { await push.disable(); toast.success('Đã tắt thông báo đẩy trên thiết bị này') }
+      else if (await push.enable()) toast.success('Đã bật thông báo đẩy trên thiết bị này')
+      else toast.error('Bạn chưa cho phép thông báo. Mở cài đặt trình duyệt → Thông báo → Cho phép.')
+    } catch { toast.error('Không đổi được. Hãy thử lại.') } finally { setBusy(false) }
+  }
+  return (
+    <button type="button" onClick={() => void toggle()} disabled={busy} aria-pressed={on}
+      aria-label={on ? 'Tắt thông báo đẩy trên thiết bị này' : 'Bật thông báo đẩy trên thiết bị này'}
+      className={cn('grid size-11 place-items-center rounded-full border transition-colors disabled:opacity-50',
+        on ? 'border-brand/40 bg-brand/10 text-brand' : 'border-border text-fg-muted hover:bg-surface-2')}>
+      {on ? <Bell className="size-5" aria-hidden /> : <BellOff className="size-5" aria-hidden />}
+    </button>
+  )
+}
+
 export function NotificationsScreen() {
   const { data, isLoading, isError, error, refetch } = useNotifications()
   const markRead = useMarkNotificationsRead()
@@ -103,7 +128,8 @@ export function NotificationsScreen() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Thông báo</h1>
-        <span className="flex gap-1">
+        <span className="flex items-center gap-1">
+          <PushToggle />
           {unread > 0 && (
             <Button variant="ghost" size="sm" onClick={() => markRead.mutate(undefined)} loading={markRead.isPending}>
               <CheckCheck className="size-4" aria-hidden /> Đọc hết

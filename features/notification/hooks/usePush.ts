@@ -8,6 +8,10 @@ import { pushSupport, urlBase64ToUint8Array, type PushSupport } from '../model/p
 
 export const pushKeys = { settings: ['push-settings'] as const }
 
+// Nơi bật/tắt (cài đặt, trang Thông báo) báo cho nơi hiển thị (chuông trên thanh trên cùng) cập nhật theo
+const PUSH_EVENT = 'rh-push-changed'
+const announce = (on: boolean) => window.dispatchEvent(new CustomEvent<boolean>(PUSH_EVENT, { detail: on }))
+
 const noop = () => () => {}
 function readSupport(): PushSupport {
   const ua = navigator.userAgent
@@ -58,7 +62,9 @@ export function usePush() {
     if (support !== 'ok') return
     let alive = true
     currentSubscription().then((s) => { if (alive) setSubscribed(!!s) }).catch(() => { if (alive) setSubscribed(false) })
-    return () => { alive = false }
+    const onChange = (e: Event) => { if (alive) setSubscribed((e as CustomEvent<boolean>).detail) }
+    window.addEventListener(PUSH_EVENT, onChange)
+    return () => { alive = false; window.removeEventListener(PUSH_EVENT, onChange) }
   }, [support])
 
   const enable = useCallback(async () => {
@@ -67,6 +73,7 @@ export function usePush() {
     if (p !== 'granted') return false
     await subscribeThisDevice()
     setSubscribed(true)
+    announce(true)
     void qc.invalidateQueries({ queryKey: pushKeys.settings })
     return true
   }, [qc])
@@ -74,6 +81,7 @@ export function usePush() {
   const disable = useCallback(async () => {
     await unsubscribeThisDevice()
     setSubscribed(false)
+    announce(false)
     void qc.invalidateQueries({ queryKey: pushKeys.settings })
   }, [qc])
 
