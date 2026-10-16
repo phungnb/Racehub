@@ -1,7 +1,7 @@
--- RaceHub: gộp 137 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
+-- RaceHub: gộp 138 migration (tạo tự động bằng scripts/db-bundle.mjs — KHÔNG sửa tay).
 -- Cách chạy: Supabase → SQL Editor → New query → dán TOÀN BỘ file → Run.
 -- Chạy trong một giao dịch: lỗi ở bất kỳ đâu thì không có gì thay đổi. Chạy lại nhiều lần vẫn an toàn.
--- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 015800, 015900, 016000, 016100, 016200, 016300, 016400, 016500, 016600, 016700, 016800, 016900, 017000, 017100, 017200, 003500
+-- Gồm: 003700, 003800, 003900, 004000, 004100, 004200, 004300, 004400, 004500, 004600, 004700, 004800, 004900, 005000, 005100, 005200, 005300, 005400, 005500, 005600, 005700, 005800, 005900, 006000, 006100, 006200, 006300, 006400, 006500, 006600, 006700, 006800, 006900, 007000, 007100, 007200, 007300, 007400, 007500, 007600, 007700, 007800, 007900, 008000, 008100, 008200, 008300, 008400, 008500, 008600, 008700, 008800, 008900, 009000, 009100, 009200, 009300, 009400, 009500, 009600, 009700, 009800, 009900, 010000, 010100, 010200, 010300, 010400, 010500, 010600, 010700, 010800, 010900, 011000, 011100, 011200, 011300, 011400, 011500, 011600, 011700, 011800, 011900, 012000, 012100, 012200, 012300, 012400, 012500, 012600, 012700, 012800, 012900, 013000, 013100, 013200, 013300, 013400, 013500, 013600, 013700, 013800, 013900, 014000, 014100, 014200, 014300, 014400, 014500, 014600, 014700, 014800, 014900, 015000, 015100, 015200, 015300, 015400, 015500, 015600, 015700, 015800, 015900, 016000, 016100, 016200, 016300, 016400, 016500, 016600, 016700, 016800, 016900, 017000, 017100, 017200, 017300, 003500
 begin;
 -- ===================================================================
 -- 20261001003700_economy_v2.sql
@@ -31140,6 +31140,60 @@ grant execute on function public.my_long_bests() to authenticated;
 notify pgrst, 'reload schema';
 
 -- ===================================================================
+-- 20261001017300_strava_scan_auto.sql
+-- ===================================================================
+-- 017300: Quét Strava từ 1/1/2026 tự chạy, không cần ai bấm.
+-- Việc quét (strava_scan_jobs, 017100) được tạo tự động cho mọi người VỪA đã nối Strava VỪA là thành viên đã duyệt của một CLB:
+--   • chạy một lần ngay trong migration này cho thành viên hiện có;
+--   • trigger khi một người được duyệt vào CLB (kể cả chủ nhiệm CLB mới lập) hoặc nối Strava;
+--   • việc đang FAILED (hết hạn Strava) tự về PENDING khi người đó nối lại.
+-- Nút "Bật quét tự động" của ban quản trị vẫn dùng được (an toàn, không tạo trùng).
+create or replace function public.strava_scan_enqueue(p_user_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if p_user_id is null then return; end if;
+  if not exists (select 1 from public.connected_accounts c where c.user_id = p_user_id and c.provider = 'STRAVA') then return; end if;
+  if not exists (select 1 from public.club_members m where m.user_id = p_user_id and m.status = 'APPROVED') then return; end if;
+  insert into public.strava_scan_jobs (user_id, since)
+  values (p_user_id, '2026-01-01T00:00:00+07:00')
+  on conflict (user_id) do update
+     set status = 'PENDING', next_page = 1, note = null, updated_at = now()
+   where public.strava_scan_jobs.status = 'FAILED';
+end $$;
+revoke all on function public.strava_scan_enqueue(uuid) from public, anon, authenticated;
+
+create or replace function public.strava_scan_enqueue_on_member() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.status = 'APPROVED' then perform public.strava_scan_enqueue(new.user_id); end if;
+  return new;
+end $$;
+
+create or replace function public.strava_scan_enqueue_on_connect() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.provider = 'STRAVA' then perform public.strava_scan_enqueue(new.user_id); end if;
+  return new;
+end $$;
+revoke all on function public.strava_scan_enqueue_on_member() from public, anon, authenticated;
+revoke all on function public.strava_scan_enqueue_on_connect() from public, anon, authenticated;
+
+drop trigger if exists strava_scan_on_member on public.club_members;
+create trigger strava_scan_on_member after insert or update of status on public.club_members
+  for each row execute function public.strava_scan_enqueue_on_member();
+drop trigger if exists strava_scan_on_connect on public.connected_accounts;
+create trigger strava_scan_on_connect after insert or update on public.connected_accounts
+  for each row execute function public.strava_scan_enqueue_on_connect();
+
+-- Thành viên hiện có
+select public.strava_scan_enqueue(u.user_id)
+  from (select distinct m.user_id from public.club_members m
+          join public.connected_accounts c on c.user_id = m.user_id and c.provider = 'STRAVA'
+         where m.status = 'APPROVED') u;
+
+notify pgrst, 'reload schema';
+
+-- ===================================================================
 -- 20261001003500_system_check.sql
 -- ===================================================================
 -- 003500: Trang "Kiểm tra hệ thống" cho admin.
@@ -31489,7 +31543,9 @@ begin
     jsonb_build_object('file', '20261001017100', 'label', 'Quét Strava nền cho CLB (từ 1/1/2026)',
       'ok', to_regclass('public.strava_scan_jobs') is not null and to_regprocedure('public.club_request_strava_scan(uuid,timestamptz)') is not null),
     jsonb_build_object('file', '20261001017200', 'label', 'Thành tích Full/Half đầy đủ, nới sai số cự ly, hồ sơ runner',
-      'ok', to_regprocedure('public.my_long_bests()') is not null and position('bests' in pg_get_functiondef(to_regprocedure('public.club_hall_of_fame(uuid)'))) > 0));
+      'ok', to_regprocedure('public.my_long_bests()') is not null and position('bests' in pg_get_functiondef(to_regprocedure('public.club_hall_of_fame(uuid)'))) > 0),
+    jsonb_build_object('file', '20261001017300', 'label', 'Quét Strava tự chạy cho thành viên CLB',
+      'ok', to_regprocedure('public.strava_scan_enqueue(uuid)') is not null));
 
   v_buckets := (select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'ok', s.id is not null,
                    'limit_mb', round(coalesce(s.file_size_limit, 0) / 1048576.0, 1)) order by b.id), '[]'::jsonb)

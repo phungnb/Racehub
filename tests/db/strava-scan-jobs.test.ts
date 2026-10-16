@@ -25,9 +25,9 @@ describe('Quét Strava nền (017100)', () => {
   let db: PGlite
   beforeAll(async () => { db = await createDb({ withMigrations: true, runMigrationsTwice: true, seed }) }, 240_000)
 
-  it('ban quản trị bật quét: chỉ thành viên đã nối Strava có việc; bật lại không tạo trùng', async () => {
+  it('ban quản trị bật quét: chỉ thành viên đã nối Strava có việc (017300 đã tự tạo sẵn); bật lại không tạo trùng', async () => {
     const r = (await asUser<{ r: Row }>(db, OWNER, '/rpc', `select public.club_request_strava_scan($1) as r`, [CLUB])).rows[0].r
-    expect(r).toMatchObject({ members: 3, connected: 1, pending: 1, queued: 1 })
+    expect(r).toMatchObject({ members: 3, connected: 1, pending: 1, queued: 0 })
     const again = (await asUser<{ r: Row }>(db, OWNER, '/rpc', `select public.club_request_strava_scan($1) as r`, [CLUB])).rows[0].r
     expect(again).toMatchObject({ pending: 1, queued: 0 })
   })
