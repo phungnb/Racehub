@@ -43,7 +43,7 @@ export function ClubStravaScan({ clubId, onDone }: { clubId: string; onDone?: ()
     <Card className="space-y-2">
       <p className="flex items-center gap-2 text-sm font-bold"><Users className="size-4 text-brand" aria-hidden />Quét Strava cho cả CLB (ban quản trị)</p>
       <p className="text-xs text-fg-muted">
-        Lấy toàn bộ bài chạy từ 1/1/2026 của thành viên đã nối Strava, chạy nền và chia nhỏ theo thời gian để không chạm giới hạn Strava (mỗi lần thành viên mở app, và hằng đêm).
+        Tự lấy toàn bộ bài chạy từ 1/1/2026 của thành viên đã nối Strava (thành viên mới và CLB mới lập cũng tự được quét), chạy nền và chia nhỏ theo thời gian để không chạm giới hạn Strava (mỗi lần thành viên mở app, và hằng đêm).
         {' '}{s.connected}/{s.members} thành viên đã nối Strava.
         {started > 0 && ` Đã xong ${s.done}, đang chờ ${s.pending}${s.failed ? `, lỗi ${s.failed} (cần nối lại Strava)` : ''} · nhập ${s.imported} bài.`}
       </p>
