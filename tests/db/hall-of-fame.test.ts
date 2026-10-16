@@ -49,8 +49,8 @@ describe('Đại sảnh danh vọng + cột mốc (007800)', () => {
     expect(h.marathon.map((x: Row) => x.name)).toEqual(['Minh Anh'])
     expect(h.half.map((x: Row) => x.name).sort()).toEqual(['Minh Anh', 'Quốc Bảo'])
     // 20261001016800: top3 thành tích Full/Half quy về đúng cự ly; Km năm liệt kê mọi thành viên đã duyệt
-    expect(h.marathon[0].top3).toEqual([expect.objectContaining({ best_s: Math.round(230 * 60 * 42195 / 42400) })])
-    expect(h.half.find((x: Row) => x.name === 'Quốc Bảo').top3.length).toBe(2)
+    expect(h.marathon[0].bests).toEqual([expect.objectContaining({ best_s: Math.round(230 * 60 * 42195 / 42400) })])
+    expect(h.half.find((x: Row) => x.name === 'Quốc Bảo').bests.length).toBe(2)
     expect(h.year.map((y: Row) => y.name).sort()).toEqual(['Minh Anh', 'Quốc Bảo'])
     const fk = h.records.find((r: Row) => r.label === '5K' && r.rank === 1)
     expect(fk).toMatchObject({ name: 'Minh Anh', best_s: Math.round(1500 * 5000 / 5100) })
