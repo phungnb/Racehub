@@ -19,3 +19,18 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# --- RaceHub: luật cho R8 (minifyEnabled true) ---
+# Capacitor tự kèm luật giữ plugin (@CapacitorPlugin, extends Plugin, @PluginMethod).
+# Giữ thêm rõ ràng các plugin đang dùng + cầu JS để R8 không đổi tên/xóa (gọi qua reflection):
+-keep class com.getcapacitor.** { *; }
+-keep class com.equimaps.capacitor_background_geolocation.** { *; }
+-keep class com.getcapacitor.community.tts.** { *; }
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+# Giữ số dòng để đọc stack trace trong Play Console (kèm file mapping tự tải lên cùng AAB)
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+-dontwarn org.apache.cordova.**

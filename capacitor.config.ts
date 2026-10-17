@@ -30,7 +30,8 @@ const config: CapacitorConfig = {
   android: {
     // Plugin GPS nền: không có dòng này Android dừng cập nhật vị trí sau 5 phút chạy nền
     useLegacyBridge: true,
-    adjustMarginsForEdgeToEdge: 'auto',
+    // 'force': MainActivity bật edge-to-edge trên mọi phiên bản Android, WebView luôn được đệm theo thanh hệ thống
+    adjustMarginsForEdgeToEdge: 'force',
   },
   ios: {
     contentInset: 'never',
